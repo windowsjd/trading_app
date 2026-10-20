@@ -5,7 +5,7 @@ import { describe, it } from 'node:test';
 // The device-side check (scripts/android-layout-check.cjs): its parsing of real
 // `dumpsys window` / `uiautomator dump` shapes, so a device run reports truly.
 const require = createRequire(import.meta.url);
-const { parseNavigationBar, parseNodes, measureAction, measureFooter, diagnose } = require('../../scripts/android-layout-check.cjs');
+const { parseNavigationBar, parseNodes, parseHierarchy, measureAction, measureFooter, diagnose } = require('../../scripts/android-layout-check.cjs');
 
 // Android 14 (InsetsSource id=… type=navigationBars), 3-button bar 126 px at 2.625x.
 const ANDROID_14 = `
@@ -37,6 +37,23 @@ const DUMP = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy
 </hierarchy>`;
 
 describe('Android bottom-action check (adb)', () => {
+  it('rejects a null-root dump even if an old XML would report clear buttons', () => {
+    let reads = 0;
+    assert.throws(() => parseHierarchy('ERROR: null root node returned by UiTestAutomationBridge.', () => {
+      reads++;
+      return DUMP;
+    }), /null root node/);
+    assert.equal(reads, 0, 'never reads stale XML after a failed dump');
+    assert.throws(() => parseHierarchy('', () => '<hierarchy rotation="0"></hierarchy>'), /no measurable nodes/);
+    assert.equal(parseHierarchy('UI hierchary dumped to: /sdcard/tc-layout-check.xml', () => DUMP).length, 5);
+  });
+  it('cannot pass missing actions or label-only bounds as verified touch areas', () => {
+    const label = node({ text: '매도하기', clickable: 'false', bounds: '[36,2000][531,2050]' });
+    const action = measureAction(parseNodes(label), '매도하기', parseNavigationBar(ANDROID_14), 420);
+    assert.deepEqual([action.found, action.clickable, action.overlaps], [true, false, false]);
+    assert.equal(diagnose([action], { found: false }), 'unavailable: clickable action bounds missing');
+    assert.equal(diagnose([{ found: false }], { found: false }), 'unavailable: clickable action bounds missing');
+  });
   it('reads the navigation bar frame most windows report, ignoring hidden ones, in both dumpsys formats', () => {
     assert.deepEqual(parseNavigationBar(ANDROID_14), { left: 0, top: 2274, right: 1080, bottom: 2400 });
     assert.deepEqual(parseNavigationBar(ANDROID_12), { left: 0, top: 2337, right: 1080, bottom: 2400 });
@@ -59,7 +76,7 @@ describe('Android bottom-action check (adb)', () => {
     assert.deepEqual(measureAction(nodes, '없는 버튼', bar, 420), { label: '없는 버튼', found: false });
   });
 
-  it('reads the bottom inset the app applied from the order bar and names what went wrong', () => {
+  it('reports effective clearance without treating inferred padding as the actual hook inset', () => {
     const nodes = parseNodes(DUMP);
     const bar = parseNavigationBar(ANDROID_14);
     const actions = ['매도하기', '매수하기'].map((label) => measureAction(nodes, label, bar, 420));
@@ -67,10 +84,10 @@ describe('Android bottom-action check (adb)', () => {
     const footer = measureFooter(nodes, 'asset-order-actions', actions, bar, 420);
     assert.deepEqual([footer.found, footer.bounds.join(','), footer.paddingBelowActionsDp, footer.appBottomInsetDp, footer.navigationBarDp, footer.overrunPx],
       [true, '0,2170,1080,2400', 20.6, 12.6, 48, 0]);
-    assert.equal(diagnose(actions, footer), "the app's bottom inset (12.6dp) is smaller than the navigation bar (48dp)");
+    assert.equal(diagnose(actions, footer), 'inferred bottom clearance (12.6dp) is smaller than the navigation bar (48dp): measure insets.bottom and child overflow');
     // The same bar with no inset at all (8dp under the actions).
     const bare = { ...footer, paddingBelowActionsDp: 8, appBottomInsetDp: 0 };
-    assert.equal(diagnose(actions, bare), 'the app applied no bottom inset (insets.bottom = 0)');
+    assert.equal(diagnose(actions, bare), 'no effective bottom clearance: measure insets.bottom and child overflow');
     // A full inset, but the screen ends 63px below the display (status bar height).
     assert.equal(diagnose(actions, { ...footer, appBottomInsetDp: 48, overrunPx: 63 }), 'screen reaches 63px past the display bottom');
     // Actions ending above the bar: clear, whatever the bar's padding.

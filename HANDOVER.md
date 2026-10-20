@@ -1,5 +1,14 @@
 # 프로젝트 인수인계서
 
+## 2026-10-20 — 국내·미국주식/암호화폐 현물 상세 Android 하단 CTA 높이 수정 (실기기 미검증)
+
+- **시작:** fetch한 origin/main = HEAD `26dbe0ab12e44a71d8ab67c281224908b170d324`, 작업 트리 clean. 기존 병행 worktree 보존. 작업 브랜치 `fix/asset-detail-android-footer-20261020`.
+- **재현된 코드 원인:** footer의 가로 너비를 나누는 QuestTarget 안쪽 CTA에도 `flex:1`이 있어, 네이티브 기본 Yoga가 세로 basis 0으로 부모 슬롯 높이를 과소 계산했다. 실제 스타일 재현에서 슬롯 28dp/CTA 50dp → 내용이 22dp 넘쳐 정상 inset 48dp여도 겹침. 이전 Safe Area/inset 테스트는 패딩 값만 확인해 내부 overflow를 놓쳤다. 사용자 기기의 유일한 원인인지는 실측 전 확정하지 않는다.
+- **수정:** 공통 AssetDetailScreen 한 곳에서 너비 flex를 QuestTarget에만 두고 CTA 세로 flex 제거. `8+insets.bottom`, 차트/ScrollView, 주문·퀘스트·종목 선택·계정 연결 그대로. 정상 선물은 원래 내부 CTA flex가 없으며 소스 변경 없음.
+- **검증:** typecheck·accounts lint PASS. 관련 8개 파일 68개 및 후속 ADB 파일 5개 PASS(중복 제외 69개). 세 시장 각각 진입·주문 경로·장외/상시·캔들 로딩/오류·긴 이름/큰 가격·계정 전환·초보 잠금 확인. 실제 footer/CTA 스타일 Yoga 432개 비교: 수정 216개 여백 8dp·텍스트/캡션 포함 슬롯 내, 내부 flex 복원 216개 겹침 재현. 기기 좌표 아님. UIAutomator null-root는 과거 XML 미사용·스크린샷 우선 저장·검증 불가 exit 2, 라벨만 찾은 경우도 불합격. 경계로 역산한 inset을 실제 hook 값으로 단정하지 않도록 진단 보완.
+- **미완료:** ADB/연결 기기·에뮬레이터 없음. Android 3버튼/제스처·SM-S936N 실제 수정 전후 좌표·스크린샷·재실행·OS 배율·iOS·실제 차트 터치 검증 NOT_RUN. 코드 수정 완료와 실기기 해결 확인을 구분한다. 운영 배포·main 병합 없음.
+- **자체 검토:** 전체 diff·공백·테스트 대형 객체 actual 위험 검토, 검증 삭제/skip·임의 패딩·새 라이브러리·금융/백엔드/API 변경 없음. [상세 보고서 및 실기기 잔여 절차](frontend/docs/asset-detail-android-footer-2026-10-20.md).
+
 ## 2026-10-20 — 종목 상세 검색 시트 보완·흐릿한 국내 로고 제외(LG전자 포함)·MY 프로필 편집 이전·상세 매도하기/매수하기 (프런트, `[skip render]`)
 
 - 기준 HEAD/origin/main `9ed671c2`(원격과 동일 확인). 프런트·문서만 변경, 백엔드·DB·운영 환경변수 변경 없음. 운영 배포 안 함(커밋 `[skip render]`).

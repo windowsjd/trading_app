@@ -8,6 +8,7 @@ import { ASSET_CHART_TIMEFRAMES } from '../../features/asset/chartTimeframes.ts'
 const { inlineTradingHarness, act, deferred } = createRequire(import.meta.url)(
   '../../../test/inlineTradingHarness.cjs',
 );
+const { questProgress } = createRequire(import.meta.url)('../../../test/questFixtures.ts');
 const text = (h: any) => JSON.stringify(h.renderer.toJSON());
 const chart = (h: any) => h.renderer.root.findByType('CandlestickChart').props;
 
@@ -124,7 +125,11 @@ test('320px and large text keep both order actions flexible below the chart', as
   t.after(h.close);
   for (const [id, color] of [[TEST_IDS.assetDetail.openBuyOrder, financial.buyAction], [TEST_IDS.assetDetail.openSellOrder, financial.sellAction]]) {
     const action = h.node(id);
-    assert.equal(action.props.style.flex, 1);
+    // QuestTarget shares the row's width; the nested CTA must size itself
+    // vertically, including enlarged text and the beginner caption.
+    assert.equal(action.parent.props.style.flex, 1);
+    assert.equal(action.parent.props.style.minWidth, 0);
+    assert.equal(action.props.style.flex === undefined, true);
     assert.equal(action.props.style.minWidth, 0);
     assert.equal(action.props.style.backgroundColor, color);
     assert.ok(action.props.style.minHeight >= 48);
@@ -154,6 +159,87 @@ test('the order bar follows the inset it is given, never a fixed gap (3-button 4
     assert.equal(h.node('asset-order-actions').props.style.paddingBottom, 8 + bottom, `${bottom}dp inset`);
   }
 });
+
+for (const assetType of ['domestic_stock', 'us_stock', 'crypto'] as const) {
+  test(`${assetType}: footer stays outside loading/error/long content and order routes follow the current account`, async (t) => {
+    const h = inlineTradingHarness();
+    Object.assign(h.assets.bnb, {
+      assetType, name: '아주 긴 종목 이름 Example Holdings International',
+      symbol: assetType === 'domestic_stock' ? '005930' : assetType === 'us_stock' ? 'AAPL' : 'BNBUSDT',
+      market: assetType === 'domestic_stock' ? 'KRX' : assetType === 'us_stock' ? 'NAS' : 'BINANCE',
+    });
+    h.assets.bnb.price.currentPrice = '123456789.1234';
+    h.safeAreaInsets = { top: 24, bottom: 48, left: 0, right: 0 };
+    h.realCandles = true;
+    const candles = deferred();
+    h.getAssetCandles = () => candles.promise;
+    await openDetail(h); t.after(h.close);
+    const assertFooter = () => {
+      const footer = h.node('asset-order-actions');
+      const scroll = h.node(TEST_IDS.assetDetail.screen);
+      // The scroll viewport and fixed bar occupy separate sibling slots.
+      let scrollSlot = scroll;
+      while (scrollSlot.parent && scrollSlot.parent !== footer.parent) scrollSlot = scrollSlot.parent;
+      assert.equal(scrollSlot.parent === footer.parent, true);
+      assert.equal(scrollSlot.props.style.flex, 1);
+      assert.equal(scrollSlot === footer, false);
+      assert.equal(footer.props.style.flexShrink, 0);
+      assert.equal(footer.props.style.paddingBottom, 8 + h.safeAreaInsets.bottom);
+      for (const id of [TEST_IDS.assetDetail.openSellOrder, TEST_IDS.assetDetail.openBuyOrder]) {
+        const action = h.node(id);
+        assert.equal(action !== undefined, true);
+        assert.equal(action.parent.props.style.flex, 1);
+        assert.equal(action.props.style.flex === undefined, true);
+      }
+    };
+    assert.equal(h.renderer.root.findAllByType('ChartLoading').length, 1);
+    assertFooter();
+    await act(async () => candles.reject(new Error('candle read failed')));
+    await h.flush();
+    assert.equal(h.node(TEST_IDS.assetDetail.chartRetry) !== undefined, true);
+    assertFooter();
+    h.getAssetCandles = async () => ({ interval: '5m', candles: [
+      { time: '2026-09-19T00:00:00Z', open: '760', high: '770', low: '750', close: '765', volume: '100' },
+    ] });
+    await h.press(TEST_IDS.assetDetail.chartRetry);
+    await h.flush();
+    for (const marketStatus of assetType === 'crypto' ? ['always_open'] : ['open', 'closed']) {
+      h.assets.bnb.marketStatus = marketStatus;
+      await h.update();
+      assert.equal(chart(h).candles.length > 0, true);
+      assertFooter();
+      for (const [side, id] of [['sell', TEST_IDS.assetDetail.openSellOrder], ['buy', TEST_IDS.assetDetail.openBuyOrder]]) {
+        await h.press(id);
+        assert.deepEqual(h.navigation.at(-1), ['Order', { assetId: 'bnb', accountId: h.accountId, side }]);
+      }
+    }
+    h.focused = false; await h.update();
+    h.focused = true;
+    h.accountId = 'season';
+    h.safeAreaInsets.bottom = 24;
+    await h.update();
+    assertFooter();
+    await h.press(TEST_IDS.assetDetail.openBuyOrder);
+    assert.deepEqual(h.navigation.at(-1), ['Order', { assetId: 'bnb', accountId: 'season', side: 'buy' }]);
+  });
+
+  test(`${assetType}: beginner buy guard and caption keep their intrinsic height contract`, async (t) => {
+    const h = inlineTradingHarness();
+    h.assets.bnb.assetType = assetType;
+    h.accountId = 'beginner-1';
+    h.accounts = [{ id: 'beginner-1', mode: 'beginner', status: 'active' }];
+    h.questProgress = questProgress(0);
+    await openDetail(h); t.after(h.close);
+    const buy = h.node(TEST_IDS.assetDetail.openBuyOrder);
+    assert.equal(typeof buy.props.learningHint, 'string');
+    assert.equal(buy.props.style.flex === undefined, true);
+    await h.press(TEST_IDS.assetDetail.openBuyOrder);
+    assert.equal(h.navigation.length, 0, 'locked buy cannot navigate');
+    assert.equal(h.alerts.length, 1, 'the existing guard explains the lock');
+    await h.press(TEST_IDS.assetDetail.openSellOrder);
+    assert.deepEqual(h.navigation, [['Order', { assetId: 'bnb', accountId: 'beginner-1', side: 'sell' }]]);
+  });
+}
 
 test('detail candle diagnostics stay admin only', async (t) => {
   const user = inlineTradingHarness();

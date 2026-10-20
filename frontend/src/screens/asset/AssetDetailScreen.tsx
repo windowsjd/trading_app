@@ -104,14 +104,14 @@ export function AssetDetailContent({
         />
       </View>
       <View style={{ ...styles.footer, paddingBottom: styles.footer.paddingBottom + insets.bottom }} testID="asset-order-actions">
-        <QuestTarget id="asset-sell" style={{ flex: 1 }}><CTAButton
+        <QuestTarget id="asset-sell" style={styles.actionSlot}><CTAButton
           testID={TEST_IDS.assetDetail.openSellOrder}
           label="매도하기"
           state={accountId ? 'enabled' : 'disabled'}
           onPress={() => openOrder('sell')}
           style={{ ...styles.action, backgroundColor: SELL_COLOR }}
         /></QuestTarget>
-        <QuestTarget id="asset-buy" style={{ flex: 1 }}><CTAButton
+        <QuestTarget id="asset-buy" style={styles.actionSlot}><CTAButton
           testID={TEST_IDS.assetDetail.openBuyOrder}
           label="매수하기"
           state={accountId ? 'enabled' : 'disabled'}
@@ -139,5 +139,10 @@ const styles = StyleSheet.create({
     borderTopColor: semantic.border,
     backgroundColor: semantic.surface,
   },
-  action: { flex: 1, minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
+  // Only the row's slots flex (horizontally). A flex: 1 button inside the
+  // column-shaped QuestTarget gets a zero vertical basis in native Yoga:
+  // the footer measures less than the button's actual minimum/text height.
+  // Let the button (or its learning caption group) set the slot's height.
+  actionSlot: { flex: 1, minWidth: 0 },
+  action: { minWidth: 0, minHeight: 50, paddingHorizontal: 8 },
 });

@@ -11,8 +11,8 @@
 // navigation bar's inset frame from `dumpsys window`, each action's clickable
 // bounds from `uiautomator dump`, and the gap between them in px and dp. The
 // order bar (`asset-order-actions`) pads itself by 8dp + the app's bottom
-// inset, so its bounds give the inset the app actually used and whether the
-// screen reaches past the display: the diagnosis names which one went wrong.
+// inset. Bounds give an inferred inset only: children overflowing their measured
+// slots can consume that padding even when useSafeAreaInsets is correct.
 // Exit code: 0 all clear, 1 an action reaches into the navigation bar,
 // 2 nothing to compare (no device, screen not open, bar not found).
 const { execFileSync } = require('node:child_process');
@@ -52,6 +52,16 @@ function parseNodes(xml) {
   }).filter(Boolean);
 }
 
+// Android can return exit 0 with "ERROR: null root node ..." and leave an old
+// XML behind. Never accept that stale hierarchy as evidence for this screen.
+function parseHierarchy(dumpOutput, readXml) {
+  if (/ERROR:|null root node/iu.test(dumpOutput)) throw new Error(dumpOutput.trim());
+  const xml = readXml();
+  const nodes = parseNodes(xml);
+  if (!/<hierarchy\b/u.test(xml) || nodes.length === 0) throw new Error('UI hierarchy has no measurable nodes.');
+  return nodes;
+}
+
 /** An action's touch area: its clickable (accessibility) node, else the label's own node; and its gap to the bar. */
 function measureAction(nodes, label, nav, density) {
   const matches = nodes.filter((node) => node.text === label || node.description === label || node.description.startsWith(`${label},`));
@@ -67,8 +77,9 @@ const toDp = (px, density) => Math.round((px / (density / 160)) * 10) / 10;
 
 /**
  * The bar holding the actions: its padding below them is 8dp + the bottom
- * inset the app applied, and its bottom should meet the display's bottom
- * (the navigation bar's bottom edge).
+ * inset when its children fit their measured slots. This is an inference,
+ * not a measurement of useSafeAreaInsets. Its bottom should meet the
+ * display's bottom (the navigation bar's bottom edge).
  */
 function measureFooter(nodes, id, actions, nav, density) {
   const footer = nodes.filter((node) => node.id === id)
@@ -87,14 +98,15 @@ function measureFooter(nodes, id, actions, nav, density) {
   };
 }
 
-/** Which part failed when an action overlaps: the inset the app got, or the screen's frame. */
+/** Bounds alone cannot distinguish a missing inset from overflowing children. */
 function diagnose(actions, footer) {
+  if (actions.some((action) => !action.found || !action.clickable)) return 'unavailable: clickable action bounds missing';
   if (!actions.some((action) => action.overlaps)) return 'clear';
   if (!footer.found || footer.navigationBarDp === null) return 'overlap (order bar not found: no cause)';
   if (footer.overrunPx > 0) return `screen reaches ${footer.overrunPx}px past the display bottom`;
-  if (footer.appBottomInsetDp < 1) return 'the app applied no bottom inset (insets.bottom = 0)';
+  if (footer.appBottomInsetDp < 1) return 'no effective bottom clearance: measure insets.bottom and child overflow';
   if (footer.appBottomInsetDp < footer.navigationBarDp - 1) {
-    return `the app's bottom inset (${footer.appBottomInsetDp}dp) is smaller than the navigation bar (${footer.navigationBarDp}dp)`;
+    return `inferred bottom clearance (${footer.appBottomInsetDp}dp) is smaller than the navigation bar (${footer.navigationBarDp}dp): measure insets.bottom and child overflow`;
   }
   return 'overlap with a full inset and an in-bounds screen: compare the screenshot';
 }
@@ -133,11 +145,18 @@ function main() {
   const pkg = shell(`dumpsys package ${PACKAGE}`);
   const field = (name) => new RegExp(`${name}=([^\\s]+(?: [0-9:]+)?)`).exec(pkg)?.[1] ?? null;
   const nav = parseNavigationBar(shell('dumpsys window'));
-  shell('uiautomator dump /sdcard/tc-layout-check.xml');
-  const nodes = parseNodes(adb(['exec-out', 'cat /sdcard/tc-layout-check.xml']));
+  // Capture first: UiTestAutomationBridge may fail on this device.
+  if (screenshot) fs.writeFileSync(screenshot, adb(['exec-out', 'screencap -p'], true));
+  let nodes = [], measurementError = null;
+  try {
+    shell('rm -f /sdcard/tc-layout-check.xml');
+    const output = shell('uiautomator dump /sdcard/tc-layout-check.xml');
+    nodes = parseHierarchy(output, () => adb(['exec-out', 'cat /sdcard/tc-layout-check.xml']));
+  } catch (error) {
+    measurementError = error.message;
+  }
   const actions = labels.map((label) => measureAction(nodes, label, nav, density));
   const footer = measureFooter(nodes, option('footer', FOOTER_ID), actions, nav, density);
-  if (screenshot) fs.writeFileSync(screenshot, adb(['exec-out', 'screencap -p'], true));
 
   console.log(JSON.stringify({
     device: { serial, model: shell('getprop ro.product.model'), android: shell('getprop ro.build.version.release'),
@@ -146,14 +165,20 @@ function main() {
     navigationBar: nav && { ...nav, heightPx: nav.bottom - nav.top, heightDp: toDp(nav.bottom - nav.top, density) },
     actions,
     footer,
-    diagnosis: nav ? diagnose(actions, footer) : null,
+    // appBottomInsetDp is retained for existing consumers; it is an inference
+    // from visible bounds, not a read of the hook's value.
+    insetMeasurement: 'inferred from bounds; child overflow can reduce it',
+    measurementError,
+    diagnosis: measurementError ? 'unavailable: UI hierarchy extraction failed' : nav ? diagnose(actions, footer) : null,
     screenshot,
   }, null, 2));
+  if (measurementError) fail(2, 'UI hierarchy unavailable: use the screenshot and native layout measurements; this is not a passing check.');
   if (!nav) fail(2, 'Navigation bar frame not found in dumpsys window (Android 11+ reports InsetsSource navigationBars).');
   if (actions.some((action) => !action.found)) fail(2, `Not on screen: ${actions.filter((a) => !a.found).map((a) => a.label).join(', ')} — open the screen first.`);
+  if (actions.some((action) => !action.clickable)) fail(2, 'Only label bounds found: the button touch areas have not been verified.');
   if (actions.some((action) => action.overlaps)) fail(1, 'An action reaches into the navigation bar.');
   console.log(`OK: every action ends above the navigation bar (${navMode}).`);
 }
 
 if (require.main === module) main();
-module.exports = { parseNavigationBar, parseNodes, measureAction, measureFooter, diagnose };
+module.exports = { parseNavigationBar, parseNodes, parseHierarchy, measureAction, measureFooter, diagnose };
