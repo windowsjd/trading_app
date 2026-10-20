@@ -477,6 +477,131 @@ describe('RankingService', () => {
     expectNoRankingWrites(prisma);
   });
 
+  describe('anchor=me (scope all)', () => {
+    // 1,000 published rows; my rank is 652 but three participants above me are
+    // hidden or excluded, so my row is the 650th public row (offset 649).
+    const mockAnchoredRanking = (prisma: ReturnType<typeof createPrisma>) => {
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+        rankingDate,
+        capturedAt,
+      });
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+        id: 'sp-652',
+        participantStatus: ParticipantStatus.active,
+        rankingHiddenAt: null,
+      });
+      prisma.seasonRanking.count
+        .mockResolvedValueOnce(1000)
+        .mockResolvedValueOnce(649);
+      const page = [rankingRow(652), rankingRow(653)];
+      mockRankingRows(prisma, page);
+      const myScope = rankingScopeFor('sp-652', 'user-652');
+      prisma.seasonRanking.findUnique.mockResolvedValueOnce({
+        ...myScope,
+        id: 'ranking-sp-652',
+        rank: 652,
+        totalAssetKrw: new Prisma.Decimal('999348.00000000'),
+        returnRate: new Prisma.Decimal('-0.65000000'),
+        maxDrawdown: new Prisma.Decimal('3.00000000'),
+        totalFillCount: 4,
+        reachedReturnAt: null,
+        capturedAt,
+        seasonParticipant: { ...myScope.seasonParticipant, finalTier: null },
+      });
+    };
+
+    it('starts the page at my own row, counted among the public rows of the same snapshot', async () => {
+      const { prisma, service } = createService();
+      mockCurrentSeason(prisma);
+      mockAnchoredRanking(prisma);
+
+      const response = await service.getRanking('user-652', {
+        anchor: 'me',
+        limit: '50',
+        // An anchored read ignores any offset it is given.
+        offset: '7',
+      });
+
+      const [, above] = prisma.seasonRanking.count.mock.calls as Array<
+        [{ where: Record<string, unknown> }]
+      >;
+      expect(above[0].where).toEqual(
+        expect.objectContaining({
+          seasonId: 'season-1',
+          rankType: SeasonRankingType.daily,
+          rankingDate,
+          capturedAt,
+          rank: { lt: 652 },
+          seasonParticipant: {
+            participantStatus: { not: ParticipantStatus.excluded },
+            rankingHiddenAt: null,
+          },
+        }),
+      );
+      const page = prisma.seasonRanking.findMany.mock.calls[1] as [
+        { skip: number; take: number },
+      ];
+      expect([page[0].skip, page[0].take]).toEqual([649, 50]);
+      expect(response.data.pagination).toEqual({
+        limit: 50,
+        offset: 649,
+        total: 1000,
+        returned: 2,
+        nextOffset: 651,
+      });
+      expect(response.data.rankings[0]).toMatchObject({
+        rank: 652,
+        seasonParticipantId: 'sp-652',
+      });
+      expect(response.data.myRanking).toMatchObject({
+        state: 'available',
+        rank: 652,
+      });
+      expectNoRankingWrites(prisma);
+    });
+
+    it('starts at the top for a caller without a visible ranking row', async () => {
+      const { prisma, service } = createService();
+      mockCurrentSeason(prisma);
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+        rankingDate,
+        capturedAt,
+      });
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      prisma.seasonRanking.count.mockResolvedValueOnce(2);
+      mockRankingRows(prisma, [rankingRow(1), rankingRow(2)]);
+
+      const response = await service.getRanking('user-x', { anchor: 'me' });
+
+      expect(prisma.seasonRanking.count).toHaveBeenCalledTimes(1);
+      expect(response.data.pagination.offset).toBe(0);
+      expect(response.data.rankings[0]).toMatchObject({ rank: 1 });
+      expect(response.data.myRanking).toMatchObject({ state: 'not_joined' });
+    });
+
+    it('rejects an anchor outside the whole ranking or with another value', async () => {
+      for (const query of [
+        { anchor: 'me', scope: 'friends' },
+        { anchor: 'me', scope: 'top10' },
+        { anchor: 'last' },
+      ]) {
+        const { prisma, service } = createService();
+        let code: string | null = null;
+        try {
+          await service.getRanking('user-2', query);
+        } catch (error) {
+          code = (
+            (error as HttpException).getResponse() as {
+              error: { code: string };
+            }
+          ).error.code;
+        }
+        expect(code).toBe('INVALID_RANKING_ANCHOR');
+        expect(prisma.seasonRanking.count).not.toHaveBeenCalled();
+      }
+    });
+  });
+
   it('limits scope=top10 to the first ten ranking rows', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);

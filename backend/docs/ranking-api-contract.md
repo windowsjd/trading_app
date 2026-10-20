@@ -88,6 +88,16 @@ Portfolio use the persisted final ranking; current prices never reprice it.
 - `offset` optional.
   - Default: `0`.
   - Must be a non-negative integer.
+- `anchor` optional (2026-10-20, 랭킹 전체 탭 내 순위 중심).
+  - Only `me`, and only with `scope=all`; anything else → `400 INVALID_RANKING_ANCHOR`.
+  - The page starts at the caller's own row: `offset` is ignored and replaced by
+    the number of public rows ranked above it in the SAME snapshot (excluded and
+    ranking-hidden participants are not counted, so it is not `rank - 1`). The
+    response's `pagination.offset` says where the window starts; earlier pages
+    are plain `offset` reads below it, later ones follow `nextOffset`.
+  - Without a visible row of the caller's own (not joined, hidden, excluded,
+    not qualified for the final ranking, or no row yet) the page starts at the
+    top, exactly as without `anchor`.
 
 ## Scope
 

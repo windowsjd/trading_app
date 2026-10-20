@@ -29,6 +29,7 @@ export class RankingController {
         scope: 'INVALID_RANKING_SCOPE',
         limit: 'INVALID_LIMIT',
         offset: 'INVALID_OFFSET',
+        anchor: 'INVALID_RANKING_ANCHOR',
       } satisfies Record<keyof RankingQuery, string>),
     )
     query: RankingQuery,

@@ -48,7 +48,7 @@ function load(file, mocks) {
     const key = srcKey(file, name);
     if (key !== name && Object.hasOwn(mocks, key)) return mocks[key];
     if (name === 'react-native-svg') return { __esModule: true, default: 'Svg',
-      ...Object.fromEntries(['Path', 'Circle', 'Rect', 'Defs', 'LinearGradient', 'Stop', 'G', 'Line', 'Polygon'].map(value => [value, value])) };
+      ...Object.fromEntries(['Path', 'Circle', 'Rect', 'Defs', 'LinearGradient', 'RadialGradient', 'Stop', 'G', 'Line', 'Polygon'].map(value => [value, value])) };
     // New guide hooks share the screen's account/transport boundaries. Resolve
     // those boundaries irrespective of the caller's relative import depth.
     for (const suffix of ['tradingAccount/TradingAccountContext', 'tradingAccount/api', 'quest/QuestGuideProvider']) {

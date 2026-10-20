@@ -38,6 +38,8 @@ export type RankingQuery = {
   limit?: string;
   offset?: string;
   scope?: string;
+  /** `me`: start the `all` list at the caller's own row (offset ignored). */
+  anchor?: string;
 };
 
 type RankingSectionState = 'available' | 'unavailable' | 'not_joined';
@@ -66,6 +68,7 @@ type ParsedRankingQuery = {
   limit: number;
   offset: number;
   scope: RankingScope;
+  anchor?: 'me';
 };
 
 /**
@@ -620,8 +623,21 @@ export class RankingService {
       parsedQuery.scope === 'friends'
         ? await client.seasonRanking.count({ where: listWhere })
         : totalParticipants;
+    // anchor=me (scope all): the page starts at my own row — its position in
+    // this public set, counted in the same snapshot, never `rank - 1`
+    // (excluded and hidden participants above me leave gaps in the ranks).
+    // Without a visible row of mine the list starts at the top as before.
+    const anchoredOffset =
+      parsedQuery.anchor === 'me' && myRankingRow
+        ? await client.seasonRanking.count({
+            where: { ...where, rank: { lt: myRankingRow.rank } },
+          })
+        : null;
     const window = this.resolveRankingWindow({
-      query: parsedQuery,
+      query:
+        anchoredOffset === null
+          ? parsedQuery
+          : { ...parsedQuery, offset: anchoredOffset },
       totalParticipants: listTotal,
     });
     const rankingRows = await client.seasonRanking.findMany({
@@ -705,7 +721,26 @@ export class RankingService {
       limit: this.parseLimit(query.limit),
       offset: this.parseOffset(query.offset),
       scope: this.parseScope(query.scope),
+      anchor: this.parseAnchor(query.anchor, query.scope),
     };
+  }
+
+  private parseAnchor(
+    value: string | undefined,
+    scope: string | undefined,
+  ): 'me' | undefined {
+    const text = this.parseOptionalText(value);
+    if (text === undefined) return undefined;
+    // Friends and TOP10 keep their own lists; only the whole ranking anchors.
+    if (text === 'me' && (this.parseOptionalText(scope) ?? 'all') === 'all') {
+      return 'me';
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_RANKING_ANCHOR',
+      'Ranking anchor must be "me" with scope all.',
+    );
   }
 
   private parseScope(value: string | undefined): RankingScope {

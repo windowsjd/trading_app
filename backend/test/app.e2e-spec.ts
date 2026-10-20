@@ -5184,6 +5184,7 @@ describe('AppController (e2e)', () => {
       ['/ranking', 'rankingDate', 'INVALID_RANKING_DATE'],
       ['/ranking', 'capturedAt', 'INVALID_RANKING_CAPTURED_AT'],
       ['/ranking', 'scope', 'INVALID_RANKING_SCOPE'],
+      ['/ranking', 'anchor', 'INVALID_RANKING_ANCHOR'],
       ['/records', 'type', 'INVALID_RECORD_TYPE'],
       ['/records', 'currencyCode', 'INVALID_CURRENCY_CODE'],
       ['/records/me/seasons', 'seasonStatus', 'INVALID_SEASON_STATUS'],

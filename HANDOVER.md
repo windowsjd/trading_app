@@ -1,5 +1,15 @@
 # 프로젝트 인수인계서
 
+## 2026-10-20 — 랭킹 전체 탭: 내 순위에서 시작 · 맨위로/맨아래로 · TOP 3 시상대 (main, push)
+
+- **시작/범위:** origin/main = HEAD `2ad3a126d59a568574ec5fa70b114cf1a227759e`(직전 시즌최종결과 작업 push 직후, clean; GPT 조사 기준 `6408bab7`). 프런트 랭킹 화면 + 백엔드 랭킹 조회 파라미터 1개. DB·랭킹 계산·스냅샷·공개/제외 정책 무변경. [상세](frontend/docs/ranking-all-tab-podium-2026-10-20.md).
+- **백엔드:** `GET /api/v1/ranking?anchor=me`(scope all만, 그 외 400 `INVALID_RANKING_ANCHOR`) — 같은 RR 스냅샷에서 공개 행 중 내 위의 수(`rank < 내 rank`, 제외·숨김 미포함)를 offset으로 써서 내 행부터 반환, `pagination.offset`이 시작점. 내 행이 없으면 offset 0(기존과 동일). count 1회 추가(인덱스 `seasonId,rankType,rankingDate,rank`). [계약](backend/docs/ranking-api-contract.md).
+- **전체 탭:** 첫 페이지 anchor=me → 내 행을 화면 맨 위로(헤더는 위로 밀림) → 바로 위 한 페이지만 읽음. 위로 스크롤 시 화면 2개 이내면 한 페이지씩(배치 전 금지, 동시 1개, 도착 후 다시 위로 스크롤해야 다음) — 650위에게 1~649위를 먼저 읽지 않는다. iOS/Android는 `maintainVisibleContentPosition {minIndexForVisible:0}`(RN 0.83 VirtualizedList가 헤더 +1, 렌더 창도 이동)로 보던 행 유지. 탭 복귀·새 발행본 → 새 구간(쿼리 키 `시작:nonce`)으로 내 행에서 다시. 친구·TOP10 무변경.
+- **맨위로/맨아래로:** 전체 탭에만, 오른쪽 아래 36dp 원형 2개(터치 48, 아이콘만, 접근성 이름 맨위로/맨아래로). 구간 밖이면 첫 페이지 또는 마지막 페이지(`total−50`)만 읽고 이동, 맨아래는 측정된 끝으로(목록 `scrollToEnd` 추정치는 웹에서 헤더만큼 모자랐음) + 1.5초 끝 따라가기(드래그 시 중단). 비활성은 실제 경계(구간 시작 0·스크롤 0 / 구간 끝 = total·끝까지)로만. 목록 아래 여백 104.
+- **TOP 3 시상대:** 기존 발행본 조회(scope all, limit 3)의 1·2·3위가 정확할 때만, 순위 안내 아래·탭 위(위·아래 16), 화면 2·1·3, 스크린리더 1·2·3. 사양 수치 그대로(카드·조명·링·왕관·단상·글자), 고정 높이는 최소 높이로(큰 글꼴에서 잘림 방지, 기본 크기 약 219), 단상 숫자 `maxFontSizeMultiplier 1.3`, 큰 수익률은 열 안 줄바꿈. `ProfileAvatar`에 선택 prop `frameStyle` 추가(기본 무변경). 목록 1~3위 행 그대로.
+- **검증:** 백엔드 typecheck·`nest build`·prettier PASS, 단위 전체 357 suites/5,781 PASS(126 opt-in skip; anchor 3건 추가), e2e 3 suites/422 PASS(빈 cwd, `anchor` scalar 행 포함), 진단 게이트 backend/frontend PASS. 프런트 `npm run check`(lint:accounts — 신규 `RankingPodium.tsx`·`podium.ts`를 게이트 범위에 추가 — ·lint:guides·typecheck·test) PASS 3,381/3,381(397 suites, skip 0; 신규 `RankingAllTab.test.ts` 13·`podium.test.ts` 3·ProfileAvatar 1, 기존 테스트는 페이지 파라미터 `limit`·행 SVG 범위만 갱신), web export PASS. RN-Web 확인(일회용, 저장소 밖) 24조합(320/360/390 × 글꼴 1/2배 × 라이트/다크 × 일반/긴 닉네임·큰 수익률): 내 행 시작·위 한 페이지·맨위로(시상대+1위, 비활성)·맨아래로(마지막 행이 버튼 위, 비활성)·시상대 글자 잘림 없음·왕관 카드 안·단상 카드 바닥 밀착. 기존 `rankingTierBrowser` QUICK PASS. RankingScreen의 기존 lint 경고(viewState useMemo deps)는 HEAD부터 있던 것으로 그대로 둠(게이트 범위 밖). 웹(RN-Web 0.21)은 maintainVisibleContentPosition이 없어 위 페이지 도착 시 화면이 바뀜 — 웹은 위 페이지를 사용자 스크롤 때만 한 페이지씩 읽음(폭주 방지 확인). iOS/Android 실기기 확인은 하지 못했다(연결 기기 없음) — 위치 유지·관성 스크롤·시스템 글꼴은 기기에서 확인 필요.
+- **배포:** 백엔드 변경(파라미터 추가, 기존 요청 동작 동일)이라 `[skip render]` 없이 push하면 Render 자동 배포. 구 서버는 `anchor`를 무시(알 수 없는 쿼리 키는 무시)하므로 새 앱 + 구 서버 조합이면 전체 탭이 1위부터 열리고 내 행 위치 이동만 빠진다(오류 없음).
+
 ## 2026-10-20 — 시즌최종결과 화면·결과 확인 상태·계정 선택 UI 개편 (main, push)
 
 - **시작/범위:** origin/main = HEAD `6408bab7aedcd8a9b55cefec0a01104aa8d811b7`(clean, GPT 조사 기준 `a8d09b27` 이후 이용약관 커밋 1개). 바로 아래 이용약관 항목은 그 커밋 `6408bab7`로 이미 main/origin에 있다(제목의 "미커밋"은 작성 당시 기준). 백엔드+프런트+문서.

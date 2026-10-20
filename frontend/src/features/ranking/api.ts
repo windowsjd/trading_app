@@ -133,6 +133,12 @@ export interface GetRankingsParams {
   offset?: number;
   rankingDate?: string | null;
   capturedAt?: string | null;
+  /**
+   * `me` (scope all only): the page starts at my own row, wherever the server
+   * finds it in this set; `offset` is ignored and `pagination.offset` says
+   * where the page starts. Without a row of mine it starts at the top.
+   */
+  anchor?: 'me';
 }
 
 export function getRankingTier(
@@ -193,6 +199,7 @@ async function requestRankings(
   if (params.rankType) searchParams.set('rankType', params.rankType);
   if (params.rankingDate) searchParams.set('rankingDate', params.rankingDate);
   if (params.capturedAt) searchParams.set('capturedAt', params.capturedAt);
+  if (params.anchor) searchParams.set('anchor', params.anchor);
 
   const response = await apiClient.get<ApiSuccessResponse<RankingsResponseDto>>(
     `/ranking?${searchParams.toString()}`,

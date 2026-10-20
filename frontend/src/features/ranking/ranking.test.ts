@@ -56,7 +56,7 @@ function createHarness(scope?: string) {
   });
   mocks.set('@react-navigation/native', { useFocusEffect: () => {}, useIsFocused: () => true, NavigationContext: React.createContext(undefined) });
   // SVG is a native host boundary; browser tests exercise its actual renderer.
-  mocks.set('react-native-svg', { default: 'svg', Path: 'path', Defs: 'defs', LinearGradient: 'linearGradient', Rect: 'rect', Stop: 'stop', __esModule: true });
+  mocks.set('react-native-svg', { default: 'svg', Path: 'path', Defs: 'defs', LinearGradient: 'linearGradient', RadialGradient: 'radialGradient', Rect: 'rect', Stop: 'stop', __esModule: true });
   mocks.set('@tanstack/react-query', {
     useQuery: (options: any) => {
       queryOptions.push(options);
@@ -376,11 +376,13 @@ describe('ranking API and query contract', () => {
     h.page.pagination.nextOffset = 50;
     const next = options.getNextPageParam(h.page);
     assert.deepEqual(next, {
-      offset: 50, rankType: 'daily', rankingDate: h.page.rankingDate, capturedAt: h.page.capturedAt,
+      offset: 50, limit: 50, rankType: 'daily', rankingDate: h.page.rankingDate, capturedAt: h.page.capturedAt,
     });
     await options.queryFn({ pageParam: next });
     const params = new URL(h.requests.at(-1)!, 'https://fixture.invalid').searchParams;
     assert.equal(params.get('offset'), '50');
+    assert.equal(params.get('limit'), '50');
+    assert.equal(params.has('anchor'), false, 'only the first page of a 전체 stretch is anchored');
     assert.equal(params.get('capturedAt'), h.page.capturedAt);
     assert.equal(params.get('rankingDate'), h.page.rankingDate);
     assert.equal(params.get('rankType'), 'daily');

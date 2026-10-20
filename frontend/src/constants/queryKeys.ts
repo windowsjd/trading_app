@@ -228,8 +228,10 @@ export const QUERY_KEYS = {
         params.offset ?? 0,
       ] as const,
     // Single responses and InfiniteData must never occupy the same entry.
-    infiniteList: (params: Parameters<typeof QUERY_KEYS.ranking.list>[0]) =>
-      [...QUERY_KEYS.ranking.list(params), 'infinite'] as const,
+    // `window` names one loaded stretch of the 전체 list (where it started:
+    // my row, the top or the bottom); a new one never reuses another's pages.
+    infiniteList: (params: Parameters<typeof QUERY_KEYS.ranking.list>[0], window?: string) =>
+      [...QUERY_KEYS.ranking.list(params), 'infinite', ...(window ? [window] : [])] as const,
     /**
      * Rows at one offset of a known set (the 순위 안내 slot). Its own entry
      * shape, never `list`: the ranking tab tells its publication and list

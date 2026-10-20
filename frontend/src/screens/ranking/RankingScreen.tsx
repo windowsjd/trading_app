@@ -12,6 +12,8 @@ import {
   Platform,
   useWindowDimensions,
 } from '../../theme/native';
+import type { FlatList as NativeFlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useIsFocused } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +33,7 @@ import {
   type RankingScope,
 } from '../../features/ranking/api';
 import { useRankingInsights } from '../../features/ranking/useRankingInsights';
+import { podiumEntries } from '../../features/ranking/podium';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import { getApiErrorCode } from '../../services/api/errorMapper';
 
@@ -47,6 +50,7 @@ import { useAppearance } from '../../theme/appearance';
 import { getHomeTier, type HomeTier } from '../home/tierPresentation';
 import TierEmblem, { tierEmblemWidth } from '../home/TierEmblem';
 import RankingInsightSlot from './RankingInsightSlot';
+import RankingPodium from './RankingPodium';
 import StandingCard, { rankingFigureText } from './StandingCard';
 
 type Props = RankingScreenProps;
@@ -60,6 +64,32 @@ const TABS: Array<{ key: RankingScope; label: string }> = [
 function getRankingItemKey(item: RankingItemDto) {
   return item.seasonParticipantId;
 }
+
+/**
+ * Where the loaded stretch of the 전체 list starts: my own row (entry), the
+ * first row (맨위로) or the last page (맨아래로). Rows outside it load page by
+ * page as the list reaches them, so a jump never downloads what lies between.
+ */
+type AllWindow = 'me' | 'top' | 'bottom';
+type RankingPageParam = {
+  offset: number;
+  limit: number;
+  anchor?: 'me';
+  rankType?: RankingRankType;
+  rankingDate: string | null;
+  capturedAt: string | null;
+};
+const CONTENT_PADDING = 16;
+// My row's ring sits 6 outside its card; this keeps it in view when my row opens the list.
+const ROW_LEAD = 8;
+// 36 visible (48 to touch), tucked toward the edge so rows' figures stay readable as they pass.
+const JUMP_SIZE = 36;
+const JUMP_GAP = 8;
+const JUMP_INSET = 16;
+const JUMP_RIGHT = 6;
+// The 전체 list ends this far above the bottom, so its last row clears the buttons.
+const JUMP_CLEARANCE = JUMP_INSET + JUMP_SIZE * 2 + JUMP_GAP + 8;
+const FOLLOW_END_MS = 1500;
 
 export default function RankingScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
@@ -94,14 +124,34 @@ export default function RankingScreen({ navigation }: Props) {
   const capturedAt = publication?.capturedAt;
   // 순위 안내: always the whole daily ranking of this publication, whatever tab.
   const insights = useRankingInsights({ publication, season: seasonQuery.data });
+  const myRanking = publication?.myRanking ?? null;
+  // TOP 3 시상대: the publication's own first three rows (scope all), on every tab.
+  const podium = podiumEntries(publication, myRanking);
+
+  // 전체 opens at my row when I have one; otherwise (not joined, hidden, not
+  // qualified, no row yet) at the top as before. Friends and TOP10 never move.
+  const isAll = selectedTab === 'all';
+  const [allWindow, setAllWindow] = React.useState<{ start: AllWindow; nonce: number }>({ start: 'me', nonce: 0 });
+  const windowStart: AllWindow = !isAll ? 'top'
+    : allWindow.start === 'me' && myRanking?.state !== 'available' ? 'top' : allWindow.start;
+  const publicationTotal = publication?.pagination?.total ?? 0;
+  const firstOffset = windowStart === 'bottom' ? Math.max(0, publicationTotal - rankingLimit) : 0;
   const rankingQueryKey = useMemo(
     () => QUERY_KEYS.ranking.infiniteList({
       scope: selectedTab, limit: rankingLimit, offset: 0,
       seasonId, rankType, rankingDate, capturedAt,
-    }),
-    [selectedTab, rankingLimit, seasonId, rankType, rankingDate, capturedAt],
+    }, isAll ? `${windowStart}:${allWindow.nonce}` : undefined),
+    [selectedTab, rankingLimit, seasonId, rankType, rankingDate, capturedAt, isAll, windowStart, allWindow.nonce],
   );
 
+  const firstPageParam: RankingPageParam = {
+    offset: firstOffset,
+    limit: rankingLimit,
+    ...(windowStart === 'me' ? { anchor: 'me' as const } : {}),
+    rankType,
+    rankingDate: rankingDate ?? null,
+    capturedAt: capturedAt ?? null,
+  };
   const rankingQuery = useInfiniteQuery({
     queryKey: rankingQueryKey,
     enabled: publication?.state === 'available',
@@ -109,29 +159,41 @@ export default function RankingScreen({ navigation }: Props) {
       getRankings({
         scope: selectedTab,
         seasonId,
-        limit: rankingLimit,
+        limit: pageParam.limit,
         offset: pageParam.offset,
+        ...(pageParam.anchor ? { anchor: pageParam.anchor } : {}),
         rankType: pageParam.rankType,
         rankingDate: pageParam.rankingDate,
         capturedAt: pageParam.capturedAt,
       }),
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: (lastPage): RankingPageParam | undefined => {
       const nextOffset = lastPage.pagination.nextOffset;
       if (nextOffset === null || nextOffset === undefined) return undefined;
 
       return {
         offset: nextOffset,
+        limit: rankingLimit,
         rankType: lastPage.rankType,
         rankingDate: lastPage.rankingDate ?? null,
         capturedAt: lastPage.capturedAt ?? null,
       };
     },
-    initialPageParam: {
-      offset: 0,
-      rankType,
-      rankingDate: rankingDate ?? null,
-      capturedAt: capturedAt ?? null,
+    // Only a 전체 stretch can start below the first row: the rows above it,
+    // one page at a time, pinned to the same set.
+    getPreviousPageParam: (firstPage): RankingPageParam | undefined => {
+      const offset = firstPage.pagination.offset;
+      if (!offset || offset <= 0) return undefined;
+      const start = Math.max(0, offset - rankingLimit);
+
+      return {
+        offset: start,
+        limit: offset - start,
+        rankType: firstPage.rankType,
+        rankingDate: firstPage.rankingDate ?? null,
+        capturedAt: firstPage.capturedAt ?? null,
+      };
     },
+    initialPageParam: firstPageParam,
   });
   const refresh = usePullToRefresh([seasonQuery, meQuery, {
     isFetching: topQuery.isFetching || rankingQuery.isFetching,
@@ -157,7 +219,67 @@ export default function RankingScreen({ navigation }: Props) {
     return Array.from(byKey.values());
   }, [rankingQuery.data]);
 
-  const myRanking = publication?.myRanking ?? null;
+  // The loaded stretch and the whole list's real edges: a page's own first or
+  // last row is never taken for the top or the bottom of the ranking.
+  const pages = rankingQuery.data?.pages;
+  const loadedStart = pages?.[0]?.pagination.offset ?? 0;
+  const lastLoaded = pages?.[pages.length - 1];
+  const loadedEnd = lastLoaded ? lastLoaded.pagination.offset + lastLoaded.pagination.returned : 0;
+  const listTotal = lastLoaded?.pagination.total ?? publicationTotal;
+  const listRef = React.useRef<NativeFlatList<RankingItemDto>>(null);
+  const scrollState = React.useRef({ y: 0, height: 0, content: 0 });
+  const headerHeight = React.useRef(0);
+  // Where a new 전체 stretch opens, applied once its rows are laid out.
+  const pendingScroll = React.useRef<AllWindow | null>('me');
+  // 맨아래로 lands on the last row while the rows near it are still being laid
+  // out (and re-measured): the end is followed briefly, until a drag.
+  const followEndUntil = React.useRef(0);
+  const [edges, setEdges] = React.useState({ top: true, bottom: true });
+
+  React.useEffect(() => {
+    pendingScroll.current = isAll ? windowStart : null;
+  }, [rankingQueryKey, isAll, windowStart]);
+
+  const updateEdges = React.useCallback(() => {
+    const { y, height, content } = scrollState.current;
+    const top = loadedStart === 0 && y <= 2;
+    const bottom = loadedEnd >= listTotal && y + height >= content - 2;
+    setEdges((current) => (current.top === top && current.bottom === bottom ? current : { top, bottom }));
+  }, [loadedStart, loadedEnd, listTotal]);
+  React.useEffect(() => { updateEdges(); }, [updateEdges]);
+
+  const { hasPreviousPage, isFetching: listFetching, fetchPreviousPage } = rankingQuery;
+  const previousInFlight = React.useRef(false);
+  // After rows were added above, the next page waits for the list to be
+  // scrolled up again: where the rows in view cannot be kept in place (web),
+  // the list would otherwise keep reading upward on its own.
+  const awaitUpScroll = React.useRef<{ lowest: number | null } | null>(null);
+  const loadPrevious = React.useCallback(() => {
+    // Never before the stretch is placed (rows would land above a list not yet
+    // at my row), and one page at a time.
+    if (!isAll || !hasPreviousPage || listFetching || pendingScroll.current || previousInFlight.current || awaitUpScroll.current) return;
+    previousInFlight.current = true;
+    void fetchPreviousPage().finally(() => {
+      previousInFlight.current = false;
+      awaitUpScroll.current = { lowest: null };
+    });
+  }, [isAll, hasPreviousPage, listFetching, fetchPreviousPage]);
+
+  // Scrolls made here are recorded at once. The end is the measured content
+  // end (a list's own scrollToEnd estimates unrendered rows and can fall short).
+  const scrollListTo = (target: number | 'end', animated = false) => {
+    const list = listRef.current;
+    if (!list) return;
+    const { content, height } = scrollState.current;
+    if (target === 'end' && !(content > 0 && height > 0)) {
+      list.scrollToEnd({ animated });
+      return;
+    }
+    const offset = target === 'end' ? Math.max(0, content - height) : target;
+    list.scrollToOffset({ offset, animated });
+    scrollState.current.y = offset;
+  };
+
   const hasNotJoined = myRanking?.state === 'not_joined' || seasonQuery.data?.joined === false;
   const rankingErrorCode = getApiErrorCode(rankingQuery.error);
   const seasonNotConfigured = getApiErrorCode(seasonQuery.error) === ERROR_CODE.SEASON_NOT_FOUND;
@@ -225,6 +347,76 @@ export default function RankingScreen({ navigation }: Props) {
     myRanking?.state,
   ]);
 
+  const applyPendingScroll = () => {
+    const target = pendingScroll.current;
+    if (!target || !isAll || !listRef.current || !pages?.length) return;
+    if (target === 'bottom') {
+      scrollListTo('end');
+      followEndUntil.current = Date.now() + FOLLOW_END_MS;
+    } else if (target === 'me' && loadedStart > 0) {
+      // My row opens the list; the header above it comes back on the way up.
+      if (headerHeight.current <= 0) return;
+      scrollListTo(CONTENT_PADDING + headerHeight.current - ROW_LEAD);
+    } else {
+      scrollListTo(0);
+    }
+    pendingScroll.current = null;
+    // The rows just above load at once, so scrolling up shows them, not the
+    // header. Native lists keep the rows in view in place while they arrive
+    // (maintainVisibleContentPosition); the web list cannot, so there they
+    // wait for the list to be scrolled up toward them.
+    if (Platform.OS === 'web') {
+      awaitUpScroll.current = { lowest: null };
+    } else {
+      awaitUpScroll.current = null;
+      loadPrevious();
+    }
+  };
+
+  const onListScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+    scrollState.current = { y: contentOffset.y, height: layoutMeasurement.height, content: contentSize.height };
+    if (Date.now() < followEndUntil.current && contentOffset.y < contentSize.height - layoutMeasurement.height - 2) {
+      scrollListTo('end');
+    }
+    const waiting = awaitUpScroll.current;
+    if (waiting) {
+      // Scrolled up since the last page above arrived (from the lowest point seen since).
+      if (waiting.lowest === null || contentOffset.y > waiting.lowest) waiting.lowest = contentOffset.y;
+      else if (contentOffset.y < waiting.lowest - 1) awaitUpScroll.current = null;
+    }
+    // Within two screens of the top of the loaded rows: the page above.
+    if (contentOffset.y < layoutMeasurement.height * 2) loadPrevious();
+    updateEdges();
+  };
+
+  const onListContentSize = (_width: number, height: number) => {
+    scrollState.current.content = height;
+    if (Date.now() < followEndUntil.current) scrollListTo('end');
+    applyPendingScroll();
+    updateEdges();
+  };
+
+  // 맨위로 / 맨아래로: within the loaded stretch just scroll; otherwise read only
+  // that end of the list (a new stretch), never everything in between.
+  const jumpTo = (target: 'top' | 'bottom') => {
+    if (target === 'top' ? edges.top : edges.bottom) return;
+    if (target === 'top' && loadedStart === 0) {
+      scrollListTo(0, true);
+    } else if (target === 'bottom' && loadedEnd >= listTotal) {
+      scrollListTo('end', true);
+    } else {
+      setAllWindow((current) => ({ start: target, nonce: current.nonce + 1 }));
+      if (target === 'top') scrollListTo(0);
+    }
+  };
+
+  const selectTab = (tab: RankingScope) => {
+    // Back on 전체: it opens at my row again, as on entry.
+    if (tab === 'all') setAllWindow((current) => ({ start: 'me', nonce: current.nonce + 1 }));
+    setSelectedTab(tab);
+  };
+
   if (viewState === 'ranking_loading') {
     return <FullPageLoading message="랭킹을 불러오는 중입니다." />;
   }
@@ -260,19 +452,31 @@ export default function RankingScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        ref={listRef}
         refreshControl={refresh.refreshControl}
         testID={TEST_IDS.ranking.screen}
         data={rankingErrorCode === ERROR_CODE.RANKING_SNAPSHOT_CHANGED ? [] : items}
         keyExtractor={getRankingItemKey}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={isAll ? [styles.content, styles.contentWithJumps] : styles.content}
         onEndReached={() => {
           if (rankingQuery.hasNextPage && !rankingQuery.isFetching) {
             void rankingQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
+        // 전체 only: rows above the loaded stretch load as the list nears them
+        // (onListScroll), and the rows in view stay where they are when they arrive.
+        maintainVisibleContentPosition={isAll ? KEEP_VISIBLE_ROWS : undefined}
+        onScroll={isAll ? onListScroll : undefined}
+        onScrollBeginDrag={isAll ? () => { followEndUntil.current = 0; } : undefined}
+        scrollEventThrottle={isAll ? 32 : undefined}
+        onLayout={isAll ? (event) => { scrollState.current.height = event.nativeEvent.layout.height; updateEdges(); } : undefined}
+        onContentSizeChange={isAll ? onListContentSize : undefined}
         ListHeaderComponent={
-          <>
+          <View onLayout={isAll ? (event: LayoutChangeEvent) => {
+            headerHeight.current = event.nativeEvent.layout.height;
+            applyPendingScroll();
+          } : undefined}>
             <MyRankingCard
               me={meQuery.data}
               myRanking={myRanking}
@@ -285,11 +489,13 @@ export default function RankingScreen({ navigation }: Props) {
 
             <RankingInsightSlot messages={insights} paused={!isFocused} />
 
-            <SegmentedControl testID="ranking-tabs" accessibilityLabel="랭킹 범위" value={selectedTab} onChange={setSelectedTab}
+            {podium ? <RankingPodium entries={podium} rankType={rankType} style={styles.podium} /> : null}
+
+            <SegmentedControl testID="ranking-tabs" accessibilityLabel="랭킹 범위" value={selectedTab} onChange={selectTab}
               style={styles.tabs}
               options={TABS.map(tab => ({ key: tab.key, label: tab.label, testID: tab.key === 'all' ? TEST_IDS.ranking.tabAll
                 : tab.key === 'friends' ? TEST_IDS.ranking.tabFriends : TEST_IDS.ranking.tabTop10 }))} />
-          </>
+          </View>
         }
         ListEmptyComponent={
           rankingQuery.isLoading ? <WhaleLoader size={28} accessibilityLabel="목록을 불러오는 중입니다." /> :
@@ -330,7 +536,34 @@ export default function RankingScreen({ navigation }: Props) {
           ) : null
         }
       />
+      {isAll && items.length > 0 && rankingErrorCode !== ERROR_CODE.RANKING_SNAPSHOT_CHANGED ? (
+        <View style={styles.jumps} pointerEvents="box-none">
+          <JumpButton direction="up" disabled={edges.top} onPress={() => jumpTo('top')} />
+          <JumpButton direction="down" disabled={edges.bottom} onPress={() => jumpTo('bottom')} />
+        </View>
+      ) : null}
     </SafeAreaView>
+  );
+}
+
+/**
+ * 맨위로 / 맨아래로 on the 전체 list: a small round icon button (no text), its
+ * name for screen readers only. Disabled at the ranking's real top or bottom.
+ */
+function JumpButton({ direction, disabled, onPress }: { direction: 'up' | 'down'; disabled: boolean; onPress: () => void }) {
+  const { colors } = useAppearance();
+  const label = direction === 'up' ? '맨위로' : '맨아래로';
+  return (
+    <ActionPressable testID={direction === 'up' ? 'ranking-jump-top' : 'ranking-jump-bottom'}
+      style={[styles.jump, disabled && styles.jumpDisabled]} hitSlop={6} disabled={disabled} onPress={disabled ? undefined : onPress}
+      accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} aria-disabled={disabled}>
+      <View {...HIDDEN}>
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
+          strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+          <Path d={direction === 'up' ? 'M7 11l5-5 5 5M7 17l5-5 5 5' : 'M7 7l5 5 5-5M7 13l5 5 5-5'} />
+        </Svg>
+      </View>
+    </ActionPressable>
   );
 }
 
@@ -418,6 +651,8 @@ function RankingFigures({ item, tierName, mine }: { item: RankingItemDto; tierNa
 const HIDDEN = {
   accessible: false, accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants', 'aria-hidden': true,
 } as const;
+// Rows added above the visible ones keep the visible ones in place (index 0 = first row; the header is counted by the list).
+const KEEP_VISIBLE_ROWS = { minIndexForVisible: 0 };
 const ROW_BORDER = 1;
 const ROW_RADIUS = 14;
 const NAME_LINE = 22;
@@ -511,6 +746,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tabs: { marginBottom: 12 },
+  // 16 between the 순위 안내 row (or 내 순위, which keep 12 below them) and the podium, 16 to the tabs.
+  podium: { marginTop: 4, marginBottom: 16 },
+  contentWithJumps: { paddingBottom: JUMP_CLEARANCE },
+  jumps: { position: 'absolute', right: JUMP_RIGHT, bottom: JUMP_INSET, gap: JUMP_GAP },
+  jump: {
+    width: JUMP_SIZE,
+    height: JUMP_SIZE,
+    borderRadius: JUMP_SIZE / 2,
+    borderWidth: 1,
+    borderColor: semantic.border,
+    backgroundColor: semantic.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jumpDisabled: { opacity: 0.4 },
   myName: { flex: 1, minWidth: 0, fontSize: 18, lineHeight: 26, fontWeight: '700' },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, flexShrink: 1 },
   // Only when the figures cannot fit beside the name (narrow screens at large

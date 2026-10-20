@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, StyleSheet, View } from '../../theme/native';
+import { Image, StyleSheet, View, type ViewStyle } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 
 type Props = {
@@ -8,6 +8,8 @@ type Props = {
   testID?: string;
   /** Omit beside a visible nickname to avoid repeating screen-reader identity. */
   accessibilityLabel?: string;
+  /** Background and border for a placement that draws its own ring (TOP 3 시상대); size and shape stay. */
+  frameStyle?: Pick<ViewStyle, 'backgroundColor' | 'borderWidth'>;
 };
 
 export function profileImageUri(value?: string | null): string | null {
@@ -22,11 +24,12 @@ export function profileImageUri(value?: string | null): string | null {
 }
 
 /** Original geometric head/shoulders; no external placeholder image or asset. */
-export default function ProfileAvatar({ profileImageUrl, size = 36, testID = 'profile-avatar', accessibilityLabel }: Props) {
+export default function ProfileAvatar({ profileImageUrl, size = 36, testID = 'profile-avatar', accessibilityLabel, frameStyle }: Props) {
   const uri = profileImageUri(profileImageUrl);
   const [failedUri, setFailedUri] = useState<string | null>(null);
+  const box = { width: size, height: size, borderRadius: size / 2 };
   return (
-    <View testID={testID} style={[styles.frame, { width: size, height: size, borderRadius: size / 2 }]}
+    <View testID={testID} style={frameStyle ? [styles.frame, box, frameStyle] : [styles.frame, box]}
       accessible={!!accessibilityLabel} accessibilityRole={accessibilityLabel ? 'image' : undefined}
       aria-hidden={!accessibilityLabel}
       accessibilityLabel={accessibilityLabel} accessibilityElementsHidden={!accessibilityLabel}

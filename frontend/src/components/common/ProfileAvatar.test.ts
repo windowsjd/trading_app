@@ -44,3 +44,15 @@ test('real image, failed load, new URI and late old failure keep the same avatar
   assert.equal(frame.props.accessibilityLabel, '프로필 사진');
   await act(async () => renderer.unmount());
 });
+
+test('a placement with its own ring sets only the frame background and border, never the size', async () => {
+  let renderer: any;
+  const frameStyle = { backgroundColor: '#E6E9EE', borderWidth: 0 };
+  await act(async () => { renderer = create(React.createElement(Avatar, { profileImageUrl: null, size: 56, frameStyle })); });
+  const style = renderer.root.findByProps({ testID: 'profile-avatar' }).props.style;
+  assert.deepEqual([style[1].width, style[1].height, style[1].borderRadius], [56, 56, 28]);
+  assert.equal(style[2] === frameStyle, true);
+  await act(async () => renderer.update(React.createElement(Avatar, { profileImageUrl: null, size: 56 })));
+  assert.equal(renderer.root.findByProps({ testID: 'profile-avatar' }).props.style.length, 2, 'unchanged without it');
+  await act(async () => renderer.unmount());
+});

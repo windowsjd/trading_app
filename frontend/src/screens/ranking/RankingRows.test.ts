@@ -169,8 +169,12 @@ describe('랭킹 목록 행: 일반 카드', () => {
       for (const [index, style] of styles.entries()) assert.deepEqual(style, styles[0], `${mode} ${tiers[index]}`);
       assert.equal(tiers.every((_, index) => h.node(`ranking-item-user-${index}`).props.underlay === undefined), true, 'no row art');
       assert.equal(h.hostsStarting('ranking-tier-background-').length, 0, 'no tier background ids');
-      // Without a joined season there is no 내 순위 art either: nothing on the screen draws SVG.
-      assert.equal(h.renderer.root.findAll((node: any) => node.type === 'Svg').length, 0, 'no SVG art');
+      // No row draws SVG. Without a joined season there is no 내 순위 art either: the only SVG
+      // on the screen is the TOP 3 podium's (glow, crown, stands) and the 전체 jump icons.
+      const svgIn = (node: any) => node.findAll((child: any) => child.type === 'Svg').length;
+      assert.equal(tiers.reduce((count, _, index) => count + svgIn(h.node(`ranking-item-user-${index}`)), 0), 0, 'no SVG art in rows');
+      const owned = svgIn(h.node('ranking-podium')) + svgIn(h.node('ranking-jump-top')) + svgIn(h.node('ranking-jump-bottom'));
+      assert.equal(h.renderer.root.findAll((node: any) => node.type === 'Svg').length, owned, 'SVG only in the podium and the jump icons');
     }
   });
 

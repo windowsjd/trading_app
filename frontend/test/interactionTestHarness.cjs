@@ -61,7 +61,7 @@ function interactionHarness(platform = 'android') {
   h.load = (file, mocks = {}) => load(resolve(file), {
     'react-native': h.native,
     '../../theme/useReducedMotion': { useReducedMotion: () => h.reduced, useReducedMotionSettled: () => true },
-    'react-native-svg': { default: 'Svg', Path: 'Path', Defs: 'Defs', LinearGradient: 'LinearGradient', Rect: 'Rect', Stop: 'Stop', __esModule: true },
+    'react-native-svg': { default: 'Svg', Path: 'Path', Defs: 'Defs', LinearGradient: 'LinearGradient', RadialGradient: 'RadialGradient', Rect: 'Rect', Stop: 'Stop', __esModule: true },
     ...mocks,
   });
   h.ActionPressable = h.load('src/components/common/ActionPressable.tsx').default;
