@@ -5,6 +5,7 @@ import {
 } from '../../src/providers/binance/binance-product-catalog';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import IORedis from 'ioredis';
 import { Prisma } from '../../src/generated/prisma/client';
 import { setTimeout as delay } from 'node:timers/promises';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -29,6 +30,7 @@ import { Actor, type Fixture, type FixtureActor } from './actor';
 import { preflight, verifyApi } from './preflight';
 import { parseFuturesContracts } from '../../src/futures/futures-instrument-coverage';
 import { CURRENT_TERMS_VERSION } from '../../src/auth/terms.constants';
+import { authEmailMailboxKey } from './auth-email';
 
 /** Complete the existing learning prerequisites through normal HTTP commands.
  * Keep every fee, order, acknowledgement and ledger leg in the full audit.
@@ -143,6 +145,32 @@ async function prepareBeginnerLearning(
   );
 }
 
+/**
+ * Signup's real email verification over HTTP: the server's replay answers the
+ * mail and keeps its code in this run's Valkey (auth-email.ts), read once here.
+ */
+async function verifySignupEmail(
+  http: AppClient,
+  mailbox: IORedis,
+  email: string,
+): Promise<string> {
+  const requested = (await http.request(
+    'POST',
+    '/auth/email/request',
+    { email, purpose: 'signup' },
+    false,
+  )) as { challengeId: string };
+  const code = await mailbox.getdel(authEmailMailboxKey(requested.challengeId));
+  if (!code) throw new Error('LOAD_TEST_SIGNUP_EMAIL_NOT_DELIVERED');
+  const verified = (await http.request(
+    'POST',
+    '/auth/email/verify',
+    { email, purpose: 'signup', challengeId: requested.challengeId, code },
+    false,
+  )) as { verificationToken: string };
+  return verified.verificationToken;
+}
+
 export async function prepare(
   m: Manifest,
   c: Credentials,
@@ -156,6 +184,11 @@ export async function prepare(
   process.env.DATABASE_URL = c.databaseUrl;
   const db = new PrismaService();
   await db.$connect();
+  const mailbox = new IORedis(c.valkeyUrl, {
+    commandTimeout: 5000,
+    maxRetriesPerRequest: 0,
+  });
+  mailbox.on('error', () => metrics.failure('CONTROL_VALKEY_ERROR'));
   try {
     if ((await db.user.count()) !== 0)
       throw new Error('LOAD_TEST_PREPARE_REQUIRES_EMPTY_USER_DATA');
@@ -342,6 +375,11 @@ export async function prepare(
                 nickname: `load-${index}-${m.runId.slice(-6)}`,
                 ageConfirmed: true,
                 termsVersion: CURRENT_TERMS_VERSION,
+                verificationToken: await verifySignupEmail(
+                  http,
+                  mailbox,
+                  email,
+                ),
               },
               false,
             );
@@ -458,6 +496,7 @@ export async function prepare(
     return data;
   } finally {
     writeJson(resolve(out, 'prepare-summary.json'), metrics.serializable());
+    mailbox.disconnect();
     await db.$disconnect();
   }
 }

@@ -7,6 +7,7 @@ import type { KoscomMarket } from '../../src/providers/koscom/koscom.config';
 import type { Manifest } from './manifest';
 import { hash } from './manifest';
 import { Metrics } from './metrics';
+import { parseFixtureEmail } from './auth-email';
 
 export const CRYPTO = BINANCE_FIXED_ASSET_UNIVERSE;
 export const STOCKS = KIS_FIXED_ASSET_UNIVERSE;
@@ -318,6 +319,8 @@ export class Replay {
   sockets = new Set<ReplaySocket>();
   epochMs = Date.now();
   tick = 0;
+  /** Where a fixture signup code goes (the server's Valkey); unset, mail is blocked. */
+  mailbox?: (mail: { challengeId: string; code: string }) => Promise<void>;
   private priceStartTick?: number;
   private previousCandles = new Map<
     string,
@@ -461,7 +464,7 @@ export class Replay {
   }
   fetch = async (
     raw: string | URL | Request,
-    _options?: RequestInit,
+    options?: RequestInit,
   ): Promise<Response> => {
     const u = new URL(raw instanceof Request ? raw.url : String(raw));
     const now = Date.now();
@@ -639,6 +642,19 @@ export class Replay {
           })),
         },
       };
+    } else if (
+      u.hostname === 'api.resend.com' &&
+      u.pathname === '/emails' &&
+      this.mailbox
+    ) {
+      // The fixture's own signup mail (auth-email.ts); anything else is blocked.
+      const mail = parseFixtureEmail(options);
+      if (!mail) {
+        this.metrics.failure('EXTERNAL_PROVIDER_HTTP_BLOCKED');
+        throw new Error('EXTERNAL_PROVIDER_HTTP_BLOCKED');
+      }
+      await this.mailbox(mail);
+      value = { id: `load-test-email-${mail.challengeId}` };
     } else {
       this.metrics.failure('EXTERNAL_PROVIDER_HTTP_BLOCKED');
       throw new Error('EXTERNAL_PROVIDER_HTTP_BLOCKED');

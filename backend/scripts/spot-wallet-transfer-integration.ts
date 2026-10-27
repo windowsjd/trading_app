@@ -1041,6 +1041,52 @@ async function modern(s: Scenario) {
   );
 }
 
+/**
+ * Applies one migration file to the private schema as `prisma migrate deploy`
+ * does: Prisma sends each statement on its own, while one multi-statement
+ * query runs as a single implicit transaction, which CREATE INDEX CONCURRENTLY
+ * refuses (25001). Those files are plain index DDL, so their statements are
+ * sent one by one; every other file still runs as one query.
+ *
+ * Existence probes assume one public schema; here they are scoped to the
+ * private one (the public schema already has every type and constraint).
+ */
+async function applyMigration(db: Client, migration: string, schema: string) {
+  const sql = readFileSync(
+    `prisma/migrations/${migration}/migration.sql`,
+    'utf8',
+  )
+    .replaceAll("'public.'", `'${schema}.'`)
+    .replaceAll(
+      'FROM pg_type WHERE',
+      'FROM pg_type WHERE typnamespace = current_schema()::regnamespace AND',
+    )
+    .replaceAll(
+      'FROM pg_constraint WHERE',
+      'FROM pg_constraint WHERE connamespace = current_schema()::regnamespace AND',
+    );
+  if (!/\bCONCURRENTLY\b/.test(sql)) {
+    await db.query(sql);
+    return;
+  }
+  // Full-line comments may contain semicolons themselves.
+  const code = sql
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('--'))
+    .join('\n');
+  const statements = code
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+  assert.ok(
+    statements.length > 0 &&
+      !code.includes('$$') &&
+      !/'[^']*;[^']*'/.test(code),
+    `${migration}: expected plain DDL statements`,
+  );
+  for (const statement of statements) await db.query(statement);
+}
+
 // Run the real migration over pre-cutover rows, then process their lifecycle
 // using a client bound to this private schema (public rows are never rewritten).
 async function legacy() {
@@ -1062,16 +1108,8 @@ async function legacy() {
     await db.query(`SET search_path TO "${schema}"`);
     for (const migration of readdirSync('prisma/migrations')
       .filter((n) => /^\d/.test(n) && n < CUTOVER)
-      .sort()) {
-      await db.query(
-        readFileSync(`prisma/migrations/${migration}/migration.sql`, 'utf8')
-          .replaceAll("'public.'", `'${schema}.'`)
-          .replaceAll(
-            'FROM pg_type WHERE',
-            'FROM pg_type WHERE typnamespace = current_schema()::regnamespace AND',
-          ),
-      );
-    }
+      .sort())
+      await applyMigration(db, migration, schema);
     const now = new Date();
     await insert('users', {
       id: 'owner',
@@ -1247,16 +1285,8 @@ async function legacy() {
     // order implementation only after applying the remaining additive schema.
     for (const migration of readdirSync('prisma/migrations')
       .filter((n) => /^\d/.test(n) && n > CUTOVER)
-      .sort()) {
-      await db.query(
-        readFileSync(`prisma/migrations/${migration}/migration.sql`, 'utf8')
-          .replaceAll("'public.'", `'${schema}.'`)
-          .replaceAll(
-            'FROM pg_type WHERE',
-            'FROM pg_type WHERE typnamespace = current_schema()::regnamespace AND',
-          ),
-      );
-    }
+      .sort())
+      await applyMigration(db, migration, schema);
     client = new PrismaClient({
       adapter: new PrismaPg(
         {

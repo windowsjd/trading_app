@@ -36,6 +36,13 @@ import { preflight } from './preflight';
 import { hasMetricSamples } from './observe';
 import { instrumentValkey } from './server-metrics';
 import { PROVIDER_FRESHNESS_THRESHOLDS_SECONDS } from '../../src/providers/source-eligibility.policy';
+import { AuthEmailService } from '../../src/auth/auth-email.service';
+import { readEmailAuthConfig } from '../../src/auth/email-auth.config';
+import {
+  LOAD_TEST_EMAIL_API_KEY,
+  authEmailMailboxKey,
+  loadTestEmailEnvironment,
+} from './auth-email';
 
 const make = () => defaultManifest('a'.repeat(40), true);
 const creds: Credentials = {
@@ -377,6 +384,83 @@ describe('deterministic provider transports retain real parsers', () => {
     expect(
       metrics.counters['prepare:failure:EXTERNAL_PROVIDER_HTTP_BLOCKED'],
     ).toBe(undefined);
+  });
+  it('answers the server’s own signup mail into the run mailbox and blocks any other mail', async () => {
+    const env = loadTestEmailEnvironment(creds);
+    // The server's settings pass the app's own email configuration check.
+    expect(readEmailAuthConfig(env)).toEqual({
+      apiKey: LOAD_TEST_EMAIL_API_KEY,
+      from: 'Trading Class <admin@nanghwa.com>',
+      secret: env.EMAIL_VERIFICATION_SECRET,
+    });
+    const metrics = new Metrics(),
+      replay = new Replay(make(), metrics);
+    const mailService = new AuthEmailService({
+      get: (key: string) => env[key as keyof typeof env],
+    } as never);
+    const challengeId = '0b9f3c2e-4f6a-4c1d-9e8b-7a6d5c4b3a21';
+    const savedFetch = globalThis.fetch;
+    globalThis.fetch = replay.fetch as typeof fetch;
+    try {
+      // Without the server's mailbox there is no mail provider at all.
+      await expect(
+        mailService.send(
+          'a-1@example.invalid',
+          'signup',
+          '012345',
+          challengeId,
+        ),
+      ).rejects.toMatchObject({
+        response: { error: { code: 'EMAIL_UNAVAILABLE' } },
+      });
+      const delivered: { challengeId: string; code: string }[] = [];
+      replay.mailbox = (mail) => {
+        delivered.push(mail);
+        return Promise.resolve();
+      };
+      // The real AuthEmailService request: exactly its code, keyed by challenge.
+      await mailService.send(
+        'a-1@example.invalid',
+        'signup',
+        '012345',
+        challengeId,
+      );
+      expect(delivered).toEqual([{ challengeId, code: '012345' }]);
+      const blocked = (init: RequestInit) =>
+        expect(
+          replay.fetch('https://api.resend.com/emails', init),
+        ).rejects.toThrow('EXTERNAL_PROVIDER_HTTP_BLOCKED');
+      const body = {
+        from: 'Trading Class <admin@nanghwa.com>',
+        to: ['a-2@example.invalid'],
+        text: 'Trading Class 이메일 인증번호\n\n인증번호: 654321\n',
+      };
+      const headers = {
+        Authorization: `Bearer ${LOAD_TEST_EMAIL_API_KEY}`,
+        'Idempotency-Key': `auth-email/${challengeId}`,
+      };
+      await blocked({
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, to: ['someone@example.com'] }),
+      });
+      await blocked({
+        method: 'POST',
+        headers: { ...headers, Authorization: 'Bearer re_other' },
+        body: JSON.stringify(body),
+      });
+      await blocked({
+        method: 'POST',
+        headers: { Authorization: headers.Authorization },
+        body: JSON.stringify(body),
+      });
+      expect(delivered.length).toBe(1);
+    } finally {
+      globalThis.fetch = savedFetch;
+    }
+    expect(authEmailMailboxKey(challengeId)).toBe(
+      `load-test:auth-email:${challengeId}`,
+    );
   });
 });
 describe('workload, histogram and exact financial checks', () => {

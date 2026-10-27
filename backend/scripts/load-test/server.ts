@@ -16,6 +16,11 @@ import { preflight, controlKey, identitySignature } from './preflight';
 import { Metrics, ProcessSampler, writeJson, jsonl } from './metrics';
 import { Replay } from './replay';
 import {
+  AUTH_EMAIL_MAILBOX_TTL_MS,
+  authEmailMailboxKey,
+  loadTestEmailEnvironment,
+} from './auth-email';
+import {
   instrumentPg,
   instrumentSends,
   instrumentMethod,
@@ -84,6 +89,8 @@ export function applyTestEnvironment(m: Manifest, c: Credentials) {
     SCHEDULER_RANKING_ENABLED: 'false',
     SCHEDULER_SEASON_LIFECYCLE_ENABLED: 'false',
     SCHEDULER_SETTLEMENT_ENABLED: 'false',
+    // Signup's real email verification; the replay is its mail provider.
+    ...loadTestEmailEnvironment(c),
   };
   // ConfigModule's existing dotenv file paths are relative to cwd. Bootstrap
   // from an empty directory so the repository's .env files cannot be loaded.
@@ -180,6 +187,14 @@ async function serveExclusively(
   const { control } = lease;
   applyTestEnvironment(m, c);
   const replay = new Replay(m, metrics);
+  replay.mailbox = async ({ challengeId, code }) => {
+    await control.set(
+      authEmailMailboxKey(challengeId),
+      code,
+      'PX',
+      AUTH_EMAIL_MAILBOX_TTL_MS,
+    );
+  };
   const savedFetch = globalThis.fetch;
   globalThis.fetch = replay.fetch as typeof fetch;
   const dbMetrics = instrumentPg(metrics);

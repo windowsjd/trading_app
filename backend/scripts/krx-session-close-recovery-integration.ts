@@ -188,12 +188,15 @@ async function main() {
     const address = server.address();
     assert.ok(address && typeof address === 'object');
     const fixtureBaseUrl = `http://127.0.0.1:${address.port}`;
+    // Production switch defaults unless a case opts in explicitly.
+    let collectionEnv: Record<string, string> = {};
     class FixtureConfig extends KoscomConfigService {
       override getConfig() {
         return {
           ...readKoscomConfig({
             PROVIDER_INGESTION_ENABLED: 'true',
             KOSCOM_API_KEY: 'fixture-key',
+            ...collectionEnv,
           }),
           baseUrl: fixtureBaseUrl,
           namespace,
@@ -554,20 +557,67 @@ async function main() {
       await prisma.assetPriceSnapshot.count({ where: fixtureWhere }),
       4,
     );
-    // OPEN uses central KOSCOM price/book collection, without close recovery.
+    // OPEN uses central KOSCOM price collection, without close recovery. The
+    // domestic order-book poll is off by default since the 2026-10-17 policy
+    // (koscom.config.ts), so only the two prices are stored and the hoga
+    // endpoint is never called.
     const live = await collect();
     assert.equal(live.success, true);
-    assert.equal(live.created, 4);
+    assert.equal(live.created, 2);
     assert.equal(
       realtimeEvents,
       2,
       'only the two OPEN prices emit realtime ticks',
     );
-    assert.equal(live.snapshots.filter((r) => r.kind === 'price').length, 2);
+    assert.equal(
+      live.snapshots.filter((r) => r.kind === 'price' && r.state === 'created')
+        .length,
+      2,
+    );
+    assert.equal(
+      live.snapshots.filter((r) => r.kind === 'orderbook').length,
+      0,
+    );
+    assert.equal(
+      requests.filter((r) => r.path.endsWith('/orderbook')).length,
+      0,
+    );
+    assert.equal(
+      await prisma.assetOrderbookSnapshot.count({ where: fixtureWhere }),
+      0,
+    );
     assert.equal(
       requests.filter((r) => r.path.endsWith('/history')).length,
       dailyCallsBeforeOpen,
     );
+    // The explicit opt-in still polls and stores both order books; the same
+    // prices are not stored again and order books emit no price ticks.
+    collectionEnv = { KOSCOM_ORDERBOOK_COLLECTION_ENABLED: 'true' };
+    const withBooks = await collect();
+    collectionEnv = {};
+    assert.equal(withBooks.success, true);
+    assert.equal(withBooks.created, 2);
+    assert.equal(
+      withBooks.snapshots.filter(
+        (r) => r.kind === 'orderbook' && r.state === 'created',
+      ).length,
+      2,
+    );
+    assert.deepEqual(
+      withBooks.snapshots
+        .filter((r) => r.kind === 'price')
+        .map((r) => r.reason),
+      ['KOSCOM_DUPLICATE_OR_OLDER_PRICE', 'KOSCOM_DUPLICATE_OR_OLDER_PRICE'],
+    );
+    assert.equal(
+      requests.filter((r) => r.path.endsWith('/orderbook')).length,
+      1,
+    );
+    assert.equal(
+      await prisma.assetOrderbookSnapshot.count({ where: fixtureWhere }),
+      2,
+    );
+    assert.equal(realtimeEvents, 2);
     for (const assetId of assetIds) {
       const detail = (await assets.getAsset(user.id, assetId)).data.asset;
       assert.equal(detail.marketStatus, 'open');
