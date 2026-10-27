@@ -493,6 +493,44 @@ describe('pending limit orders in the real trading screen', () => {
       await h.press('pending-kind-limit'); await waitForPending();
       assert.equal(/대기 중인 지정가 주문이 없습니다/.test(empty(h)), spot === 0 && futures === 0);
     });
+  it('대기 목록 opens on every kind with no filter selected; a filter narrows it and pressing it again shows all', async (t) => {
+    const h = inlineTradingHarness();
+    h.orders = { general: [pendingOrder('spot-1', 'buy')] };
+    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
+    const kinds = ['limit', 'protection', 'conditional'];
+    const selected = () => kinds.filter(kind => h.node(`pending-kind-${kind}`).props.accessibilityState.selected);
+    const groups = () => kinds.filter(kind => h.node(`pending-group-${kind}`) !== undefined);
+    const headings = () => h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'header'
+      && /^pending-group-/.test(n.parent?.props.testID ?? '')).map((n: any) => text(n));
+    assert.deepEqual(selected(), []);
+    assert.deepEqual(groups(), kinds);
+    assert.deepEqual(headings(), ['지정가', '손절가/익절가', '조건주문']);
+    assert.deepEqual(pendingIds(h), ['pending-order-spot-1'], 'the 지정가 list is part of the all view');
+    // The renamed filter reads 손절가/익절가; its invisible glue only moves where it may wrap.
+    const label = h.node('pending-kind-protection');
+    assert.equal(label.props.accessibilityLabel, '손절가/익절가');
+    assert.equal(text(label).replace(/[\u2060\u200B]/gu, ''), '손절가/익절가');
+
+    await h.press('pending-kind-protection');
+    assert.deepEqual([selected(), groups(), headings()], [['protection'], ['protection'], []]);
+    await h.press('pending-kind-protection');
+    assert.deepEqual([selected(), groups()], [[], kinds], 'pressing the selected filter again shows all');
+    await h.press('pending-kind-limit');
+    await h.press('pending-kind-conditional');
+    assert.deepEqual([selected(), groups()], [['conditional'], ['conditional']], 'another filter replaces the previous one');
+  });
+
+  it('a list shown in the all view and in its own filter is not read again on switching', async (t) => {
+    const h = inlineTradingHarness();
+    h.orders = { general: [pendingOrder('spot-1', 'buy')] };
+    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
+    const reads = h.orderReads.length;
+    await h.press('pending-kind-limit'); await h.flush();
+    await h.press('pending-kind-limit'); await h.flush();
+    assert.equal(h.orderReads.length, reads);
+    assert.deepEqual(pendingIds(h), ['pending-order-spot-1']);
+  });
+
   it('keeps holdings filters and shows a distinct empty pending state', async (t) => {
     const h = inlineTradingHarness();
     h.holdings = { general: [holding('btc')] };

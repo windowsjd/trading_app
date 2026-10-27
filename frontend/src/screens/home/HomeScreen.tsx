@@ -6,6 +6,7 @@ import { useAppearance } from '../../theme/appearance';
 
 import type { HomeScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { openInMarketTab } from '../../app/navigation/marketTabEntry';
 
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { useHomeAccountContext } from './HomeAccountContext';
@@ -121,10 +122,7 @@ export default function HomeScreen({ navigation }: Props) {
   }
 
   const openAsset = (assetId: string) =>
-    rootNavigation.navigate('MainTabs', {
-      screen: 'MarketTab',
-      params: { screen: 'AssetDetail', params: { assetId } },
-    });
+    rootNavigation.navigate('MainTabs', openInMarketTab('AssetDetail', { assetId, returnTab: 'HomeTab' }));
 
   const openMarket = (assetType: AssetType) =>
     rootNavigation.navigate('MainTabs', {

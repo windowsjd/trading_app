@@ -169,7 +169,8 @@ describe('selected account Wallet and shared Home holdings', () => {
       find(wallet, 'wallet-orders').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: h.account.id }]);
       find(wallet, 'wallet-position-0').props.onPress();
-      assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: '0' } } }]);
+      // Over the Market list, and back returns to the Wallet (marketTabEntry).
+      assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: '0', returnTab: 'WalletTab' }, initial: false } }]);
     });
 
     it(`${mode} scopes every read and completes offset pagination beyond 100`, async (t) => {

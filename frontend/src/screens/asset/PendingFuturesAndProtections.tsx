@@ -17,7 +17,8 @@ import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
 import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSlSheet';
 import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryTpSlSummaries';
 
-export default function PendingFuturesAndProtections({ accountId, focused, protections = false, seasonUi, onCount }: { accountId: string; focused: boolean; protections?: boolean; seasonUi: boolean; onCount?: (count: number | undefined) => void }) {
+/** `excludeOrderIds`: Futures limit orders shown elsewhere in the same list (on their conditional entry). */
+export default function PendingFuturesAndProtections({ accountId, focused, protections = false, seasonUi, onCount, excludeOrderIds }: { accountId: string; focused: boolean; protections?: boolean; seasonUi: boolean; onCount?: (count: number | undefined) => void; excludeOrderIds?: ReadonlySet<string> }) {
   const { selectedAccountId } = useTradingAccount();
   const client = useQueryClient();
   const query = useQuery({ queryKey: protections ? QUERY_KEYS.tradingAccount.protections.pending(accountId) : QUERY_KEYS.tradingAccount.futures.pending(accountId), queryFn: async ({ signal }) => protections ? getPendingProtections(accountId, signal) : getFuturesLimitOrders(accountId, signal), enabled: focused && selectedAccountId === accountId, refetchInterval: focused ? 4000 : false });
@@ -30,7 +31,8 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const current = () => alive.current && selected.current === accountId && isCurrentSession(session);
   const data = !query.isError && query.data?.tradingAccountId === accountId ? query.data : undefined;
-  const count = data && 'orders' in data ? data.orders.length : undefined;
+  const orders = data && 'orders' in data ? data.orders.filter(o => !excludeOrderIds?.has(o.id)) : undefined;
+  const count = orders?.length;
   const plans = useEntryTpSlSummaries(accountId, focused && !protections && !!count);
   useEffect(() => { onCount?.(count); }, [count, onCount]);
   const permission = useRef(false);
@@ -59,7 +61,7 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
   if (query.isError) return <ErrorNotice error={query.error} message="대기 내역을 불러오지 못했습니다." />;
   if (!data) return <Text style={styles.hint}>대기 내역 확인 중…</Text>;
   const pendingGroups = 'groups' in data ? data.groups.filter(g => g.status === 'holding' || g.status === 'active') : [];
-  const empty = 'orders' in data ? !data.orders.length : !pendingGroups.length;
+  const empty = orders ? !orders.length : !pendingGroups.length;
   // New OCO registration is retired (canCreate* false); watching existing groups is not.
   const canMonitor = (domain: 'spot' | 'futures') => 'groups' in data && data.capabilities.enabled && (domain === 'futures'
     ? data.capabilities.canMonitorFutures ?? data.capabilities.canCreateFutures
@@ -71,7 +73,7 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
     {protections ? <Text accessibilityRole="header" style={styles.heading}>기존 TP/SL(OCO)</Text> : null}
     {'groups' in data && !data.capabilities.enabled ? <Text style={styles.hint}>현재 기존 TP/SL(OCO) 조건 감시가 중지되어 있습니다. 보호 내역은 확인할 수 있습니다.</Text> : null}
     {empty ? <Text style={styles.hint}>{protections ? '대기 중인 기존 TP/SL(OCO)이 없습니다.' : '대기 중인 선물 진입 주문이 없습니다.'}</Text> : null}
-    {'orders' in data ? data.orders.map(o => <View key={o.id} style={styles.card}>
+    {'orders' in data ? (orders ?? []).map(o => <View key={o.id} style={styles.card}>
       <Text style={styles.name}>{o.instrument.underlying.name} · {o.instrument.underlying.symbol}</Text>
       <Text style={styles.text}>선물 지정가 · {o.direction === 'long' ? 'Long' : 'Short'} · {o.marginMode === 'cross' ? 'Cross' : 'Isolated'} · {o.leverage}x</Text>
       <Text style={styles.text}>진입 ${formatDisplayDecimal(o.limitPrice)} · 수량 {formatDisplayDecimal(o.quantity)}</Text>

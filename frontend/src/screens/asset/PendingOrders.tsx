@@ -32,6 +32,7 @@ import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSl
 import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryTpSlSummaries';
 import { isEntryTpSlMarketSupported } from '../../features/order/orderMethods';
 import type { RecordOrderItemDto } from '../../features/record/api';
+import { WORD_JOINER, ZERO_WIDTH_SPACE } from '../guide/figureText';
 
 /** The pending row's asset type from its market (KRX, BINANCE, US exchanges). */
 function pendingAssetType(market?: string) {
@@ -65,35 +66,49 @@ export default function PendingOrders(props: Props) {
   const { selectedAccountId } = useTradingAccount();
   return selectedAccountId === props.accountId ? <BoundPendingOrders key={`${props.accountId}:${getSessionGeneration()}`} {...props} /> : null;
 }
-const KIND_LABEL = { limit: '지정가', protection: 'TP/SL', conditional: '조건주문' } as const;
+const KIND_LABEL = { limit: '지정가', protection: '손절가/익절가', conditional: '조건주문' } as const;
+type Kind = keyof typeof KIND_LABEL;
+// Kept whole on a line: a filter too wide for its row wraps after the slash,
+// never inside a word (Korean may otherwise break between any two syllables).
+const glued = (label: string) => label.split('/').map(word => [...word].join(WORD_JOINER)).join(`/${ZERO_WIDTH_SPACE}`);
 export function BoundPendingOrders(props: Props) {
-  const [kind, setKind] = useState<keyof typeof KIND_LABEL>('limit');
+  // No filter shows every kind; pressing the selected filter again clears it.
+  const [kind, setKind] = useState<Kind | null>(null);
+  // The open Futures conditional entries' own limit orders, which those
+  // entries show (as a Spot conditional child stays in its list): the all
+  // view lists each such order once, on its entry.
+  const [entryOrderIds, setEntryOrderIds] = useState<ReadonlySet<string> | undefined>(undefined);
   const kinds = props.conditional ? (['limit', 'protection', 'conditional'] as const) : (['limit', 'protection'] as const);
   return <View style={styles.list}>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
-      {kinds.map(value => <ActionPressable key={value} testID={`pending-kind-${value}`} accessibilityRole="button" accessibilityState={{ selected: value === kind }} aria-pressed={value === kind} onPress={() => setKind(value)} style={[styles.retry, value === kind && styles.kindSelected]}><Text style={styles.value}>{KIND_LABEL[value]}</Text></ActionPressable>)}
+      {kinds.map(value => <ActionPressable key={value} testID={`pending-kind-${value}`} accessibilityRole="button" accessibilityLabel={KIND_LABEL[value]} accessibilityState={{ selected: value === kind }} aria-pressed={value === kind} onPress={() => setKind(current => current === value ? null : value)} style={[styles.retry, styles.kind, value === kind && styles.kindSelected]}><Text style={styles.value}>{glued(KIND_LABEL[value])}</Text></ActionPressable>)}
     </View>
-    {kind === 'limit' ? <LimitPendingOrders {...props} />
-      : kind === 'conditional' ? <>
-        <ConditionalBuyOrdersList key={`conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
-        <ConditionalSellOrdersList key={`sell-condition:${props.accountId}`} accountId={props.accountId} family="condition" isFocused={props.isFocused} seasonUi={props.seasonUi} />
-        <FuturesConditionalEntriesList key={`futures-conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
-      </>
-      : <>
-        {props.conditional ? <ConditionalSellOrdersList key={`sell-protection:${props.accountId}`} accountId={props.accountId} family="protection" isFocused={props.isFocused} seasonUi={props.seasonUi} /> : null}
-        {props.conditional ? <FuturesTpSlList key={`futures-tp-sl:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} /> : null}
-        {props.conditional ? <EntryTpSlPlansList key={`entry-tp-sl:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} /> : null}
-        {/* Existing whole-position OCO protections (registered before 2026-10-16) and their history. */}
-        <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />
-      </>}
+    {/* Keyed per kind: a list shown in both the all view and its own filter
+        stays mounted (no re-read) when the filter changes. */}
+    {(kind ? [kind] : kinds).map(value => <View key={value} style={styles.list} testID={`pending-group-${value}`}>
+      {kind ? null : <Text accessibilityRole="header" style={styles.groupTitle}>{KIND_LABEL[value]}</Text>}
+      {value === 'limit' ? <LimitPendingOrders {...props} excludeFuturesOrderIds={kind ? undefined : entryOrderIds} />
+        : value === 'conditional' ? <>
+          <ConditionalBuyOrdersList key={`conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
+          <ConditionalSellOrdersList key={`sell-condition:${props.accountId}`} accountId={props.accountId} family="condition" isFocused={props.isFocused} seasonUi={props.seasonUi} />
+          <FuturesConditionalEntriesList key={`futures-conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} onLimitOrderIds={setEntryOrderIds} />
+        </>
+        : <>
+          {props.conditional ? <ConditionalSellOrdersList key={`sell-protection:${props.accountId}`} accountId={props.accountId} family="protection" isFocused={props.isFocused} seasonUi={props.seasonUi} /> : null}
+          {props.conditional ? <FuturesTpSlList key={`futures-tp-sl:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} /> : null}
+          {props.conditional ? <EntryTpSlPlansList key={`entry-tp-sl:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} /> : null}
+          {/* Existing whole-position OCO protections (registered before 2026-10-16) and their history. */}
+          <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />
+        </>}
+    </View>)}
   </View>;
 }
-function LimitPendingOrders(props: Props) {
+function LimitPendingOrders({ excludeFuturesOrderIds, ...props }: Props & { excludeFuturesOrderIds?: ReadonlySet<string> }) {
   const [spotCount, setSpotCount] = useState<number | undefined>(undefined);
   const [futuresCount, setFuturesCount] = useState<number | undefined>(undefined);
   return <>
     <SpotPendingOrders {...props} onCount={setSpotCount} />
-    <PendingFuturesAndProtections accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} onCount={setFuturesCount} />
+    <PendingFuturesAndProtections accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} onCount={setFuturesCount} excludeOrderIds={excludeFuturesOrderIds} />
     {spotCount === 0 && futuresCount === 0 ? <InlineEmptyState title="대기 중인 지정가 주문이 없습니다." message="" /> : null}
   </>;
 }
@@ -263,7 +278,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     maxWidth: '100%',
   },
+  kind: { maxWidth: '100%' },
   kindSelected: { borderColor: semantic.selected },
+  groupTitle: { fontSize: 17, lineHeight: 24, fontWeight: '800', color: semantic.text },
   retry: {
     backgroundColor: semantic.raised,
     alignSelf: 'flex-start',

@@ -116,18 +116,20 @@ function popStacksToRoot(names: readonly string[]) {
   }
 }
 
+// A practice screen opens over the Market list (`initial: false`, see
+// app/navigation/marketTabEntry), so Back always has a screen to return to.
 function openPractice(session: GuideSession) {
   if (!isTradingQuest(session.quest)) {
     rootNavigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet', pop: true } });
   } else if (session.quest === 'futuresLong' || session.quest === 'futuresShort') {
-    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: session.accountId } } });
+    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: session.accountId }, initial: false } });
   } else if (session.assetId) {
     // Holdings, TP/SL and limit review steps live on the order screen of that asset.
     if (TRADING_GUIDE_STEPS[session.quest][session.step]?.screen === 'order') {
       rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Order', params: {
-        assetId: session.assetId, accountId: session.accountId, side: session.quest === 'marketSell' || session.quest === 'protection' ? 'sell' : 'buy' }, pop: true } });
+        assetId: session.assetId, accountId: session.accountId, side: session.quest === 'marketSell' || session.quest === 'protection' ? 'sell' : 'buy' }, pop: true, initial: false } });
     } else {
-      rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: session.assetId }, pop: true } });
+      rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: session.assetId }, pop: true, initial: false } });
     }
   } else {
     rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market', params: { assetType: session.quest === 'krStock' ? 'domestic_stock' : session.quest === 'usStock' ? 'us_stock' : 'crypto' }, pop: true } });

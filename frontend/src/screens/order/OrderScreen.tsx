@@ -86,10 +86,11 @@ export default function OrderScreen(props: OrderScreenProps) {
         {...props}
         onOpenAssetSheet={() => setAssetSheetOpen(true)}
         // The stack's own detail page is the entry asset's; after an in-place
-        // change, return to the detail of the asset being traded instead.
+        // change, return to the detail of the asset being traded instead
+        // (merged: a detail opened from another tab still returns there).
         onReturnToAsset={() => {
           if (assetId === entryAssetId) navigation.goBack();
-          else navigation.popTo('AssetDetail', { assetId });
+          else navigation.popTo('AssetDetail', { assetId }, { merge: true });
         }}
         onSideChange={(next) => {
           sideRef.current = next;

@@ -33,8 +33,10 @@ import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryT
  * triggered; once it created a limit entry, that entry is canceled instead.
  * Read and cancel stay available while new registrations are switched off.
  */
-export default function FuturesConditionalEntriesList({ accountId, isFocused, seasonUi }: {
+export default function FuturesConditionalEntriesList({ accountId, isFocused, seasonUi, onLimitOrderIds }: {
   accountId: string; isFocused: boolean; seasonUi: boolean;
+  /** The limit orders these entries show (state 주문 대기), or undefined while unknown. */
+  onLimitOrderIds?: (ids: ReadonlySet<string> | undefined) => void;
 }) {
   const { selectedAccountId } = useTradingAccount();
   const client = useQueryClient();
@@ -60,6 +62,11 @@ export default function FuturesConditionalEntriesList({ accountId, isFocused, se
   const openRows = !open.isError && open.data?.tradingAccountId === accountId ? open.data.entries : undefined;
   const plans = useEntryTpSlSummaries(accountId, isFocused && bound && !!openRows?.length);
   const endedRows = !ended.isError && ended.data?.tradingAccountId === accountId ? ended.data.entries : undefined;
+  const limitOrderIds = bound ? openRows?.flatMap((row) => row.limitOrder?.status === 'submitted' ? [row.limitOrder.orderId] : []).join(',') : undefined;
+  useEffect(() => {
+    onLimitOrderIds?.(limitOrderIds === undefined ? undefined : new Set(limitOrderIds ? limitOrderIds.split(',') : []));
+  }, [limitOrderIds, onLimitOrderIds]);
+  useEffect(() => () => onLimitOrderIds?.(undefined), [onLimitOrderIds]);
   const openIds = openRows?.map((row) => `${row.id}:${row.state}`).join(',');
   const previous = useRef<string | undefined>(undefined);
   useEffect(() => {

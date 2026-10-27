@@ -126,21 +126,31 @@ export function isWithinChartBounds(
 }
 
 /** One gesture at a time owns the chart. */
-export type ChartGestureType = 'pan' | 'pinch' | 'crosshair' | 'priceScale';
+export type ChartGestureType = 'pan' | 'pinch' | 'crosshair' | 'priceScale' | 'priceZoom';
 export type ChartGestureOwner = ChartGestureType | 'none';
 
 export type ChartTouch = { id: number; x: number; y: number };
 export type TouchPair = readonly [ChartTouch, ChartTouch];
 
-/** Lock one intention until lift. Distance change wins over mixed movement;
- * Y scaling requires both fingers moving together, predominantly vertically. */
-export function classifyTwoFingerGesture(start: TouchPair, current: TouchPair): 'pinch' | 'priceScale' | null {
+/** A pinch whose spread changes this much more vertically than horizontally
+ * (within about 35° of vertical) zooms prices; any other pinch zooms time. */
+export const VERTICAL_PINCH_RATIO = 1.4;
+
+/** Lock one intention until lift. Distance change wins over mixed movement: a
+ * pinch zooms time (X), or prices (Y) when the fingers spread or close
+ * vertically. Y scaling by a drag requires both fingers moving together,
+ * predominantly vertically. */
+export function classifyTwoFingerGesture(start: TouchPair, current: TouchPair): 'pinch' | 'priceZoom' | 'priceScale' | null {
   if (start.some((touch, index) => touch.id !== current[index].id)) return null;
   const distance = (pair: TouchPair) => Math.hypot(pair[1].x - pair[0].x, pair[1].y - pair[0].y);
   const initialDistance = distance(start);
   const ratio = distance(current) / initialDistance;
   if (!Number.isFinite(ratio) || initialDistance < 8 || ratio <= 0) return null;
-  if (Math.abs(Math.log(ratio)) >= 0.06) return 'pinch';
+  if (Math.abs(Math.log(ratio)) >= 0.06) {
+    const spread = (axis: 'x' | 'y') =>
+      Math.abs(Math.abs(current[1][axis] - current[0][axis]) - Math.abs(start[1][axis] - start[0][axis]));
+    return spread('y') > spread('x') * VERTICAL_PINCH_RATIO ? 'priceZoom' : 'pinch';
+  }
   const dy0 = current[0].y - start[0].y;
   const dy1 = current[1].y - start[1].y;
   const dy = (dy0 + dy1) / 2;

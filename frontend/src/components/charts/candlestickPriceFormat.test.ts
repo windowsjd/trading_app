@@ -54,4 +54,17 @@ describe('formatChartPrice', () => {
     assert.equal(formatChartPrice(undefined, 'USD', 5), '-');
     assert.equal(formatChartPrice(Number.NaN, 'USD', 5), '-');
   });
+
+  it('converts a dollar price into won; only a converted won keeps carried-over decimals', () => {
+    const rate = 1384.45;
+    assert.equal(formatChartPrice(189.5, 'KRW', null, rate), '262,353원', 'US stock: whole won');
+    assert.equal(formatChartPrice(100000, 'KRW', 0, rate), '138,445,000원');
+    assert.equal(formatChartPrice(0.24561, 'KRW', 2, rate), '340.03원', 'DOGE');
+    assert.equal(formatChartPrice(0.00001, 'KRW', 5, rate), '0.01384원', 'PEPE, not 0원');
+    assert.equal(formatChartPrice(Number.NaN, 'KRW', 2, rate), '-');
+    assert.equal(formatChartPrice(null, 'KRW', 2, rate), '-');
+    // Not converted: a won price of its own is whole won whatever is declared.
+    assert.equal(formatChartPrice(71300.4, 'KRW', 5), '71,300원');
+    assert.equal(formatChartPrice(0.2456, 'USD', 5, undefined), '$0.2456');
+  });
 });

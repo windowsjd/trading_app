@@ -80,7 +80,7 @@ it('HOT uses the Market turnover DESC result and stable order for each category,
     }
     assert.deepEqual(h.hotRows().map(n => n.props.testID), h.markets[type].map(a => `home-hot-item-${a.id}`));
     await h.press(`home-hot-item-${type}-0`);
-    assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: `${type}-0` } } }]);
+    assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: `${type}-0`, returnTab: 'HomeTab' }, initial: false } }]);
     await h.press('home-hot-market');
     const market = h.node('home-hot-market');
     assert.equal(market.props.primary, true);

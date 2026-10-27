@@ -358,3 +358,108 @@ it('raw touch release prevents a late pinch update from restarting Y scale as X 
   h.chart.render(); h.chart.flushEffects();
   assert.ok(h.geometry().geometry.maxY > 1000);
 });
+
+describe('vertical pinch → price zoom (Y), beside the time zoom (X)', () => {
+  /** Two fingers one above the other at x=150, `apart` px further each from y 110/150. */
+  const vertical = (h: ReturnType<typeof setup>, eventType: number, apart: number) => h.events.update(h.pricePan, {
+    eventType, numberOfTouches: 2, changedTouches: [],
+    allTouches: [{ id: 1, x: 150, y: 110 - apart }, { id: 2, x: 150, y: 150 + apart }],
+  });
+  const priceAt = (geometry: any, y: number) => geometry.maxY - ((y - geometry.padding.top) / geometry.innerHeight) * geometry.range;
+  const pinchDown = (h: ReturnType<typeof setup>) => {
+    vertical(h, 1, 0); // TOUCHES_DOWN
+    h.events.state(h.pricePan, BEGAN, ACTIVE, { numberOfPointers: 2 });
+    h.events.state(h.pinch, BEGAN, ACTIVE, { numberOfPointers: 2 });
+  };
+  const lift = (h: ReturnType<typeof setup>) => {
+    h.events.state(h.pricePan, ACTIVE, END);
+    h.events.state(h.pinch, ACTIVE, END);
+  };
+
+  it('fingers apart enlarge the same move, together show a wider range, about where the pinch began', () => {
+    const h = setup(); h.down();
+    const before = h.geometry().geometry;
+    pinchDown(h);
+    vertical(h, 2, 20); // 40 px → 80 px: twice the distance
+    const apart = h.geometry().geometry;
+    assert.ok(Math.abs(apart.range - before.range / 2) < 1e-9);
+    assert.ok(Math.abs(priceAt(apart, 130) - priceAt(before, 130)) < 1e-9, 'the price under the pinch stays under it');
+    assert.equal(apart.slotWidth, before.slotWidth, 'time is not zoomed');
+    assert.equal(apart.startIndex, before.startIndex);
+    vertical(h, 2, -10); // 40 px → 20 px
+    assert.ok(Math.abs(h.geometry().geometry.range - before.range * 2) < 1e-9);
+    // A claimed price zoom stays one: horizontal movement cannot turn it into a time zoom.
+    h.events.update(h.pricePan, { eventType: 2, numberOfTouches: 2, changedTouches: [],
+      allTouches: [{ id: 1, x: 60, y: 100 }, { id: 2, x: 240, y: 160 }] });
+    assert.equal(h.geometry().geometry.slotWidth, before.slotWidth);
+    lift(h);
+    assert.deepEqual(h.intents, ['start', 'end']);
+  });
+
+  it('the zoom stays after the gesture, through new candles and a later time zoom, until 최신 or another chart', () => {
+    const h = setup(); h.down();
+    pinchDown(h);
+    vertical(h, 2, 20);
+    lift(h);
+    const zoomed = h.geometry().geometry;
+    h.chart.props.candles = [...candles, { ...candles.at(-1)!, time: '2026-09-02T00:00:00Z', high: 1000 }];
+    h.chart.render(); h.chart.flushEffects();
+    assert.equal(h.geometry().geometry.range, zoomed.range);
+    // A horizontal pinch zooms time and leaves the price zoom alone.
+    h.events.update(h.pricePan, { eventType: 1, numberOfTouches: 2, changedTouches: [],
+      allTouches: [{ id: 3, x: 100, y: 120 }, { id: 4, x: 200, y: 120 }] });
+    h.events.state(h.pricePan, BEGAN, ACTIVE, { numberOfPointers: 2 });
+    h.events.state(h.pinch, BEGAN, ACTIVE, { numberOfPointers: 2 });
+    h.events.update(h.pricePan, { eventType: 2, numberOfTouches: 2, changedTouches: [],
+      allTouches: [{ id: 3, x: 50, y: 121 }, { id: 4, x: 250, y: 119 }] });
+    const timeZoomed = h.geometry().geometry;
+    assert.ok(timeZoomed.slotWidth > zoomed.slotWidth);
+    assert.equal(timeZoomed.range, zoomed.range);
+    lift(h);
+    elements(h.chart.render(), 'Pressable')[0].props.onPress(); // 최신
+    assert.ok(h.geometry().geometry.range > zoomed.range * 1.5);
+    h.chart.props.viewportResetKey = 'other-asset:1h';
+    h.chart.render(); h.chart.flushEffects();
+    assert.ok(h.geometry().geometry.maxY > 1000);
+  });
+});
+
+describe('display currency (the won view of a dollar asset)', () => {
+  const RATE = 1384.45;
+  const labels = (h: ReturnType<typeof setup>) => elements(h.renderer(), 'text').map((node: any) => String(node.props.children));
+
+  it('writes every price in won and keeps pan, time zoom and price zoom as they were', () => {
+    const h = setup({ currentPrice: '339.5' }); h.down();
+    h.events.state(h.pan, BEGAN, ACTIVE);
+    h.events.update(h.pan, { translationX: 40 });
+    h.events.state(h.pan, ACTIVE, END);
+    const dollars = h.geometry();
+    assert.ok(labels(h).some(label => label.startsWith('$')));
+    h.chart.props = { ...h.chart.props, currencyCode: 'KRW', displayPriceDecimals: null, displayRate: RATE };
+    h.chart.render(); h.chart.flushEffects();
+    const won = h.geometry();
+    for (const key of ['minY', 'maxY', 'range', 'startIndex'] as const) assert.equal(won.geometry[key], dollars.geometry[key], key);
+    assert.equal(won.displayRate, RATE);
+    const written = labels(h).filter(label => /원$/.test(label));
+    assert.ok(written.length >= 5, 'axis labels are won');
+    assert.equal(labels(h).some(label => label.startsWith('$')), false);
+    // The grid's top label is its dollar value at the rate, whole won.
+    const top = formatChartPrice(dollars.geometry.maxY, 'KRW', null, RATE);
+    assert.ok(written.includes(top), top);
+    h.chart.props = { ...h.chart.props, currencyCode: 'USD', displayPriceDecimals: 5, displayRate: null };
+    h.chart.render(); h.chart.flushEffects();
+    assert.deepEqual([h.geometry().geometry.minY, h.geometry().geometry.range], [dollars.geometry.minY, dollars.geometry.range]);
+    assert.equal(labels(h).some(label => /원$/.test(label)), false);
+  });
+
+  it('a low-priced coin keeps readable won decimals and the axis fits a narrow chart', () => {
+    const tiny = candles.map((candle, i) => ({ ...candle, open: 0.00001 + i * 1e-8, high: 0.0000102 + i * 1e-8, low: 0.0000099 + i * 1e-8, close: 0.0000101 + i * 1e-8 }));
+    const h = setup({ candles: tiny, currencyCode: 'KRW', displayPriceDecimals: 5, displayRate: RATE, height: 220 });
+    const written = labels(h).filter(label => /원$/.test(label));
+    assert.ok(written.length >= 5);
+    assert.equal(written.every(label => /^0\.0\d+원$/.test(label)), true, written.join(' '));
+    assert.ok(new Set(written).size >= 4, 'distinct grid labels, not a column of 0원');
+    const geometry = h.geometry().geometry;
+    for (const label of written) assert.ok(chartLabelWidth(label) <= geometry.padding.right, label);
+  });
+});

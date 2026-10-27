@@ -116,7 +116,8 @@ describe('order screen asset sheet', () => {
     await h.press(submit); await h.flush();
     assert.equal(h.success().visible, true);
     await act(async () => h.success().onGoAssetDetail());
-    assert.deepEqual(h.navigation.at(-1), ['popTo', 'AssetDetail', { assetId: 'btc' }]);
+    // Merged: a detail opened from another tab keeps where its back returns.
+    assert.deepEqual(h.navigation.at(-1), ['popTo', 'AssetDetail', { assetId: 'btc' }, { merge: true }]);
   });
 
   it('discards a pending quote of the previous asset after a selection', async (t) => {

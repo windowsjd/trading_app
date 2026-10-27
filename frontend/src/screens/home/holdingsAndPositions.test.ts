@@ -38,12 +38,12 @@ for (const mode of ['general', 'season', 'beginner']) for (const [spot, future] 
     if (spot) {
       assert.equal(h.positions[mode][0].quantity, '1');
       await h.press(spotId);
-      assert.equal(h.navigation.at(-1)[1].params.screen, 'AssetDetail');
+      assert.deepEqual(h.navigation.at(-1)[1].params, { screen: 'AssetDetail', params: { assetId: h.positions[mode][0].assetId, returnTab: 'HomeTab' }, initial: false });
     }
     if (future) {
       await h.press(futuresId);
       assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: {
-        screen: 'Futures', params: { accountId: mode, instrumentId: 'btc' },
+        screen: 'Futures', params: { accountId: mode, instrumentId: 'btc' }, initial: false,
       } }]);
     }
   });

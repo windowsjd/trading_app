@@ -45,6 +45,30 @@ export function scalePriceByPixels(
   return { ...start, factor };
 }
 
+/**
+ * A vertical pinch: `scale` > 1 (fingers apart) narrows the range so the same
+ * move looks larger, < 1 widens it, within the same factor limits as a drag.
+ * The price under `anchor` (0 plot top … 1 bottom: where the pinch began)
+ * stays there, except that a wide range never goes below zero.
+ */
+export function zoomPriceScale(
+  start: ManualPriceScale,
+  scale: number,
+  anchor: number,
+): ManualPriceScale {
+  if (!Number.isFinite(scale) || scale <= 0) return start;
+  const factor = Math.min(
+    MAX_PRICE_SCALE,
+    Math.max(MIN_PRICE_SCALE, start.factor / scale),
+  );
+  const at = Number.isFinite(anchor) ? Math.min(1, Math.max(0, anchor)) : 0.5;
+  const before = scaledPriceRange(start);
+  const { range } = scaledPriceRange({ ...start, factor });
+  const price = before.maxY - at * before.range;
+  const minY = Math.max(MIN_PRICE, price - (1 - at) * range);
+  return { ...start, center: minY + range / 2, factor };
+}
+
 export function scaledPriceRange(scale: ManualPriceScale): PriceRange {
   const center =
     Number.isFinite(scale.center) && scale.center > MIN_PRICE * 2

@@ -97,6 +97,10 @@ test('a conditional entry and the limit entry it created share one plan set', as
     triggerCondition: 'at_or_below', triggerPrice: '100' })];
   await h.start(); t.after(h.close);
   await h.view('pending');
+  // The all view lists the created order once: on its entry, not again as a 지정가 card.
+  assert.equal(words(h.node('futures-conditional-p-tp-sl-summary')), '손절 1건');
+  assert.equal(h.node('pending-futures-limit-1-tp-sl-summary') === undefined, true);
+  await h.press('pending-kind-limit');
   assert.equal(words(h.node('pending-futures-limit-1-tp-sl-summary')), '손절 1건', 'the created order shows the conditional entry’s plans');
   await h.press('pending-kind-conditional');
   assert.equal(words(h.node('futures-conditional-p-tp-sl-summary')), '손절 1건');

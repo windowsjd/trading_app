@@ -144,7 +144,8 @@ describe('existing behaviour that must not regress', () => {
     assert.ok(rendererSource.includes('clipPath='));
     assert.ok(chartSource.includes('displayPriceDecimals'));
     assert.ok(rendererSource.includes('displayPriceDecimals'));
-    assert.ok(fullScreenSource.includes('displayPriceDecimals={displayPrice.displayPriceDecimals}'));
+    // The dollar view passes the declared precision; the won view its carried-over precision.
+    assert.ok(fullScreenSource.includes('displayPriceDecimals={chartWon ? chartWon.displayPriceDecimals : displayPrice.displayPriceDecimals}'));
   });
 });
 

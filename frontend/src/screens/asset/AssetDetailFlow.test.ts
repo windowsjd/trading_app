@@ -442,6 +442,38 @@ test('USD/KRW toggle swaps only the same display price pair', async (t) => {
   await h.press('asset-currency-usd'); assert.equal(primary(), '$900');
 });
 
+test('the chart follows the USD/KRW toggle at the shown price\'s own rate, over the same candles and viewport', async (t) => {
+  const h = inlineTradingHarness();
+  h.ticker = { type: 'asset_ticker', assetId: 'bnb', priceLocal: '900', priceCurrency: 'USD',
+    priceKrw: '1234567', priceKrwState: 'available', changeRate: '2.50' };
+  await openDetail(h); t.after(h.close);
+  const dollars = chart(h);
+  assert.deepEqual([dollars.currencyCode, dollars.displayPriceDecimals, dollars.displayRate], ['USD', 4, undefined]);
+  await h.press('asset-currency-krw');
+  const won = chart(h);
+  // The header's won price over its dollar price: the chart's current price is the header's.
+  assert.deepEqual([won.currencyCode, won.displayRate], ['KRW', 1234567 / 900]);
+  assert.equal(won.displayPriceDecimals, 1, '4 dollar decimals less the rate\'s 3 digits');
+  // Display only: the same candles, live price and viewport identity (no reset).
+  assert.equal(JSON.stringify(won.candles) === JSON.stringify(dollars.candles), true, 'the same candle values');
+  assert.deepEqual([won.currentPrice, won.viewportResetKey], [dollars.currentPrice, dollars.viewportResetKey]);
+  await h.press('asset-currency-usd');
+  assert.deepEqual([chart(h).currencyCode, chart(h).displayRate], ['USD', undefined]);
+});
+
+test('without an available won price the chart stays in dollars, as the header', async (t) => {
+  const h = inlineTradingHarness();
+  h.ticker = { type: 'asset_ticker', assetId: 'bnb', priceLocal: '900', priceCurrency: 'USD',
+    priceKrw: '1234567', priceKrwState: 'available', changeRate: '2.50' };
+  await openDetail(h); t.after(h.close);
+  await h.press('asset-currency-krw');
+  assert.equal(chart(h).currencyCode, 'KRW');
+  // The next ticker's conversion failed: no older rate is kept.
+  h.ticker = { ...h.ticker, priceKrw: null, priceKrwState: 'unavailable' }; await h.update();
+  assert.equal(h.node('asset-detail-primary-price').props.children, '$900');
+  assert.deepEqual([chart(h).currencyCode, chart(h).displayRate], ['USD', undefined]);
+});
+
 test('unavailable ticker KRW never borrows REST conversion', async (t) => {
   const h = inlineTradingHarness();
   h.ticker = { type: 'asset_ticker', assetId: 'bnb', priceLocal: '900', priceCurrency: 'USD',

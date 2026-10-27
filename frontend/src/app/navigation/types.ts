@@ -42,7 +42,8 @@ export type MarketStackParamList = {
   FuturesDetail: { accountId: string; instrumentId: string };
   Market: { assetType?: import('../../features/market/api').AssetType } | undefined;
   MarketSearch: { returnToAsset?: boolean; sort?: import('../../features/market/marketSort').MarketSort } | undefined;
-  AssetDetail: { assetId: string };
+  /** `returnTab`: opened from that tab, where back returns (marketTabEntry). */
+  AssetDetail: { assetId: string; returnTab?: EntryTab };
   /**
    * `accountId` is REQUIRED, not optional (작업 10 §A-2).
    *
@@ -110,6 +111,9 @@ export type MainTabParamList = {
   WalletTab: NavigatorScreenParams<WalletStackParamList> | undefined;
   MyTab: NavigatorScreenParams<MyStackParamList> | undefined;
 };
+
+/** A tab a Market-tab screen can be opened from. */
+export type EntryTab = Exclude<keyof MainTabParamList, 'MarketTab'>;
 
 export type RootStackParamList = {
   /** `market`/`futuresView` preselect the 현물|선물 and 체결|강제청산 views

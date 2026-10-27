@@ -14,6 +14,7 @@ import { primaryGradient, semantic } from '../../theme/tokens';
 import { getHeaderScreenContentStyle } from '../../theme/screenLayout';
 import type { WalletScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { openInMarketTab } from '../../app/navigation/marketTabEntry';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
@@ -314,7 +315,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                       key={position.positionId}
                       testID={`wallet-position-${position.assetId}`}
                       position={position}
-                      onPress={() => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: position.assetId } } })}
+                      onPress={() => rootNavigation.navigate('MainTabs', openInMarketTab('AssetDetail', { assetId: position.assetId, returnTab: 'WalletTab' }))}
                     />
                   ))}
             {positions ? positionsQuery.data?.valuationErrors?.map((failure, index) => (
@@ -322,7 +323,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             )) : null}
           </View>
           <FuturesPositionsSection holdings={futures} testID="wallet-futures"
-            onOpen={position => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId, instrumentId: position.instrumentId } } })} />
+            onOpen={position => rootNavigation.navigate('MainTabs', openInMarketTab('Futures', { accountId, instrumentId: position.instrumentId }))} />
         </View>
       ) : null}
     </ScrollView>

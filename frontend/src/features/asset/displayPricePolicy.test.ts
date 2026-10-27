@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { selectDisplayPrice } from './displayPricePolicy.ts';
+import { selectDisplayPrice, wonChartDisplay } from './displayPricePolicy.ts';
 import type { AssetTickerMessage } from './assetTickerPolicy.ts';
 
 const restPrice = {
@@ -263,5 +263,28 @@ describe('detail completed-session display', () => {
     assert.equal(display.priceLocal, null);
     assert.equal(display.priceKrw, null);
     assert.equal(display.isRealtime, false);
+  });
+});
+
+describe('wonChartDisplay (the chart in the header\'s won)', () => {
+  const won = (priceLocal: string | null, priceKrw: string | null, displayPriceDecimals: number | null, priceKrwState = 'available') =>
+    wonChartDisplay({ priceLocal, priceKrw, priceKrwState, displayPriceDecimals });
+
+  it('uses the rate the server applied to the shown price, so the chart\'s current price is the header\'s', () => {
+    const view = won('189.50000000', '262353.27500000', null);
+    assert.equal(view?.rate, 1384.45);
+    assert.equal(view?.displayPriceDecimals, null, 'US stock: whole won, the app policy');
+    assert.equal(Math.abs(189.5 * (view?.rate ?? 0) - 262353.275) < 1e-6, true);
+  });
+
+  it('keeps the dollar precision in won, whole won when none is left', () => {
+    assert.equal(won('100000.00', '138445000.00', 2)?.displayPriceDecimals, 0, 'BTC');
+    assert.equal(won('0.24561', '340.0347045', 5)?.displayPriceDecimals, 2, 'DOGE');
+    assert.equal(won('0.00001000', '0.01384450', 8)?.displayPriceDecimals, 5, 'PEPE');
+  });
+
+  it('never invents a rate: unavailable, missing or non-positive won keeps the chart in dollars', () => {
+    for (const view of [won('189.5', '262353.275', null, 'unavailable'), won('189.5', null, null), won(null, '262353.275', null),
+      won('0', '0', null), won('189.5', '-1', null), won('abc', '262353.275', null)]) assert.equal(view, null);
   });
 });

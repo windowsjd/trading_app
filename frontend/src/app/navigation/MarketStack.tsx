@@ -8,6 +8,7 @@ import { useReducedMotion } from '../../theme/useReducedMotion';
 import { stackTransition } from './transitionPolicy';
 import { stackScreenLayout } from './stackScreenLayout';
 import { questNavigationRouter } from '../../features/quest/questNavigationGuard';
+import { returnToEntryTab } from './marketTabEntry';
 
 import type { MarketStackParamList } from './types';
 import MarketScreen from '../../screens/market/MarketScreen';
@@ -20,7 +21,8 @@ const Stack = createNativeStackNavigator<MarketStackParamList>();
 export default function MarketStack() {
   const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="MarketStack" UNSTABLE_router={questNavigationRouter} screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}>
+    <Stack.Navigator id="MarketStack" UNSTABLE_router={questNavigationRouter} screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}
+      screenListeners={returnToEntryTab}>
       <Stack.Screen
         name="Market"
         component={MarketScreen}
@@ -36,7 +38,10 @@ export default function MarketStack() {
       <Stack.Screen
         name="AssetDetail"
         component={AssetDetailScreen}
-        options={({ theme }) => ({ title: '종목 상세', headerTitleStyle: theme.fonts.heavy })}
+        // Opened from another tab, back returns there: the arrow alone, and a
+        // generic 뒤로 for screen readers instead of the screen below (마켓).
+        options={({ theme, route }) => ({ title: '종목 상세', headerTitleStyle: theme.fonts.heavy,
+          ...(route.params.returnTab ? { headerBackTitle: '뒤로', headerBackButtonDisplayMode: 'minimal' as const } : {}) })}
       />
       <Stack.Screen
         name="Order"

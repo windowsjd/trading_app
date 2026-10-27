@@ -298,7 +298,7 @@ describe('QuestGuideProvider: transfer sheet and order-screen holdings', () => {
     const h = harness(); await h.render(); t.after(h.close);
     await h.start('protection', questProgress(3));
     assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Order',
-      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'sell' }, pop: true } }]);
+      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'sell' }, pop: true, initial: false } }]);
   });
 
   it('a claimed spot fill is reviewed on the order screen without navigating away', async t => {
@@ -330,7 +330,7 @@ describe('QuestGuideProvider: no resume — leaving ends the guide, a start is a
     assert.equal(h.guide.starting === null, true);
     assert.deepEqual([h.guide.active.step, h.guide.active.orderId, h.guide.active.assetId], [7, 'fill-1', 'crypto-1']);
     assert.deepEqual(h.navigations, [['MainTabs', { screen: 'MarketTab', params: { screen: 'Order',
-      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'buy' }, pop: true } }]]);
+      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'buy' }, pop: true, initial: false } }]]);
   });
 
   it('opens nothing when the read fails or the user left the list meanwhile', async t => {
@@ -440,7 +440,7 @@ describe('QuestGuideProvider: no resume — leaving ends the guide, a start is a
     const h = harness(); await h.render(); t.after(h.close);
     await h.start('futuresLong', questProgressInProgress(8, 'open-1', { longPositionId: 'position-1' }));
     assert.deepEqual([h.guide.active.step, h.guide.active.positionId], [5, 'position-1']);
-    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: ACCOUNT } } }]);
+    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: ACCOUNT }, initial: false } }]);
   });
 });
 

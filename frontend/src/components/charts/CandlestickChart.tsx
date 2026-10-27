@@ -1,5 +1,5 @@
 import { semantic } from '../../theme/tokens';
-import { priceRange, capturePriceScale, scalePriceByPixels, scaledPriceRange, type ManualPriceScale } from './candlestickPriceScale';
+import { priceRange, capturePriceScale, scalePriceByPixels, scaledPriceRange, zoomPriceScale, type ManualPriceScale } from './candlestickPriceScale';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutChangeEvent,
@@ -63,6 +63,14 @@ export type CandlestickChartProps = {
    * instead of $0.2456 on the axis, current-price label and crosshair.
    */
   displayPriceDecimals?: number | null;
+  /**
+   * Display conversion of every written price (axis, current price label,
+   * crosshair, accessibility): the won view of a dollar asset passes its
+   * USD/KRW rate with `currencyCode` 'KRW'. Candles, `currentPrice` and every
+   * range stay in the candles' own currency, so a change keeps the user's
+   * pan, zoom and price scale exactly as they are.
+   */
+  displayRate?: number | null;
   /** Live price for the current-price line. Falls back to the last candle close. */
   currentPrice?: string | number | null;
   /**
@@ -177,12 +185,14 @@ export default function CandlestickChart({
   candles,
   currencyCode,
   displayPriceDecimals,
+  displayRate: displayRateProp,
   currentPrice,
   height: heightOverride,
   emptyMessage = '표시할 차트 데이터가 없습니다.',
   viewportResetKey,
 }: CandlestickChartProps) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const displayRate = displayRateProp != null && Number.isFinite(displayRateProp) && displayRateProp > 0 ? displayRateProp : undefined;
   // Re-runs on rotation and on browser resize, so the chart height follows.
   // The platform matters: a landscape PHONE is wide but is not a tablet.
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -223,6 +233,7 @@ export default function CandlestickChart({
     `${labelPriceRange.minY < 0 ? '-' : ''}${Math.ceil(Math.max(Math.abs(labelPriceRange.minY), Math.abs(labelPriceRange.maxY)))}.12345678`,
     currencyCode,
     displayPriceDecimals,
+    displayRate,
   );
   const paddingRight = Math.min(
     Math.max(PADDING.right, Math.ceil(chartLabelWidth(priceLabelSample)) + 8),
@@ -241,6 +252,8 @@ export default function CandlestickChart({
   totalRef.current = total;
   const innerWidthRef = useRef(innerWidth);
   innerWidthRef.current = innerWidth;
+  const innerHeightRef = useRef(innerHeight);
+  innerHeightRef.current = innerHeight;
   const slotWidthRef = useRef(slotWidth);
   slotWidthRef.current = slotWidth;
   const gestureStartViewportRef = useRef<CandleViewport>(viewport);
@@ -315,6 +328,14 @@ export default function CandlestickChart({
   const handlePriceScale = useCallback((deltaY: number) => {
     const start = gestureStartPriceRef.current;
     if (start) setManualPriceScale(scalePriceByPixels(start, deltaY));
+  }, []);
+
+  const handlePriceZoom = useCallback((scale: number, focalY: number) => {
+    const start = gestureStartPriceRef.current;
+    if (start)
+      setManualPriceScale(
+        zoomPriceScale(start, scale, (focalY - PADDING.top) / innerHeightRef.current),
+      );
   }, []);
 
   const handleCrosshair = useCallback(
@@ -443,6 +464,7 @@ export default function CandlestickChart({
       livePrice ?? parsed[total - 1].close,
       currencyCode,
       displayPriceDecimals,
+      displayRate,
     )}`,
   ].join(', ');
 
@@ -466,6 +488,7 @@ export default function CandlestickChart({
           onPan={handlePan}
           onZoom={handleZoom}
           onPriceScale={handlePriceScale}
+          onPriceZoom={handlePriceZoom}
           onCrosshair={handleCrosshair}
           onGestureEnd={handleGestureEnd}
         >
@@ -474,6 +497,7 @@ export default function CandlestickChart({
             candles={renderedCandles}
             currencyCode={currencyCode}
             displayPriceDecimals={displayPriceDecimals}
+            displayRate={displayRate}
             currentPrice={currentPriceValue}
             currentBullish={parsed[total - 1].bullish}
             crosshair={crosshairState}

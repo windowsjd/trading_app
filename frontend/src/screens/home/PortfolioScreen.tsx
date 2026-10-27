@@ -14,6 +14,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { PortfolioScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { openInMarketTab } from '../../app/navigation/marketTabEntry';
 import { TEST_IDS } from '../../constants/testIds';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import type { PortfolioViewState } from '../../models/enums/viewState';
@@ -511,13 +512,7 @@ export default function PortfolioScreen({ navigation }: Props) {
             <PositionAssetRow position={item}
               testID={TEST_IDS.portfolio.positionItem(item.assetId)}
               onPress={() =>
-                rootNavigation.navigate('MainTabs', {
-                  screen: 'MarketTab',
-                  params: {
-                    screen: 'AssetDetail',
-                    params: { assetId: item.assetId },
-                  },
-                })
+                rootNavigation.navigate('MainTabs', openInMarketTab('AssetDetail', { assetId: item.assetId, returnTab: 'HomeTab' }))
               }
             />
           </View>
@@ -531,7 +526,7 @@ export default function PortfolioScreen({ navigation }: Props) {
             ) : null}
             <View style={styles.card}>
               <FuturesPositionsSection holdings={futures} testID="portfolio-futures"
-                onOpen={position => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId, instrumentId: position.instrumentId } } })} />
+                onOpen={position => rootNavigation.navigate('MainTabs', openInMarketTab('Futures', { accountId, instrumentId: position.instrumentId }))} />
             </View>
             <CTAButton
               label="마켓으로 이동"

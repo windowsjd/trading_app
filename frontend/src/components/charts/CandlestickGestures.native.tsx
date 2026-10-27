@@ -15,9 +15,10 @@ import {
 import type { CandlestickGesturesProps } from './CandlestickGestures';
 
 /** One-finger horizontal pan/long-press race alongside simultaneous native
- * pinch and two-finger pan recognizers. Shared touch intention locks either
- * X zoom or parallel vertical Y scaling until lift. No manual activation or
- * Reanimated dependency: pending recognition never owns the chart session. */
+ * pinch and two-finger pan recognizers. Shared touch intention locks X zoom
+ * (a pinch), Y zoom (a vertical pinch) or parallel vertical Y scaling until
+ * lift. No manual activation or Reanimated dependency: pending recognition
+ * never owns the chart session. */
 export default function CandlestickGestures({
   children,
   paddingLeft,
@@ -27,6 +28,7 @@ export default function CandlestickGestures({
   onPan,
   onZoom,
   onPriceScale,
+  onPriceZoom,
   onCrosshair,
   onGestureEnd,
 }: CandlestickGesturesProps) {
@@ -86,7 +88,7 @@ export default function CandlestickGestures({
 
     let pairStart: TouchPair | null = null;
     let pairNow: TouchPair | null = null;
-    let twoMode: 'pinch' | 'priceScale' | null = null;
+    let twoMode: 'pinch' | 'priceZoom' | 'priceScale' | null = null;
     let pinchActive = false;
     let twoPanActive = false;
     let rawTouchesAvailable = false;
@@ -108,21 +110,19 @@ export default function CandlestickGestures({
         onPriceScale(
           (pairNow[0].y + pairNow[1].y - pairStart[0].y - pairStart[1].y) / 2,
         );
-      } else {
-        onZoom(
-          pinchScale(
-            Math.hypot(
-              pairNow[1].x - pairNow[0].x,
-              pairNow[1].y - pairNow[0].y,
-            ),
-            Math.hypot(
-              pairStart[1].x - pairStart[0].x,
-              pairStart[1].y - pairStart[0].y,
-            ),
-          ),
-          (pairNow[0].x + pairNow[1].x) / 2 - paddingLeft,
-        );
+        return;
       }
+      const scale = pinchScale(
+        Math.hypot(pairNow[1].x - pairNow[0].x, pairNow[1].y - pairNow[0].y),
+        Math.hypot(
+          pairStart[1].x - pairStart[0].x,
+          pairStart[1].y - pairStart[0].y,
+        ),
+      );
+      // Y zooms about where the pinch began; X about the fingers' midpoint.
+      if (mode === 'priceZoom')
+        onPriceZoom(scale, (pairStart[0].y + pairStart[1].y) / 2);
+      else onZoom(scale, (pairNow[0].x + pairNow[1].x) / 2 - paddingLeft);
     };
     const readTouches = (event: {
       allTouches: ChartTouch[];
@@ -209,6 +209,7 @@ export default function CandlestickGestures({
     onPan,
     onZoom,
     onPriceScale,
+    onPriceZoom,
     onCrosshair,
     onGestureEnd,
   ]);

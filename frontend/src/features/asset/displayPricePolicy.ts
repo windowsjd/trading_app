@@ -141,3 +141,29 @@ export function selectDisplayPrice(input: {
     isRealtime: false,
   };
 }
+
+/**
+ * The won view of a dollar price's chart: its rate and axis precision, or null
+ * when won is unavailable (the chart stays in dollars, as the header does).
+ *
+ * The rate is the one the server applied to this very price set (its won value
+ * over its local price), so the chart's current price is the header's won
+ * price: no rate of the app's own, never an older one. Won keeps the dollar
+ * precision, one decimal fewer per digit of the rate (DOGE 0.24561 → 340.03원,
+ * PEPE → 0.01384원), whole won when none are left (US stocks, BTC).
+ */
+export function wonChartDisplay(
+  price: Pick<DisplayPrice, 'priceLocal' | 'priceKrw' | 'priceKrwState' | 'displayPriceDecimals'>,
+): { rate: number; displayPriceDecimals: number | null } | null {
+  const local = Number(price.priceLocal);
+  const won = Number(price.priceKrw);
+  if (price.priceKrwState !== 'available' || !(local > 0) || !(won > 0)) return null;
+  const rate = won / local;
+  if (!Number.isFinite(rate)) return null;
+  const decimals = price.displayPriceDecimals;
+  return {
+    rate,
+    displayPriceDecimals: decimals == null ? null
+      : Math.min(8, Math.max(0, decimals - Math.floor(Math.log10(rate)))),
+  };
+}

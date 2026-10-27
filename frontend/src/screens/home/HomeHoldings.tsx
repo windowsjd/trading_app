@@ -16,6 +16,7 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import ErrorState from '../../components/states/ErrorState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { openInMarketTab } from '../../app/navigation/marketTabEntry';
 import { useFuturesHoldings } from '../../features/futures/useFuturesHoldings';
 import { futuresHolding } from '../../features/futures/positionDisplay';
 
@@ -100,8 +101,8 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
             testID={TEST_IDS.home.positionItem(entry.position.assetId)} onPress={() => onOpenAsset(entry.position.assetId)} />
           : <FuturesPositionRow key={entry.key} testID={`home-futures-${entry.position.id}`}
             position={futuresHolding(entry.position)} evaluatedAt={futures.data?.evaluatedAt ?? ''} now={futures.clock}
-            onPress={() => rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures',
-              params: { accountId, instrumentId: entry.position.instrumentId } } })} />)}
+            onPress={() => rootNavigation.navigate('MainTabs', openInMarketTab('Futures',
+              { accountId, instrumentId: entry.position.instrumentId }))} />)}
       </>}
       {expanded && fullQuery.isLoading ? <View testID="home-holdings-loading"><SectionSkeleton lines={2} /></View> : null}
       {expanded && fullQuery.isError ? <ErrorState title="전체 보유 종목을 불러오지 못했습니다."

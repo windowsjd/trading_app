@@ -73,6 +73,8 @@ export type CandlestickChartRendererProps = {
    * 0.25. Null keeps the currency's default policy.
    */
   displayPriceDecimals?: number | null;
+  /** The chart's `displayRate`: converts labels only, never geometry. */
+  displayRate?: number;
   /** Only supplied while the latest candle is on screen. */
   currentPrice?: number | null;
   currentBullish?: boolean;
@@ -90,6 +92,7 @@ export default function CandlestickChartRenderer({
   candles,
   currencyCode,
   displayPriceDecimals,
+  displayRate,
   currentPrice,
   currentBullish = true,
   crosshair,
@@ -121,7 +124,7 @@ export default function CandlestickChartRenderer({
   const plotClipId = `candle-plot-${instanceId}`;
 
   const formatPrice = (value: number | null | undefined) =>
-    formatChartPrice(value, currencyCode, displayPriceDecimals);
+    formatChartPrice(value, currencyCode, displayPriceDecimals, displayRate);
 
   const yForPrice = useMemo(() => {
     const { minY, range } = geometry;
@@ -182,7 +185,7 @@ export default function CandlestickChartRenderer({
     return Array.from({ length: GRID_LINES + 1 }, (_, index) => {
       const value = minY + (range * index) / GRID_LINES;
       const y = yForPrice(value);
-      const label = formatChartPrice(value, currencyCode, displayPriceDecimals);
+      const label = formatChartPrice(value, currencyCode, displayPriceDecimals, displayRate);
       return (
         <G key={`grid-${index}`}>
           <SvgLine
@@ -212,6 +215,7 @@ export default function CandlestickChartRenderer({
     rightEdgeX,
     currencyCode,
     displayPriceDecimals,
+    displayRate,
     gridColor,
     axisColor,
   ]);

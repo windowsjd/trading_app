@@ -27,7 +27,7 @@ import {
 import { getLastSessionCloseNotice } from '../../features/asset/lastSessionClose';
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
-import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
+import { selectDisplayPrice, wonChartDisplay } from '../../features/asset/displayPricePolicy';
 import { mergeAssetCandleSnapshot } from '../../features/asset/liveCandle';
 import { describeCandleError } from '../../features/asset/candleErrors';
 import { safeRuntimeCode } from '../../services/ws/runtimeDiagnostics';
@@ -177,6 +177,8 @@ export function AssetMarketChart({
   const usdPrice = formatAssetPrice(displayPrice.priceLocal, displayPrice.priceCurrency, displayPrice.displayPriceDecimals);
   const krwPrice = krwAvailable ? `${formatKrw(displayPrice.priceKrw)}원` : '원 환산 불가';
   const useKrw = usdAsset && krwAvailable && displayCurrency === 'KRW';
+  // The chart shows the header's currency: won at the header price's own rate.
+  const chartWon = useKrw ? wonChartDisplay(displayPrice) : null;
   const lastCloseNotice =
     displayPrice.priceLocal === null ? null : getLastSessionCloseNotice(displayPrice);
   const chartBody = (
@@ -361,8 +363,9 @@ export function AssetMarketChart({
           <CandlestickChart
             candles={chartCandles}
             height={chartHeight > 0 ? chartHeight : undefined}
-            currencyCode={displayPrice.priceCurrency}
-            displayPriceDecimals={displayPrice.displayPriceDecimals}
+            currencyCode={chartWon ? 'KRW' : displayPrice.priceCurrency}
+            displayPriceDecimals={chartWon ? chartWon.displayPriceDecimals : displayPrice.displayPriceDecimals}
+            displayRate={chartWon?.rate}
             currentPrice={
               displayPrice.isRealtime ? displayPrice.priceLocal : null
             }

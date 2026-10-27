@@ -33,6 +33,8 @@ export type CandlestickGesturesProps = {
   onZoom: (scale: number, focalX: number) => void;
   /** Vertical price scaling, pixels from the gesture start. */
   onPriceScale: (translationY: number) => void;
+  /** Vertical pinch: price zoom about `focalY` (chart coordinates, px). */
+  onPriceZoom: (scale: number, focalY: number) => void;
   /** Crosshair position in chart coordinates, or null to clear it. */
   onCrosshair: (position: { x: number; y: number } | null) => void;
   /** Gesture finished (adapters use it to end crosshair/pan sessions). */

@@ -42,9 +42,10 @@ for (const [stack, root, label, icon] of [
     // 종목 상세 (stocks/crypto and futures contracts) and 주문 alone take the
     // heavy theme font (bolder, same size).
     const bold = stack === 'Market' ? ['AssetDetail', 'FuturesDetail', 'Order'] : [];
+    const route = (name: string, params: object = {}) => ({ key: name, name, params });
     for (const screen of screens) {
       const resolved = typeof screen.props.options === 'function'
-        ? screen.props.options({ theme: navigationTheme.useTheme() }) : screen.props.options;
+        ? screen.props.options({ theme: navigationTheme.useTheme(), route: route(screen.props.name) }) : screen.props.options;
       assert.equal(resolved.header, undefined);
       assert.equal(resolved.headerLeft, undefined);
       assert.equal(resolved.headerBackVisible, undefined);
@@ -57,8 +58,16 @@ for (const [stack, root, label, icon] of [
     if (stack === 'Market') {
       for (const [name, title] of [['AssetDetail', '종목 상세'], ['FuturesDetail', '종목 상세'], ['Order', '주문']]) {
         const screen = screens.find(item => item.props.name === name);
-        assert.equal(screen.props.options({ theme: navigationTheme.useTheme() }).title, title);
+        assert.equal(screen.props.options({ theme: navigationTheme.useTheme(), route: route(name) }).title, title);
       }
+      // A detail opened from another tab goes back there: the arrow alone, never labeled 마켓.
+      const detail = screens.find(item => item.props.name === 'AssetDetail');
+      const back = (params: object) => {
+        const options = detail.props.options({ theme: navigationTheme.useTheme(), route: route('AssetDetail', params) });
+        return [options.headerBackTitle, options.headerBackButtonDisplayMode];
+      };
+      assert.deepEqual(back({ assetId: 'BTC' }), [undefined, undefined]);
+      assert.deepEqual(back({ assetId: 'BTC', returnTab: 'HomeTab' }), ['뒤로', 'minimal']);
     }
   });
 }
