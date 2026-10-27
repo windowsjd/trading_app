@@ -90,15 +90,19 @@ const wallet = (s: Scenario) =>
   db.cashWallet.findUniqueOrThrow({ where: { id: s.futuresWalletId } });
 async function snapshot(s: Scenario) {
   const where = { tradingAccountId: s.accountId };
+  // Rows in a fixed order: PostgreSQL returns an unordered scan in whatever
+  // physical order updates left, which is not a change of the rows themselves.
+  const orderBy = { id: 'asc' } as const;
   return JSON.stringify({
     wallet: await wallet(s),
-    positions: await db.futuresPosition.findMany({ where }),
-    orders: await db.futuresLimitOrder.findMany({ where }),
-    executions: await db.futuresExecution.findMany({ where }),
-    ledger: await db.walletTransaction.findMany({ where }),
+    positions: await db.futuresPosition.findMany({ where, orderBy }),
+    orders: await db.futuresLimitOrder.findMany({ where, orderBy }),
+    executions: await db.futuresExecution.findMany({ where, orderBy }),
+    ledger: await db.walletTransaction.findMany({ where, orderBy }),
     participant: await db.seasonParticipant.findFirst({ where }),
     groups: await db.protectionGroup.findMany({
       where,
+      orderBy,
       include: {
         legs: { orderBy: { id: 'asc' } },
         children: { orderBy: { id: 'asc' } },

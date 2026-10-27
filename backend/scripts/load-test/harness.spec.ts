@@ -31,6 +31,7 @@ import { instrumentPg, instrumentMethod } from './server-metrics';
 import pg from 'pg';
 import { HttpException } from '@nestjs/common';
 import { installNetworkGuard } from './network-guard';
+import { recordUnexpectedHttpErrors } from './server';
 import net from 'node:net';
 import { preflight } from './preflight';
 import { hasMetricSamples } from './observe';
@@ -255,10 +256,42 @@ describe('deterministic provider transports retain real parsers', () => {
     );
     expect(Array.isArray((await r.json()).symbols)).toBe(true);
     await expect(
-      replay.fetch('https://api.binance.com/unapproved'),
+      replay.fetch('https://api.binance.com/unapproved?symbol=BTCUSDT'),
     ).rejects.toThrow('EXTERNAL_PROVIDER_HTTP_BLOCKED');
     expect(
       metrics.counters['prepare:failure:EXTERNAL_PROVIDER_HTTP_BLOCKED'],
+    ).toBe(1);
+    // The evidence names the blocked path (never its query).
+    expect(
+      metrics.counters['prepare:replay.blocked.api.binance.com/unapproved'],
+    ).toBe(1);
+  });
+  it('records an unexpected server exception by class, code and a digit-free message, leaving the response to the app', () => {
+    const metrics = new Metrics();
+    const handled: unknown[] = [];
+    class Filter {
+      catch(exception: unknown) {
+        handled.push(exception);
+      }
+    }
+    recordUnexpectedHttpErrors(Filter, metrics);
+    const filter = new Filter();
+    class PrismaClientKnownRequestError extends Error {
+      code = 'P2028';
+    }
+    const expired = new PrismaClientKnownRequestError(
+      'Transaction already closed: expired after 5123 ms for 1b4e28ba-2fa1-11d2-883f-0016d3cca427',
+    );
+    filter.catch(expired, {});
+    filter.catch(new HttpException('handled', 409), {});
+    expect(handled).toHaveLength(2);
+    expect(metrics.failures.map((f) => f.code)).toEqual([
+      'UNEXPECTED_PrismaClientKnownRequestError_P2028',
+    ]);
+    expect(
+      metrics.counters[
+        'prepare:unexpected.PrismaClientKnownRequestError.P2028: Transaction already closed: expired after # ms for :id'
+      ],
     ).toBe(1);
   });
   it('serves the KOSCOM paths the client requests only while KRX is open', async () => {

@@ -656,6 +656,10 @@ export class Replay {
       await this.mailbox(mail);
       value = { id: `load-test-email-${mail.challengeId}` };
     } else {
+      // Which provider path the run reached without a replay (no query).
+      this.metrics.count(
+        `replay.blocked.${u.hostname}${u.pathname.replace(/\/load-test-[^/]+/g, '/:test-key')}`,
+      );
       this.metrics.failure('EXTERNAL_PROVIDER_HTTP_BLOCKED');
       throw new Error('EXTERNAL_PROVIDER_HTTP_BLOCKED');
     }

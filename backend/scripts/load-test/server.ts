@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, HttpException, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { WsAdapter } from '@nestjs/platform-ws';
 import IORedis from 'ioredis';
@@ -95,6 +95,40 @@ export function applyTestEnvironment(m: Manifest, c: Credentials) {
   // ConfigModule's existing dotenv file paths are relative to cwd. Bootstrap
   // from an empty directory so the repository's .env files cannot be loaded.
   process.chdir(mkdtempSync(resolve(tmpdir(), 'trading-load-empty-env-')));
+}
+
+/**
+ * Evidence only: the app logs a 500 from an unexpected exception with its
+ * category alone. Keep its class, error code and a digit-free message in the
+ * run's metrics (synthetic fixture data) so a failed run says what failed.
+ * The response and the app's own logging are unchanged.
+ */
+export function recordUnexpectedHttpErrors(
+  filter: { prototype: { catch(exception: unknown, host: unknown): void } },
+  metrics: Metrics,
+) {
+  const original = filter.prototype.catch;
+  filter.prototype.catch = function (exception: unknown, host: unknown) {
+    if (!(exception instanceof HttpException)) {
+      const error = (exception ?? {}) as {
+        code?: unknown;
+        message?: unknown;
+      };
+      const name =
+        exception instanceof Error ? exception.constructor.name : 'NonError';
+      const code = typeof error.code === 'string' ? error.code : 'none';
+      const message =
+        typeof error.message === 'string'
+          ? error.message
+              .replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, ':id')
+              .replace(/\d+/g, '#')
+              .slice(0, 160)
+          : '';
+      metrics.failure(`UNEXPECTED_${name}_${code}`);
+      metrics.count(`unexpected.${name}.${code}: ${message}`);
+    }
+    return original.call(this, exception, host);
+  };
 }
 
 export const SERVER_LEASE_KEY = 'load-test:server-lease';
@@ -200,6 +234,11 @@ async function serveExclusively(
   const dbMetrics = instrumentPg(metrics);
   const restoreSends = instrumentSends(metrics);
   const { AppModule } = require('../../src/app.module');
+  recordUnexpectedHttpErrors(
+    require('../../src/common/global-http-exception.filter')
+      .GlobalHttpExceptionFilter,
+    metrics,
+  );
   const {
     LIVE_CANDLE_SOCKET_FACTORY,
   } = require('../../src/realtime/live-candle-stream-supervisor.service');
