@@ -241,6 +241,8 @@
 - Korea EXIM과 ExchangeRate-API의 실제 fetch가 성공하면 같은 rate/effectiveAt이어도 receivedAt을 capturedAt으로 새 observation을 저장한다. 기존 row는 수정하지 않으며, Korea EXIM의 fresh row 재사용 시에는 fetch/write를 하지 않는다.
   근거: 환율 값이 같다는 사실은 새 관측이 없었다는 뜻이 아니며, 과거 관측 시각을 덮어쓰면 이력의 의미가 바뀐다.
 - USD 시장가 create/internal execute는 ownership·committed replay 확인 뒤 금융 transaction 밖에서 부족한 execute FX evidence를 준비한다. FX와 공유하는 process-local coordinator가 Korea EXIM → ExchangeRate-API 순서로 refresh하고 같은 freshness 정책의 동시 요청을 병합한다. Provider 응답은 snapshot으로 commit한 뒤 transaction 안에서 DB clock과 기존 60초/provider-only 정책으로 다시 선택한다. Quote TTL·rate-change guard·거래 arithmetic은 유지하며 scheduler의 기본 FX 3600초 주기를 correctness 조건으로 삼지 않는다. Limit fill은 기존 DB-only selection/skip을 유지한다.
+- USD 주문 quote(시장가·지정가·LOC, worker의 조건주문 quote 포함)도 committed provider USD/KRW가 신선하지 않을 때만 금융 transaction 밖에서 같은 coordinator(`orders_quote`, quote 300초, FX quote와 같은 병합 슬롯)로 준비한 뒤 같은 eligibility·우선순위로 다시 선택한다(2026-10-28). Refresh 후에도 적격 row가 없으면 기존 `FX_RATE_UNAVAILABLE`/`FX_RATE_STALE`로 차단하고 quote를 쓰지 않는다. quoteAt 기준 TTL 15초, 30bps guard, execute의 60초 재선택은 그대로다.
+  근거: 운영 FX 수집은 약 61분 주기의 Korea EXIM 단독인데 quote는 300초 evidence를 요구해, quote가 먼저 실패하면 execute 준비에 도달하지 못했다(2026-10-27 `FX_RATE_UNAVAILABLE` 18건, provider 정상 시각).
 
 ## Market-Date Calculation Inventory
 

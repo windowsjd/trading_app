@@ -167,6 +167,40 @@ describe('UsdKrwRefreshService', () => {
     });
   });
 
+  it('prepares order quotes with the 300 s quote limit, shared with FX quotes, never as an execute', async () => {
+    const stale = fixture(400);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    stale.primary.ensureFreshUsdKrwSnapshot.mockImplementation(async () => {
+      await gate;
+      stale.rows.unshift(row(0));
+    });
+    const requests = Array.from({ length: 20 }, (_, i) =>
+      stale.service.prepare(i % 4 ? 'orders_quote' : 'fx_quote'),
+    );
+    release();
+    const results = await Promise.all(requests);
+    expect(results.every((r) => r.result === 'refreshed')).toBe(true);
+    expect(stale.primary.ensureFreshUsdKrwSnapshot).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        stale.primary.ensureFreshUsdKrwSnapshot.mock.calls[0] as unknown as [
+          { maxAgeSeconds: number },
+        ]
+      )[0].maxAgeSeconds,
+    ).toBe(300);
+    // 68 s old: fresh for a quote, not for an execute.
+    const quoted = fixture(68);
+    expect((await quoted.service.prepare('orders_quote')).attempted).toBe(
+      false,
+    );
+    expect((await quoted.service.prepare('orders_execute')).attempted).toBe(
+      true,
+    );
+  });
+
   it('propagates storage failures and releases in-flight work for a later request', async () => {
     const f = fixture();
     f.primary.ensureFreshUsdKrwSnapshot.mockRejectedValueOnce(

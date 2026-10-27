@@ -1668,6 +1668,242 @@ describe('OrdersService', () => {
     expectNoOrderWrites(prisma);
   });
 
+  describe('orders quote: stale USD/KRW evidence and the shared provider refresh', () => {
+    const usAsset = {
+      id: 'asset-us',
+      symbol: 'AAPL',
+      name: 'Apple Inc.',
+      market: 'NAS',
+      assetType: AssetType.us_stock,
+      currencyCode: CurrencyCode.USD,
+      isActive: true,
+    };
+    const fxRow = (
+      id: string,
+      ageSeconds: number,
+      sourceName = 'korea_exim_exchange_rate',
+      rate = '1490.00000000',
+    ) => ({
+      id,
+      rate: new Prisma.Decimal(rate),
+      sourceType: FxRateSourceType.provider_api,
+      sourceName,
+      effectiveAt: new Date(Date.now() - ageSeconds * 1_000),
+      capturedAt: new Date(Date.now() - ageSeconds * 1_000),
+    });
+    // One USD market BUY quote's reads (season, participant, asset, price, wallet).
+    const arrangeQuote = (prisma: ReturnType<typeof createPrisma>) => {
+      mockActiveSeason(prisma);
+      mockJoined(prisma);
+      prisma.asset.findUnique.mockResolvedValueOnce(usAsset);
+      prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+        {
+          id: 'provider-price-us',
+          price: new Prisma.Decimal('110.00000000'),
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: 'kis_us_delayed_trade',
+          effectiveAt: new Date(Date.now() - 1_000),
+          capturedAt: new Date(Date.now() - 1_000),
+        },
+      ]);
+      mockCashWallet(prisma, '1000.00000000');
+    };
+    const quoteUs = (service: OrdersService) =>
+      service.quoteOrder('user-1', {
+        assetId: 'asset-us',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '2.00000000',
+      });
+    const failure = async (promise: Promise<unknown>) => {
+      const error = await promise.then(
+        () => null,
+        (cause: unknown) => cause,
+      );
+      return error instanceof HttpException
+        ? `${error.getStatus()} ${(error.getResponse() as { error: { code: string } }).error.code}`
+        : String(error);
+    };
+
+    it('uses fresh committed evidence without a provider call', async () => {
+      const { prisma, service, primary, secondary } = createService(true);
+      prisma.fxRateSnapshot.findMany.mockResolvedValue([fxRow('fx-fresh', 30)]);
+      arrangeQuote(prisma);
+      const response = await quoteUs(service);
+      expect(response.data.fxRateSnapshotId).toBe('fx-fresh');
+      expect(primary.ensureFreshUsdKrwSnapshot).not.toHaveBeenCalled();
+      expect(secondary.ingestUsdKrw).not.toHaveBeenCalled();
+    });
+
+    it('refreshes a stale observation once, pins the new one and keeps the quote window', async () => {
+      const { prisma, service, primary, secondary } = createService(true);
+      // The last hourly observation is older than the 300 s quote limit.
+      let rows = [fxRow('fx-stale', 1_500)];
+      prisma.fxRateSnapshot.findMany.mockImplementation(async () => rows);
+      primary.ensureFreshUsdKrwSnapshot.mockImplementation(async () => {
+        rows = [
+          fxRow('fx-refreshed', 0, 'korea_exim_exchange_rate', '1495.00000000'),
+          ...rows,
+        ];
+      });
+      arrangeQuote(prisma);
+      const response = await quoteUs(service);
+      expect(response.data.fxRateSnapshotId).toBe('fx-refreshed');
+      expect(response.data.krwGrossAmount).toBe('328900.00000000');
+      expect(primary.ensureFreshUsdKrwSnapshot).toHaveBeenCalledTimes(1);
+      expect(
+        primary.ensureFreshUsdKrwSnapshot.mock.calls[0][0].maxAgeSeconds,
+      ).toBe(300);
+      expect(secondary.ingestUsdKrw).not.toHaveBeenCalled();
+      expect(
+        new Date(response.data.expiresAt ?? '').getTime() -
+          new Date(response.data.quoteAt).getTime(),
+      ).toBe(15_000);
+      expect(prisma.quote.create.mock.calls[0][0].data.fxRateSnapshotId).toBe(
+        'fx-refreshed',
+      );
+      expect(
+        prisma.quote.create.mock.calls[0][0].data.fxRateSourceJson.sourceName,
+      ).toBe('korea_exim_exchange_rate');
+    });
+
+    it('fails closed with a retryable 503 when no eligible rate comes back, then recovers on the next quote', async () => {
+      const { prisma, service, primary, secondary } = createService(true);
+      let rows = [fxRow('fx-stale', 1_500)];
+      prisma.fxRateSnapshot.findMany.mockImplementation(async () => rows);
+      primary.ensureFreshUsdKrwSnapshot.mockRejectedValueOnce(
+        new ProviderHttpError(
+          'korea_exim_exchange_rate',
+          'KOREA_EXIM_HTTP_ERROR',
+          'down',
+        ),
+      );
+      arrangeQuote(prisma);
+      expect(await failure(quoteUs(service))).toBe('503 FX_RATE_UNAVAILABLE');
+      expect(prisma.quote.create).not.toHaveBeenCalled();
+      // The fallback provider was asked too; nothing was invented.
+      expect(secondary.ingestUsdKrw).toHaveBeenCalledTimes(1);
+      // No failure is remembered: the provider is back, the next quote refreshes.
+      primary.ensureFreshUsdKrwSnapshot.mockImplementationOnce(async () => {
+        rows = [fxRow('fx-recovered', 0), ...rows];
+      });
+      arrangeQuote(prisma);
+      const response = await quoteUs(service);
+      expect(response.data.fxRateSnapshotId).toBe('fx-recovered');
+      expect(primary.ensureFreshUsdKrwSnapshot).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the source priority and the manual fallback rules after a refresh', async () => {
+      // Korea EXIM down, ExchangeRate-API answers: its fresh row is used.
+      const fallback = createService(true);
+      let rows = [fxRow('fx-stale', 1_500)];
+      fallback.prisma.fxRateSnapshot.findMany.mockImplementation(
+        async () => rows,
+      );
+      fallback.primary.ensureFreshUsdKrwSnapshot.mockRejectedValueOnce(
+        new ProviderHttpError(
+          'korea_exim_exchange_rate',
+          'KOREA_EXIM_HTTP_ERROR',
+          'down',
+        ),
+      );
+      fallback.secondary.ingestUsdKrw.mockImplementationOnce(async () => {
+        rows = [
+          fxRow('fx-exchange-api', 0, 'exchange_rate_api', '1500.00000000'),
+          ...rows,
+        ];
+        return { success: true };
+      });
+      arrangeQuote(fallback.prisma);
+      expect((await quoteUs(fallback.service)).data.fxRateSnapshotId).toBe(
+        'fx-exchange-api',
+      );
+      // A stale approved manual rate is still refused after an empty refresh.
+      const manual = createService(true);
+      manual.prisma.fxRateSnapshot.findMany.mockResolvedValue([
+        fxRow('fx-stale', 1_500),
+      ]);
+      manual.prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
+        id: 'manual-old',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceName: 'manual-fx',
+        effectiveAt: new Date(Date.now() - 600_000),
+        capturedAt: new Date(Date.now() - 600_000),
+      });
+      arrangeQuote(manual.prisma);
+      expect(await failure(quoteUs(manual.service))).toBe('503 FX_RATE_STALE');
+      expect(manual.primary.ensureFreshUsdKrwSnapshot).toHaveBeenCalledTimes(1);
+    });
+
+    it('lets concurrent quotes share one provider refresh', async () => {
+      // Same frozen clock; setImmediate stays real to let all three reach the refresh.
+      jest
+        .useFakeTimers({ doNotFake: ['setImmediate'] })
+        .setSystemTime(usMarketOpenAt);
+      const { prisma, service, primary } = createService(true);
+      let rows = [fxRow('fx-stale', 1_500)];
+      prisma.fxRateSnapshot.findMany.mockImplementation(async () => rows);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      primary.ensureFreshUsdKrwSnapshot.mockImplementation(async () => {
+        await gate;
+        rows = [fxRow('fx-shared', 0), ...rows];
+      });
+      for (let i = 0; i < 3; i++) arrangeQuote(prisma);
+      const quotes = Promise.all([
+        quoteUs(service),
+        quoteUs(service),
+        quoteUs(service),
+      ]);
+      await new Promise((resolve) => setImmediate(resolve));
+      release();
+      const responses = await quotes;
+      expect(
+        responses.map((response) => response.data.fxRateSnapshotId),
+      ).toEqual(['fx-shared', 'fx-shared', 'fx-shared']);
+      expect(primary.ensureFreshUsdKrwSnapshot).toHaveBeenCalledTimes(1);
+    });
+
+    it('never reads FX or calls a provider for a KRW-settled quote', async () => {
+      useKrxMarketOpenTime();
+      const { prisma, service, primary, secondary } = createService(true);
+      mockActiveSeason(prisma);
+      mockJoined(prisma);
+      prisma.asset.findUnique.mockResolvedValueOnce({
+        id: 'asset-krx',
+        symbol: '005930',
+        name: 'Samsung',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+        isActive: true,
+      });
+      prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+        {
+          id: 'provider-price-krx',
+          price: new Prisma.Decimal('70000.00000000'),
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: 'koscom_krx_realtime_price',
+          effectiveAt: new Date(Date.now() - 1_000),
+          capturedAt: new Date(Date.now() - 1_000),
+        },
+      ]);
+      mockCashWallet(prisma, '10000000.00000000');
+      const response = await service.quoteOrder('user-1', {
+        assetId: 'asset-krx',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1.000000',
+      });
+      expect(response.data.fxRateSnapshotId ?? null).toBe(null);
+      expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+      expect(primary.ensureFreshUsdKrwSnapshot).not.toHaveBeenCalled();
+      expect(secondary.ingestUsdKrw).not.toHaveBeenCalled();
+    });
+  });
+
   it('falls back to admin_manual price when orders quote provider price is stale', async () => {
     useKrxMarketOpenTime();
     const { prisma, service } = createService();

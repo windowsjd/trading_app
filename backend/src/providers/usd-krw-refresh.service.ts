@@ -11,7 +11,11 @@ import {
   selectFreshProviderSnapshotBySourcePriority,
 } from './source-eligibility.policy';
 
-type RefreshWorkflow = 'orders_execute' | 'fx_execute' | 'fx_quote';
+type RefreshWorkflow =
+  | 'orders_quote'
+  | 'orders_execute'
+  | 'fx_execute'
+  | 'fx_quote';
 export type UsdKrwRefreshResult = {
   attempted: boolean;
   result: 'already_fresh' | 'refreshed' | 'unavailable';

@@ -7178,35 +7178,62 @@ export class OrdersService {
       baseCurrency: CurrencyCode.USD,
       quoteCurrency: CurrencyCode.KRW,
     });
-    const providerCandidates = providerEligibility.eligible
-      ? await findUsdKrwProviderSnapshotCandidates(this.prisma, {
-          sourceNames: providerEligibility.sourceNames,
-          take: 10,
-        })
-      : [];
-    const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshotBySourcePriority({
-          candidates: providerCandidates,
-          expectedSourceNames: providerEligibility.sourceNames,
-          now: quoteAt,
-          freshnessThresholdSeconds:
-            providerEligibility.freshnessThresholdSeconds,
-          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
-        })
-      : {
-          state: 'not_selected' as const,
-          decision: {
-            selectedSourceType: null,
-            selectedSourceName: null,
-            selectedSnapshotId: null,
-            selectedEffectiveAt: null,
-            selectedCapturedAt: null,
-            fallbackUsed: true,
-            fallbackReason: providerEligibility.reason,
-            rejectedProviderReason: null,
-            freshnessAgeSeconds: null,
-          },
-        };
+    const selectProvider = async (evaluationAt: Date) => {
+      const candidates = providerEligibility.eligible
+        ? await findUsdKrwProviderSnapshotCandidates(this.prisma, {
+            sourceNames: providerEligibility.sourceNames,
+            take: 10,
+          })
+        : [];
+      const selection = providerEligibility.eligible
+        ? selectFreshProviderSnapshotBySourcePriority({
+            candidates,
+            expectedSourceNames: providerEligibility.sourceNames,
+            now: evaluationAt,
+            freshnessThresholdSeconds:
+              providerEligibility.freshnessThresholdSeconds,
+            isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+          })
+        : {
+            state: 'not_selected' as const,
+            decision: {
+              selectedSourceType: null,
+              selectedSourceName: null,
+              selectedSnapshotId: null,
+              selectedEffectiveAt: null,
+              selectedCapturedAt: null,
+              fallbackUsed: true,
+              fallbackReason: providerEligibility.reason,
+              rejectedProviderReason: null,
+              freshnessAgeSeconds: null,
+            },
+          };
+      return { evaluationAt, candidates, selection };
+    };
+    let provider = await selectProvider(quoteAt);
+    // Committed evidence first. Only a missing or stale observation asks the
+    // shared provider preparation (as FX quotes and order executes do): one
+    // refresh per process for concurrent callers, none while fresh. The same
+    // eligibility, freshness and source priority then select again; a refresh
+    // that yields nothing keeps the fail-closed path below.
+    if (
+      provider.selection.state !== 'selected' &&
+      providerEligibility.eligible &&
+      this.usdKrwRefreshService
+    ) {
+      const preparation = await this.usdKrwRefreshService.prepare(
+        'orders_quote',
+        quoteAt,
+      );
+      setAdminDiagnosticContext({
+        evidence: { preflightRefresh: preparation },
+      });
+      // A new observation is captured after quoteAt, and a capture after the
+      // evaluation clock is never eligible: select it at the current time.
+      provider = await selectProvider(new Date());
+    }
+    const { candidates: providerCandidates, selection: providerSelection } =
+      provider;
 
     if (providerSelection.state === 'selected') {
       return {
@@ -7218,7 +7245,7 @@ export class OrdersService {
 
     const providerFailureEvidence = buildSelectionFailureEvidence({
       workflow: sourceWorkflow,
-      evaluationAt: quoteAt,
+      evaluationAt: provider.evaluationAt,
       eligibility: providerEligibility,
       candidates: providerCandidates,
       selection: providerSelection,
