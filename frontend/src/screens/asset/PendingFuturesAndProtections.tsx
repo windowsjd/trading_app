@@ -70,9 +70,9 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
   // An entry that just filled leaves the list; its open sheet stays to say so.
   if (!protections && empty) return <View testID="pending-futures">{sheet}</View>;
   return <View style={styles.list} testID={protections ? 'pending-protections' : 'pending-futures'}>
-    {protections ? <Text accessibilityRole="header" style={styles.heading}>기존 TP/SL(OCO)</Text> : null}
-    {'groups' in data && !data.capabilities.enabled ? <Text style={styles.hint}>현재 기존 TP/SL(OCO) 조건 감시가 중지되어 있습니다. 보호 내역은 확인할 수 있습니다.</Text> : null}
-    {empty ? <Text style={styles.hint}>{protections ? '대기 중인 기존 TP/SL(OCO)이 없습니다.' : '대기 중인 선물 진입 주문이 없습니다.'}</Text> : null}
+    {protections ? <Text accessibilityRole="header" style={styles.heading}>기존 손절가/익절가(OCO)</Text> : null}
+    {'groups' in data && !data.capabilities.enabled ? <Text style={styles.hint}>현재 기존 손절가/익절가(OCO) 조건 감시가 중지되어 있습니다. 보호 내역은 확인할 수 있습니다.</Text> : null}
+    {empty ? <Text style={styles.hint}>{protections ? '대기 중인 기존 손절가/익절가(OCO)가 없습니다.' : '대기 중인 선물 진입 주문이 없습니다.'}</Text> : null}
     {'orders' in data ? (orders ?? []).map(o => <View key={o.id} style={styles.card}>
       <Text style={styles.name}>{o.instrument.underlying.name} · {o.instrument.underlying.symbol}</Text>
       <Text style={styles.text}>선물 지정가 · {o.direction === 'long' ? 'Long' : 'Short'} · {o.marginMode === 'cross' ? 'Cross' : 'Isolated'} · {o.leverage}x</Text>
@@ -87,7 +87,7 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
       <Text style={styles.name}>{g.asset?.name ?? '보호 종목'} · {g.asset?.symbol ?? ''}</Text>
       <Text style={styles.text}>{g.domain === 'spot' ? '현물' : `선물 ${g.direction === 'long' ? 'Long' : 'Short'}`} · {g.status === 'holding' ? '진입 체결 대기' : canMonitor(g.domain) ? '포지션 보호 중' : '보호 감시 중지'}</Text>
       {g.legs.map(leg => <View key={leg.id} style={styles.list}>
-        <Text style={styles.text}>{leg.kind === 'stop_loss' ? '손절 SL' : '익절 TP'} · 조건 {formatDisplayDecimal(leg.triggerPrice)} {g.currencyCode}</Text>
+        <Text style={styles.text}>{leg.kind === 'stop_loss' ? '손절가' : '익절가'} · 조건 {formatDisplayDecimal(leg.triggerPrice)} {g.currencyCode}</Text>
         <Text style={styles.text}>{leg.childOrderType === 'market' ? '시장가 실행' : `지정가 ${formatDisplayDecimal(leg.childLimitPrice ?? '0')} ${g.currencyCode}`}</Text>
         <Text style={styles.hint}>{leg.state === 'holding' ? '진입 체결 후 감시' : !canMonitor(g.domain) ? '조건 감시 중지' : leg.state === 'triggered' ? '조건 충족 · 체결 대기' : '조건 감시 중'}</Text>
       </View>)}
@@ -113,18 +113,18 @@ function ProtectionHistory({ accountId, focused }: { accountId: string; focused:
   return <View style={styles.list}>
     <ActionPressable accessibilityRole="button" testID="protection-history-toggle" accessibilityState={{ expanded: open }} aria-expanded={open}
       onPress={() => setOpen(value => !value)} style={styles.history}>
-      <Text style={styles.text}>{open ? '종료된 기존 TP/SL(OCO) 이력 닫기' : '종료된 기존 TP/SL(OCO) 이력 보기'}</Text>
+      <Text style={styles.text}>{open ? '종료된 기존 손절가/익절가(OCO) 이력 닫기' : '종료된 기존 손절가/익절가(OCO) 이력 보기'}</Text>
     </ActionPressable>
     {open ? <View style={styles.list} testID="protection-history">
-      {query.isError ? <ErrorNotice error={query.error} message="TP/SL 이력을 불러오지 못했습니다." />
-        : !ended ? <Text style={styles.hint}>TP/SL 이력 확인 중…</Text>
-        : !ended.length ? <Text style={styles.hint}>종료된 TP/SL이 없습니다.</Text>
+      {query.isError ? <ErrorNotice error={query.error} message="기존 손절가/익절가(OCO) 이력을 불러오지 못했습니다." />
+        : !ended ? <Text style={styles.hint}>기존 손절가/익절가(OCO) 이력 확인 중…</Text>
+        : !ended.length ? <Text style={styles.hint}>종료된 기존 손절가/익절가(OCO)가 없습니다.</Text>
         : <>
           <Text style={styles.hint}>최근 보호 최대 30건 · 각 보호의 최근 조건 충족 최대 20건</Text>
           {ended.map(g => <View key={g.id} style={styles.card}>
             <Text style={styles.name}>{g.asset?.name ?? '보호 종목'} · {g.asset?.symbol ?? ''}</Text>
             <Text style={styles.text}>{g.domain === 'spot' ? '현물' : `선물 ${g.direction === 'long' ? 'Long' : 'Short'}`} · {g.status === 'completed' ? '보호 완료' : '보호 취소'} · {(g.endedAt ?? g.createdAt).slice(0, 10)}</Text>
-            {g.legs.map(leg => <Text key={leg.id} style={styles.hint}>{leg.kind === 'stop_loss' ? '손절 SL' : '익절 TP'} · 조건 {formatDisplayDecimal(leg.triggerPrice)} {g.currencyCode}</Text>)}
+            {g.legs.map(leg => <Text key={leg.id} style={styles.hint}>{leg.kind === 'stop_loss' ? '손절가' : '익절가'} · 조건 {formatDisplayDecimal(leg.triggerPrice)} {g.currencyCode}</Text>)}
             {g.children.map(c => <Text key={c.id} style={styles.hint}>조건 충족 {formatDisplayDecimal(c.triggerEvidence.price)} · {c.status === 'filled' ? '실행됨' : c.status === 'canceled' ? '취소/교체됨' : '체결 대기'}</Text>)}
           </View>)}
         </>}

@@ -284,7 +284,7 @@ export const BLOCKED_REASON_MESSAGE: Record<BlockedReason, string> = {
   blocked_season_not_joined: '시즌에 참가해야 거래할 수 있습니다.',
   blocked_season_not_active: '현재 거래 가능한 시즌이 아닙니다.',
   blocked_settlement_in_progress: '정산 중에는 거래할 수 없습니다.',
-  blocked_fx_rate_stale: '환율 정보를 확인할 수 없어 환전할 수 없습니다.',
+  blocked_fx_rate_stale: '환율 정보를 확인할 수 없어 환전할 수 없습니다. 잠시 후 다시 시도해주세요.',
   blocked_fx_insufficient_balance: '환전할 잔액이 부족합니다.',
   blocked_fx_season_inactive: '현재 환전 가능한 시즌이 아닙니다.',
 };
@@ -456,7 +456,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.INVALID_CONDITIONAL_SELL_PRICE:
       return '감시가격, 지정가격 또는 수량을 다시 확인해주세요.';
     case ERROR_CODE.PROTECTION_CONFLICT:
-      return '이 종목의 기존 TP/SL(OCO) 보호와 함께 사용할 수 없습니다. 대기 목록의 TP/SL에서 기존 보호를 확인하고 취소한 뒤 다시 시도해주세요.';
+      return '이 종목의 기존 손절가/익절가(OCO) 보호와 함께 사용할 수 없습니다. 대기 목록의 손절가/익절가에서 기존 보호를 확인하고 취소한 뒤 다시 시도해주세요.';
     case ERROR_CODE.PROTECTION_REGISTRATION_RETIRED:
       return '기존 TP/SL(OCO) 방식은 새로 등록할 수 없습니다. 손절가/익절가 설정을 이용해주세요. 이미 등록된 TP/SL은 그대로 감시되고 취소할 수 있습니다.';
     case ERROR_CODE.INVALID_FUTURES_TP_SL:
@@ -539,9 +539,9 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.INSUFFICIENT_QUANTITY:
       return '보유 수량이 부족합니다.';
     case ERROR_CODE.FX_RATE_STALE:
-      return '환율 갱신 대기 중입니다.';
+      return '환율 갱신 대기 중입니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.FX_RATE_UNAVAILABLE:
-      return '환율 정보를 확인할 수 없습니다.';
+      return '환율 정보를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.QUOTE_REQUIRED:
       return '최신 견적을 먼저 확인해주세요.';
     case ERROR_CODE.QUOTE_NOT_FOUND:

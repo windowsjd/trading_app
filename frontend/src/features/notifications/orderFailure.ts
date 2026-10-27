@@ -146,7 +146,7 @@ export function describeOrderFailure(row: OrderFailureDto): OrderFailureView {
             ? '조건 충족 후 30초 안에 포지션을 종료하지 못했어요.'
             : '조건은 충족됐지만 포지션을 종료하지 못했어요.'),
         consequence: `포지션은 그대로 열려 있고, 이 ${label} 설정은 종료되었어요.`,
-        where: '선물 화면의 대기 주문 > TP/SL 종료 이력에서도 확인할 수 있어요.',
+        where: '선물 화면의 대기 주문 > 손절가/익절가 종료 이력에서도 확인할 수 있어요.',
         tradeHistory: false,
       };
     }
@@ -159,7 +159,7 @@ export function describeOrderFailure(row: OrderFailureDto): OrderFailureView {
         reason: getEntryPlanFailureText({ status: 'failed', failureCode: row.failureCode }) ??
           '체결 후 설정을 활성화하지 못했어요.',
         consequence: `${futures ? '진입은' : '매수는'} 체결되었지만 이 ${label}가는 등록되지 않았어요. ${futures ? '포지션' : '보유종목'}에서 다시 설정해 주세요.`,
-        where: `${futures ? '선물 화면의 대기 주문' : '주문 화면의 대기 목록'} > TP/SL 종료 이력에서도 확인할 수 있어요.`,
+        where: `${futures ? '선물 화면의 대기 주문' : '주문 화면의 대기 목록'} > 손절가/익절가 종료 이력에서도 확인할 수 있어요.`,
         tradeHistory: false,
       };
     }

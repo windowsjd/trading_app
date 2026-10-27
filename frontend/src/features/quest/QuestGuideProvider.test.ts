@@ -563,6 +563,30 @@ describe('QuestGuideProvider: the practice path is held, 안내 종료 lifts it'
     assert.equal(h.guide.active?.quest, 'futuresLong');
   });
 
+  it('QUEST 03 short of cash: 이체하기 opens the order form’s own sheet through the guard, and the step stays', async t => {
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.start('marketBuy', questProgress(2));
+    await h.focus('Order');
+    const opened: string[] = [];
+    t.after(bridge.registerQuestGuideFunding('order', () => {
+      opened.push(guard.questNavigationAllowed('WalletTransfer') ? 'sheet' : 'held');
+    }));
+    const { step } = h.guide.active;
+    const navigations = h.navigations.length;
+    await h.act(() => h.overlay.onAction('transfer', step));
+    assert.deepEqual(opened, ['sheet'], 'the form’s own sheet, which the guard lets through');
+    assert.deepEqual([h.guide.active.quest, h.guide.active.step, h.guide.active.phase], ['marketBuy', step, 'guiding']);
+    assert.equal(h.overlay.notice, false, 'not a held move');
+    assert.equal(h.navigations.length, navigations, 'no page change');
+    assert.equal(await held(h, 'WalletFx'), false, '환전 first, inside the sheet, when no USD is left anywhere');
+    for (const name of ['WalletTab', 'Wallet', 'WalletTransactions']) assert.equal(await held(h, name), true, name);
+    assert.deepEqual([h.fetches.length, h.acks.length], [1, 0], 'opening the sheet sends and verifies nothing');
+    // Closing the sheet (cancel) changes nothing in the guide; after 안내 종료 the action is inert.
+    await h.exit();
+    await h.act(() => h.overlay.onAction('transfer', step));
+    assert.deepEqual(opened, ['sheet']);
+  });
+
   it('a move the guard could not hold (a native back gesture into another screen) still ends the guide', async t => {
     const h = harness(); await h.render(); t.after(h.close);
     await h.start('futuresShort', questProgress(6));

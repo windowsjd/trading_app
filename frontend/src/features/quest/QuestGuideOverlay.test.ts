@@ -148,6 +148,32 @@ describe('QuestGuideOverlay', () => {
     assert.equal(h.find('quest-guide-next').props.accessibilityState.disabled, false);
   });
 
+  it('says a short balance inside the card, beside its own 이체하기 and the waiting 다음', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness();
+    const short = { ...card, title: '금액과 수량', next: 'disabled', notice: '잔액이 부족합니다.', actions: ['transfer', 'exit'] };
+    await h.render(spotlight('1:fx:2:practice:short', { card: short }));
+    t.after(h.close);
+    await tick(t);
+    await measureCard(h, 90, 92);
+    const cardNode = h.find('quest-guide-card');
+    const notice = h.find('quest-guide-form-notice');
+    assert.equal(notice.props.children, '잔액이 부족합니다.');
+    assert.equal(cardNode.findAll((node: any) => node.props.testID === 'quest-guide-form-notice').length > 0, true, 'inside the card');
+    assert.equal(h.find('quest-guide-actions').findAll((node: any) => node === notice).length, 1, 'with the actions, outside the scrolling text');
+    assert.equal(h.find('quest-guide-text').findAll((node: any) => node.props.testID === 'quest-guide-form-notice').length, 0);
+    assert.equal(h.find('quest-guide-transfer').props.accessibilityLabel, '이체하기');
+    assert.equal(h.find('quest-guide-next').props.accessibilityState.disabled, true);
+    assert.equal(JSON.stringify(cardNode.findByProps({ accessibilityRole: 'header' }).props.children), '"금액과 수량"', 'title stays');
+    await Renderer.act(async () => h.find('quest-guide-transfer').props.onPress());
+    assert.deepEqual(h.actions, [['transfer', 2]]);
+    // Enough again: the same card, without the notice or its button.
+    await h.render(spotlight('1:fx:2:ready', { card: { ...short, next: 'enabled', notice: null, actions: ['exit'] } }));
+    assert.equal(h.find('quest-guide-card') === cardNode, true);
+    assert.equal(h.has('quest-guide-form-notice'), false);
+    assert.equal(h.has('quest-guide-transfer'), false);
+  });
+
   it('asks for room first, then compacts and scrolls its own text instead of covering the control', async t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = harness();
@@ -219,6 +245,49 @@ describe('QuestGuideOverlay', () => {
     assert.equal(flat(h.find('quest-guide-card').props.style).opacity === 0, false);
     assert.equal(fades(h), shown, 'no new fade-in for the same step');
     assert.equal(h.loops.length, 0);
+  });
+
+  it('holds the card still while Android re-rounds its heights to the pixel grid after each move', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness();
+    // A control low on the screen: the card sits above it, so its top follows its height.
+    h.rects.target = { x: 24, y: 600, width: 120, height: 60 };
+    await h.render(spotlight());
+    t.after(h.close);
+    await tick(t);
+    // Yoga (Android, 2.625x) rounds each view to the pixel grid from its
+    // absolute position: height = round(bottom) - round(top). The same content
+    // reports a pixel more or less wherever the card sits (card border 1 +
+    // padding 14, 6 between title block and instruction, 10 before actions).
+    const density = 2.625;
+    const grid = (top: number, height: number) => (Math.round((top + height) * density) - Math.round(top * density)) / density;
+    const natural = { head: 44, text: 41, actions: 44 };
+    const layoutAt = () => Renderer.act(async () => {
+      const top = flat(h.find('quest-guide-card').props.style).top as number;
+      const head = h.find('quest-guide-head');
+      const textTop = top + 15 + (head ? natural.head + 6 : 0);
+      head?.props.onLayout(layout(grid(top + 15, natural.head)));
+      h.find('quest-guide-instruction').props.onLayout(layout(grid(textTop, natural.text)));
+      h.find('quest-guide-actions').props.onLayout(layout(grid(textTop + natural.text + 10, natural.actions)));
+    });
+    const tops: number[] = [];
+    for (let pass = 0; pass < 12; pass++) {
+      await layoutAt();
+      tops.push(flat(h.find('quest-guide-card').props.style).top as number);
+    }
+    assert.equal(flat(h.find('quest-guide-card').props.style).opacity === 0, false);
+    assert.deepEqual([...new Set(tops.slice(1))], [tops[1]], `the card settles after its first measured layout: ${tops.join(', ')}`);
+    assert.equal(tops[1] + 175 <= 594, true, 'above the 6px ring, not on the control');
+    // A real change (one more line of instruction) still moves it, once.
+    natural.text += 23;
+    const before = tops[1];
+    tops.length = 0;
+    for (let pass = 0; pass < 6; pass++) {
+      await layoutAt();
+      tops.push(flat(h.find('quest-guide-card').props.style).top as number);
+    }
+    assert.deepEqual([...new Set(tops)], [tops[0]], `one move for one change: ${tops.join(', ')}`);
+    assert.equal(Math.round(before - tops[0]), 23);
   });
 
   it('follows the keyboard without hiding the step', async t => {

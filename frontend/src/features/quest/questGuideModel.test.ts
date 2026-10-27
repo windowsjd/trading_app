@@ -261,7 +261,8 @@ describe('session movement', () => {
     assert.deepEqual(allowed('exchange'), ['WalletTab', 'Wallet', 'WalletFx']);
     assert.deepEqual(allowed('transfer'), ['WalletTab', 'Wallet', 'WalletTransfer']);
     for (const quest of ['marketBuy', 'protection', 'marketSell', 'limitBuy', 'krStock', 'usStock'] as const) {
-      assert.deepEqual(allowed(quest), ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart'], quest);
+      // 이체 / 환전 are sheets over the order screen (its wallet notice, the guide's 이체하기), not the Wallet tab.
+      assert.deepEqual(allowed(quest), ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart', 'WalletFx', 'WalletTransfer'], quest);
     }
     for (const quest of ['futuresLong', 'futuresShort'] as const) {
       // The contract's detail (from the 선물 list) leads to the same order screen.

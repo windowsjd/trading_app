@@ -74,7 +74,7 @@ export default function ConditionalSellOrdersList({ accountId, family, isFocused
   const isCurrent = (request: CancelRequest) =>
     request.accountId === scope.current.accountId && request.epoch === scope.current.epoch;
   const [failure, setFailure] = useState<{ cause: unknown } | null>(null);
-  const title = family === 'condition' ? '조건주문 매도' : '손절·익절';
+  const title = family === 'condition' ? '조건주문 매도' : '손절가/익절가';
 
   const open = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.conditionalSell.open(accountId, family),

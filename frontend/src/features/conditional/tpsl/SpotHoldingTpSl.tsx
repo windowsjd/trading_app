@@ -188,7 +188,7 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
     : settingsQuery.isError && !settingsData ? '등록된 설정을 확인하지 못했어요.'
     : !settingsData ? '등록된 설정을 확인하는 중이에요.'
     : !settingsData.capabilities.protection?.canCreate ? '현재 손절가/익절가를 새로 등록할 수 없어요.'
-    : ocoActive ? '이 종목에는 기존 TP/SL(OCO) 보호가 있어 함께 설정할 수 없어요. 대기 목록의 TP/SL에서 기존 보호를 취소한 뒤 등록해 주세요.'
+    : ocoActive ? '이 종목에는 기존 손절가/익절가(OCO) 보호가 있어 함께 설정할 수 없어요. 대기 목록의 손절가/익절가에서 기존 보호를 취소한 뒤 등록해 주세요.'
     : null;
   const canSubmit = !blockedReason && !draftError && !pending;
   // Still reading the holding or its settings: not a block for the guide.

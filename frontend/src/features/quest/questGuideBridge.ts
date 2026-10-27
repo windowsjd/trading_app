@@ -6,7 +6,9 @@
  *  - plain facts about their own state (`publishQuestGuideFacts`), so the
  *    guide can follow the real form instead of guessing at it;
  *  - after THEIR OWN command succeeded, a description of that command
- *    (`claimQuestGuideCommand`).
+ *    (`claimQuestGuideCommand`);
+ *  - optionally their own 이체 sheet (`registerQuestGuideFunding`), which the
+ *    card's 이체하기 opens; money moves only by the sheet's own 이체하기.
  *
  * Nothing here can execute, retry or alter a financial command. With no guide
  * mounted (general/season accounts, tests, a beginner not following a quest)
@@ -106,6 +108,16 @@ export type TradeGuideFacts = { [S in TradeGuideScreen]: {
   positionDirection?: string;
   /** The futures leverage sheet open over the form (preset list or 직접 설정하기). */
   leverageSheet?: 'list' | 'custom';
+  /**
+   * The order form's own live balance check, as the form shows it: the
+   * fee-included total is above the AVAILABLE balance. Absent while the
+   * amount, price, fee or balance is unknown, invalid or enough.
+   */
+  insufficientBalance?: string;
+  /** The paying wallet takes a USD transfer: 이체하기 opens the form's own sheet. */
+  transferFunding?: boolean;
+  /** The form's 이체 / 환전 sheet is open over it. */
+  fundingOpen?: boolean;
 } }[TradeGuideScreen];
 export type QuestGuideFacts = WalletGuideFacts | FxGuideFacts | TransferGuideFacts | TradeGuideFacts;
 type FactsFor<S extends QuestGuideScreen> = Extract<QuestGuideFacts, { screen: S }>;
@@ -125,6 +137,7 @@ const targets = new Map<QuestGuideTargetId, MeasurableNode>();
 const refCallbacks = new Map<QuestGuideTargetId, (node: MeasurableNode | null) => (() => void) | undefined>();
 const facts = new Map<QuestGuideScreen, QuestGuideFacts>();
 const reveals = new Map<QuestGuideScreen, (node: QuestGuideMeasurable) => void>();
+const fundings = new Map<QuestGuideScreen, () => void>();
 const listeners = new Set<Listener>();
 let version = 0;
 let commandSink: ((command: QuestGuideCommand) => boolean) | null = null;
@@ -175,6 +188,25 @@ export function publishQuestGuideFacts<S extends QuestGuideScreen>(screen: S, va
 export function registerQuestGuideReveal(screen: QuestGuideScreen, reveal: ((node: QuestGuideMeasurable) => void) | null) {
   if (reveal) reveals.set(screen, reveal);
   else reveals.delete(screen);
+}
+
+/**
+ * The screen's own 이체 sheet, for the guide card's 이체하기 (the user's press).
+ * Opening it moves no money: only the sheet's own 이체하기 does, with the
+ * screen's guards. The returned disposer never removes a newer one.
+ */
+export function registerQuestGuideFunding(screen: QuestGuideScreen, open: () => void) {
+  fundings.set(screen, open);
+  return () => {
+    if (fundings.get(screen) === open) fundings.delete(screen);
+  };
+}
+
+/** Opens the screen's 이체 sheet; false when the screen offers none. */
+export function openQuestGuideFunding(screen: QuestGuideScreen): boolean {
+  const open = fundings.get(screen);
+  open?.();
+  return !!open;
 }
 
 /**

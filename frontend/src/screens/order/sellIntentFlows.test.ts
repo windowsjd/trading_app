@@ -346,7 +346,7 @@ describe('손절가/익절가 설정 from the holding card (independent stop-los
     h.protections = conditionalFixture('general', { domain: 'spot', active: true });
     await h.mount(); t.after(h.close);
     await openTpSl(h);
-    expectText(h, /기존 TP\/SL\(OCO\) 보호가 있어 함께 설정할 수 없어요\. 대기 목록의 TP\/SL에서 기존 보호를 취소한 뒤 등록해 주세요\./);
+    expectText(h, /기존 손절가\/익절가\(OCO\) 보호가 있어 함께 설정할 수 없어요\. 대기 목록의 손절가\/익절가에서 기존 보호를 취소한 뒤 등록해 주세요\./);
     assert.equal(h.node('tp-sl-take-profit-toggle').props.disabled, true);
     assert.equal(h.node('tp-sl-submit').props.state, 'disabled');
     h.protections = conditionalFixture('general', { domain: 'spot' });

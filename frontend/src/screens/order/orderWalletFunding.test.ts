@@ -221,6 +221,47 @@ describe('order: funding obeys the guide and the learning gates', () => {
     assert.equal(sheetOpen(h, 'transfer'), true);
   });
 
+  it('QUEST 03 short of cash: the guide gets the form’s own reason and opens this form’s 이체 sheet; cancel or success keeps the order', async (t) => {
+    const bridge = require('../../features/quest/questGuideBridge.ts');
+    const owner = () => undefined;
+    t.after(() => guard.setQuestNavigationGuard(owner, null));
+    // The report: about 10 USD usable, 10 USD entered, 0.01 USD fee.
+    const h = await buy(t, (h) => {
+      h.accounts.push({ id: 'beginner-1', mode: 'beginner', status: 'active', season: null });
+      h.accountId = 'beginner-1';
+      h.questProgress = questProgress(2);
+      h.usdBalance = '10'; h.usdReserved = '0'; h.usdAvailable = '10';
+    });
+    guard.setQuestNavigationGuard(owner, 'marketBuy');
+    const facts = () => bridge.getQuestGuideFacts('order');
+    const guideFacts = () => [facts().insufficientBalance ?? null, facts().transferFunding, facts().fundingOpen, facts().amountValid];
+    await h.input(amount, '5');
+    assert.deepEqual(guideFacts(), [null, true, false, true], 'enough: nothing to say');
+    await h.input(amount, '10');
+    assert.equal(h.node('order-balance-insufficient').props.children, '잔액이 부족합니다.');
+    assert.deepEqual(guideFacts(), ['잔액이 부족합니다.', true, false, false], 'the same line, for the card');
+    // The card's 이체하기: this form's sheet into crypto Spot; nothing is sent by opening it.
+    await act(h, () => assert.equal(bridge.openQuestGuideFunding('order'), true));
+    assert.equal(sheetOpen(h, 'transfer'), true, 'the marketBuy guide lets the sheet through');
+    assert.deepEqual(panels(h, 'WalletTransferPanel')[0].props.initial, { source: undefined, destination: 'crypto_spot' });
+    assert.equal(facts().fundingOpen, true, 'the guide steps aside while the sheet is open');
+    assert.equal(h.requests.some((request: any) => /wallet-transfers/.test(request.url)), false);
+    // Cancel: the same form, amount and account; still short.
+    await h.press('order-transfer-sheet-close');
+    assert.equal(sheetOpen(h, 'transfer'), false);
+    assert.deepEqual([h.node(amount).props.value, facts().accountId], ['10', 'beginner-1']);
+    assert.deepEqual(guideFacts(), ['잔액이 부족합니다.', true, false, false]);
+    // A completed transfer closes the sheet; the re-read balance lifts the notice.
+    await act(h, () => bridge.openQuestGuideFunding('order'));
+    h.usdBalance = '60'; h.usdAvailable = '60';
+    await act(h, () => panels(h, 'WalletTransferPanel')[0].props.onSucceeded());
+    await h.update();
+    assert.equal(sheetOpen(h, 'transfer'), false);
+    assert.equal(h.node('order-balance-insufficient') === undefined, true);
+    assert.deepEqual(guideFacts(), [null, true, false, true]);
+    assert.equal(h.node(amount).props.value, '10', 'the order input is kept');
+  });
+
   for (const completed of [0, 1]) it(`beginner with ${completed} quest(s) done: 이체 ${completed ? 'opens' : 'explains its lock'}`, async (t) => {
     const h = await buy(t, (h) => {
       h.accounts.push({ id: 'beginner-1', mode: 'beginner', status: 'active', season: null });

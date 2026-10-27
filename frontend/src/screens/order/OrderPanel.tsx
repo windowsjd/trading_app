@@ -1,8 +1,8 @@
-import { captureQuestGuideCommand, questGuideTarget } from '../../features/quest/questGuideBridge';
+import { captureQuestGuideCommand, questGuideTarget, registerQuestGuideFunding } from '../../features/quest/questGuideBridge';
 import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import { questNavigationAllowed } from '../../features/quest/questNavigationGuard';
-import { walletFundingMessage, walletFundingState, type FundingAction, type FundingProduct } from '../../features/wallet/walletFunding';
+import { FUNDING_WALLET, walletFundingMessage, walletFundingState, type FundingAction, type FundingProduct } from '../../features/wallet/walletFunding';
 import WalletFundingNotice from '../../components/tradingAccount/WalletFundingNotice';
 import WalletFundingSheet, { type FundingRequest } from '../wallet/WalletFundingSheet';
 import QuestTarget from '../../features/quest/QuestTarget';
@@ -954,6 +954,17 @@ export function OrderForm({
     }
     if (questNavigationAllowed('WalletTransfer')) transferGate.guard(() => setFunding({ kind: 'transfer', destination: action.destination }));
   };
+  // The paying wallet's 이체 route, when it takes one (crypto Spot, 증권 USD):
+  // a beginner guide's 이체하기 opens this same sheet with the same guards.
+  const transferAction = fundingProduct && side === 'buy'
+    ? FUNDING_WALLET[fundingProduct].actions.find((action) => action.kind === 'transfer') ?? null : null;
+  const openFundingRef = useRef(openFunding);
+  openFundingRef.current = openFunding;
+  useEffect(() => {
+    if (!enabled || !transferAction) return;
+    const action = transferAction;
+    return registerQuestGuideFunding('order', () => openFundingRef.current(action));
+  }, [enabled, transferAction]);
   // The ordinary submit serves market/limit/LOC.
   const canExecute =
     methodReady &&
@@ -963,7 +974,8 @@ export function OrderForm({
     !buyInsufficientReason &&
     !successData &&
     !orderActionRef.current?.completed;
-  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType: orderMethod, methodSheetOpen, amountValid: !inputInvalidReason && !buyInsufficientReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason }, enabled);
+  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType: orderMethod, methodSheetOpen, amountValid: !inputInvalidReason && !buyInsufficientReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason,
+    insufficientBalance: buyInsufficientReason ?? undefined, transferFunding: !!transferAction && !orderPending, fundingOpen: !!funding }, enabled);
   const inputErrorMessage =
     fieldError ?? (orderInput.trim() ? inputInvalidReason : null);
 

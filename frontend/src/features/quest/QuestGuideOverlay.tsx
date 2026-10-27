@@ -332,7 +332,7 @@ function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, request
   const measured = headHeight !== null && textHeight !== null && actionsHeight !== null;
   const full = measured
     ? placeGuideCard({ area: frame.area, hole, placement,
-      card: { width: cardWidth, height: headHeight + TEXT_GAP + textHeight + actionsHeight + CARD_CHROME } })
+      card: { width: cardWidth, height: Math.ceil(headHeight + TEXT_GAP + textHeight + actionsHeight + CARD_CHROME) } })
     : null;
   // Too tall as it is: drop the quest label and title, keep the instruction,
   // and only then let the instruction scroll inside the card.
@@ -340,8 +340,8 @@ function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, request
   const placed = compact
     ? placeGuideCard({ area: frame.area, hole, placement, card: {
       width: cardWidth,
-      height: textHeight + actionsHeight + CARD_CHROME,
-      minHeight: Math.min(textHeight, MIN_TEXT_HEIGHT) + actionsHeight + CARD_CHROME,
+      height: Math.ceil(textHeight + actionsHeight + CARD_CHROME),
+      minHeight: Math.ceil(Math.min(textHeight, MIN_TEXT_HEIGHT) + actionsHeight + CARD_CHROME),
     } })
     : full;
 
@@ -378,12 +378,14 @@ function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, request
     AccessibilityInfo.announceForAccessibility(`${view.card.title}. ${view.card.body}`);
   }, [view.card.title, view.card.body]);
 
-  const onActionsLayout = (event: LayoutChangeEvent) => {
-    const height = Math.ceil(event.nativeEvent.layout.height);
-    setActionsHeight(previous => previous !== null && Math.abs(previous - height) < 1 ? previous : height);
-  };
+  // Android lays each view out on the pixel grid from where it sits (Yoga:
+  // round(bottom) - round(top)), so after the card moves the same content
+  // reports up to a pixel more or less. Rounded up per view and fed back into
+  // the card's top, that pixel moved the card again: it never settled at
+  // 2.625x and similar densities. Raw heights within 1dp of the kept one are
+  // the same content; only the card's total is rounded up, once.
   const keep = (setter: React.Dispatch<React.SetStateAction<number | null>>) => (event: LayoutChangeEvent) => {
-    const next = Math.ceil(event.nativeEvent.layout.height);
+    const next = event.nativeEvent.layout.height;
     setter(previous => previous !== null && Math.abs(previous - next) < 1 ? previous : next);
   };
 
@@ -410,7 +412,7 @@ function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, request
         }]}
       >
         <GuideCardContent card={view.card} quest={quest} compact={compact} scrolls={placed?.maxHeight != null}
-          onHeadLayout={keep(setHeadHeight)} onTextLayout={keep(setTextHeight)} onActionsLayout={onActionsLayout}
+          onHeadLayout={keep(setHeadHeight)} onTextLayout={keep(setTextHeight)} onActionsLayout={keep(setActionsHeight)}
           onAction={action => onAction(action, view.kind === 'spotlight' ? view.step : null)} />
       </Animated.View>
     </>
@@ -421,6 +423,7 @@ const ACTION_LABEL: Record<Exclude<GuideAction, 'next'>, string> = {
   exit: QUEST_GUIDE_COPY.actions.exit,
   retry: QUEST_GUIDE_COPY.actions.retry,
   back: QUEST_GUIDE_COPY.actions.back,
+  transfer: QUEST_GUIDE_COPY.actions.transfer,
 };
 
 function GuideCardContent({ card, quest, compact, scrolls, onHeadLayout, onTextLayout, onActionsLayout, onAction }: {
@@ -458,12 +461,16 @@ function GuideCardContent({ card, quest, compact, scrolls, onHeadLayout, onTextL
         </View>
       </ScrollView>
       <View style={styles.actions} onLayout={onActionsLayout} testID="quest-guide-actions">
+        {/* With the actions, outside the scrolling text: always in sight. */}
+        {card.notice ? (
+          <Text style={styles.formNotice} testID="quest-guide-form-notice" accessibilityLiveRegion="polite">{card.notice}</Text>
+        ) : null}
         {card.busy ? <WhaleLoader size={20} /> : null}
         {card.actions.map(action => (
           <ActionPressable key={action} testID={`quest-guide-${action}`} accessibilityRole="button"
             accessibilityLabel={ACTION_LABEL[action as Exclude<GuideAction, 'next'>]}
             onPress={() => onAction(action)} style={styles.textButton}>
-            <Text style={styles.textButtonLabel}>{ACTION_LABEL[action as Exclude<GuideAction, 'next'>]}</Text>
+            <Text style={[styles.textButtonLabel, action === 'transfer' && styles.fundingLabel]}>{ACTION_LABEL[action as Exclude<GuideAction, 'next'>]}</Text>
           </ActionPressable>
         ))}
         {card.next ? (
@@ -506,6 +513,8 @@ const styles = StyleSheet.create({
   actions: { flexShrink: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   textButton: { minHeight: 44, minWidth: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   textButtonLabel: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.secondary, textAlign: 'center' },
+  fundingLabel: { fontWeight: '700', color: semantic.info },
+  formNotice: { flexBasis: '100%', fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.warning },
   nextButton: {
     minHeight: 44,
     minWidth: 72,

@@ -19,6 +19,7 @@ import { acknowledgeBeginnerQuest, getBeginnerQuestProgress } from '../tradingAc
 import {
   getQuestGuideFacts,
   getQuestGuideVersion,
+  openQuestGuideFunding,
   setQuestGuideCommandSink,
   subscribeQuestGuide,
   type QuestGuideTargetId,
@@ -333,6 +334,9 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     } else if (action === 'retry') {
       setSession({ ...current, phase: 'verifying' });
       verify(current.id);
+    } else if (action === 'transfer') {
+      // The order form's own 이체 sheet, with its guards; the step stays.
+      if (current.phase === 'guiding') openQuestGuideFunding('order');
     } else {
       setSession(null);
       if (action === 'back') openQuestList();

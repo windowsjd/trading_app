@@ -150,7 +150,7 @@ export default function EntryTpSl({ accountId, entryType, entryId, onBusyChange,
     : entry.state === 'ended' ? '종료된 주문이라 설정할 수 없어요.'
     : entry.domain === 'spot' && !isEntryTpSlMarketSupported(data.capabilities.spot, entry.asset.assetType)
       ? '이 시장은 손절가/익절가 설정을 지원하지 않아요.'
-    : entry.legacyProtection ? '이 주문에는 기존 TP/SL(OCO) 보호가 연결되어 있어요. 대기 목록의 TP/SL에서 취소한 뒤 설정해 주세요.'
+    : entry.legacyProtection ? '이 주문에는 기존 손절가/익절가(OCO) 보호가 연결되어 있어요. 대기 목록의 손절가/익절가에서 취소한 뒤 설정해 주세요.'
     : !capability?.canCreate ? '현재 손절가/익절가를 새로 등록할 수 없어요.'
     : null;
   const canSubmit = !blockedReason && !draftError && !pending;

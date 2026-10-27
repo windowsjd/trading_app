@@ -213,3 +213,40 @@ test('another practiced method: the guide opens the 주문방식 field and then 
   if (sellDefault.kind === 'spotlight') assert.equal(sellDefault.card.next, 'enabled');
   else assert.fail('the market sell practice reads its step');
 });
+test('short of usable cash: the card says the form’s own reason with its 이체 sheet, and 다음 waits', () => {
+  // QUEST 03 step 5/8 (금액과 수량), as in the 10 USD + 0.01 USD fee report.
+  const session = { ...startGuideSession(1, account, 'marketBuy', questProgress(2))!, step: 4 };
+  const at = (form: Record<string, unknown>) => resolveGuideView(session, 'order', { wallet: null, fx: null, transfer: null, practice: { order: orderForm(form) } });
+  const short = at({ amountValid: false, insufficientBalance: '잔액이 부족합니다.', transferFunding: true });
+  if (short.kind !== 'spotlight') assert.fail('the amount step stays up');
+  assert.deepEqual(short.targets, ['order-input']);
+  assert.equal(short.card.stepLabel, '5/8');
+  assert.equal(short.card.notice, '잔액이 부족합니다.', 'exactly the form’s line');
+  assert.deepEqual(short.card.actions, ['transfer', 'exit']);
+  assert.equal(short.card.next, 'disabled');
+  assert.equal(short.card.title, '금액과 수량', 'title and instruction stay');
+  // Enough (after a transfer or a smaller amount): the notice goes by itself.
+  const enough = at({ amountValid: true, transferFunding: true });
+  if (enough.kind !== 'spotlight') assert.fail('the amount step');
+  assert.deepEqual([enough.card.notice, enough.card.actions, enough.card.next], [null, ['exit'], 'enabled']);
+  assert.equal(enough.anchor, short.anchor, 'the same card, updated in place');
+  // An invalid amount is not a balance problem.
+  const invalid = at({ amountValid: false, transferFunding: true });
+  if (invalid.kind !== 'spotlight') assert.fail('the amount step');
+  assert.deepEqual([invalid.card.notice, invalid.card.actions, invalid.card.next], [null, ['exit'], 'disabled']);
+  // A wallet without a transfer route (증권 KRW) only says it.
+  const krw = at({ assetType: 'crypto', amountValid: false, insufficientBalance: '잔액이 부족합니다.' });
+  if (krw.kind !== 'spotlight') assert.fail('the amount step');
+  assert.deepEqual([krw.card.notice, krw.card.actions], ['잔액이 부족합니다.', ['exit']]);
+  // Later order steps keep saying it; the sheet itself is the user's, so the guide steps aside.
+  const submit = resolveGuideView({ ...session, step: 6 }, 'order', { wallet: null, fx: null, transfer: null,
+    practice: { order: orderForm({ amountValid: false, insufficientBalance: '잔액이 부족합니다.', transferFunding: true }) } });
+  if (submit.kind !== 'spotlight') assert.fail('the submit step');
+  assert.deepEqual([submit.card.notice, submit.card.actions], ['잔액이 부족합니다.', ['transfer', 'exit']]);
+  assert.equal(at({ amountValid: false, insufficientBalance: '잔액이 부족합니다.', transferFunding: true, fundingOpen: true }).kind, 'none');
+  // A SELL practice never gets a buy-wallet notice.
+  const sell = { ...startGuideSession(1, account, 'marketSell', questProgress(10))!, step: 3 };
+  const selling = resolveGuideView(sell, 'order', { wallet: null, fx: null, transfer: null, practice: { order: orderForm({ side: 'sell', amountValid: false }) } });
+  if (selling.kind !== 'spotlight') assert.fail('the sell amount step');
+  assert.deepEqual([selling.card.notice, selling.card.actions], [null, ['exit']]);
+});

@@ -45,7 +45,8 @@ export interface GuideSession {
   positionId?: string;
 }
 
-export type GuideAction = 'next' | 'exit' | 'retry' | 'back';
+/** `transfer`: the order form's own 이체 sheet (opening it moves no money). */
+export type GuideAction = 'next' | 'exit' | 'retry' | 'back' | 'transfer';
 
 export interface GuideCard {
   title: string;
@@ -56,6 +57,8 @@ export interface GuideCard {
   stepLabel: string | null;
   next: 'enabled' | 'disabled' | null;
   busy: boolean;
+  /** A problem with the form the step waits on, said beside the actions (e.g. 잔액이 부족합니다.). */
+  notice: string | null;
   /** Secondary actions in display order. */
   actions: GuideAction[];
 }
@@ -113,6 +116,7 @@ function card(block: CopyBlock, options: Partial<GuideCard> = {}): GuideCard {
     stepLabel: options.stepLabel ?? null,
     next: options.next ?? null,
     busy: options.busy ?? false,
+    notice: options.notice ?? null,
     actions: options.actions ?? ['exit'],
   };
 }
@@ -304,6 +308,9 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   if (!step || step.screen !== focused) return NONE;
   const form = facts.practice?.[screen];
   if (!form || form.accountId !== session.accountId) return NONE;
+  // The order form's own 이체 / 환전 sheet is the user's: the guide steps aside
+  // and comes back to the same step when it closes.
+  if (screen === 'order' && form.fundingOpen) return NONE;
   const wantedAssetType = session.quest === 'krStock' ? 'domestic_stock' : session.quest === 'usStock' ? 'us_stock' : 'crypto';
   if ((screen === 'asset' || screen === 'order') && form.assetType && form.assetType !== wantedAssetType) {
     return message(session, screen, 'wrong-market', card({ title: '실습 시장 확인', body: '이번 퀘스트의 시장에 해당하는 종목을 선택해 주세요. 퀘스트 목록으로 돌아가 다시 시작할 수 있어요.' }, { actions: ['back', 'exit'] }));
@@ -326,6 +333,8 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   if (blocked) return message(session, screen, 'operationally-unavailable', card({ title: '거래 가능 상태 확인', body: '현재는 화면에 안내된 거래 제한이 적용돼요. 휴장·시세 미준비·운영 중지 상태를 확인해 주세요. 퀘스트 목록으로 돌아가 다른 실습을 선택할 수도 있어요.' }, { actions: ['back', 'exit'] }));
   let ready = !!step.next;
   let hint: string | null = null;
+  let notice: string | null = null;
+  let actions: GuideAction[] = ['exit'];
   // Only the order form's own steps depend on the chosen side and type.
   if (screen === 'order' && step.target.startsWith('order-')) {
     const wantedSide = session.quest === 'marketSell' ? 'sell' : 'buy';
@@ -342,6 +351,13 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
         : `주문방식을 눌러 ${label} 선택해 주세요.` }));
     }
     if (step.target === 'order-input') ready = ready && form.amountValid === true;
+    // The form's own balance check, fee included (never the guide's): said in
+    // the card, which may cover the form's line, with its 이체 sheet when this
+    // wallet takes a transfer.
+    if (form.insufficientBalance) {
+      notice = form.insufficientBalance;
+      if (form.transferFunding) actions = ['transfer', 'exit'];
+    }
   }
   if (step.target === 'asset-holdings' && session.orderId) ready = ready && holding?.accountId === session.accountId && holding.assetId === session.assetId && holding.holdingsVisible === true;
   if (step.target === 'limit-review') ready = ready && review?.accountId === session.accountId && review.orderResolved === true;
@@ -361,7 +377,8 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   if (screen === 'futures' && session.step < 5 && form.positionId) {
     hint = '이 종목에는 포지션이 이미 있어요. 기존 포지션을 전량 종료하거나 다른 종목을 선택한 뒤 새 포지션으로 실습해 주세요. One-way 정책은 그대로 적용돼요.';
   }
-  const view = spotlight(session, screen, index, ready ? 'ready' : 'practice', [step.target], card(step, { next: step.next ? ready ? 'enabled' : 'disabled' : null, hint }));
+  const view = spotlight(session, screen, index, `${ready ? 'ready' : 'practice'}${notice ? ':short' : ''}`, [step.target],
+    card(step, { next: step.next ? ready ? 'enabled' : 'disabled' : null, hint, notice, actions }));
   if (view.kind === 'spotlight') view.card.stepLabel = `${index + 1}/${steps.length}`;
   return view;
 }
@@ -385,16 +402,17 @@ export function startGuideSession(id: number, accountId: string, quest: Beginner
 
 /**
  * Where an active guide lets its practice go: the bottom tab(s), their screens
- * and the 이체 sheet ('WalletTransfer', not a route). Everything else waits for
- * 안내 종료. Spot practice may explore any listed asset (the guide itself flags
- * a wrong market); futures funding may top up the futures USD wallet, by 이체 or,
- * with no USD left anywhere, 환전 first. Either practice may open its own chart
- * screen (AssetChart, FuturesChart) over the tabs.
+ * and the 이체 / 환전 sheets ('WalletTransfer', 'WalletFx', not routes).
+ * Everything else waits for 안내 종료. Spot practice may explore any listed
+ * asset (the guide itself flags a wrong market) and top up the paying wallet
+ * from the order screen's own sheet; futures funding may top up the futures
+ * USD wallet. Either funds by 이체 or, with no USD left anywhere, 환전 first.
+ * Either practice may open its own chart screen (AssetChart, FuturesChart).
  */
 const GUIDE_ROUTES = {
   exchange: ['WalletTab', 'Wallet', 'WalletFx'],
   transfer: ['WalletTab', 'Wallet', 'WalletTransfer'],
-  spot: ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart'],
+  spot: ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart', 'WalletTransfer', 'WalletFx'],
   futures: ['MarketTab', 'Market', 'FuturesDetail', 'Futures', 'FuturesChart', 'WalletTab', 'Wallet', 'WalletTransfer', 'WalletFx'],
 } as const;
 

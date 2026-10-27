@@ -199,7 +199,7 @@ async function run() {
       await go('asset=SUI&longName=1&sell=enabled&holding=10&protection=active');
       await pick('protection');
       await page.getByTestId('sell-intent-blocked').waitFor();
-      assert.ok((await page.getByTestId('sell-intent-blocked').innerText()).includes('TP/SL(OCO)'), `OCO conflict explained (${tag})`);
+      assert.ok((await page.getByTestId('sell-intent-blocked').innerText()).includes('(OCO)'), `OCO conflict explained (${tag})`);
       await page.getByTestId('sell-intent-blocked').scrollIntoViewIfNeeded();
       await shot('crypto-sell-protection-oco');
 
