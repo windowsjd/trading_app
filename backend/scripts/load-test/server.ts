@@ -56,6 +56,11 @@ export function applyTestEnvironment(m: Manifest, c: Credentials) {
     KIS_WS_BASE_URL: 'ws://ops.koreainvestment.com:21000',
     KIS_WEBSOCKET_STREAMING_ENABLED: 'false',
     KIS_API_ENVIRONMENT: 'real',
+    // The replay serves the KIS REST current price (token + quotations), not
+    // the KIS WebSocket that provider_kis_ingest uses by default: that mode's
+    // approval request is an external provider attempt, which aborts the run
+    // whenever US stocks are open.
+    KIS_PRICE_INGESTION_MODE: 'rest_current_price',
     KOSCOM_API_KEY: 'load-test-koscom-key',
     KOSCOM_MARKET_DATA_ENABLED: 'true',
     KOSCOM_POLLING_ENABLED: 'true',

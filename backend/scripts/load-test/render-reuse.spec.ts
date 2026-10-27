@@ -39,6 +39,7 @@ import {
 } from './server';
 import { Test } from '@nestjs/testing';
 import { mergeRuntimeEnv } from '../lib/load-runtime-env';
+import { getOpsSchedulerConfig } from '../../src/ops/ops-config';
 
 function fixture() {
   const m = defaultManifest('a'.repeat(40), true);
@@ -145,6 +146,10 @@ describe('reviewed Render reuse transition', () => {
       expect(process.env.DATABASE_URL).toBe(c.databaseUrl);
       expect(process.env.REDIS_URL).toBe(c.valkeyUrl);
       expect(process.env.KIS_APP_SECRET).toBe('load-test-kis-secret');
+      // The replay serves KIS REST, so the KIS job never asks for a WebSocket approval.
+      expect(getOpsSchedulerConfig().providerKisPriceIngestionMode).toBe(
+        'rest_current_price',
+      );
       expect(process.env.UNAPPROVED_PROVIDER_SECRET === undefined).toBe(true);
       expect(process.env.RENDER_SERVICE_ID === undefined).toBe(true);
       expect(process.env.FUTURES_TRADING_MODE).toBe('ENABLED');

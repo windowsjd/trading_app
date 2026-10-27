@@ -40,6 +40,10 @@ import { PROVIDER_FRESHNESS_THRESHOLDS_SECONDS } from '../../src/providers/sourc
 import { AuthEmailService } from '../../src/auth/auth-email.service';
 import { readEmailAuthConfig } from '../../src/auth/email-auth.config';
 import {
+  parseKisDomesticCurrentPriceResponse,
+  parseKisUsCurrentPriceResponse,
+} from '../../src/providers/kis/kis-rest-current-price.parser';
+import {
   LOAD_TEST_EMAIL_API_KEY,
   authEmailMailboxKey,
   loadTestEmailEnvironment,
@@ -293,6 +297,40 @@ describe('deterministic provider transports retain real parsers', () => {
         'prepare:unexpected.PrismaClientKnownRequestError.P2028: Transaction already closed: expired after # ms for :id'
       ],
     ).toBe(1);
+  });
+  it('serves the KIS REST current price the fixture job uses, in the shapes the real parsers accept', async () => {
+    const metrics = new Metrics(),
+      replay = new Replay(make(), metrics);
+    const at = new Date();
+    const domestic = await (
+      await replay.fetch(
+        'https://openapi.koreainvestment.com:9443/uapi/domestic-stock/v1/quotations/inquire-price?FID_COND_MRKT_DIV_CODE=J&FID_INPUT_ISCD=005930',
+      )
+    ).json();
+    const krx = parseKisDomesticCurrentPriceResponse(domestic, at, '005930');
+    expect([krx.symbol, new Prisma.Decimal(krx.price).toFixed(0)]).toEqual([
+      '005930',
+      '100000',
+    ]);
+    // A fresh KST trade clock, not a stale or future one.
+    expect(Math.abs(krx.effectiveAt.getTime() - at.getTime()) < 5000).toBe(
+      true,
+    );
+    const us = await (
+      await replay.fetch(
+        'https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/price?AUTH=&EXCD=NAS&SYMB=AAPL',
+      )
+    ).json();
+    expect(parseKisUsCurrentPriceResponse(us, at, 'AAPL', 'NAS').symbol).toBe(
+      'AAPL',
+    );
+    expect(
+      metrics.counters['prepare:failure:EXTERNAL_PROVIDER_HTTP_BLOCKED'],
+    ).toBe(undefined);
+    // The WebSocket mode's approval request stays an external attempt.
+    await expect(
+      replay.fetch('https://openapi.koreainvestment.com:9443/oauth2/Approval'),
+    ).rejects.toThrow('EXTERNAL_PROVIDER_HTTP_BLOCKED');
   });
   it('serves the KOSCOM paths the client requests only while KRX is open', async () => {
     const metrics = new Metrics(),

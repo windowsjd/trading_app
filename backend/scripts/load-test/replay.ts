@@ -596,6 +596,22 @@ export class Replay {
         },
       };
     else if (
+      u.hostname === 'openapi.koreainvestment.com' &&
+      u.pathname.endsWith('/quotations/inquire-price')
+    ) {
+      // The REST job's KRX current price while KRX is open: the legacy
+      // fallback source (KRX orders read KOSCOM), at the KOSCOM replay price.
+      const kst = new Date(now + 9 * 3600000).toISOString();
+      value = {
+        rt_cd: '0',
+        output: {
+          stck_shrn_iscd: u.searchParams.get('FID_INPUT_ISCD'),
+          stck_prpr: '100000',
+          stck_bsop_date: kst.slice(0, 10).replaceAll('-', ''),
+          stck_cntg_hour: kst.slice(11, 19).replaceAll(':', ''),
+        },
+      };
+    } else if (
       u.hostname === 'oap.k-mydata.org' &&
       // KoscomMarketMapService's market membership list. In this fixture it is
       // reached only while KRX is open (polling, intraday candles), so an
