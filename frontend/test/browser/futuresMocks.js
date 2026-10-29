@@ -4,6 +4,8 @@ const params = new URLSearchParams(location.search);
 export const state = { accountId: params.get('account') ?? 'A', requests: [], kind: params.get('kind') ?? 'isolated', mode: params.get('mode') ?? 'ENABLED', options: { missingMark: params.get('mark') === 'missing', expiredMark: params.get('mark') === 'stale', missingReference: params.get('last') === 'missing', ...(params.has('free') ? { freeCollateral: params.get('free'), crossBase: params.get('free'), liquidationBuffer: params.get('free') } : {}) } };
 export const useIsFocused = () => true;
 export const useHeaderHeight = () => 64;
+// navigationHooks (reached through shared screen components) reads the root navigator.
+export const useNavigation = () => ({ navigate() {}, goBack() {}, dispatch() {}, getParent: () => undefined });
 // Quest provider / root ref imports; inert in the isolated futures fixture.
 export const createNavigationContainerRef = () => ({ isReady: () => false, navigate() {}, reset() {}, dispatch() {},
   getCurrentRoute: () => undefined, getRootState: () => undefined, addListener: () => () => {} });

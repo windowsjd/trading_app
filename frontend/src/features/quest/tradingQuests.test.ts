@@ -139,6 +139,17 @@ test('futures leverage step: the spotlight follows the leverage sheets, then 다
     if(closed.kind==='spotlight'){assert.deepEqual(closed.targets,['futures-margin']);assert.equal(closed.card.next,next);}else assert.fail('the controls are pointed at');
   }
 });
+test('futures close step: the card is pointed at, and the guide steps aside while a position sheet is open',()=>{
+  const session={...startGuideSession(3,account,'futuresLong',questProgress(6))!,step:5,positionId:'lifetime-1'};
+  const view=(form:Record<string,unknown>)=>resolveGuideView(session,'futures',{wallet:null,fx:null,transfer:null,
+    practice:{futures:{screen:'futures' as const,accountId:account,direction:'long',marginMode:'isolated',leverage:2,positionId:'lifetime-1',...form}}});
+  const card=view({});
+  if(card.kind==='spotlight'){assert.deepEqual(card.targets,['futures-position']);assert.match(card.card.body,/포지션 카드의 포지션 종료를 누르고, 열린 화면에서 100%로 포지션 종료를 실행해 주세요/);assert.doesNotMatch(card.card.body,/전량 종료를 선택/);}
+  else assert.fail('the position card is pointed at');
+  // 포지션 종료 (or 손절가/익절가) over the screen is the user's: no card covers its controls.
+  assert.equal(view({positionSheetOpen:true}).kind,'none');
+  assert.equal(view({positionSheetOpen:false}).kind,'spotlight');
+});
 test('replay preserves completion and returns without fireworks only after new practice',()=>{
   // A passed practice cannot be replayed before every quest is complete.
   assert.equal(startGuideSession(4,account,'marketBuy',questProgress(6)),null);

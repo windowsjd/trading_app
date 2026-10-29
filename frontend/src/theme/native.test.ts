@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { primaryGradient, semantic, resolveSemanticColor, resolveSemanticStyle } from './tokens.ts';
 import { financial, getFinancialColors } from './financialColors.ts';
@@ -84,6 +85,37 @@ test('shared native TextInput keeps value, placeholder, caret and selection visi
       assert.equal(style.opacity, editable ? undefined : 0.7);
     }
   }
+});
+
+test('scroll views and lists hand a tap to the button under it while the soft keyboard is up', () => {
+  const UI = themed('light');
+  for (const name of ['ScrollView', 'FlatList'] as const) {
+    // React Native's own default ('never') spends that first tap on dismissing the keyboard.
+    assert.equal(UI[name].render({}, null).props.keyboardShouldPersistTaps, 'handled', name);
+    // A screen that states its own policy keeps it.
+    assert.equal(UI[name].render({ keyboardShouldPersistTaps: 'always' }, null).props.keyboardShouldPersistTaps, 'always', name);
+  }
+});
+
+test('every scroll container in the app goes through that default; none opts back into eating taps', () => {
+  const sources = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const file = join(directory, entry.name);
+    if (entry.isDirectory()) return sources(file);
+    return /\.tsx?$/u.test(entry.name) && !/\.test\.ts$/u.test(entry.name) ? [file] : [];
+  });
+  const bypass: string[] = [];
+  const optOut: string[] = [];
+  for (const file of sources(resolve('src'))) {
+    if (file.endsWith(join('theme', 'native.tsx'))) continue;
+    const source = readFileSync(file, 'utf8');
+    for (const [, names] of source.matchAll(/import\s+(?!type\b)\{([^}]*)\}\s*from\s*'react-native'/gu)) {
+      const runtime = names.split(',').map((name) => name.trim()).filter((name) => name && !name.startsWith('type '));
+      if (runtime.some((name) => /^(ScrollView|FlatList|SectionList|VirtualizedList)\b/u.test(name))) bypass.push(file);
+    }
+    if (/keyboardShouldPersistTaps=(?:"never"|\{\s*(?:false|'never')\s*\})/u.test(source)) optOut.push(file);
+  }
+  assert.deepEqual(bypass, [], 'import scroll containers from theme/native');
+  assert.deepEqual(optOut, []);
 });
 
 for (const width of [320, 360, 390]) {

@@ -22,7 +22,7 @@ const futures = (short: boolean): TradingGuideStep[] => [
   { screen: 'futures', target: 'futures-direction', title: short ? 'Short · 숏' : 'Long · 롱', body: short ? '숏은 가격이 하락하면 이익, 상승하면 손실이 발생해요. Short를 선택해 주세요.' : '롱은 가격이 상승하면 이익, 하락하면 손실이 발생해요. Long을 선택해 주세요.', next: true },
   { screen: 'futures', target: 'futures-margin', title: '레버리지와 격리마진', body: '낮은 레버리지(예: 2배)와 Isolated 격리마진을 권장해요. 적은 증거금으로 큰 포지션을 만들 수 있지만 손실과 청산 위험도 커져요.', next: true },
   { screen: 'futures', target: 'futures-submit', title: '포지션 진입', body: '수량·증거금·수수료를 확인한 뒤 진입해 주세요. 이 실습은 1배보다 높은 레버리지로 진입해야 해요.' },
-  { screen: 'futures', target: 'futures-position', title: '손익과 청산가격', body: '같은 포지션의 미실현손익과 청산가격을 확인해 주세요. 포지션 카드에서 전량 종료를 선택하고 종료 주문을 실행해 주세요. 강제청산은 종료 실습에 포함되지 않아요.' },
+  { screen: 'futures', target: 'futures-position', title: '손익과 청산가격', body: '같은 포지션의 미실현손익과 청산가격을 확인해 주세요. 포지션 카드의 포지션 종료를 누르고, 열린 화면에서 100%로 포지션 종료를 실행해 주세요. 강제청산은 종료 실습에 포함되지 않아요.' },
 ];
 export const TRADING_GUIDE_STEPS: Record<TradingQuestKey, TradingGuideStep[]> = {
   marketBuy: [market, price, buy, marketType, amount, preview, submit, holdings],

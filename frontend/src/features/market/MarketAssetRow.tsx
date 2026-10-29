@@ -27,8 +27,6 @@ type Props = {
   isStale?: boolean;
   priceError?: AssetPriceErrorDto;
   onPress: (assetId: string) => void;
-  /** A picker's current asset (the detail it was opened over): outlined, checked and announced as selected. */
-  selected?: boolean;
   /** Defaults to the Spot list ids; other lists keep their own ids. */
   testID?: string;
   changeTestID?: string;
@@ -50,7 +48,6 @@ function MarketAssetRowComponent({
   onPress,
   testID,
   changeTestID,
-  selected = false,
 }: Props) {
   const displayItem = useMemo(
     () => mergeMarketAssetTicker(item, ticker ?? undefined),
@@ -72,20 +69,14 @@ function MarketAssetRowComponent({
     <View>
       <ActionPressable
         testID={testID ?? TEST_IDS.market.item(item.id)}
-        style={[styles.itemRow, selected && styles.itemRowSelected]}
-        accessibilityState={selected ? { selected } : undefined}
-        aria-selected={selected || undefined}
+        style={styles.itemRow}
         onPress={() => onPress(item.id)}
       >
         <View style={styles.leading}>
           <AssetLogo testID={`market-logo-${item.id}`} assetType={displayItem.assetType} market={displayItem.market}
             symbol={displayItem.symbol} name={nameDisplay.primary} />
           <View style={styles.identity}>
-            <Text testID={`market-name-${item.id}`} style={styles.itemSymbol}>
-              {/* The mark follows the name (and wraps with it), as in the futures contract picker. */}
-              {selected ? [nameDisplay.primary, <Text key="selected" testID={`market-selected-${item.id}`} style={styles.selectedMark}> ✓</Text>]
-                : nameDisplay.primary}
-            </Text>
+            <Text testID={`market-name-${item.id}`} style={styles.itemSymbol}>{nameDisplay.primary}</Text>
             {secondLine ? (
               <Text testID={`market-subtitle-${item.id}`} style={styles.helper}>{secondLine}</Text>
             ) : null}
@@ -128,8 +119,7 @@ export const MarketAssetRow = React.memo(
     previous.priceError === next.priceError &&
     previous.onPress === next.onPress &&
     previous.testID === next.testID &&
-    previous.changeTestID === next.changeTestID &&
-    previous.selected === next.selected,
+    previous.changeTestID === next.changeTestID,
 );
 
 const styles = StyleSheet.create({
@@ -148,10 +138,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: semantic.border,
   },
-  // Same box as itemRow (no layout shift): only the outline and ground change.
-  itemRowSelected: { borderColor: semantic.info, backgroundColor: semantic.raised },
   itemSymbol: { fontSize: 16, fontWeight: '700' },
-  selectedMark: { color: semantic.info },
   itemPrice: { maxWidth: '100%', textAlign: 'right', fontSize: 15, fontWeight: '600' },
   itemPriceStale: { color: semantic.warning },
   alignEnd: { alignItems: 'flex-end', flexGrow: 1, flexShrink: 1, minWidth: 0, maxWidth: '100%' },

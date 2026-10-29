@@ -96,7 +96,7 @@ it('a closed US market\'s last confirmed close is labeled 종가 without its ses
   assert.equal([r.node('market-last-close-live'), r.node('market-last-close-krx')].every((node) => node === undefined), true);
 });
 
-it('a picker\'s current asset is outlined, checked after its name and announced as selected; other rows are unchanged', (t) => {
+it('a row is the same plain card in every list, the asset pickers included (no current-asset mark)', (t) => {
   const { semantic } = require('../../theme/tokens.ts');
   const h = interactionHarness();
   h.dimensions = { width: 320, height: 800, fontScale: 2 };
@@ -104,29 +104,14 @@ it('a picker\'s current asset is outlined, checked after its name and announced 
     '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
     '../../components/states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
   });
-  const current = row({ id: 'kr', assetType: 'domestic_stock', symbol: '005930', name: 'Samsung Electronics', market: 'KRX', priceCurrency: 'KRW' });
-  const other = row({ id: 'kr2', assetType: 'domestic_stock', symbol: '000660', name: 'SK Hynix', market: 'KRX', priceCurrency: 'KRW' });
-  const renderer = h.render(React.createElement(React.Fragment, null,
-    React.createElement(MarketAssetRow, { item: current, selected: true, onPress() {} }),
-    React.createElement(MarketAssetRow, { item: other, onPress() {} })));
+  const item = row({ id: 'kr', assetType: 'domestic_stock', symbol: '005930', name: 'Samsung Electronics', market: 'KRX', priceCurrency: 'KRW' });
+  // The detail's and the order screen's sheets pass no current asset (2026-10-28): nothing to mark.
+  const renderer = h.render(React.createElement(MarketAssetRow, { item, selected: true, onPress() {} } as any));
   t.after(() => act(() => renderer.unmount()));
   const node = (id: string) => renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === id)[0];
-  const press = (id: string) => renderer.root.findAll((n: any) => n.props?.testID === id && n.props?.onPress)[0];
-  // The mark follows the name in the same (wrapping) line.
-  assert.equal(strings(node('market-name-kr')).join(''), '삼성전자 ✓');
-  assert.equal(flatten(node('market-selected-kr').props.style).color, semantic.info);
-  const selectedRow = press('market-item-kr');
-  assert.deepEqual([selectedRow.props.accessibilityState?.selected, selectedRow.props['aria-selected']], [true, true]);
-  const outline = flatten(selectedRow.props.style);
-  assert.deepEqual([outline.borderColor, outline.backgroundColor, outline.borderWidth, outline.paddingVertical], [semantic.info, semantic.raised, 1, 14]);
-  // Any other row: no mark, no state, the plain name and the shared card.
-  assert.equal(node('market-selected-kr2') === undefined, true);
-  assert.equal(node('market-name-kr2').props.children, 'SK하이닉스');
-  const plainRow = press('market-item-kr2');
-  assert.deepEqual([plainRow.props.accessibilityState === undefined, plainRow.props['aria-selected'] === undefined], [true, true]);
-  assert.deepEqual([flatten(plainRow.props.style).borderColor, flatten(plainRow.props.style).backgroundColor], [semantic.border, semantic.surface]);
-  // A change of the current asset re-renders the memoized row.
-  const props = { item: current, onPress() {}, selected: true };
-  assert.equal(MarketAssetRow.compare(props, { ...props, selected: false }), false);
-  assert.equal(MarketAssetRow.compare(props, { ...props }), true);
+  const press = renderer.root.findAll((n: any) => n.props?.testID === 'market-item-kr' && n.props?.onPress)[0];
+  assert.equal(node('market-selected-kr') === undefined, true);
+  assert.equal(node('market-name-kr').props.children, '삼성전자');
+  assert.deepEqual([press.props.accessibilityState === undefined, press.props['aria-selected'] === undefined], [true, true]);
+  assert.deepEqual([flatten(press.props.style).borderColor, flatten(press.props.style).backgroundColor], [semantic.border, semantic.surface]);
 });

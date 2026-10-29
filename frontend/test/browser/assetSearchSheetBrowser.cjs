@@ -1,7 +1,8 @@
-// Asset detail search sheet and order buttons in RN Web (2026-10-20): the name ▼
-// on a domestic, US or crypto spot detail searches that market only (no market
-// choice), marks the asset on screen, closes on picking it and swaps the detail
-// in place for another one, whose 매수하기 then orders it; 매도하기 / 매수하기 on
+// Asset detail search sheet and order buttons in RN Web: the name ▼ on a
+// domestic, US or crypto spot detail opens the order screen's sheet (2026-10-28:
+// every market with its market choice on 전체, no row marked), closes on picking
+// the asset on screen and swaps the detail in place for another one — another
+// market's too — whose 매수하기 then orders it; 매도하기 / 매수하기 on
 // the spot and futures details stay one line inside their buttons. Every text in
 // the sheet and the order bars stays inside its root and over no other text, at
 // 320/360/390/430 × light/dark × font 1/2. RN-Web only — not a device check.
@@ -94,11 +95,9 @@ async function run() {
     .catch((error) => { server.close(); throw error; });
   const base = `http://127.0.0.1:${server.address().port}`;
   const errors = [], problems = [], layouts = [];
-  const markets = {
-    crypto: { asset: 'BNB', title: '암호화폐 종목 선택', listed: ['BTC', 'BNB', 'PEPE', 'SUI'], others: ['SAMSUNG', 'AAPL'] },
-    domestic_stock: { asset: 'SAMSUNG', title: '국내주식 종목 선택', listed: ['SAMSUNG'], others: ['BNB', 'AAPL'] },
-    us_stock: { asset: 'AAPL', title: '미국주식 종목 선택', listed: ['AAPL'], others: ['BNB', 'SAMSUNG'] },
-  };
+  // Every detail opens the same sheet the order screen opens: 전체, every market listed.
+  const listed = ['BTC', 'BNB', 'PEPE', 'SUI', 'SAMSUNG', 'AAPL'];
+  const markets = { crypto: { asset: 'BNB' }, domestic_stock: { asset: 'SAMSUNG' }, us_stock: { asset: 'AAPL' } };
   let page;
   try {
     const widths = quick ? [320] : [320, 360, 390, 430];
@@ -118,22 +117,20 @@ async function run() {
         const actions = await page.evaluate(buttonLines, ['asset-detail-open-sell-order', 'asset-detail-open-buy-order']);
         assert.deepEqual(actions.map((a) => [a.label, a.lines, a.inside]), [['매도하기', 1, true], ['매수하기', 1, true]], tag);
         problems.push(...(await page.evaluate(textProblems, 'asset-order-actions')).map((p) => `${tag}/actions: ${p}`));
-        // The name ▼: this market's sheet only.
+        // The name ▼: the order screen's sheet.
         await page.getByTestId('asset-name-selector').click();
         await page.getByTestId('order-asset-sheet').waitFor();
         await page.getByTestId(`market-item-${market.asset}`).waitFor();
         await page.waitForTimeout(450);
         const header = await page.getByTestId('order-asset-sheet').getByRole('heading').innerText();
-        assert.equal(header.trim(), market.title, tag);
-        assert.equal(await page.locator('[data-testid^="order-asset-scope-"]').count(), 0, `${tag}: no market choice`);
+        assert.equal(header.trim(), '종목 선택', tag);
+        assert.equal(await page.locator('[data-testid^="order-asset-scope-"]').count(), 4, `${tag}: the market choice`);
+        assert.equal(await page.getByTestId('order-asset-scope-all').getAttribute('aria-selected'), 'true', tag);
         const reads = await page.evaluate(() => window.fixture.state.reads.filter((read) => read.startsWith('/assets?')));
-        assert.ok(reads.length > 0 && reads.every((read) => new URL(read, 'http://x').searchParams.get('assetType') === assetType), `${tag}: ${reads}`);
-        for (const id of market.listed) assert.equal(await page.getByTestId(`market-item-${id}`).count(), 1, `${tag}: ${id} listed`);
-        for (const id of market.others) assert.equal(await page.getByTestId(`market-item-${id}`).count(), 0, `${tag}: ${id} not listed`);
-        // The asset on screen: selected, checked after its name; no other row is.
-        assert.equal(await page.getByTestId(`market-item-${market.asset}`).getAttribute('aria-selected'), 'true', tag);
-        assert.equal(await page.locator('[aria-selected="true"][data-testid^="market-item-"]').count(), 1, tag);
-        assert.match(await page.getByTestId(`market-name-${market.asset}`).innerText(), /✓$/u, tag);
+        assert.ok(reads.length > 0 && reads.every((read) => !new URL(read, 'http://x').searchParams.get('assetType')), `${tag}: ${reads}`);
+        for (const id of listed) assert.equal(await page.getByTestId(`market-item-${id}`).count(), 1, `${tag}: ${id} listed`);
+        // As on the order screen, no row is marked.
+        assert.equal(await page.locator('[aria-selected="true"][data-testid^="market-item-"]').count(), 0, tag);
         problems.push(...(await page.evaluate(textProblems, 'order-asset-sheet')).map((p) => `${tag}/sheet: ${p}`));
         if (fontScale === 2 || (width === 390 && fontScale === 1)) {
           await page.screenshot({ path: path.join(out, `sheet-${assetType}-${width}-${theme}-${fontScale}.png`) });
@@ -144,7 +141,7 @@ async function run() {
         assert.deepEqual(await page.evaluate(() => window.fixture.state.paramCalls ?? []), [], tag);
         layouts.push(tag);
       }
-      // Another crypto asset swaps the detail in place; its 매수하기 orders it.
+      // Another asset swaps the detail in place; its 매수하기 orders it.
       const tag = `${width}/${theme}/${fontScale}/switch`;
       await page.goto(`${base}/?screen=detail&asset=BNB&krx=1&us=1&viewport=1&fontScale=${fontScale}`);
       await page.waitForFunction(() => window.tradingAppearance);
@@ -157,8 +154,6 @@ async function run() {
       assert.deepEqual(await page.evaluate(() => window.fixture.state.paramCalls), [{ assetId: 'BTC' }], tag);
       await page.getByTestId('asset-name-selector').click();
       await page.getByTestId('market-item-BTC').waitFor(); await page.waitForTimeout(450);
-      assert.deepEqual([await page.getByTestId('market-item-BTC').getAttribute('aria-selected'),
-        await page.getByTestId('market-item-BNB').getAttribute('aria-selected')], ['true', null], tag);
       await page.getByTestId('order-asset-sheet-close').click();
       await page.waitForFunction(() => !document.querySelector('[data-testid="order-asset-sheet"]'));
       await page.getByTestId('asset-detail-open-buy-order').click();

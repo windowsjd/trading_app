@@ -6,6 +6,7 @@ import OrderNumberInput, { orderInputStyle } from '../order/OrderNumberInput';
 import QuantityRatioSlider from '../order/QuantityRatioSlider';
 
 const RATIOS = [0.25, 0.5, 0.75, 1] as const;
+const FORM_ID = 'futures-amount';
 
 /**
  * The USD order amount (the position's notional, leverage applied) with what
@@ -13,8 +14,10 @@ const RATIOS = [0.25, 0.5, 0.75, 1] as const;
  * screen gives (collateral capacity for entries, the position for a reduce),
  * and the 주문가능 line. The screen owns the amount, the ratio and their rules.
  */
-export default function FuturesAmountField({ label, amount, onChange, editable, estimate, ratioLabel, ratio, activeRatio,
+export default function FuturesAmountField({ testID = FORM_ID, label, amount, onChange, editable, estimate, ratioLabel, ratio, activeRatio,
   ratioDisabled, ratioReason, onRatio, available, availableTarget, onInputFocus, onInputBlur }: {
+  /** The trade form's ids by default; another field (the 포지션 종료 sheet's) names its own. */
+  testID?: string;
   label: string;
   amount: string;
   onChange: (amount: string) => void;
@@ -35,13 +38,19 @@ export default function FuturesAmountField({ label, amount, onChange, editable, 
   onInputBlur?: () => void;
 }) {
   const { fontScale } = useWindowDimensions();
+  const own = testID !== FORM_ID;
+  const ids = {
+    quick: (value: number) => `${own ? testID : 'futures'}-ratio-${Math.round(value * 100)}`,
+    reason: own ? `${testID}-ratio-reason` : 'futures-ratio-reason',
+    available: own ? `${testID}-available` : 'futures-available-collateral',
+  };
   return (
-    <View style={styles.stack} testID="futures-amount-field">
+    <View style={styles.stack} testID={`${testID}-field`}>
       <View style={styles.group}>
         <Text style={styles.label}>{label}</Text>
         <OrderNumberInput
           accessibilityLabel={label}
-          testID="futures-amount"
+          testID={testID}
           value={amount}
           onChangeText={onChange}
           editable={editable}
@@ -53,7 +62,7 @@ export default function FuturesAmountField({ label, amount, onChange, editable, 
         />
       </View>
       {estimate.length ? (
-        <View style={styles.estimate} testID="futures-amount-estimate">
+        <View style={styles.estimate} testID={`${testID}-estimate`}>
           {estimate.map((line) => <Text key={line} style={styles.helper}>{line}</Text>)}
         </View>
       ) : null}
@@ -61,12 +70,12 @@ export default function FuturesAmountField({ label, amount, onChange, editable, 
         <View style={styles.ratioLabel}>
           <Text style={styles.label}>{ratioLabel}</Text>
           {/* Room for 100% so digit changes cannot move the track during a drag. */}
-          <Text testID="futures-amount-ratio" style={[styles.label, styles.ratioValue, { flexBasis: 36 * fontScale }]}>
+          <Text testID={`${testID}-ratio`} style={[styles.label, styles.ratioValue, { flexBasis: 36 * fontScale }]}>
             {Math.round(ratio * 100)}%
           </Text>
         </View>
         <QuantityRatioSlider
-          testID="futures-amount-slider"
+          testID={`${testID}-slider`}
           accessibilityLabel={ratioLabel}
           value={ratio}
           disabled={!editable || ratioDisabled}
@@ -81,7 +90,7 @@ export default function FuturesAmountField({ label, amount, onChange, editable, 
           return (
             <ActionPressable
               key={value}
-              testID={`futures-ratio-${Math.round(value * 100)}`}
+              testID={ids.quick(value)}
               accessibilityRole="button"
               accessibilityLabel={`${ratioLabel} ${text}`}
               aria-pressed={selected}
@@ -96,9 +105,9 @@ export default function FuturesAmountField({ label, amount, onChange, editable, 
           );
         })}
       </View>
-      {ratioReason ? <Text style={styles.helper} testID="futures-ratio-reason" accessibilityLiveRegion="polite">{ratioReason}</Text> : null}
+      {ratioReason ? <Text style={styles.helper} testID={ids.reason} accessibilityLiveRegion="polite">{ratioReason}</Text> : null}
       <View ref={availableTarget} collapsable={false} style={styles.group}>
-        <Text style={styles.helper} testID="futures-available-collateral">{available}</Text>
+        <Text style={styles.helper} testID={ids.available}>{available}</Text>
       </View>
     </View>
   );

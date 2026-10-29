@@ -17,34 +17,19 @@ import CTAButton from '../../components/common/CTAButton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import { AssetMarketChart } from './AssetChartScreen';
 import OrderAssetSheet from '../order/OrderAssetSheet';
-import type { AssetType } from '../../features/market/api';
 import { useIsFocused } from '@react-navigation/native';
 
 export default function AssetDetailScreen(props: AssetDetailScreenProps) {
   const { assetId } = props.route.params;
   const focused = useIsFocused();
-  // The order screen's own asset sheet, as the futures detail reuses its
-  // contract picker: another asset is picked over this screen and the detail
-  // is rebuilt for it in place. It searches this asset's market only
-  // (domestic, US or crypto spot), read from the detail's own cached answer
-  // (the content below loads it), with this asset marked.
-  const assetType = useQuery({
-    queryKey: QUERY_KEYS.asset.detail(assetId),
-    queryFn: () => getAssetDetail(assetId),
-    enabled: false,
-  }).data?.asset.assetType;
+  // The order screen's asset sheet, opened the way the order screen opens it
+  // (every market with its market choice, from any asset): another asset is
+  // picked over this screen and the detail is rebuilt for it in place.
   const [assetSheetOpen, setAssetSheetOpen] = useState(false);
-  // The market the sheet opened in, kept while it closes over the next asset.
-  const [sheetScope, setSheetScope] = useState<AssetType | null>(null);
   // The sheet never stays over another screen.
   useEffect(() => {
     if (!focused) setAssetSheetOpen(false);
   }, [focused]);
-  // Until the market is known there is nothing to pick within.
-  const openAssetSheet = assetType ? () => {
-    setSheetScope(assetType);
-    setAssetSheetOpen(true);
-  } : undefined;
   const selectAsset = (nextAssetId: string) => {
     setAssetSheetOpen(false);
     if (nextAssetId !== assetId) props.navigation.setParams({ assetId: nextAssetId });
@@ -52,11 +37,8 @@ export default function AssetDetailScreen(props: AssetDetailScreenProps) {
   return (
     <>
       {/* Recreate the chart subscription and timeframe state when the pair changes. */}
-      <AssetDetailContent key={assetId} {...props} onOpenAssetSheet={openAssetSheet} />
-      {sheetScope ? (
-        <OrderAssetSheet visible={assetSheetOpen && focused} scope={sheetScope} selectedAssetId={assetId}
-          onClose={() => setAssetSheetOpen(false)} onSelect={selectAsset} />
-      ) : null}
+      <AssetDetailContent key={assetId} {...props} onOpenAssetSheet={() => setAssetSheetOpen(true)} />
+      <OrderAssetSheet visible={assetSheetOpen && focused} onClose={() => setAssetSheetOpen(false)} onSelect={selectAsset} />
     </>
   );
 }

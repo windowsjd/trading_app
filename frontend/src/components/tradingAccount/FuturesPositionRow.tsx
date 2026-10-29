@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, useWindowDimensions } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { financial } from '../../theme/financialColors';
-import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import type { FuturesHolding } from '../../features/futures/api';
 import { getFuturesPositionDisplay } from '../../features/futures/positionDisplay';
 import ActionPressable from '../common/ActionPressable';
 import AssetLogo from '../../features/market/AssetLogo';
+import FuturesDirectionBadge from './FuturesDirectionBadge';
 
 type Props = { position: FuturesHolding; evaluatedAt: string; now: number; testID?: string; onPress?: () => void };
 export default function FuturesPositionRow({ position, evaluatedAt, now, testID, onPress }: Props) {
@@ -20,7 +20,7 @@ export default function FuturesPositionRow({ position, evaluatedAt, now, testID,
         <AssetLogo testID={`${testID}-logo`} assetType="crypto" market="BINANCE" symbol={position.symbol} name={display.name} />
         <View style={styles.identity}>
           <View style={styles.heading}>
-            <Text testID={`${testID}-direction`} style={[styles.direction, { color: position.direction === 'long' ? BUY_COLOR : SELL_COLOR }]}>{display.direction}</Text>
+            <FuturesDirectionBadge testID={`${testID}-direction`} direction={position.direction} />
             <Text testID={`${testID}-name`} style={styles.name}>{display.name}</Text>
           </View>
           <Text testID={`${testID}-margin`} style={styles.muted}>{display.margin}</Text>
@@ -42,8 +42,7 @@ const styles = StyleSheet.create({
   columns: { minWidth: 0, flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   leading: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
   identity: { flex: 1, minWidth: 0, gap: 3 },
-  heading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 5 },
-  direction: { fontSize: 12, lineHeight: 18, fontWeight: '700', flexShrink: 1 },
+  heading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   name: { minWidth: 0, maxWidth: '100%', flexShrink: 1, fontSize: 18, lineHeight: 27, fontWeight: '700' },
   muted: { fontSize: 12, lineHeight: 18, color: semantic.secondary },
   values: { minWidth: 0, maxWidth: '60%', flexShrink: 1, gap: 2 },

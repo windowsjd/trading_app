@@ -17,14 +17,26 @@ const ThemedText = React.forwardRef<RN.Text, RN.TextProps>((props, ref) => {
   const { colors, mode, financialPreference } = useAppearance();
   return <RN.Text {...props} ref={ref} style={[{ color: colors.text }, resolveSemanticStyle(props.style, colors, mode, financialPreference)]} />;
 });
+/**
+ * Taps inside a scroll view reach their buttons while the soft keyboard is up.
+ * React Native's native ScrollView otherwise ('never') takes the first touch on
+ * anything but a text input as a keyboard dismissal: the button under the finger
+ * never gets it. Forms keep the keyboard up when a control is pressed, so the
+ * next scroll view tapped (a 주문방식 or 레버리지 sheet, the market list under its
+ * search, MY's nickname 저장) lost that first tap. React Native Web leaves this
+ * capture out, so only phones showed it. A tap on empty space still dismisses.
+ */
+const KEYBOARD_TAPS = 'handled';
 const ThemedScrollView = React.forwardRef<RN.ScrollView, RN.ScrollViewProps>((props, ref) => {
   const { colors, mode, financialPreference } = useAppearance();
-  return <RN.ScrollView {...props} ref={ref} style={resolveSemanticStyle(props.style, colors, mode, financialPreference)}
+  return <RN.ScrollView {...props} ref={ref} keyboardShouldPersistTaps={props.keyboardShouldPersistTaps ?? KEYBOARD_TAPS}
+    style={resolveSemanticStyle(props.style, colors, mode, financialPreference)}
     contentContainerStyle={resolveSemanticStyle(props.contentContainerStyle, colors, mode, financialPreference)} />;
 });
 const ThemedFlatList = React.forwardRef<RN.FlatList<unknown>, RN.FlatListProps<unknown>>((props, ref) => {
   const { colors, mode, financialPreference } = useAppearance();
-  return <RN.FlatList {...props} ref={ref} style={resolveSemanticStyle(props.style, colors, mode, financialPreference)}
+  return <RN.FlatList {...props} ref={ref} keyboardShouldPersistTaps={props.keyboardShouldPersistTaps ?? KEYBOARD_TAPS}
+    style={resolveSemanticStyle(props.style, colors, mode, financialPreference)}
     contentContainerStyle={resolveSemanticStyle(props.contentContainerStyle, colors, mode, financialPreference)} />;
 }) as unknown as typeof RN.FlatList;
 const ThemedPressable = React.forwardRef<RN.View, RN.PressableProps>((props, ref) => {

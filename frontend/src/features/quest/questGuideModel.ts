@@ -311,6 +311,8 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   // The order form's own 이체 / 환전 sheet is the user's: the guide steps aside
   // and comes back to the same step when it closes.
   if (screen === 'order' && form.fundingOpen) return NONE;
+  // So do a position's own sheets (포지션 종료 closes it there, at 100% unless changed).
+  if (screen === 'futures' && form.positionSheetOpen) return NONE;
   const wantedAssetType = session.quest === 'krStock' ? 'domestic_stock' : session.quest === 'usStock' ? 'us_stock' : 'crypto';
   if ((screen === 'asset' || screen === 'order') && form.assetType && form.assetType !== wantedAssetType) {
     return message(session, screen, 'wrong-market', card({ title: '실습 시장 확인', body: '이번 퀘스트의 시장에 해당하는 종목을 선택해 주세요. 퀘스트 목록으로 돌아가 다시 시작할 수 있어요.' }, { actions: ['back', 'exit'] }));

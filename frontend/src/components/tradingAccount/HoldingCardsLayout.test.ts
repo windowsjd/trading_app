@@ -46,13 +46,18 @@ for (const platform of ['android', 'ios']) for (const mode of ['light', 'dark'])
       for (const id of ['spot-logo-image', 'future-logo-image']) {
         assert.equal(renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === id).length, 1, id);
       }
-      assert.equal(flatten(node('future-direction').props.style).color, financial.buyAction);
+      // The side is the small L box in the buy color, spoken as the side itself.
+      const badge = renderer.root.findAll(n => n.type === 'View' && n.props.testID === 'future-direction')[0];
+      assert.equal(flatten(badge.props.style).backgroundColor, financial.buyAction);
+      assert.equal(badge.props.accessibilityLabel, '롱(Long)');
+      assert.equal(badge.findByType('Text').props.children, 'L');
+      assert.equal(renderer.root.findAll(n => n.type === 'Text' && n.props.children === 'LONG').length, 0, 'no LONG word');
       assert.equal(flatten(node('future-performance').props.style).color, financial.fall);
       for (const preference of ['red_blue', 'green_red']) {
         const colors = { secondary: 'neutral' };
         const pnl = flatten(resolveSemanticStyle(node('future-performance').props.style, colors as any, mode as any, preference as any)).color;
-        const direction = flatten(resolveSemanticStyle(node('future-direction').props.style, colors as any, mode as any, preference as any)).color;
-        assert.equal(pnl === direction, false, 'a LONG loss uses the loss role independently of the buy direction');
+        const direction = flatten(resolveSemanticStyle(badge.props.style, colors as any, mode as any, preference as any)).backgroundColor;
+        assert.equal(pnl === direction, false, 'a long loss uses the loss role independently of the buy direction');
       }
       assert.equal(flatten(node('spot-quantity').props.style).color, semantic.secondary);
     });

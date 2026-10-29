@@ -76,12 +76,13 @@ module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
  await tab('퀘스트').click();
  assert.equal(await page.getByTestId('quest-card-futuresShort-start').getAttribute('aria-disabled'),'true');
  await buy('marketBuy','BTC');
- // TP/SL is the SELL 주문방식 손절가/익절가 설정 of the practiced asset: field, sheet row,
- // one take-profit with a share of the holding, then 확인 (one setting is enough).
- await start('protection');await pick('protection');await id('sell-protection-form').waitFor();
- assert.equal(await page.getByTestId('holding-protection-BTC').count(),0,'no TP/SL button on the holdings card');
- await id('sell-take-profit-toggle').click();await id('sell-take-profit-trigger-price').fill('120');await id('sell-take-profit-ratio-50').click();
- await next();await id('sell-intent-submit').click();await finish('protection');
+ // TP/SL is set from the practiced holding's card under the order form, in its sheet (since 2026-10-16,
+ // no 주문방식): one take-profit with a share of the holding, then 등록하기 (one setting is enough).
+ await start('protection');
+ const holdingTpSl=page.locator('[data-testid^="holding-"][data-testid$="-tp-sl"]').filter({visible:true}).first();
+ await holdingTpSl.waitFor();await holdingTpSl.scrollIntoViewIfNeeded();await holdingTpSl.click();await id('tp-sl-spot-holding').waitFor();
+ await id('tp-sl-take-profit-toggle').click();await id('tp-sl-take-profit-trigger-price').fill('120');await id('tp-sl-take-profit-ratio-50').click();
+ await next();await id('tp-sl-submit').click();await finish('protection');
  // 매도하기 on the detail, then holdings below the sell form, then the form steps.
  await start('marketSell');await id('asset-detail-open-sell-order').click();await next();await marketDefault();await next();
  await id('order-quantity-input').fill('1');await next();await next();await id('order-execute-submit').click();await finish('marketSell');
@@ -104,8 +105,11 @@ module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
   await page.screenshot({path:path.join(out,`${key}-leverage-spotlight.png`)});await id('futures-leverage-option-2').click();
   await page.waitForFunction(()=>!document.querySelector('[data-testid="futures-leverage-sheet"]'));
   await next();await id('futures-amount').fill('102');await id('futures-submit').click();
-  await page.getByRole('button',{name:'전량 종료',exact:true}).filter({visible:true}).first().click();
-  await id('futures-submit').click();await finish(key);
+  // 포지션 종료 on the card opens its sheet at 100% (the guide steps aside there); its confirm closes the lifetime.
+  await page.getByRole('button',{name:'포지션 종료',exact:true}).filter({visible:true}).first().click();
+  await id('futures-close-submit').waitFor();await page.waitForTimeout(450);
+  assert.equal(await page.locator('[data-testid="quest-guide-overlay"]').count(),0,'no guide card over the sheet');
+  await id('futures-close-submit').click();await finish(key);
  }
  assert.equal((await id('quest-summary-progress').textContent()),'퀘스트 10/10 완료');
  assert.deepEqual(errors,[]);

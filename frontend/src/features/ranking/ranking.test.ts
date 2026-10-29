@@ -599,8 +599,10 @@ describe('friend portfolio access rendering', () => {
     assert.match(html, /비중 확인 불가/);
     assert.doesNotMatch(html, /최근 30일|2026-09-29/);
     assert.match(html, /거래 완료 종목/);
-    // Newest first, as the server orders them: the Short lifetime, then the Korean stock.
-    assert.ok(html.indexOf('선물 SHORT') < html.indexOf('삼성전자'));
+    // Newest first, as the server orders them: the Short lifetime (선물 with its S box), then the Korean stock.
+    assert.ok(html.indexOf('숏(Short)') < html.indexOf('삼성전자'));
+    assert.match(html, /aria-label="숏\(Short\)"[^>]*>(<[^>]+>)*S</);
+    assert.doesNotMatch(html, /SHORT|LONG/);
     assert.match(html, /진입 증거금 \$63\.33/);
     assert.match(html, /실현 손익 \+\$24\.65 · 수익률 \+38\.91%/);
     assert.match(html, /현물/);

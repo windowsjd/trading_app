@@ -15,6 +15,7 @@ import FuturesConditionalEntryForm, {
   type FuturesConditionalDraft,
 } from './FuturesConditionalEntryForm';
 import FuturesInstrumentSheet from './FuturesInstrumentSheet';
+import FuturesCloseSheet, { type FuturesCloseRequest } from './FuturesCloseSheet';
 import FuturesAmountField from './FuturesAmountField';
 import FuturesLeverageSelect, { type FuturesLeverageSheet } from './FuturesLeverageSelect';
 import FuturesMarginModeField from './FuturesMarginModeField';
@@ -27,6 +28,7 @@ import TpSlSheet, { type TpSlTarget } from "../../features/conditional/tpsl/TpSl
 import { tpSlCountSummary } from "../../features/conditional/tpSlModel";
 import { getFuturesTpSlSettings } from "../../features/futures/tpSlApi";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -56,6 +58,7 @@ import {
   type Operation,
   type FuturesCommand,
   type FuturesInstrument,
+  type FuturesPosition,
 } from "../../features/futures/api";
 import {
   freshFuturesEvaluation,
@@ -69,6 +72,7 @@ import {
   positionCommand,
 } from "../../features/futures/policy";
 import { COLLATERAL_SHORT, MAINTENANCE_SHORT, futuresErrorMessage } from "../../features/futures/orderFeedback";
+import { futuresHolding, getFuturesPositionDisplay } from "../../features/futures/positionDisplay";
 import {
   futuresAmountAtRatio,
   futuresAmountExceeds,
@@ -117,8 +121,6 @@ export default function FuturesScreen(props: FuturesScreenProps) {
 type ListView = 'positions' | 'pending';
 /** Longer than the screen's 1 s re-render: it was not on screen meanwhile. */
 const MARK_WATCH_GAP_MS = 3000;
-/** RN and RN-web ScrollView: the content container (absent from RN's legacy typings). */
-type InnerViewScroll = { getInnerViewRef?: () => View | null };
 
 /**
  * The futures trading screen, laid out like the spot order screen: the
@@ -153,18 +155,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const { revealView } = inputScroll;
   useEffect(() => { registerQuestGuideReveal('futures', node => revealView(node, 'start')); return () => { registerQuestGuideReveal('futures', null); }; }, [revealView]);
   const headerHeight = useHeaderHeight();
-  // A position card's action brings the trade form to the top, measured after
-  // the commit that selected it, as a position inside the content: a browser
-  // may shift the scroll offset itself when the content above changes size.
-  const tradeRow = useRef<View>(null);
-  const [tradeReveal, setTradeReveal] = useState(0);
-  const { scrollRef } = inputScroll;
-  useEffect(() => {
-    const scroll = scrollRef.current, row = tradeRow.current;
-    const content = (scroll as unknown as InnerViewScroll | null)?.getInnerViewRef?.();
-    if (!tradeReveal || !scroll || !row || !content) return;
-    row.measureLayout(content, (_x, y) => scroll.scrollTo({ y: Math.max(0, y - 12), animated: true }), () => undefined);
-  }, [tradeReveal, scrollRef]);
   const [, setClock] = useState(Date.now());
   const clock = Date.now();
   // When this contract's Mark was last seen fresh (or first watched): only how
@@ -192,6 +182,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const [conditionalBusy, setConditionalBusy] = useState(false);
   // The one position card whose TP/SL panel is open.
   const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
+  // The position whose 포지션 종료 sheet is open, that sheet's last refusal,
+  // and the result of its last command (shown over the positions).
+  const [closeTarget, setCloseTarget] = useState<string | null>(null);
+  const [closeError, setCloseError] = useState<{ cause: unknown; message: string } | null>(null);
+  const [closeNotice, setCloseNotice] = useState<string | null>(null);
   const [operation, setOperation] = useState<Operation>("open");
   const [failure, setFailure] = useState<unknown>(null);
   const [collateralAttempted, setCollateralAttempted] = useState(false);
@@ -211,6 +206,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       mounted: true,
     };
   const action = useRef<{
+    /** The trade form or a position's 포지션 종료 sheet: where its result is shown. */
+    origin: 'form' | 'close';
     reportQuestCommand: ReturnType<typeof captureQuestGuideCommand>;
     signature: string;
     command: FuturesCommand;
@@ -300,6 +297,13 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       const execution = result.execution;
       request.reportQuestCommand({ kind: 'futures', accountId, positionId: execution.positionId, direction: execution.direction, operation: execution.operation, leverage: execution.leverage, quantityAfter: execution.positionAfter.quantity, summary: '선물 실행 기록이 확인됐어요.' });
       action.current = null;
+      if (request.origin === 'close') {
+        // The sheet closes on its fill; the trade form's draft is left as it was.
+        setCloseTarget(null);
+        setCloseError(null);
+        setCloseNotice(`${execution.operation === 'close' ? '포지션 종료' : '포지션 감소'} 체결 완료 · 수수료 $${formatUsd(execution.feeAmount)}`);
+        return;
+      }
       setFailure(null);
       setAmount("");
       setChosenRatio(null);
@@ -309,7 +313,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     },
     onError: (error, request) => {
       if (current(request)) {
-        setFailure(error);
         const info = getApiErrorInfo(error);
         if (info.serverCode === 'BEGINNER_FEATURE_LOCKED')
           void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.quests(accountId) });
@@ -317,7 +320,10 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         // key for the same-request check. A clear refusal (4xx) did not fill.
         request.uncertain = !info.hasResponse || (info.status ?? 0) >= 500;
         if (!request.uncertain) action.current = null;
-        setNotice(futuresErrorMessage(info.serverCode, request.uncertain));
+        const message = futuresErrorMessage(info.serverCode, request.uncertain);
+        if (request.origin === 'close') { setCloseError({ cause: error, message }); return; }
+        setFailure(error);
+        setNotice(message);
       }
     },
     onSettled: () => {
@@ -333,7 +339,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const practicePosition = positions.data?.positions.find(p => p.id === guide?.active?.positionId)
     ?? positions.data?.positions.find(p => p.instrumentId === selectedId);
   useTradingGuideFacts({ screen: 'futures', accountId, direction, leverage: Number(leverage), marginMode,
-    leverageSheet: leverageSheet ?? undefined,
+    leverageSheet: leverageSheet ?? undefined, positionSheetOpen: !!closeTarget || !!tpSlTarget,
     positionId: practicePosition?.id, positionDirection: practicePosition?.direction, pending: mutation.isPending,
     blocked: (guide?.active?.step === 5 ? positions.data?.capabilities.canClose : positions.data?.capabilities.canOpen) !== true }, focused && bound);
   if (binding.state === "loading")
@@ -381,6 +387,14 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   // of the server made a fresh Mark flash "Mark 확인 불가" before every poll.
   const positionsNow = futuresServerNow(data, clock);
   const instrumentsNow = futuresServerNow(instruments.data, clock);
+  // The position the 포지션 종료 sheet is open for, read live (null once gone),
+  // with its own Mark (as its card shows it) and its own Futures Last.
+  const closePosition = closeTarget ? data.positions.find((p) => p.id === closeTarget) ?? null : null;
+  const closeView = closePosition ? {
+    markFresh: getFuturesPositionDisplay(futuresHolding(closePosition), data.evaluatedAt, positionsNow).fresh,
+    referenceFresh: !!futuresPrice(closePosition.referencePrice)
+      && freshFuturesReference(closePosition.referencePriceEvidence, positionsNow),
+  } : { markFresh: false, referenceFresh: false };
   const timely = freshFuturesEvaluation(data.evaluatedAt, positionsNow);
   const crossFresh = data.positions
     .filter((p) => p.marginMode === "cross")
@@ -644,6 +658,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     if (action.current?.signature !== signature) {
       const key = createIdempotencyKey("futures");
       action.current = {
+        origin: 'form',
         reportQuestCommand: captureQuestGuideCommand(),
         signature,
         epoch: scope.current.epoch,
@@ -672,7 +687,40 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setRatioMessage(null);
     mutation.mutate(action.current);
   };
-  const focusTrade = () => setTradeReveal((count) => count + 1);
+  // A position's 포지션 종료 sheet sends the existing reduce or close command of
+  // that position on this screen's one command path (same key on a retry, the
+  // same lock, refresh and quest report); only where its result shows differs.
+  const submitClose = (target: FuturesPosition, { operation: op, quantity }: FuturesCloseRequest) => {
+    if (submitLock.current || pendingResult || limitBusy || conditionalBusy) return;
+    const signature = JSON.stringify([scope.current.epoch, 'close', target.id, op, op === 'close' ? target.quantity : quantity]);
+    if (action.current?.signature !== signature) {
+      action.current = {
+        origin: 'close',
+        reportQuestCommand: captureQuestGuideCommand(),
+        signature,
+        epoch: scope.current.epoch,
+        session,
+        command: positionCommand(target, op, quantity, createIdempotencyKey("futures")),
+      };
+    }
+    submitLock.current = true;
+    setCloseError(null);
+    setCloseNotice(null);
+    mutation.mutate(action.current);
+  };
+  // The position sheets open over the screen without the form's keyboard; a
+  // close waits like every other command (its card button is off meanwhile).
+  const openTpSl = (positionId: string) => {
+    Keyboard.dismiss();
+    setTpSlTarget({ type: 'futures_position', accountId, positionId });
+  };
+  const openClose = (positionId: string) => {
+    if (submitLock.current || pendingResult) return;
+    Keyboard.dismiss();
+    setCloseError(null);
+    setCloseNotice(null);
+    setCloseTarget(positionId);
+  };
   const estimateLines: string[] = [];
   if (sizing?.state === "ready") {
     estimateLines.push(`예상 수량 ${formatDisplayDecimal(sizing.quantity)} ${baseSymbol}`);
@@ -806,7 +854,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
           </>
         ) : null}
         {/* The spot order screen's row: the form beside the book on every width. */}
-        <View ref={tradeRow} collapsable={false} style={[styles.tradingRow, compact && styles.compactTradingRow]} testID="futures-trading-columns">
+        <View style={[styles.tradingRow, compact && styles.compactTradingRow]} testID="futures-trading-columns">
           <View style={styles.orderColumn} testID="futures-trade">
             {pendingResult ? (
               <View style={styles.pendingResult}>
@@ -1084,21 +1132,20 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               { key: 'pending', label: '대기 주문', testID: 'futures-view-pending' },
             ]} />
           {listView === 'positions' ? (
-            !data.positions.length ? (
-              <Text style={styles.muted} testID="futures-positions-empty">포지션이 없습니다.</Text>
-            ) : (
-              data.positions.map((p) => (
-                <FuturesPositionCard key={p.id} position={p} accountId={accountId} evaluatedAt={data.evaluatedAt} now={positionsNow}
+            <>
+              {/* A 포지션 종료 sheet's fill reads here, also after the last position closed. */}
+              {closeNotice ? (
+                <Text accessibilityRole="alert" style={styles.notice} testID="futures-close-notice">{closeNotice}</Text>
+              ) : null}
+              {!data.positions.length ? (
+                <Text style={styles.muted} testID="futures-positions-empty">포지션이 없습니다.</Text>
+              ) : data.positions.map((p) => (
+                <FuturesPositionCard key={p.id} position={p} evaluatedAt={data.evaluatedAt} now={positionsNow}
                   disabled={locked} capabilities={data.capabilities}
-                  onSelect={op => {
-                    if (submitLock.current || pendingResult || limitBusy || conditionalBusy) return;
-                    choose(p.instrumentId); setOperation(op);
-                    focusTrade();
-                  }}
                   tpSlSummary={tpSlRows ? tpSlCountSummary(tpSlRows.filter((row) => row.positionId === p.id)) : null}
-                  onTpSl={() => setTpSlTarget({ type: 'futures_position', accountId, positionId: p.id })} />
-              ))
-            )
+                  onTpSl={() => openTpSl(p.id)} onClose={() => openClose(p.id)} />
+              ))}
+            </>
           ) : (
             <PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.account.mode === "season"} conditional />
           )}
@@ -1132,6 +1179,20 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         ) : null}
       </ScrollView>
       <TpSlSheet target={focused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />
+      <FuturesCloseSheet
+        open={focused && !!closeTarget}
+        position={closePosition}
+        markFresh={closeView.markFresh}
+        referenceFresh={closeView.referenceFresh}
+        capabilities={data.capabilities}
+        busy={mutation.isPending}
+        held={limitBusy || conditionalBusy}
+        uncertain={pendingResult}
+        error={closeError}
+        onSubmit={(request) => { if (closePosition) submitClose(closePosition, request); }}
+        onRetry={retryResult}
+        onClose={() => setCloseTarget(null)}
+      />
       {/* 이체 over this screen: closes on success; the next reads carry the new balance and margin. */}
       <WalletFundingSheet testID="futures" request={funding} visible={focused && bound} closeOnSuccess onClose={() => setFunding(null)} />
       <FuturesInstrumentSheet

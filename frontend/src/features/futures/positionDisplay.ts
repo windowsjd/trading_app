@@ -17,7 +17,6 @@ export function getFuturesPositionDisplay(position: FuturesHolding, evaluatedAt:
   const roi = fresh ? formatSignedPercent(position.roi) : '-';
   return {
     name: getAssetNameDisplay(position).primary,
-    direction: position.direction === 'long' ? 'LONG' : 'SHORT',
     margin: `${position.marginMode === 'cross' ? '교차' : '격리'} · ${position.leverage}x`,
     notional: fresh ? formatMoneyDecimal(position.markNotional, 'USD') : '-',
     pnl, roi, performance: fresh ? `${pnl} (${roi})` : '-',

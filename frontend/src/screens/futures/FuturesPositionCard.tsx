@@ -1,36 +1,36 @@
-import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { questGuideTarget } from '../../features/quest/questGuideBridge';
 import React from 'react';
 import { View, Text, StyleSheet, useWindowDimensions } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { financial } from '../../theme/financialColors';
-import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
-import type { FuturesPosition, FuturesCapabilities, Operation } from '../../features/futures/api';
+import type { FuturesPosition, FuturesCapabilities } from '../../features/futures/api';
 import { futuresHolding, getFuturesPositionDisplay } from '../../features/futures/positionDisplay';
-import { formatAssetPrice, formatDisplayDecimal, formatMoneyDecimal, getFinancialDirection } from '../../utils/format';
+import { TP_SL_TITLE } from '../../features/conditional/tpSlModel';
+import { formatAssetPrice, formatMoneyDecimal } from '../../utils/format';
 import CTAButton from '../../components/common/CTAButton';
-import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
+import FuturesDirectionBadge from '../../components/tradingAccount/FuturesDirectionBadge';
 
-type Props = { position: FuturesPosition; accountId: string; evaluatedAt: string; now: number;
-  disabled: boolean; capabilities: FuturesCapabilities; onSelect: (operation: Exclude<Operation, 'open'>) => void;
+type Props = { position: FuturesPosition; evaluatedAt: string; now: number;
+  disabled: boolean; capabilities: FuturesCapabilities;
   /** `익절 2건 · 손절 1건` of this lifetime's live settings; null when none/unknown. */
   tpSlSummary: string | null;
   /** Opens this position's 손절가/익절가 bottom sheet. */
-  onTpSl: () => void };
+  onTpSl: () => void;
+  /** Opens this position's 포지션 종료 bottom sheet (the whole position, or a part of it). */
+  onClose: () => void };
 
 /**
- * One open futures position: what it is (contract, direction, margin mode,
- * leverage), how it performs on Mark, its size and prices, its 손절가/익절가
- * and realized result, and the actions that select it in the trade form. A
- * liquidation price is individual to an isolated position only. 손절가/익절가
- * is set, listed and canceled in this position's bottom sheet — never through
- * the trade form's 조건주문 (a new-position entry).
+ * One open futures position: what it is (side, contract, margin mode,
+ * leverage), how it performs on Mark, its size, prices and estimated closing
+ * fee, and its two actions side by side — 손절가/익절가 설정 and 포지션 종료,
+ * each in its own bottom sheet over this screen. A liquidation price is
+ * individual to an isolated position only. Adding to a position (or reducing
+ * it by an amount) stays in the trade form above, for the selected contract.
  */
-export default function FuturesPositionCard({ position: p, accountId, evaluatedAt, now,
-  disabled, capabilities, onSelect, tpSlSummary, onTpSl }: Props) {
+export default function FuturesPositionCard({ position: p, evaluatedAt, now,
+  disabled, capabilities, tpSlSummary, onTpSl, onClose }: Props) {
   const { width, fontScale } = useWindowDimensions();
-  const learning = useLearningAccess(accountId).gate('allTrading');
   const guide = useQuestGuide();
   const stacked = width / fontScale < 300;
   // Entry | Mark | Liq. read as one row on phones; narrow screens use two columns.
@@ -39,11 +39,10 @@ export default function FuturesPositionCard({ position: p, accountId, evaluatedA
   const price = (value: string | null | undefined) => value == null ? '-'
     : formatAssetPrice(value, 'USD', p.instrument.underlying.displayPriceDecimals);
   const pnlColor = display.pnlDirection === 'neutral' ? semantic.secondary : financial[display.pnlDirection];
-  const realizedDirection = getFinancialDirection(p.realizedPnl);
   const isolated = p.marginMode === 'isolated';
   return <View ref={guide?.active?.positionId === p.id ? questGuideTarget('futures-position') : undefined} collapsable={false} style={styles.card} testID={`futures-position-${p.id}`}>
     <View style={styles.header}>
-      <Text style={[styles.direction, { color: p.direction === 'long' ? BUY_COLOR : SELL_COLOR }]}>{display.direction}</Text>
+      <FuturesDirectionBadge testID={`futures-position-${p.id}-direction`} direction={p.direction} />
       <Text style={styles.name}>{display.name}</Text>
       <Text style={styles.badge}>무기한</Text>
       <Text testID={`futures-position-${p.id}-margin`} style={styles.badge}>{isolated ? '격리' : '교차'} {p.leverage}x</Text>
@@ -62,43 +61,38 @@ export default function FuturesPositionCard({ position: p, accountId, evaluatedA
     <View style={styles.metrics}>
       <Metric columns={columns} label="포지션 규모" value={display.notional} />
       <Metric columns={columns} label="기준 초기 증거금" value={formatMoneyDecimal(p.initialMargin, 'USD')} />
-      <Metric columns={columns} label="보유 수량" value={`${formatDisplayDecimal(p.quantity)} ${p.instrument.underlying.symbol.replace(/USDT$/u, '')}`} />
+      {/* The server's estimate of the fee to close the whole position now (on Mark). */}
+      <Metric columns={columns} label="예상 종료 수수료" testID={`futures-position-${p.id}-fee`}
+        value={display.fresh ? formatMoneyDecimal(p.risk?.estimatedCloseFee, 'USD') : '-'} />
       <Metric columns={columns} label="평균 진입가" value={price(p.averageEntryPrice)} />
       <Metric columns={columns} label="Mark Price" value={display.fresh ? price(p.markPrice) : '-'} />
-      {isolated ? <>
+      {isolated ? (
         <Metric columns={columns} label="예상 청산가" value={display.fresh && p.risk
           ? p.risk.liquidationPrice === null ? '양수 가격 범위 내 없음' : price(p.risk.liquidationPrice) : '-'} />
-        <Metric columns={columns} label="격리 담보" value={formatMoneyDecimal(p.isolatedMargin, 'USD')} />
-        <Metric columns={columns} label="유지 증거금 + 종료 수수료" value={display.fresh ? formatMoneyDecimal(p.risk?.liquidationRequirement, 'USD') : '-'} />
-      </> : null}
+      ) : null}
     </View>
     {isolated ? null : <Text style={styles.caption}>선물 USD 지갑의 공동 담보를 사용합니다. 교차 담보와 청산 위험은 공동 평가 영역에서 확인해주세요.</Text>}
-    <TpSlButton testID={`futures-position-${p.id}-protection`} summary={tpSlSummary} onPress={onTpSl} />
-    <View style={styles.line} testID={`futures-position-${p.id}-realized`}>
-      <Text style={styles.lineLabel}>누적 실현 손익 · USD</Text>
-      <Text selectable style={[styles.lineValue, realizedDirection !== 'neutral' && { color: financial[realizedDirection] }]}>
-        {formatMoneyDecimal(p.realizedPnl, 'USD', true)}
-      </Text>
-    </View>
-    <View style={styles.actions}>
-      {(['increase', 'reduce', 'close'] as const).map(op => <CTAButton key={op} variant="secondary"
-        testID={`futures-position-${p.id}-${op}`} label={op === 'increase' ? '포지션 증가' : op === 'reduce' ? '포지션 감소' : '전량 종료'}
-        learningHint={op === 'increase' && learning.locked ? learning.message : null}
-        style={styles.action} state={disabled || !capabilities[op === 'increase' ? 'canIncrease' : op === 'reduce' ? 'canReduce' : 'canClose']
-          ? 'disabled' : 'enabled'} onPress={() => op === 'increase' ? learning.guard(() => onSelect(op)) : onSelect(op)} />)}
+    {tpSlSummary ? (
+      <Text testID={`futures-position-${p.id}-protection-summary`} style={styles.summary}>{`${TP_SL_TITLE} · ${tpSlSummary}`}</Text>
+    ) : null}
+    <View style={[styles.actions, stacked && styles.stacked]}>
+      <CTAButton variant="secondary" testID={`futures-position-${p.id}-protection`} label={TP_SL_TITLE}
+        style={stacked ? undefined : styles.action} onPress={onTpSl} />
+      <CTAButton variant="secondary" testID={`futures-position-${p.id}-close`} label="포지션 종료"
+        style={stacked ? undefined : styles.action}
+        state={disabled || !(capabilities.canClose || capabilities.canReduce) ? 'disabled' : 'enabled'} onPress={onClose} />
     </View>
   </View>;
 }
 
 /** Fixed columns keep a short last row aligned with the rows above it. */
 const COLUMN_WIDTH = { 1: '100%', 2: '46%', 3: '30%' } as const;
-function Metric({ label, value, columns }: { label: string; value: string; columns: 1 | 2 | 3 }) {
-  return <View style={[styles.metric, { width: COLUMN_WIDTH[columns] }]}><Text style={styles.caption}>{label}</Text><Text selectable style={styles.value}>{value}</Text></View>;
+function Metric({ label, value, columns, testID }: { label: string; value: string; columns: 1 | 2 | 3; testID?: string }) {
+  return <View style={[styles.metric, { width: COLUMN_WIDTH[columns] }]}><Text style={styles.caption}>{label}</Text><Text testID={testID} selectable style={styles.value}>{value}</Text></View>;
 }
 const styles = StyleSheet.create({
   card: { minWidth: 0, padding: 14, gap: 12, borderRadius: 12, borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.surface },
   header: { minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 4 },
-  direction: { fontSize: 13, lineHeight: 20, fontWeight: '800' },
   name: { minWidth: 0, maxWidth: '100%', flexShrink: 1, fontSize: 17, lineHeight: 25, fontWeight: '700', color: semantic.text },
   badge: { fontSize: 11, lineHeight: 15, fontWeight: '600', color: semantic.secondary, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: semantic.raised, overflow: 'hidden' },
   caption: { fontSize: 12, lineHeight: 18, color: semantic.secondary, flexShrink: 1 },
@@ -113,10 +107,9 @@ const styles = StyleSheet.create({
   stacked: { flexDirection: 'column', alignItems: 'stretch' },
   value: { fontSize: 15, lineHeight: 22, color: semantic.text, fontVariant: ['tabular-nums'] },
   notice: { fontSize: 12, lineHeight: 19, color: semantic.warning },
-  line: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', columnGap: 12, rowGap: 2,
-    minWidth: 0, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: semantic.border },
-  lineLabel: { flexShrink: 1, fontSize: 13, lineHeight: 19, color: semantic.secondary },
-  lineValue: { flexShrink: 1, fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.text, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  action: { flexGrow: 1, flexShrink: 1, minWidth: 96, maxWidth: '100%' },
+  summary: { fontSize: 13, lineHeight: 19, fontWeight: '600', color: semantic.secondary },
+  actions: { flexDirection: 'row', gap: 8 },
+  // Two equal halves from a zero basis: each label is measured at its final
+  // width, so a long one wraps to a second line instead of being cut.
+  action: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
 });

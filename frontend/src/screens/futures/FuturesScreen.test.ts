@@ -5,27 +5,55 @@ const { futuresHarness, deferred } = createRequire(import.meta.url)(
   "../../../test/futuresHarness.cjs",
 );
 
-for (const mode of ['ENABLED', 'REDUCE_ONLY', 'DISABLED']) test(`${mode}: detailed card selects the existing trade form without submitting and keeps capability restrictions`, async t => {
+const words = (node: any) => [node?.props.children].flat(Infinity).filter((part: unknown) => typeof part === 'string').join('');
+// Open = the sheet takes touches; this harness's motion never ends, so a closing sheet stays drawn without them.
+const sheetOpen = (h: any) => h.node('futures-close-sheet')?.props.pointerEvents === 'auto';
+
+for (const mode of ['ENABLED', 'REDUCE_ONLY', 'DISABLED']) test(`${mode}: the card pairs 손절가/익절가 설정 with 포지션 종료, whose sheet (never the trade form) follows the capability`, async t => {
   const h = futuresHarness({ position: true, mode });
   await h.start(); t.after(h.close);
-  for (const op of ['increase', 'reduce', 'close']) {
-    const action = h.node(`futures-position-A:position-${op}`);
-    assert.equal(action.props.state, (mode === 'DISABLED' || (mode === 'REDUCE_ONLY' && op === 'increase')) ? 'disabled' : 'enabled');
-    if (action.props.state === 'enabled') {
-      await h.press(`futures-position-A:position-${op}`);
-      assert.equal(h.requests.length, 0);
-      assert.equal(h.node('futures-leverage-select') === undefined, true, 'a position keeps its leverage');
-      if (op !== 'close') {
-        assert.equal(h.node('futures-submit').props.state, 'disabled', 'selecting an operation still requires a valid amount');
-        // $51 at Futures Last 102 is 0.5 contracts.
-        await h.amount('51');
-      }
-      assert.equal(h.node('futures-submit').props.state, 'enabled');
-    }
-  }
+  const card = 'futures-position-A:position';
+  // No 포지션 증가 / 포지션 감소 shortcuts and no 누적 실현 손익 box: two actions, side by side.
+  for (const removed of ['increase', 'reduce', 'realized']) assert.equal(h.node(`${card}-${removed}`) === undefined, true, removed);
+  const tpSl = h.node(`${card}-protection`), close = h.node(`${card}-close`);
+  assert.deepEqual([tpSl.props.label, close.props.label], ['손절가/익절가 설정', '포지션 종료']);
+  const rowStyle = Object.assign({}, ...[close.parent.props.style].flat(Infinity).filter(Boolean));
+  assert.equal(tpSl.parent === close.parent && rowStyle.flexDirection === 'row', true, 'one row');
+  assert.deepEqual([tpSl.props.style, close.props.style].map((style: any) => [style.flexGrow, style.flexBasis]), [[1, 0], [1, 0]], 'equal halves');
+  assert.equal(tpSl.props.state ?? 'enabled', 'enabled');
+  assert.equal(close.props.state, mode === 'DISABLED' ? 'disabled' : 'enabled');
+  if (mode === 'DISABLED') return;
+  const form = h.node('futures-submit').props.label;
+  await h.amount('51');
+  await h.press(`${card}-close`);
+  assert.equal(sheetOpen(h), true);
+  assert.equal(h.keyboardDismissals >= 1, true, 'the form\'s keyboard goes down under the sheet');
+  assert.equal(h.requests.length, 0);
+  assert.deepEqual(h.navigation, []);
+  assert.equal(h.node('futures-submit').props.label, form, 'the trade form is left as it was');
+  assert.equal(h.node('futures-amount').props.value, '51');
 });
 
-const words = (node: any) => [node?.props.children].flat(Infinity).filter((part: unknown) => typeof part === 'string').join('');
+test('the card shows the side as an L box and the estimated closing fee where 보유 수량 was; no 격리 담보 or 유지 증거금 + 종료 수수료', async t => {
+  for (const [direction, letter, spoken] of [['long', 'L', '롱(Long)'], ['short', 'S', '숏(Short)']]) {
+    const h = futuresHarness({ position: true, direction });
+    await h.start(); t.after(h.close);
+    const card = h.node('futures-position-A:position');
+    const badge = h.node('futures-position-A:position-direction');
+    assert.deepEqual([badge.props.accessibilityLabel, words(badge.findAll((n: any) => n.type === 'Text')[0])], [spoken, letter]);
+    const text = JSON.stringify(card.findAll((n: any) => n.type === 'Text').map((n: any) => words(n)));
+    assert.equal(/LONG|SHORT/.test(text), false, direction);
+    for (const label of ['포지션 규모', '기준 초기 증거금', '예상 종료 수수료', '평균 진입가', 'Mark Price', '예상 청산가'])
+      assert.equal(text.includes(label), true, label);
+    for (const label of ['보유 수량', '격리 담보', '유지 증거금 + 종료 수수료', '누적 실현 손익'])
+      assert.equal(text.includes(label), false, label);
+    // The server's estimate for closing the whole position on Mark (fixture: 0.2).
+    assert.equal(words(h.node('futures-position-A:position-fee')), '$0.2');
+  }
+  const stale = futuresHarness({ position: true, stale: true });
+  await stale.start(); t.after(stale.close);
+  assert.equal(words(stale.node('futures-position-A:position-fee')), '-', 'no fee estimate without a fresh Mark');
+});
 
 test('the card 손절가/익절가 설정 opens that position\'s sheet; an existing OCO group shows there with its cancel and blocks new settings', async t => {
   const h = futuresHarness({ position: true, protectionEnabled: true });
@@ -54,6 +82,11 @@ test('a Long position registers independent partial 손절가/익절가 on Futur
   const h = futuresHarness({ position: true });
   await h.start(); t.after(h.close);
   await h.press('futures-position-A:position-protection');
+  // The position sheets' shared top, as 포지션 종료: contract with its L box and margin, 진입가, Mark Price.
+  const summary = h.node('tp-sl-summary');
+  assert.equal(h.node('tp-sl-summary-direction').props.accessibilityLabel, '롱(Long)');
+  assert.deepEqual(['name', 'entry', 'mark'].map((id) => words(h.node(`tp-sl-summary-${id}`))), ['비트코인', '$100', '$101']);
+  assert.equal(summary.findAll((n: any) => n.type === 'Text').some((n: any) => /^(Long|LONG)\b/.test(words(n))), false);
   assert.match(words(h.node('tp-sl-position')), /포지션 수량 2 BTC/);
   await h.press('tp-sl-take-profit-toggle');
   await h.change('tp-sl-take-profit-trigger-price', '110');
@@ -140,16 +173,21 @@ test('a contract change starts at 시장가 with the entry draft cleared', async
   assert.equal(h.requests.length, 0);
 });
 
-test('closing from the detailed card sends the existing captured quantity and removes the refreshed open position', async t => {
+test('포지션 종료 sends the existing close of the whole captured quantity from its sheet, then shows the fill over the refreshed positions', async t => {
   const h = futuresHarness({ position: true });
   await h.start(); t.after(h.close);
+  await h.amount('51');
   await h.press('futures-position-A:position-close');
   assert.equal(h.requests.length, 0);
   h.options.position = false;
-  await h.press('futures-submit');
+  await h.press('futures-close-submit');
   assert.equal(h.requests.length, 1);
-  assert.equal(h.requests[0].body.operation, 'close');
-  assert.equal(h.requests[0].body.quantity, '2');
+  assert.equal(h.requests[0].path, '/trading-accounts/A/futures/execute');
+  assert.deepEqual([h.requests[0].body.operation, h.requests[0].body.quantity, h.requests[0].body.positionId], ['close', '2', 'A:position']);
+  assert.equal(sheetOpen(h), false, 'the sheet closes on its fill');
+  assert.match(words(h.node('futures-close-notice')), /^포지션 종료 체결 완료 · 수수료 \$0\.1/);
+  assert.equal(h.node('futures-order-notice') === undefined, true, 'the trade form says nothing');
+  assert.equal(h.node('futures-amount').props.value, '51', 'the trade form keeps its draft');
   assert.equal(h.node('futures-position-A:position') === undefined, true);
   assert.equal(h.invalidations.some(key => key.includes('A') && key.includes('futures')), true);
   assert.equal(h.reads.filter(path => path.endsWith('/futures/positions')).length >= 2, true);
@@ -361,7 +399,7 @@ test("opening with no free collateral is refused on press; reduce and unknown co
   const reducing = futuresHarness({ position: true, freeCollateral: "0.00000000" });
   await reducing.start();
   t.after(reducing.close);
-  await reducing.press("futures-position-A:position-reduce");
+  await reducing.choose("수량 감소(Reduce)");
   await reducing.amount("51");
   assert.equal(reducing.node("futures-collateral-insufficient") === undefined, true, "risk reduction needs no new collateral");
 });

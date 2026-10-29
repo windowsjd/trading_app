@@ -9,6 +9,7 @@ import {
   futuresEntryCapacity,
   futuresEntryEstimate,
   futuresNotional,
+  futuresPositionShare,
   futuresPrice,
   futuresQuantityForAmount,
   isFuturesLeverage,
@@ -101,6 +102,15 @@ describe('USD amount → contract quantity', () => {
     assert.deepEqual(futuresEntryEstimate('80', 10, '0.001'), { margin: '8', fee: '0.08' });
     assert.deepEqual(futuresEntryEstimate('100', 3, null), { margin: '33.33333334', fee: null }, 'margin rounds up like the server');
     assert.equal(futuresEntryEstimate('80', 0, '0.001'), null);
+  });
+
+  it('a closing share takes the same part of the server\'s whole-position figures, signs kept, unknown never guessed', () => {
+    assert.equal(futuresPositionShare('-2.12345678', '1', '2'), '-1.06172839');
+    assert.equal(futuresPositionShare('0.2', '2', '2'), '0.2', 'the whole position is the whole figure');
+    assert.equal(futuresPositionShare('65.55', '0.5', '2'), '16.3875');
+    assert.equal(futuresPositionShare('1', '1', '3'), '0.33333333', '8 decimals');
+    for (const [value, quantity, whole] of [[null, '1', '2'], ['x', '1', '2'], ['1', '', '2'], ['1', '0', '2'], ['1', '1', '0'], ['1', '-1', '2']])
+      assert.equal(futuresPositionShare(value, quantity as string, whole as string), null, `${value}/${quantity}/${whole}`);
   });
 });
 

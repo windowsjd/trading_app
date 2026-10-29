@@ -44,7 +44,7 @@ test('Reduce and Close need no money: only Open and Increase show the wallet', a
   await h.start(); t.after(h.close);
   assert.equal(notice(h), EMPTY, 'Increase (the default with a position)');
   for (const op of ['reduce', 'close']) {
-    await h.press(`futures-position-A:position-${op}`);
+    await h.choose(op === 'reduce' ? '수량 감소(Reduce)' : '전량 종료(Close)');
     assert.equal(notice(h), null, op);
     assert.deepEqual(actions(h, 'futures-funding-actions'), [], op);
   }

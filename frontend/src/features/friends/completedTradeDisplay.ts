@@ -12,7 +12,8 @@ export function getCompletedTradeDisplay(item: FriendCompletedTrade) {
   return {
     name: name.primary,
     subline: getAssetNameSubline(name),
-    kind: spot ? '현물' : item.direction === 'long' ? '선물 LONG' : '선물 SHORT',
+    kind: spot ? '현물' : '선물',
+    // A futures lifetime's side: the L / S box beside the kind (FuturesDirectionBadge).
     direction: spot ? null : item.direction,
     basisLabel: spot ? '매수 금액' : '진입 증거금',
     basis: formatMoneyDecimal(spot ? item.buyAmount : item.entryMargin, item.currencyCode),

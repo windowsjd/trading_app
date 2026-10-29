@@ -23,7 +23,6 @@ for (const direction of ['long', 'short']) for (const marginMode of ['cross', 'i
       const display = getFuturesPositionDisplay(p, data.evaluatedAt, now);
       assert.equal(display.notional, '$9,876.54');
       assert.equal(display.pnlDirection, role);
-      assert.equal(display.direction, direction.toUpperCase());
       assert.equal(display.roi, formatSignedPercent(roi));
     }
     for (const evidence of [null, { effectiveAt: new Date(now - 6000).toISOString(), capturedAt: data.evaluatedAt },
@@ -31,7 +30,7 @@ for (const direction of ['long', 'short']) for (const marginMode of ['cross', 'i
       p.markEvidence = evidence;
       const display = getFuturesPositionDisplay(p, data.evaluatedAt, now);
       assert.equal(display.performance, '-'); assert.equal(display.notional, '-');
-      assert.equal(display.direction, direction.toUpperCase()); assert.match(display.margin, /100x/);
+      assert.match(display.margin, /100x/);
     }
   });
 }

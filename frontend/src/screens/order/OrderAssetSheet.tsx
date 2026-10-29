@@ -26,7 +26,6 @@ import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import MarketAssetRow from '../../features/market/MarketAssetRow';
 import MarketSortControl from '../../features/market/MarketSortControl';
 import type { MarketSort } from '../../features/market/marketSort';
-import type { AssetType } from '../../features/market/api';
 import {
   MARKET_SEARCH_SCOPES,
   useMarketAssetSearch,
@@ -46,30 +45,15 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onSelect: (assetId: string) => void;
-  /**
-   * One market only (an asset detail's own: domestic, US or crypto spot): the
-   * search stays in it and no other market is offered. Unset (the order
-   * screen): every market, with the market choice.
-   */
-  scope?: AssetType;
-  /** The asset the sheet was opened over, marked in the list. */
-  selectedAssetId?: string;
-};
-
-/** The sheet's title for one market. */
-const SCOPE_TITLES: Record<AssetType, string> = {
-  domestic_stock: '국내주식 종목 선택',
-  us_stock: '미국주식 종목 선택',
-  crypto: '암호화폐 종목 선택',
 };
 
 /**
- * Asset picker over the order screen (and an asset detail). The sheet slides
- * up from the bottom and back down on close; its content stays mounted for the
- * closing motion only. Selecting reports the asset id and leaves navigation to
- * the screen.
+ * Asset picker over the order screen and an asset detail, the same on both:
+ * every market with its market choice. The sheet slides up from the bottom
+ * and back down on close; its content stays mounted for the closing motion
+ * only. Selecting reports the asset id and leaves navigation to the screen.
  */
-export default function OrderAssetSheet({ visible, onClose, onSelect, scope, selectedAssetId }: Props) {
+export default function OrderAssetSheet({ visible, onClose, onSelect }: Props) {
   const reduced = useReducedMotion();
   const native = Platform.OS !== 'web';
   const [mounted, setMounted] = useState(visible);
@@ -123,14 +107,12 @@ export default function OrderAssetSheet({ visible, onClose, onSelect, scope, sel
         reduced={reduced}
         onClose={onClose}
         onSelect={onSelect}
-        scope={scope}
-        selectedAssetId={selectedAssetId}
       />
     </Modal>
   );
 }
 
-function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect, scope: fixedScope, selectedAssetId }: Props & {
+function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect }: Props & {
   progress: Animated.Value;
   drag: Animated.Value;
   native: boolean;
@@ -140,8 +122,7 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
   const insets = useSafeAreaInsets();
   const { colors } = useAppearance();
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
-  const [scopeChoice, setScope] = useState<MarketSearchScope>('all');
-  const scope = fixedScope ?? scopeChoice;
+  const [scope, setScope] = useState<MarketSearchScope>('all');
   const [searchText, setSearchText] = useState('');
   const [sort, setSort] = useState<MarketSort>('turnover_desc');
   // Unlike the search screen, an empty search lists assets right away.
@@ -219,7 +200,7 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
           <View {...pan.panHandlers} style={styles.handleArea}>
             <View style={styles.grabber} />
             <View style={styles.titleRow}>
-              <Text accessibilityRole="header" style={styles.title}>{fixedScope ? SCOPE_TITLES[fixedScope] : '종목 선택'}</Text>
+              <Text accessibilityRole="header" style={styles.title}>종목 선택</Text>
               <ActionPressable
                 testID="order-asset-sheet-close"
                 accessibilityRole="button"
@@ -252,30 +233,27 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
               returnKeyType="search"
               clearButtonMode="while-editing"
             />
-            {/* An asset detail's sheet stays in that asset's market: no market choice. */}
-            {fixedScope ? null : (
-              <View style={styles.scopeRow}>
-                {MARKET_SEARCH_SCOPES.map((option) => {
-                  const active = option.key === scope;
-                  return (
-                    <ActionPressable
-                      key={option.key}
-                      testID={`order-asset-scope-${option.key}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${option.label} 시장`}
-                      accessibilityState={{ selected: active }}
-                      aria-selected={active}
-                      style={[styles.scopeChip, active && styles.scopeChipActive]}
-                      onPress={() => setScope(option.key)}
-                    >
-                      <Text style={active ? styles.scopeChipTextActive : styles.scopeChipText}>
-                        {option.label}
-                      </Text>
-                    </ActionPressable>
-                  );
-                })}
-              </View>
-            )}
+            <View style={styles.scopeRow}>
+              {MARKET_SEARCH_SCOPES.map((option) => {
+                const active = option.key === scope;
+                return (
+                  <ActionPressable
+                    key={option.key}
+                    testID={`order-asset-scope-${option.key}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${option.label} 시장`}
+                    accessibilityState={{ selected: active }}
+                    aria-selected={active}
+                    style={[styles.scopeChip, active && styles.scopeChipActive]}
+                    onPress={() => setScope(option.key)}
+                  >
+                    <Text style={active ? styles.scopeChipTextActive : styles.scopeChipText}>
+                      {option.label}
+                    </Text>
+                  </ActionPressable>
+                );
+              })}
+            </View>
             <View style={styles.sortRow}>
               <MarketSortControl value={sort} onChange={setSort} />
             </View>
@@ -284,7 +262,6 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
             testID="order-asset-sheet-list"
             style={styles.list}
             data={items}
-            extraData={selectedAssetId}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
@@ -334,7 +311,7 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
                     title={trimmedSearchText ? '검색 결과가 없습니다.' : '표시할 종목이 없습니다.'}
                     message={trimmedSearchText
                       ? '다른 종목명 또는 심볼로 다시 검색해주세요.'
-                      : fixedScope ? '잠시 후 다시 확인해주세요.' : '다른 시장을 선택해주세요.'}
+                      : '다른 시장을 선택해주세요.'}
                   />
                 </View>
               )
@@ -344,7 +321,6 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
                 item={item}
                 ticker={tickersByAssetId.get(item.id)}
                 isStale={staleAssetIds.has(item.id)}
-                selected={item.id === selectedAssetId}
                 onPress={select}
               />
             )}

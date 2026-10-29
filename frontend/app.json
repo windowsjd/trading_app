@@ -3,7 +3,10 @@
   "slug": "leagueoftrading",
   "icon": "./assets/icon/trading-class-ios-icon-1024.png",
   "ios": {
-    "bundleIdentifier": "com.leagueoftrading"
+    "bundleIdentifier": "com.leagueoftrading",
+    "infoPlist": {
+      "ITSAppUsesNonExemptEncryption": false
+    }
   },
   "android": {
     "package": "com.nanghwa.tradingclass",
@@ -26,20 +29,31 @@
   },
   "owner": "mycroft7947",
   "plugins": [
-    ["react-native-google-mobile-ads", {
-      "androidAppId": "ca-app-pub-7899930948413451~9002185139",
-      "iosAppId": "ca-app-pub-7899930948413451~7288069200",
-      "delayAppMeasurementInit": true,
-      "skAdNetworkItems": ["cstr6suwn9.skadnetwork"]
-    }],
-    ["expo-image-picker", {
-      "photosPermission": "프로필 사진을 선택하려면 사진 접근 권한이 필요합니다.",
-      "cameraPermission": false,
-      "microphonePermission": false
-    }],
-    ["expo-notifications", {
-      "defaultChannel": "default"
-    }]
+    [
+      "react-native-google-mobile-ads",
+      {
+        "androidAppId": "ca-app-pub-7899930948413451~9002185139",
+        "iosAppId": "ca-app-pub-7899930948413451~7288069200",
+        "delayAppMeasurementInit": true,
+        "skAdNetworkItems": [
+          "cstr6suwn9.skadnetwork"
+        ]
+      }
+    ],
+    [
+      "expo-image-picker",
+      {
+        "photosPermission": "프로필 사진을 선택하려면 사진 접근 권한이 필요합니다.",
+        "cameraPermission": false,
+        "microphonePermission": false
+      }
+    ],
+    [
+      "expo-notifications",
+      {
+        "defaultChannel": "default"
+      }
+    ]
   ],
   "scheme": "leagueoftrading",
   "userInterfaceStyle": "automatic"

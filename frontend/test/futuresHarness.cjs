@@ -100,7 +100,7 @@ function futuresHarness(options = {}) {
   // Modal: the chart's 봉 시간 sheet (BottomSheetBackdrop) mounts one.
   const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView', 'Modal'].map(name => [name, name]));
   native.useWindowDimensions = () => options.dimensions ?? { width: 390, height: 844, fontScale: 1 };
-  Object.assign(native, { Alert: { alert: (...args) => { h.alerts.push(args); } }, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
+  Object.assign(native, { Alert: { alert: (...args) => { h.alerts.push(args); } }, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() { h.keyboardDismissals = (h.keyboardDismissals ?? 0) + 1; } },
     // Bottom sheets (주문방식, 선물 상품) mount these only while open.
     Pressable: 'Pressable', BackHandler: { addEventListener: () => ({ remove() {} }) } });
   const conditionalApi = load(resolve(__dirname, '../src/features/conditional/api.ts'), {

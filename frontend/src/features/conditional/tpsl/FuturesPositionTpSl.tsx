@@ -7,6 +7,9 @@ import ErrorNotice from '../../../components/states/ErrorNotice';
 import { QUERY_KEYS } from '../../../constants/queryKeys';
 import { cancelProtection, getProtections } from '../api';
 import { getFuturesPositions } from '../../futures/api';
+import { futuresServerNow } from '../../futures/policy';
+import { futuresHolding, getFuturesPositionDisplay } from '../../futures/positionDisplay';
+import FuturesPositionSheetSummary from '../../../components/tradingAccount/FuturesPositionSheetSummary';
 import {
   cancelFuturesTpSlSetting,
   createFuturesTpSlSettings,
@@ -66,6 +69,9 @@ export default function FuturesPositionTpSl({ accountId, positionId, onBusyChang
   });
   const position = positionsQuery.data?.tradingAccountId === accountId
     ? positionsQuery.data.positions.find((row) => row.id === positionId) ?? null : null;
+  // Mark Price as the position's card shows it: only while fresh.
+  const markFresh = !!position && !!positionsQuery.data && getFuturesPositionDisplay(futuresHolding(position),
+    positionsQuery.data.evaluatedAt, futuresServerNow(positionsQuery.data, Date.now())).fresh;
   const settingsQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.futures.tpSl(accountId, 'open'),
     queryFn: ({ signal }) => getFuturesTpSlSettings(accountId, 'open', signal),
@@ -186,8 +192,10 @@ export default function FuturesPositionTpSl({ accountId, positionId, onBusyChang
   const live = settings.filter((row) => row.state === 'watching' || row.state === 'triggered');
   return (
     <View style={styles.body} testID="tp-sl-futures-position">
+      {/* The position sheets' shared top (as 포지션 종료): contract, side, 진입가, Mark Price. */}
+      {position ? <FuturesPositionSheetSummary testID="tp-sl-summary" position={position} markFresh={markFresh} />
+        : <Text style={styles.name}>선물 포지션</Text>}
       <View style={styles.header}>
-        <Text style={styles.name}>{position ? `${position.instrument.underlying.name} · ${direction === 'long' ? 'Long' : 'Short'} ${position.leverage}x ${position.marginMode === 'cross' ? '교차' : '격리'}` : '선물 포지션'}</Text>
         <Text testID="tp-sl-position" style={styles.helper}>
           포지션 수량 {quantity ? `${formatDisplayDecimal(quantity)} ${base}` : '-'}
           {notional(quantity) ? ` · 명목금액 약 ${formatMoneyDecimal(notional(quantity), 'USD')}` : ''}

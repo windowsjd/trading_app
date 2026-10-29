@@ -118,6 +118,8 @@ export type TradeGuideFacts = { [S in TradeGuideScreen]: {
   transferFunding?: boolean;
   /** The form's 이체 / 환전 sheet is open over it. */
   fundingOpen?: boolean;
+  /** A futures position's 포지션 종료 or 손절가/익절가 sheet is open over the screen. */
+  positionSheetOpen?: boolean;
 } }[TradeGuideScreen];
 export type QuestGuideFacts = WalletGuideFacts | FxGuideFacts | TransferGuideFacts | TradeGuideFacts;
 type FactsFor<S extends QuestGuideScreen> = Extract<QuestGuideFacts, { screen: S }>;

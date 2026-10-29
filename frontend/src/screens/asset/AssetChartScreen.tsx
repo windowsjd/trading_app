@@ -186,7 +186,7 @@ export function AssetMarketChart({
       {detailView ? (
         <View style={styles.detailHeader}>
           <View style={styles.assetNameRow}>
-            {/* No picker (and no ▼) until the detail names the asset's market: loading or failed. */}
+            {/* The order screen's asset picker (every market), open at once; no ▼ without one. */}
             <ActionPressable testID="asset-name-selector" style={styles.nameSelector}
               accessibilityRole="button"
               accessibilityLabel={`종목 변경, 현재 ${asset ? getAssetNameDisplay(asset).primary : '종목'}`}

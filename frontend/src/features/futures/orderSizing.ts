@@ -76,6 +76,17 @@ export function futuresNotional(quantity: string, price: string) {
   return new D(quantity).mul(price).toFixed();
 }
 
+/**
+ * The part of a whole-position figure the server reported (Mark PnL, the
+ * estimated closing fee) that `quantity` of the position stands for, for the
+ * 포지션 종료 sheet's estimates. Display only; null when anything is unknown.
+ */
+export function futuresPositionShare(value: string | null | undefined, quantity: string, positionQuantity: string) {
+  const whole = signed(value);
+  if (!whole || !positive(quantity) || !positive(positionQuantity)) return null;
+  return whole.mul(quantity).div(positionQuantity).toDecimalPlaces(8).toFixed();
+}
+
 /** Estimated initial margin (rounded up, like the server) and fee of an amount. */
 export function futuresEntryEstimate(amount: string, leverage: number, feeRate: string | null | undefined) {
   if (!AMOUNT.test(amount.trim()) || !isFuturesLeverage(leverage)) return null;

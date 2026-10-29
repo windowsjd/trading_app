@@ -5,9 +5,10 @@ import CTAButton from '../../../components/common/CTAButton';
 import { TP_SL_TITLE } from '../tpSlModel';
 
 /**
- * The one entry point to the 손절가/익절가 sheet on every target (holding,
- * position, pending entry, an entry being created). The label never changes;
- * a short count of what is set (`익절 2건 · 손절 1건`) sits beside it.
+ * The entry point to the 손절가/익절가 sheet on a holding, a pending entry or
+ * an entry being created. The label never changes; a short count of what is
+ * set (`익절 2건 · 손절 1건`) sits beside it. A futures position's card pairs
+ * the same label with 포지션 종료 as two equal buttons (FuturesPositionCard).
  */
 export default function TpSlButton({ testID, summary, disabled = false, learningHint = null, onPress }: {
   testID: string;

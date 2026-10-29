@@ -139,15 +139,24 @@ NYS; `otherHolding=us` adds a Microsoft holding): the Korean name with
 row and the holding row, at 320/360/390/430px × Light/Dark × font scales
 1/1.5/2 (120 screens), with no line outside its row or over another text.
 
-The asset detail search sheet (2026-10-20) uses `assetSearchSheetBrowser.cjs`
-on the trading fixture (`BROWSER_EXECUTABLE_PATH`; `ASSET_SHEET_QUICK=1` = 320
-only): from a crypto, KRX and US detail, the name ▼ sheet is titled for that
-market, offers no market choice, reads `/assets` with that `assetType` only
-(the fixture's `/assets` now filters by it like the server), marks the asset on
-screen, closes on picking it and swaps the detail for another one, whose 매수하기
-orders it; 매도하기/매수하기 on the spot and futures details stay one line, at
-320/360/390/430px × Light/Dark × font scales 1/2, with no text outside its root
-or over another text.
+The asset detail search sheet uses `assetSearchSheetBrowser.cjs` on the trading
+fixture (`BROWSER_EXECUTABLE_PATH`; `ASSET_SHEET_QUICK=1` = 320 only): from a
+crypto, KRX and US detail, the name ▼ opens the order screen's sheet (since
+2026-10-28: titled 종목 선택, the market choice on 전체, every market read and
+listed, no row marked), closes on picking the asset on screen and swaps the
+detail for another one, whose 매수하기 orders it; 매도하기/매수하기 on the spot
+and futures details stay one line, at 320/360/390/430px × Light/Dark × font
+scales 1/2, with no text outside its root or over another text.
+
+A futures position card and its sheets (2026-10-28) use
+`futuresCloseSheetBrowser.cjs` on the trading fixture (`?screen=futures&futuresPosition=1`;
+`BROWSER_EXECUTABLE_PATH`; `FUTURES_CLOSE_QUICK=1` = 320 dark 2x and 390 light
+1x): the L box, 예상 종료 수수료 where 보유 수량 was, 손절가/익절가 설정 | 포지션
+종료 side by side (stacked below 300 dp per font scale) with their labels inside
+the buttons, the 포지션 종료 sheet's structure at 100% and 50% with its confirm
+reachable inside the viewport, and the 손절가/익절가 sheet's position block, at
+320/360/390/430px × Light/Dark × font scales 1/2, with no clipped text or
+sideways scroll.
 
 Reproduce the provided-source preparation with:
 

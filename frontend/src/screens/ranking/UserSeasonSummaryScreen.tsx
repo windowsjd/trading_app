@@ -23,7 +23,6 @@ import { formatKrw, formatKstDateTime, formatPercent } from '../../utils/format'
 import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
 import { getCompletedTradeDisplay } from '../../features/friends/completedTradeDisplay';
 import { financial } from '../../theme/financialColors';
-import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import { useAppearance } from '../../theme/appearance';
 import { getHomeTier } from '../home/tierPresentation';
 import TierEmblem from '../home/TierEmblem';
@@ -34,6 +33,7 @@ import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import FuturesPositionRow from '../../components/tradingAccount/FuturesPositionRow';
+import FuturesDirectionBadge from '../../components/tradingAccount/FuturesDirectionBadge';
 
 type Props = { route: { params: { userId: string } } };
 export default function UserSeasonSummaryScreen({ route }: Props) {
@@ -233,10 +233,10 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
                   return (
                     <View key={`${item.kind}-${item.assetId}-${index}`} testID={`friend-completed-${index}`} style={styles.completedRow}>
                       <View style={styles.completedHeading}>
-                        <Text testID={`friend-completed-${index}-kind`} style={[styles.completedKind,
-                          display.direction ? { color: display.direction === 'long' ? BUY_COLOR : SELL_COLOR } : null]}>
-                          {display.kind}
-                        </Text>
+                        {display.direction ? (
+                          <FuturesDirectionBadge testID={`friend-completed-${index}-direction`} direction={display.direction} />
+                        ) : null}
+                        <Text testID={`friend-completed-${index}-kind`} style={styles.completedKind}>{display.kind}</Text>
                         <Text testID={`friend-completed-${index}-name`} style={styles.completedName}>{display.name}</Text>
                       </View>
                       {display.subline ? <Text style={styles.helper}>{display.subline}</Text> : null}
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   completedRow: { gap: 3, paddingVertical: 10, borderTopWidth: 1, borderTopColor: semantic.border },
-  completedHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6, rowGap: 2 },
+  completedHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2 },
   completedKind: { fontSize: 12, lineHeight: 18, fontWeight: '700', color: semantic.secondary },
   completedName: { minWidth: 0, flexShrink: 1, fontSize: 16, lineHeight: 24, fontWeight: '700' },
   completedResult: { fontSize: 14, lineHeight: 21, fontWeight: '600', fontVariant: ['tabular-nums'] },

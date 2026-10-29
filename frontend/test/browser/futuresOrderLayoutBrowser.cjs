@@ -171,17 +171,10 @@ async function main() {
         assert.ok(collapsedForm.x + collapsedForm.width <= collapsedBook.x + 1, `${label}: collapsed book keeps its column`);
         await id('futures-order-book-toggle').click(); await id('asset-order-book').waitFor();
       } else {
-        // A position card action selects the trade form and scrolls it into view.
-        await id('futures-position-A:position-reduce').or(id('futures-position-B:position-reduce')).first().scrollIntoViewIfNeeded();
-        // The screen learns its offset from scroll events; a finger cannot tap within the jump's frame.
-        await page.waitForTimeout(150);
-        await id('futures-position-A:position-reduce').or(id('futures-position-B:position-reduce')).first().click();
-        // A long smooth scroll takes about a second on the web.
-        await page.waitForFunction(() => { const sc = document.querySelector('[data-testid="futures-screen"]'); const last = window.__lastTop; window.__lastTop = sc.scrollTop; return last === sc.scrollTop; }, null, { polling: 150, timeout: 5000 });
-        const { top, height } = await page.evaluate(() => ({ top: document.querySelector('[data-testid="futures-trading-columns"]').getBoundingClientRect().top, height: innerHeight }));
-        // The form lands 12pt under the screen top.
-        assert.ok(Math.abs(top - 12) <= 2, `${label}: the form scrolled into view (${top})`);
-        assert.ok(top < height / 2);
+        // 수량 감소 stays in the trade form for the selected contract (the card's
+        // 포지션 종료 opens its own sheet since 2026-10-28; futuresCloseSheetBrowser).
+        await id('futures-operation-reduce').scrollIntoViewIfNeeded();
+        await id('futures-operation-reduce').click();
         assert.equal(await id('futures-amount').getAttribute('aria-label'), '감소 금액 (USD)');
         await id('futures-ratio-50').click();
         assert.equal(await id('futures-amount').inputValue(), '102', `${label}: 50% of the 2 BTC position at 102`);
