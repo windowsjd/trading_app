@@ -19,6 +19,18 @@ the status badge never on the title (user and operator rows), buttons hit-testab
 the detectors are self-tested first. Chrome counts a textarea newline as two characters
 for `maxlength`, so the long web draft stops a little short of 2000 (native counts code points).
 
+비회원 둘러보기(2026-10-30)는 `NODE_PATH=/path/to/browser-tools/node_modules BROWSER_EXECUTABLE_PATH=…
+node test/browser/guestBrowsingBrowser.cjs` (`GUEST_BROWSER_QUICK=1`: 320px only). It starts at the production
+Login screen and presses 「로그인 없이 둘러보기」: real RootNavigator, guest tabs, headers, sheets and React
+Query over `guestBrowsingMocks.js`, which answers like the server's `GUEST_MARKET_DATA_ASSET_TYPES`
+(`?guestTypes=crypto`, default none = every market 401). Bottom tab labels are measured at 320/360/390/430px ×
+font scale 1/1.5/2 (no ellipsis), and every guest screen (Login, Home + HOT, Market sign-in or crypto list,
+asset detail sign-in sheet, 선물, Guide, Wallet, 투자모드 and its sheet) at Light/Dark × 320/390px × 1/2x ×
+both scopes: no word off-screen, clipped by an overflow box or ellipsized (the detector self-tests first), no
+`비회원` banner, no account read in the transport log, and 회원가입 from a sheet ends browsing. RN Web only;
+physical Android/iOS rendering is a separate check. Output defaults to `/tmp/trading-guest-browser`
+(`GUEST_BROWSER_OUTPUT`).
+
 The ranking tab uses `NODE_PATH=/path/to/browser-tools/node_modules node
 test/browser/rankingTierBrowser.cjs`. The production RankingScreen (내 순위 on its
 tier card art, plain list rows, the 순위 안내 slot), theme, React Query, formatters

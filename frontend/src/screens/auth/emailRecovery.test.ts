@@ -35,6 +35,7 @@ function harness(kind = 'PasswordReset', os = 'android') {
     '../../features/auth/api': api,
     '../../features/auth/session': { authenticateSession: (_query: unknown, work: () => Promise<unknown>) => work() },
     '../../features/auth/useEnterApp': { useEnterApp: () => async () => { routes.push('mode-selection'); } },
+    '../../features/auth/useBrowseAsGuest': { useBrowseAsGuest: () => ({ pending: false, start: async () => {} }) },
     '../../services/api/sessionOwnership': { isCurrentSession: () => true, SessionSupersededError: class extends Error {} },
     '../../components/states/WhaleLoader': { default: 'WhaleLoader', __esModule: true },
     '@tanstack/react-query': {

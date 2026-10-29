@@ -1,4 +1,5 @@
 import { apiClient } from '../../services/api/client';
+import { guestReadConfig } from '../auth/guestBrowsing.ts';
 import type {
   ApiSuccessResponse,
   AdminDiagnosticDto,
@@ -117,9 +118,10 @@ export async function getAssets(params: GetAssetsParams) {
   searchParams.set('limit', String(limit));
   searchParams.set('offset', String(offset));
 
+  // Guest browsing reads it as a public request (no credentials).
   const response = await apiClient.get<
     ApiSuccessResponse<AssetsResponseDto & { items?: MarketAssetItemDto[] }>
-  >(`/assets?${searchParams.toString()}`);
+  >(`/assets?${searchParams.toString()}`, guestReadConfig());
 
   const data = response.data.data;
   const assets = data.assets ?? data.items ?? [];

@@ -21,6 +21,7 @@ describe('public authentication and general account errors', () => {
       '../../features/auth/api': {},
       '../../features/auth/session': {},
       '../../features/auth/useEnterApp': { useEnterApp: () => () => {} },
+      '../../features/auth/useBrowseAsGuest': { useBrowseAsGuest: () => ({ pending: false, start: async () => {} }) },
       '../../services/api/sessionOwnership': { SessionSupersededError: class extends Error {} },
     }).default;
     const renderer = h.render(React.createElement(Screen, { navigation: {} }));

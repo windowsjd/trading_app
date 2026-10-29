@@ -21,6 +21,7 @@ for (const kind of ['Login', 'Signup'] as const) it(`${kind}: one request per ta
     },
     '../../features/auth/useEmailVerification': { useEmailVerification: () => ({ verificationToken: 'verified-proof', challenge: null, busy: false }) },
     '../../features/auth/useEnterApp': { useEnterApp: () => async () => {} },
+    '../../features/auth/useBrowseAsGuest': { useBrowseAsGuest: () => ({ pending: false, start: async () => {} }) },
     // Session/HTTP boundaries: this test covers only the button and its fence.
     '../../features/auth/api': { login: async () => ({}), signup: async () => ({}) },
     '../../features/auth/session': { authenticateSession: async () => ({}), endSession: async () => {} },

@@ -51,6 +51,7 @@ import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snaps
 import { DailyChangeRateService } from './daily-change-rate.service';
 import { TIINGO_EOD_CANDLE_SOURCE } from '../providers/tiingo/tiingo.config';
 import { KOSCOM_HISTORY_SOURCE } from '../providers/koscom/koscom.config';
+import { readGuestMarketDataAssetTypes } from './guest-market-data.config';
 import { createHash, randomUUID } from 'node:crypto';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -92,6 +93,8 @@ export type AssetsQuery = {
 
 type ParsedAssetsQuery = {
   assetType?: AssetType;
+  /** An anonymous all-type list: only the guest-readable types (never set for a signed-in user). */
+  assetTypes?: AssetType[];
   currencyCode?: CurrencyCode;
   market?: string;
   search?: string;
@@ -385,15 +388,10 @@ export class AssetsService {
     userId: string | undefined,
     query: AssetsQuery = {},
   ): Promise<AssetsListResponse> {
-    if (!userId) {
-      this.throwApiError(
-        HttpStatus.UNAUTHORIZED,
-        'UNAUTHORIZED',
-        'Unauthorized',
-      );
-    }
-
-    const parsedQuery = this.parseQuery(query);
+    const guestTypes = this.guestAssetTypes(userId);
+    const parsedQuery = guestTypes
+      ? this.guestAssetsQuery(this.parseQuery(query), guestTypes)
+      : this.parseQuery(query);
     if (parsedQuery.sortBy) return this.getSortedAssets(parsedQuery);
     const where = this.buildAssetWhere(parsedQuery);
     const [total, assets] = await Promise.all([
@@ -759,14 +757,7 @@ export class AssetsService {
     userId: string | undefined,
     assetId: string | undefined,
   ): Promise<AssetDetailResponse> {
-    if (!userId) {
-      this.throwApiError(
-        HttpStatus.UNAUTHORIZED,
-        'UNAUTHORIZED',
-        'Unauthorized',
-      );
-    }
-
+    const guestTypes = this.guestAssetTypes(userId);
     const parsedAssetId = this.parseAssetId(assetId);
     const asset = await this.prisma.asset.findUnique({
       where: {
@@ -780,6 +771,13 @@ export class AssetsService {
         HttpStatus.NOT_FOUND,
         'ASSET_NOT_FOUND',
         'Asset not found.',
+      );
+    }
+    if (guestTypes && !guestTypes.includes(asset.assetType)) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
       );
     }
 
@@ -1677,6 +1675,7 @@ export class AssetsService {
       ...SPOT_ASSET_WHERE,
       ...(query.includeInactive ? {} : { isActive: true }),
       ...(query.assetType ? { assetType: query.assetType } : {}),
+      ...(query.assetTypes ? { assetType: { in: query.assetTypes } } : {}),
       ...(query.currencyCode ? { currencyCode: query.currencyCode } : {}),
       ...(query.market ? { market: query.market } : {}),
       ...(query.search
@@ -1697,6 +1696,47 @@ export class AssetsService {
             ],
           }
         : {}),
+    };
+  }
+
+  /**
+   * Anonymous market reads (guest browsing): the configured guest-readable
+   * asset types, or the existing 401 when there are none. A signed-in user
+   * gets null and every existing rule unchanged.
+   */
+  private guestAssetTypes(userId: string | undefined) {
+    if (userId) return null;
+    const types = readGuestMarketDataAssetTypes();
+    if (!types.length) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+    return types;
+  }
+
+  /** An anonymous list reads guest-readable, active assets only and never forces a re-sort. */
+  private guestAssetsQuery(
+    query: ParsedAssetsQuery,
+    types: readonly AssetType[],
+  ): ParsedAssetsQuery {
+    if (query.assetType && !types.includes(query.assetType)) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+    const allTypes = Object.values(AssetType).every((type) =>
+      types.includes(type),
+    );
+    return {
+      ...query,
+      includeInactive: false,
+      sortRefresh: false,
+      ...(query.assetType || allTypes ? {} : { assetTypes: [...types] }),
     };
   }
 
@@ -1926,6 +1966,9 @@ export class AssetsService {
   private formatFilters(query: ParsedAssetsQuery) {
     return {
       assetType: query.assetType ?? null,
+      // Also keys the shared sort snapshot: an anonymous all-type list never
+      // shares a snapshot with a signed-in one.
+      ...(query.assetTypes ? { assetTypes: query.assetTypes } : {}),
       currencyCode: query.currencyCode ?? null,
       market: query.market ?? null,
       search: query.search ?? null,

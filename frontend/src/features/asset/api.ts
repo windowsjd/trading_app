@@ -1,4 +1,5 @@
 import { apiClient } from '../../services/api/client';
+import { guestReadConfig } from '../auth/guestBrowsing.ts';
 import type {
   ApiSuccessResponse,
   IsoDateTimeString,
@@ -113,8 +114,10 @@ export interface GetAssetCandlesParams {
 }
 
 export async function getAssetDetail(assetId: string) {
+  // Detail and candles are guest-readable: a guest sends them without credentials.
   const response = await apiClient.get<ApiSuccessResponse<AssetDetailDto>>(
     `/assets/${assetId}`,
+    guestReadConfig(),
   );
 
   return response.data.data;
@@ -146,6 +149,7 @@ export async function getAssetCandles(
 
   const response = await apiClient.get<ApiSuccessResponse<AssetCandlesDto>>(
     `/assets/${assetId}/candles?${searchParams.toString()}`,
+    guestReadConfig(),
   );
 
   return response.data.data;

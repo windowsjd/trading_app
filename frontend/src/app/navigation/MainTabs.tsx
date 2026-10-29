@@ -15,35 +15,43 @@ import { useTradingAccount } from '../../features/tradingAccount/TradingAccountC
 import { ScreenSheetHost } from '../../components/common/ScreenSheetHost';
 import { QuestGuideProvider } from '../../features/quest/QuestGuideProvider';
 import { questNavigationRouter } from '../../features/quest/questNavigationGuard';
-import type { MainTabParamList } from './types';
-import HomeStack from './HomeStack';
+import { isGuestBrowsing } from '../../features/auth/guestBrowsing';
+import { GuestExitContext } from '../../components/guest/guestExit';
+import { leaveGuestBrowsing } from './seasonRouting';
+import type { MainTabParamList, MainTabsScreenProps } from './types';
+import HomeStack, { GuestHomeStack } from './HomeStack';
 import MarketStack from './MarketStack';
 import GuideStack, { QuestStack } from './GuideStack';
 import RankingStack from './RankingStack';
-import WalletStack from './WalletStack';
+import WalletStack, { GuestWalletStack } from './WalletStack';
 import MyStack from './MyStack';
+import ModesStack from './ModesStack';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-export default function MainTabs() {
+export default function MainTabs(props: MainTabsScreenProps) {
   const { fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { colors } = useAppearance();
   const reducedMotion = useReducedMotion();
   const { selectedAccount, isLoading } = useTradingAccount();
+  // 「로그인 없이 둘러보기」: no account at all, so nothing to wait for. A
+  // signed-in user never reaches here as a guest (a session ends browsing).
+  const guest = isGuestBrowsing();
+  const account = guest ? null : selectedAccount;
 
   // The entry flow normally resolves the account before MainTabs mounts. Keep
   // tabs hidden during provider refreshes as well, so neither mode briefly
   // exposes the other mode's third tab.
-  if (isLoading || !selectedAccount) {
+  if (!guest && (isLoading || !account)) {
     return <FullPageLoading message="계정 정보를 불러오는 중입니다." />;
   }
 
-  const mode = selectedAccount.mode;
+  const mode = account?.mode ?? 'guest';
 
   const tabs = (
     <Tab.Navigator
-      key={selectedAccount.id}
+      key={account?.id ?? 'guest'}
       id="MainTabs"
       initialRouteName="HomeTab"
       // An active beginner quest holds tab switches outside its practice.
@@ -65,7 +73,7 @@ export default function MainTabs() {
     >
       <Tab.Screen
         name="HomeTab"
-        component={HomeStack}
+        component={mode === 'guest' ? GuestHomeStack : HomeStack}
         options={{
           title: '홈',
           tabBarIcon: ({ color, size, focused }) => (
@@ -95,12 +103,15 @@ export default function MainTabs() {
           tabBarItemStyle: fontScale > 1 ? { flex: 1.4 } : undefined,
           tabBarIcon: ({ color, size, focused }) => <TabBarIcon focused={focused} name="quest" color={color} size={size} />,
         }} />
-      ) : mode === 'general' ? (
+      ) : mode === 'general' || mode === 'guest' ? (
         <Tab.Screen
           name="GuideTab"
           component={GuideStack}
           options={{
             title: '가이드',
+            // Beside the guest's four-character 투자모드, the three-character
+            // label needs Quest's allowance at larger text sizes too.
+            tabBarItemStyle: mode === 'guest' && fontScale > 1 ? { flex: 1.4 } : undefined,
             tabBarIcon: ({ color, size, focused }) => (
               <TabBarIcon focused={focused} name="guide" color={color} size={size} />
             ),
@@ -120,7 +131,7 @@ export default function MainTabs() {
       )}
       <Tab.Screen
         name="WalletTab"
-        component={WalletStack}
+        component={mode === 'guest' ? GuestWalletStack : WalletStack}
         options={{
           title: '지갑',
           tabBarIcon: ({ color, size, focused }) => (
@@ -128,16 +139,27 @@ export default function MainTabs() {
           ),
         }}
       />
-      <Tab.Screen
-        name="MyTab"
-        component={MyStack}
-        options={{
-          title: 'MY',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabBarIcon focused={focused} name="menu" color={color} size={size} />
-          ),
-        }}
-      />
+      {mode === 'guest' ? (
+        // No account to show under MY: the investment modes instead.
+        <Tab.Screen name="ModesTab" component={ModesStack} options={{
+          title: '투자모드',
+          // Room for the four-character label at larger text sizes: with
+          // 가이드's 1.4, every label keeps ~8% spare at 320 pt and 2x text.
+          tabBarItemStyle: fontScale > 1 ? { flex: 1.8 } : undefined,
+          tabBarIcon: ({ color, size, focused }) => <TabBarIcon focused={focused} name="modes" color={color} size={size} />,
+        }} />
+      ) : (
+        <Tab.Screen
+          name="MyTab"
+          component={MyStack}
+          options={{
+            title: 'MY',
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabBarIcon focused={focused} name="menu" color={color} size={size} />
+            ),
+          }}
+        />
+      )}
     </Tab.Navigator>
   );
 
@@ -146,7 +168,16 @@ export default function MainTabs() {
   // Bottom sheets of tab screens cover headers and the tab bar but stay below
   // the quest overlay, which the provider draws after its children.
   const hosted = <ScreenSheetHost>{tabs}</ScreenSheetHost>;
-  return mode === 'beginner' ? (
-    <QuestGuideProvider key={selectedAccount.id} accountId={selectedAccount.id}>{hosted}</QuestGuideProvider>
+  if (mode === 'guest') {
+    // A guest's 로그인 / 회원가입, from any tab or sheet: this root route's
+    // own navigation resets to the auth stack.
+    const exit = {
+      signIn: () => leaveGuestBrowsing(props.navigation, 'Login'),
+      signUp: () => leaveGuestBrowsing(props.navigation, 'Signup'),
+    };
+    return <GuestExitContext.Provider value={exit}>{hosted}</GuestExitContext.Provider>;
+  }
+  return mode === 'beginner' && account ? (
+    <QuestGuideProvider key={account.id} accountId={account.id}>{hosted}</QuestGuideProvider>
   ) : hosted;
 }

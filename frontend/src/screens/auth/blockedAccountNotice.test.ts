@@ -19,6 +19,7 @@ function authScreen(kind: 'Login' | 'Signup') {
     '../../features/auth/api': {},
     '../../features/auth/session': { endSession: async (...args: unknown[]) => { ended.push(args); } },
     '../../features/auth/useEnterApp': { useEnterApp: () => async () => {} },
+    '../../features/auth/useBrowseAsGuest': { useBrowseAsGuest: () => ({ pending: false, start: async () => {} }) },
     '../../services/api/sessionOwnership': { isCurrentSession: () => true, SessionSupersededError: class extends Error {} },
   }).default;
   const renderer = h.render(React.createElement(Screen, { navigation: {} }));

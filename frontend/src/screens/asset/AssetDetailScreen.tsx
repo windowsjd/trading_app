@@ -17,6 +17,8 @@ import CTAButton from '../../components/common/CTAButton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import { AssetMarketChart } from './AssetChartScreen';
 import OrderAssetSheet from '../order/OrderAssetSheet';
+import GuestSignInSheet from '../../components/guest/GuestSignInSheet';
+import { isGuestBrowsing } from '../../features/auth/guestBrowsing';
 import { useIsFocused } from '@react-navigation/native';
 
 export default function AssetDetailScreen(props: AssetDetailScreenProps) {
@@ -62,7 +64,18 @@ export function AssetDetailContent({
   const buyGate = learning.gate(assetType === 'crypto' ? ['cryptoMarketBuy', 'cryptoLimitBuy']
     : assetType === 'domestic_stock' ? 'krStockMarketBuy' : assetType === 'us_stock' ? 'usStockMarketBuy' : 'allTrading');
   useTradingGuideFacts({ screen: 'asset', accountId: accountId ?? '', assetId, assetType: detail.data?.asset.assetType }, focused);
+  // Guest browsing: 매수하기/매도하기 stay pressable and explain that an order
+  // needs an account (the sign-in sheet); no order screen, quote or request.
+  const guest = isGuestBrowsing();
+  const [signInOpen, setSignInOpen] = useState(false);
+  useEffect(() => {
+    if (!focused) setSignInOpen(false);
+  }, [focused]);
   const openOrder = (side: 'buy' | 'sell') => {
+    if (guest) {
+      setSignInOpen(true);
+      return;
+    }
     if (!accountId) return;
     navigation.navigate('Order', { assetId, accountId, side });
   };
@@ -80,7 +93,7 @@ export function AssetDetailContent({
           variant="detail"
           onChangePair={onOpenAssetSheet}
           // Holdings, TP/SL and limit review live under the order screen (one place).
-          footerContent={!isLoading && !accountId ? (
+          footerContent={!isLoading && !accountId && !guest ? (
             <InlineEmptyState title="계정이 없습니다." message="계정을 개설하면 주문할 수 있습니다." />
           ) : null}
         />
@@ -89,20 +102,24 @@ export function AssetDetailContent({
         <QuestTarget id="asset-sell" style={styles.actionSlot}><CTAButton
           testID={TEST_IDS.assetDetail.openSellOrder}
           label="매도하기"
-          state={accountId ? 'enabled' : 'disabled'}
+          state={accountId || guest ? 'enabled' : 'disabled'}
           onPress={() => openOrder('sell')}
           style={{ ...styles.action, backgroundColor: SELL_COLOR }}
         /></QuestTarget>
         <QuestTarget id="asset-buy" style={styles.actionSlot}><CTAButton
           testID={TEST_IDS.assetDetail.openBuyOrder}
           label="매수하기"
-          state={accountId ? 'enabled' : 'disabled'}
+          state={accountId || guest ? 'enabled' : 'disabled'}
           learningHint={buyGate.locked ? buyGate.message : null}
           onPress={() => buyGate.guard(() => openOrder('buy'))}
           style={{ ...styles.action, backgroundColor: BUY_COLOR }}
         /></QuestTarget>
       </View>
     </View>
+    {guest ? (
+      <GuestSignInSheet testID="asset-sign-in" visible={signInOpen && focused} onClose={() => setSignInOpen(false)}
+        message="매수·매도 주문은 로그인한 뒤 나의 가상투자 계정으로 할 수 있습니다." />
+    ) : null}
     </SafeAreaView>
   );
 }

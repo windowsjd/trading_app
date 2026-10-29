@@ -11,7 +11,8 @@ export type TabIconName =
   | 'record'
   | 'wallet'
   | 'profile'
-  | 'menu';
+  | 'menu'
+  | 'modes';
 
 type Props = {
   name: TabIconName;
@@ -27,6 +28,9 @@ const HOME_HOUSE = 'M10.65 3.55Q12 2.4 13.35 3.55L20.15 9.4Q21 10.15 21 11.3V18.
 // and the ranking trophy. The filled pole is a solid bar of the same width.
 const QUEST_FLAG_OUTLINE = 'M5 21V3 M5 4h13.5l-3.3 4.5 3.3 4.5H5';
 const QUEST_FLAG_FILLED = 'M4 3h2v18H4z M6 4h13.5l-3.3 4.5 3.3 4.5H6z';
+// The guest browsing modes tab: three stacked layers, one per investment mode.
+const MODES_LAYERS_OUTLINE = 'M12 3l9 4.5-9 4.5-9-4.5z M3 12l9 4.5 9-4.5 M3 16.5l9 4.5 9-4.5';
+const MODES_LAYERS_FILLED = 'M12 2l10 5-10 5L2 7z M2 11l10 5 10-5v2.2l-10 5-10-5z M2 15.6l10 5 10-5v2.2l-10 5-10-5z';
 
 export default function TabBarIcon({ name, color, size, focused = false }: Props) {
   let drawing: React.ReactNode;
@@ -44,6 +48,7 @@ export default function TabBarIcon({ name, color, size, focused = false }: Props
       case 'wallet': drawing = <Path d="M4 3h15v3H5a1 1 0 0 0 0 2h16v4h-6v6h6v3H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm13 11v2h5v-2h-5Z" fillRule="evenodd" />; break;
       case 'record': drawing = <Path d="M8 2h8v3h3v17H5V5h3V2Zm2 2v2h4V4h-4Zm-2 6v2h8v-2H8Zm0 4v2h8v-2H8Zm0 4v2h6v-2H8Z" fillRule="evenodd" />; break;
       case 'menu': drawing = <Path d="M4 5h16v3H4zM4 11h16v3H4zM4 17h16v3H4z" />; break;
+      case 'modes': drawing = <Path d={MODES_LAYERS_FILLED} />; break;
       case 'profile': drawing = <><Circle cx={12} cy={7} r={4} /><Path d="M3 21v-2c0-3 3-5 6-5h6c3 0 6 2 6 5v2H3Z" /></>; break;
     }
   } else switch (name) {
@@ -75,6 +80,9 @@ export default function TabBarIcon({ name, color, size, focused = false }: Props
       break;
     case 'menu':
       drawing = <Path d="M4 6h16 M4 12h16 M4 18h16" />;
+      break;
+    case 'modes':
+      drawing = <Path d={MODES_LAYERS_OUTLINE} />;
       break;
     case 'profile':
       drawing = (

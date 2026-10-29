@@ -34,6 +34,7 @@ function authHarness(kind: 'Login' | 'Signup' | 'PasswordReset', os: 'android' |
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 48, left: 0, right: 0 }) },
     '@tanstack/react-query': { useQueryClient: () => ({}), useMutation: () => ({ isPending: false, mutate: () => {} }) },
     '../../features/auth/useEnterApp': { useEnterApp: () => async () => {} },
+    '../../features/auth/useBrowseAsGuest': { useBrowseAsGuest: () => ({ pending: false, start: async () => {} }) },
     '../../features/auth/useEmailVerification': { useEmailVerification: () => ({ busy: false, hasRequested: verifying, challenge: verifying ? { message: '발송 안내' } : null, verificationToken: null, code: '', secondsLeft: 600, resendSeconds: 0 }) },
       '../../features/auth/api': { login: async () => ({}), signup: async () => ({}) },
     '../../features/auth/session': { authenticateSession: async () => ({}), endSession: async () => {} },

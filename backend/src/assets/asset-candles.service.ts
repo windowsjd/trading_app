@@ -1,6 +1,7 @@
 import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { KoscomCandleReaderService } from './koscom-candle-reader.service';
+import { readGuestMarketDataAssetTypes } from './guest-market-data.config';
 import { KoscomError } from '../providers/koscom/koscom.config';
 import { Optional } from '@nestjs/common';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
@@ -454,7 +455,10 @@ export class AssetCandlesService {
     assetId: string | undefined,
     query: AssetCandlesQuery = {},
   ): Promise<AssetCandlesResponse> {
-    if (!userId) {
+    // Anonymous (guest browsing): only GUEST_MARKET_DATA_ASSET_TYPES; with
+    // none configured, the existing 401 before any read.
+    const guestTypes = userId ? null : readGuestMarketDataAssetTypes();
+    if (guestTypes && !guestTypes.length) {
       this.throwApiError(
         HttpStatus.UNAUTHORIZED,
         'UNAUTHORIZED',
@@ -475,6 +479,13 @@ export class AssetCandlesService {
         HttpStatus.NOT_FOUND,
         'ASSET_NOT_FOUND',
         'Asset not found.',
+      );
+    }
+    if (guestTypes && !guestTypes.includes(asset.assetType)) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
       );
     }
 

@@ -10,6 +10,8 @@ import { getHeaderScreenContentStyle, SCREEN_SECTION_GAP } from '../../theme/scr
 import { SafeAreaView } from '../../theme/safeArea';
 import { getMarketSessionLabel } from '../../features/market/marketPresentation';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
+import { isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../../features/auth/guestBrowsing';
+import { GuestSignInPanel } from '../../components/guest/GuestSignIn';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -50,6 +52,10 @@ const TABS: Array<{ key: AssetType; label: string }> = [
 export default function MarketScreen({ navigation, route }: Props) {
   const isAdmin = useAdminDiagnostics();
   const guide = useQuestGuide();
+  // Guest browsing: account-free REST reads only (no realtime socket, no
+  // account-scoped futures list); a market the server does not serve to
+  // signed-out visitors shows a sign-in panel instead of an error.
+  const guest = isGuestBrowsing();
   const [cryptoProduct, setCryptoProduct] = useState<'spot' | 'futures'>('spot');
   const [selectedTab, setSelectedTab] = useState<AssetType>(route?.params?.assetType ?? 'domestic_stock');
   // Consume each explicit navigation intent. Clearing it also lets a later
@@ -91,6 +97,7 @@ export default function MarketScreen({ navigation, route }: Props) {
     getNextPageParam: nextMarketPage,
     initialPageParam: { offset: 0 },
     enabled: !futuresMarket,
+    ...(guest ? { retry: retryGuestRead } : {}),
   });
 
   const refresh = usePullToRefresh([marketQuery],
@@ -129,7 +136,7 @@ export default function MarketScreen({ navigation, route }: Props) {
     useMarketTickers({
       assetIds,
       wsUrl: wsUrl ?? '',
-      enabled: !!wsUrl && !futuresMarket,
+      enabled: !!wsUrl && !futuresMarket && !guest,
     });
 
   const openAsset = useCallback(
@@ -141,7 +148,7 @@ export default function MarketScreen({ navigation, route }: Props) {
     (accountId: string, instrumentId: string) => navigation.navigate('FuturesDetail', { accountId, instrumentId }),
     [navigation],
   );
-  const futures = useFuturesMarket({ active: futuresMarket, sort, refreshVersion: futuresRefresh, onSelect: openFutures });
+  const futures = useFuturesMarket({ active: futuresMarket && !guest, sort, refreshVersion: futuresRefresh, onSelect: openFutures });
 
   const viewState = useMemo(() => {
     if (marketQuery.isLoading) return 'market_loading';
@@ -187,7 +194,7 @@ export default function MarketScreen({ navigation, route }: Props) {
                   { key: 'futures', label: '선물', accessibilityLabel: '암호화폐 선물', testID: 'crypto-product-futures' },
                 ]} />
             ) : null}
-            {futuresMarket ? <FuturesMarketControls market={futures} sort={sort} onSortChange={setSort} /> : <>
+            {futuresMarket ? (guest ? null : <FuturesMarketControls market={futures} sort={sort} onSortChange={setSort} />) : <>
             <ActionPressable
               style={styles.searchEntry}
               onPress={() => navigation.navigate('MarketSearch', { sort })}
@@ -220,7 +227,11 @@ export default function MarketScreen({ navigation, route }: Props) {
             ) : null}
             </>}
           </View>
-          {futuresMarket ? <FuturesMarketRows market={futures} /> : null}
+          {futuresMarket ? (guest
+            // Contracts are read through an investment account.
+            ? <GuestSignInPanel testID="market-futures-sign-in" title="로그인하면 선물 상품을 확인할 수 있습니다."
+              message="선물 목록과 거래는 가상투자 계정에서 이용할 수 있습니다." />
+            : <FuturesMarketRows market={futures} />) : null}
           </View>
         }
         ListEmptyComponent={futuresMarket ? null : viewState === 'market_loading' ? (
@@ -228,6 +239,9 @@ export default function MarketScreen({ navigation, route }: Props) {
             <WhaleLoader size={56} />
             <Text style={styles.listLoadingText}>종목 목록을 불러오는 중입니다.</Text>
           </View>
+        ) : viewState === 'market_error' && isGuestSignInRequired(marketQuery.error) ? (
+          <GuestSignInPanel testID="market-sign-in"
+            title={`로그인하면 ${TABS.find((tab) => tab.key === selectedTab)?.label ?? '이 시장의'} 시세를 확인할 수 있습니다.`} />
         ) : viewState === 'market_error' ? (
           <ErrorState
             title="종목 목록을 불러오지 못했습니다."

@@ -7,6 +7,7 @@ import type { TradingAccountPortfolioSummaryDto, TradingAccountPortfolioDto } fr
 import { homeUnrealizedPnlKrw } from '../../features/tradingAccount/homePortfolio';
 import { formatKrw, formatPercent } from '../../utils/format';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import { GuestSignInActions } from '../../components/guest/GuestSignIn';
 import { fitHeroTotal, heroTotalWidth, HERO_ASIDE_GAP, HERO_TOTAL_FONT_SIZE, HERO_TOTAL_MIN_FONT_SIZE } from './heroTotalFit';
 
 type Props = {
@@ -125,6 +126,25 @@ export default function HomeAssetHero({ summary, finalResult, settled = false, c
   );
 }
 
+/**
+ * Guest browsing's 총 자산 (2026-10-30): the hero's place, label and type,
+ * but a way in instead of numbers. A visitor has no account, so there is no
+ * total, return or PnL to show — never a 0원 or 0% stand-in, and not a
+ * financial-data error either.
+ */
+export function HomeGuestHero() {
+  return (
+    <View testID="home-guest-hero" style={styles.heroRow}>
+      <View style={styles.hero}>
+        <Text style={styles.label}>총 자산</Text>
+        <Text accessibilityRole="header" style={styles.guestTitle}>로그인 후 나의 자산을 확인하세요</Text>
+        <Text style={styles.guestMessage}>가상투자를 시작하고 총자산과 수익률을 관리해 보세요.</Text>
+        <GuestSignInActions testID="home-guest-hero" />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   host: { minWidth: 0 },
   heroRow: { paddingVertical: 12, flexDirection: 'row', alignItems: 'center', columnGap: HERO_ASIDE_GAP, minWidth: 0 },
@@ -138,6 +158,9 @@ const styles = StyleSheet.create({
   compactBottom: { paddingBottom: 0 },
   compactTop: { paddingTop: 0 },
   label: { fontSize: 18, fontWeight: '700', lineHeight: 27, color: semantic.secondary },
+  // Sentences in the total's place: they wrap at any width and text size.
+  guestTitle: { fontSize: 24, lineHeight: 32, fontWeight: '700', color: semantic.text },
+  guestMessage: { fontSize: 15, lineHeight: 23, color: semantic.secondary },
   // A smaller fitted size keeps this line height, so the hero never jumps when the amount changes.
   total: { fontSize: HERO_TOTAL_FONT_SIZE, fontWeight: '700', lineHeight: 46, flexShrink: 1, fontVariant: ['tabular-nums'] },
   performance: { gap: 4, marginTop: 4, flexGrow: 1, flexShrink: 1, flexBasis: 150, minWidth: 0 },

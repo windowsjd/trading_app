@@ -12,6 +12,7 @@ import type { LoginScreenProps } from '../../app/navigation/types';
 import { login, type LoginRequestDto } from '../../features/auth/api';
 import { authenticateSession, endSession } from '../../features/auth/session';
 import { useEnterApp } from '../../features/auth/useEnterApp';
+import { useBrowseAsGuest } from '../../features/auth/useBrowseAsGuest';
 import {
   isCurrentSession,
   SessionSupersededError,
@@ -52,6 +53,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   const enterApp = useEnterApp();
   const queryClient = useQueryClient();
   const scroll = useFocusedInputScroll();
+  // 「로그인 없이 둘러보기」: the main tabs with no account (Guideline 5.1.1(v)).
+  const guest = useBrowseAsGuest();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -125,7 +128,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   }, [loginMutation.isPending, fieldError, blockedAuthState, submitError]);
 
   const onSubmit = () => {
-    if (inFlight.current || loginMutation.isPending) return;
+    if (inFlight.current || loginMutation.isPending || guest.pending) return;
     setFieldError(null);
     setSubmitError(null);
     setBlockedAuthState(null);
@@ -192,7 +195,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           primary
           style={styles.primaryButton}
           onPress={onSubmit}
-          disabled={loginMutation.isPending}
+          disabled={loginMutation.isPending || guest.pending}
           // Busy keeps the brand background; the whale replaces the label.
           accessibilityRole="button"
           accessibilityLabel={loginMutation.isPending ? '로그인 중' : '로그인'}
@@ -220,6 +223,15 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <Text style={styles.secondaryButtonText}>비밀번호 찾기</Text>
         </ActionPressable>
       </View>
+
+      {/* No account, no session: the tabs that need none (홈·마켓·가이드).
+          Held while a sign-in is in flight, and the reverse. */}
+      <ActionPressable testID="auth-guest-browse" style={styles.guestButton}
+        disabled={loginMutation.isPending || guest.pending} accessibilityRole="button"
+        accessibilityState={{ disabled: loginMutation.isPending || guest.pending, busy: guest.pending }}
+        onPress={() => void guest.start()}>
+        <Text style={styles.guestButtonText}>로그인 없이 둘러보기</Text>
+      </ActionPressable>
     </AuthFormLayout>
   );
 }
@@ -273,6 +285,22 @@ const styles = StyleSheet.create({
     color: semantic.text,
     fontSize: 16,
     fontWeight: '700',
+  },
+  guestButton: {
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  guestButtonText: {
+    textAlign: 'center',
+    color: semantic.secondary,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   errorText: {
     color: semantic.error,

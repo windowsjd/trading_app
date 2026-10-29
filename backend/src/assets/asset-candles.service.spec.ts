@@ -435,6 +435,69 @@ describe('AssetCandlesService', () => {
     );
   });
 
+  describe('guest market data: signed-out candles (2026-10-30)', () => {
+    const previousGuestTypes = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    afterEach(() => {
+      if (previousGuestTypes === undefined)
+        delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previousGuestTypes;
+    });
+
+    it('keeps the existing 401 before any read while no type is configured', async () => {
+      delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      const { prisma, serving, service } = createService();
+
+      await expectApiError(
+        service.getAssetCandles(undefined, 'asset-btc'),
+        401,
+        'UNAUTHORIZED',
+      );
+      expect(prisma.asset.findUnique).not.toHaveBeenCalled();
+      expect(serving.serve).not.toHaveBeenCalled();
+    });
+
+    it('serves a configured type and refuses any other before a candle read', async () => {
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'crypto';
+      const { prisma, serving, koscomClient, kisQuoteClient, service } =
+        createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: 'asset-samsung',
+          symbol: '005930',
+          name: 'Samsung Electronics',
+          market: 'KRX',
+          assetType: AssetType.domestic_stock,
+          currencyCode: CurrencyCode.KRW,
+        }),
+      );
+      await expectApiError(
+        service.getAssetCandles(undefined, 'asset-samsung'),
+        401,
+        'UNAUTHORIZED',
+      );
+      expect(serving.serve).not.toHaveBeenCalled();
+      expect(koscomClient.get).not.toHaveBeenCalled();
+      expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: 'asset-btc',
+          symbol: 'BTC',
+          name: 'Bitcoin',
+          market: 'BINANCE',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+      const served = { success: true, data: { candles: [] } };
+      serving.serve.mockResolvedValueOnce(served as never);
+      await expect(
+        service.getAssetCandles(undefined, 'asset-btc'),
+      ).resolves.toBe(served);
+      expect(serving.serve).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('normalizes KOSCOM domestic today 1-minute candles into server-side buckets', async () => {
     const { prisma, kisAuthClient, koscomClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(

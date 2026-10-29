@@ -3,6 +3,7 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
+import { isGuestBrowsing, retryGuestRead } from '../../features/auth/guestBrowsing';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
@@ -88,6 +89,9 @@ export function AssetMarketChart({
   React.useEffect(() => { registerQuestGuideReveal('asset', node => revealView(node, 'start')); return () => registerQuestGuideReveal('asset', null); }, [revealView]);
   const isFocused = useIsFocused();
   const isAdmin = useAdminDiagnostics();
+  // Guest browsing: REST detail and candles only; the realtime socket needs a session.
+  const guest = isGuestBrowsing();
+  const guestRead = guest ? { retry: retryGuestRead } : {};
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [selectedTimeframe, setSelectedTimeframe] =
     useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
@@ -97,6 +101,7 @@ export function AssetMarketChart({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
     enabled: isFocused,
+    ...guestRead,
   });
   // The selected tab's request window depends on the market (KRX session
   // windows, the long-range 4h window); it waits for the asset type instead
@@ -121,6 +126,7 @@ export function AssetMarketChart({
         limit: chartWindow.limit,
       }),
     enabled: isFocused && requestTimeframe !== null,
+    ...guestRead,
   });
   const refresh = usePullToRefresh([
     { ...detailQuery, enabled: isFocused && variant === 'detail' },
@@ -130,7 +136,7 @@ export function AssetMarketChart({
   const { latestTicker, showReconnectBanner, isStale: isTickerStale, runtime: tickerRuntime } = useAssetTicker({
     assetId,
     wsUrl: wsUrl ?? '',
-    enabled: isFocused && !!wsUrl,
+    enabled: isFocused && !!wsUrl && !guest,
   });
   const {
     latestCandle,
@@ -142,7 +148,7 @@ export function AssetMarketChart({
     assetId,
     interval: selectedTimeframe.interval,
     wsUrl: wsUrl ?? '',
-    enabled: isFocused && !!wsUrl,
+    enabled: isFocused && !!wsUrl && !guest,
   });
   const refetchCandles = candlesQuery.refetch;
   useEffect(() => {

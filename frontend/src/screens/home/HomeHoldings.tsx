@@ -122,6 +122,20 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
   );
 }
 
+/**
+ * Guest browsing's 보유종목 및 포지션: the same card and heading with what
+ * signing in shows here. Nothing is read — no positions, no futures, no
+ * cached or sample holdings.
+ */
+export function HomeGuestHoldings() {
+  return (
+    <View testID="home-guest-holdings" style={styles.card}>
+      <Text accessibilityRole="header" style={styles.title}>보유종목 및 포지션</Text>
+      <InlineEmptyState title="로그인하면 보유 중인 종목과 포지션을 확인할 수 있습니다." />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // No outline: the transparent 1px border keeps the content inset unchanged.
   card: { borderWidth: 1, borderColor: 'transparent', borderRadius: 14, paddingHorizontal: 16,

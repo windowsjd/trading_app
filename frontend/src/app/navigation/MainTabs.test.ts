@@ -25,14 +25,16 @@ const icons = readFileSync(
 
 type AccountMode = 'general' | 'season' | 'beginner';
 
-function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`) {
+function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`, guest = false) {
   // Tab screens' bottom sheets render in ScreenSheetHost; the navigator contract is inside it.
   const unwrap = (node: any) => node?.type === 'ScreenSheetHost' ? node.props.children : node;
-  const tree: any = renderHostedTabs(mode, isLoading, appearance, reduced, accountId);
-  return tree?.type === 'QuestGuideProvider' ? { ...tree, props: { ...tree.props, children: unwrap(tree.props.children) } } : unwrap(tree);
+  const tree: any = renderHostedTabs(mode, isLoading, appearance, reduced, accountId, guest);
+  // Guest tabs: the exit provider wraps the hosted navigator.
+  const hosted = guest && tree?.props?.value ? tree.props.children : tree;
+  return hosted?.type === 'QuestGuideProvider' ? { ...hosted, props: { ...hosted.props, children: unwrap(hosted.props.children) } } : unwrap(hosted);
 }
 
-function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`) {
+function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`, guest = false, navigation: unknown = undefined) {
   const MainTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
     'react-native': { useWindowDimensions: () => ({ fontScale: 1 }) },
     'react-native-safe-area-context': {
@@ -69,15 +71,16 @@ function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearanc
     },
     '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
     '../../components/common/ScreenSheetHost': { ScreenSheetHost: 'ScreenSheetHost' },
+    '../../features/auth/guestBrowsing': { isGuestBrowsing: () => guest },
     ...Object.fromEntries(
-      ['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
+      ['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My', 'Modes'].map((name) => [
         `./${name}Stack`,
-        { default: `${name}Stack`, QuestStack: 'QuestStack', __esModule: true },
+        { default: `${name}Stack`, QuestStack: 'QuestStack', GuestHomeStack: 'GuestHomeStack', GuestWalletStack: 'GuestWalletStack', __esModule: true },
       ]),
     ),
   }).default;
 
-  return MainTabs();
+  return MainTabs({ navigation } as never);
 }
 
 function screenOptions(screen: any, route = {}) {
@@ -197,7 +200,7 @@ describe('bottom tab icon contract', () => {
     assert.match(icons, /import Svg, \{ Circle, Path \} from 'react-native-svg'/);
     assert.deepEqual(
       [...new Set([...icons.matchAll(/case '(\w+)':/g)].map((match) => match[1]))],
-      ['market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu', 'profile'],
+      ['market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu', 'modes', 'profile'],
     );
     assert.match(icons, /width=\{size\}\s+height=\{size\}/);
     assert.match(icons, /viewBox="0 0 24 24"/);
@@ -241,7 +244,7 @@ describe('bottom tab visual states', () => {
       'react-native': { View: 'View' },
       'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
     }).default;
-    for (const name of ['home', 'market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu']) {
+    for (const name of ['home', 'market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu', 'modes']) {
       const active = elements(Icon({ name, color: '#ffffff', size: 25, focused: true }), 'Svg')[0];
       const inactive = elements(Icon({ name, color: '#aebbc8', size: 25, focused: false }), 'Svg')[0];
       assert.equal(active.props.fill, '#ffffff'); assert.equal(active.props.stroke, 'none');
@@ -313,4 +316,62 @@ it('beginner tabs run inside one quest guide keyed by the account, unlike other 
 });
 it('even switching two season accounts resets nested navigation by account id', () => {
   assert.notEqual(renderTabs('season', false, 'light', false, 'season-one').key, renderTabs('season', false, 'light', false, 'season-two').key);
+});
+
+describe('guest browsing tabs (로그인 없이 둘러보기)', () => {
+  it('shows Home, Market, Guide, Wallet and 투자모드 — no MY, Ranking or Quest', () => {
+    assert.deepEqual(tabContract(renderTabs(null, false, 'light', false, undefined, true)), [
+      ['HomeTab', 'GuestHomeStack', '홈', 'home'],
+      ['MarketTab', 'MarketStack', '마켓', 'market'],
+      ['GuideTab', 'GuideStack', '가이드', 'guide'],
+      ['WalletTab', 'GuestWalletStack', '지갑', 'wallet'],
+      ['ModesTab', 'ModesStack', '투자모드', 'modes'],
+    ]);
+  });
+
+  it('needs no account: it never waits on the account provider and keys itself apart', () => {
+    for (const loading of [false, true]) {
+      const tree = renderTabs(null, loading, 'light', false, undefined, true);
+      assert.equal(tree.type, 'Navigator');
+      assert.equal(tree.key, 'guest');
+      assert.equal(tree.props.initialRouteName, 'HomeTab');
+    }
+    // A stale account in the provider never turns guest tabs into its mode's tabs.
+    const names = elements(renderTabs('season', false, 'light', false, 'season-account', true), 'Screen')
+      .map((screen: any) => screen.props.name);
+    assert.deepEqual(names, ['HomeTab', 'MarketTab', 'GuideTab', 'WalletTab', 'ModesTab']);
+  });
+
+  it('keeps the members\' MY tab and mode tabs unchanged', () => {
+    for (const mode of ['general', 'season', 'beginner'] as const) {
+      const names = elements(renderTabs(mode), 'Screen').map((screen: any) => screen.props.name);
+      assert.equal(names.at(-1), 'MyTab', mode);
+      assert.ok(!names.includes('ModesTab'), mode);
+    }
+  });
+
+  it('reserves room for 가이드 and the four-character 투자모드 only when fonts grow', () => {
+    const items = (tree: unknown) => Object.fromEntries(elements(tree, 'Screen')
+      .map((screen: any) => [screen.props.name, screenOptions(screen).tabBarItemStyle]));
+    const guest = items(renderTabs(null, false, 'light', false, undefined, true));
+    assert.equal(Object.values(guest).every((style) => style === undefined), true, 'fontScale 1: equal tabs');
+    assert.match(tabs, /title: '투자모드',[\s\S]*?tabBarItemStyle: fontScale > 1 \? \{ flex: 1\.8 \} : undefined/);
+    assert.match(tabs, /title: '가이드',[\s\S]*?tabBarItemStyle: mode === 'guest' && fontScale > 1 \? \{ flex: 1\.4 \} : undefined/);
+    // Members' 가이드 keeps its equal share at every text size.
+    assert.equal(items(renderTabs('general')).GuideTab, undefined);
+  });
+
+  it('offers 로그인 and 회원가입 from any tab through its own root navigation', () => {
+    const resets: any[] = [];
+    const tree: any = renderHostedTabs(null, false, 'light', false, undefined, true, { reset: (state: unknown) => resets.push(state) });
+    assert.equal(tree.props.children.type, 'ScreenSheetHost');
+    tree.props.value.signIn();
+    tree.props.value.signUp();
+    assert.deepEqual(resets, [
+      { index: 0, routes: [{ name: 'AuthStack', state: { index: 0, routes: [{ name: 'Login' }] } }] },
+      { index: 0, routes: [{ name: 'AuthStack', state: { index: 1, routes: [{ name: 'Login' }, { name: 'Signup' }] } }] },
+    ]);
+    // Members get no exit provider.
+    for (const mode of ['general', 'season'] as const) assert.equal((renderHostedTabs(mode) as any).type, 'ScreenSheetHost');
+  });
 });

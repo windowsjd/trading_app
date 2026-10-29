@@ -35,6 +35,8 @@ import { useMarketTickers } from '../../features/market/useMarketTickers';
 import { buildWsUrl } from '../../constants/env';
 import WhaleLoader from '../../components/states/WhaleLoader';
 import { useKeyboardCover } from '../../hooks/useKeyboardCover';
+import { isGuestBrowsing, isGuestSignInRequired } from '../../features/auth/guestBrowsing';
+import { GuestSignInPanel } from '../../components/guest/GuestSignIn';
 
 const OPEN_DURATION = 280;
 const CLOSE_DURATION = 220;
@@ -136,7 +138,8 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
   const { tickersByAssetId, staleAssetIds } = useMarketTickers({
     assetIds,
     wsUrl: wsUrl ?? '',
-    enabled: visible && !!wsUrl,
+    // Guest browsing (asset detail's pair change) has no realtime socket.
+    enabled: visible && !!wsUrl && !isGuestBrowsing(),
   });
 
   // The list only gains bottom room for the keyboard; the header never moves.
@@ -291,6 +294,10 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
                 <View testID="order-asset-sheet-loading" style={styles.state}>
                   <WhaleLoader size={28} />
                   <Text style={styles.stateText}>{loadingCopy}</Text>
+                </View>
+              ) : searchQuery.isError && isGuestSignInRequired(searchQuery.error) ? (
+                <View testID="order-asset-sheet-sign-in" style={styles.state}>
+                  <GuestSignInPanel testID="order-asset-sheet-sign-in-panel" title="로그인하면 이 시장의 종목을 확인할 수 있습니다." />
                 </View>
               ) : searchQuery.isError ? (
                 <View testID="order-asset-sheet-error" style={styles.state}>

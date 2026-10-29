@@ -14,6 +14,7 @@ import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
+import { isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../../features/auth/guestBrowsing';
 
 const CATEGORIES: { key: AssetType; label: string }[] = [
   { key: 'domestic_stock', label: '국내주식' },
@@ -31,6 +32,8 @@ export function useHomeHotMarket(enabled: boolean) {
     queryKey: QUERY_KEYS.market.assetPreview(params),
     queryFn: () => getAssets({ ...params, sortRefresh: refreshingCategory.current === assetType }),
     enabled,
+    // A guest's 401 is "sign in to see this market", not a blip to retry.
+    ...(isGuestBrowsing() ? { retry: retryGuestRead } : {}),
   });
   const refetch = async (options?: { cancelRefetch?: boolean }) => {
     refreshingCategory.current = assetType;
@@ -60,8 +63,12 @@ export default function HomeHotMarket({ hot, onOpenAsset, onOpenMarket }: {
         options={CATEGORIES.map(item => ({ key: item.key, label: item.label, testID: `home-hot-tab-${item.key}` }))} />
       <Text style={styles.caption}>거래대금 TOP 5</Text>
       {query.isLoading ? <SectionSkeleton lines={3} /> : null}
-      {query.isError ? <ErrorState title="HOT 종목을 불러오지 못했습니다."
-        onRetry={() => void hot.refreshQuery.refetch()} diagnosticError={query.error} /> : null}
+      {/* A market not served to signed-out visitors (guest browsing) is a
+          sign-in notice, never a failure. */}
+      {query.isError && isGuestSignInRequired(query.error)
+        ? <InlineEmptyState testID="home-hot-sign-in" title={`로그인하면 ${category?.label ?? ''} 거래대금 TOP 5를 확인할 수 있습니다.`} />
+        : query.isError ? <ErrorState title="HOT 종목을 불러오지 못했습니다."
+          onRetry={() => void hot.refreshQuery.refetch()} diagnosticError={query.error} /> : null}
       {!query.isLoading && !query.isError && !assets.length ? <InlineEmptyState message="거래대금을 확인할 수 있는 종목이 없습니다." /> : null}
       {assets.map((item, index) => {
         const nameDisplay = getAssetNameDisplay(item);

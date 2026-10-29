@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common';
 import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
+import { GuestMarketDataRead } from './guest-market-data.guard';
 import { AssetCandlesService } from './asset-candles.service';
 import type { AssetCandlesQuery } from './asset-candles.service';
 import { AssetsService } from './assets.service';
@@ -19,6 +20,12 @@ export class AssetsController {
     private readonly assetCandlesService: AssetCandlesService,
   ) {}
 
+  // Guest-readable market data (2026-10-30): with GUEST_MARKET_DATA_ASSET_TYPES
+  // configured, a request without a token reaches the service, which serves
+  // only that scope; otherwise it stops at the existing 401 before any pipe.
+  // A token that is sent is still verified by the global guard. The price
+  // route stays signed-in only.
+  @GuestMarketDataRead()
   @Get()
   getAssets(
     @Req() request: AuthenticatedRequest,
@@ -43,6 +50,7 @@ export class AssetsController {
     return this.assetsService.getAssets(this.extractUserId(request), query);
   }
 
+  @GuestMarketDataRead()
   @Get(':assetId/candles')
   getAssetCandles(
     @Req() request: AuthenticatedRequest,
@@ -77,6 +85,7 @@ export class AssetsController {
     );
   }
 
+  @GuestMarketDataRead()
   @Get(':assetId')
   getAsset(
     @Req() request: AuthenticatedRequest,

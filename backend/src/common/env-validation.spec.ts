@@ -58,3 +58,27 @@ describe('validateEnv general FX fee', () => {
     },
   );
 });
+
+describe('validateEnv guest market data', () => {
+  it.each([
+    undefined,
+    '',
+    ' ',
+    'crypto',
+    'crypto, us_stock',
+    'domestic_stock,us_stock,crypto',
+  ])('boots with GUEST_MARKET_DATA_ASSET_TYPES=%j', (value) => {
+    expect(() =>
+      validateEnv({ ...BASE, GUEST_MARKET_DATA_ASSET_TYPES: value }),
+    ).not.toThrow();
+  });
+
+  it.each(['CRYPTO', 'cryto', 'crypto,crypto', 'crypto,', 'all', 'futures'])(
+    'fails startup for GUEST_MARKET_DATA_ASSET_TYPES=%j',
+    (value) => {
+      expect(() =>
+        validateEnv({ ...BASE, GUEST_MARKET_DATA_ASSET_TYPES: value }),
+      ).toThrow(/GUEST_MARKET_DATA_ASSET_TYPES/u);
+    },
+  );
+});

@@ -50,7 +50,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
     },
     '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
     '../../components/common/ScreenSheetHost': { ScreenSheetHost: 'ScreenSheetHost' },
-    ...Object.fromEntries(['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
+    ...Object.fromEntries(['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My', 'Modes'].map((name) => [
       `./${name}Stack`, { default: `${name}Stack`, __esModule: true },
     ])),
   }).default;

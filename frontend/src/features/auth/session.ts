@@ -21,6 +21,7 @@ import {
   type SessionQueryClient,
 } from './sessionCache.ts';
 import { runSessionExpiryTeardown } from './sessionTeardown.ts';
+import { setGuestBrowsing } from './guestBrowsing.ts';
 import type { AuthTokensDto, AuthUserDto, LoginResponseDto } from './api';
 
 export type { SessionQueryClient };
@@ -34,6 +35,8 @@ export async function beginSession(
   expected = getSessionGeneration(),
 ) {
   const owner = startSessionInstall(expected);
+  // An authenticated session never coexists with guest browsing.
+  setGuestBrowsing(false);
   resetSessionExpiryNotice();
   clearSessionCache(queryClient);
   try {
@@ -76,6 +79,34 @@ export async function authenticateSession(
     }
     throw error;
   }
+}
+
+/**
+ * 「로그인 없이 둘러보기」: the main tabs with no session at all (2026-10-30).
+ *
+ * The pre-login session — a cold start's restoring phase, or one a logout or
+ * an expiry already ended — is ended FIRST and awaited. A request still in
+ * flight from it (the account provider's /me at cold start) then can neither
+ * refresh nor expire into a reset to login, a teardown already running
+ * finishes its own navigation before the tabs open, and no request in
+ * browsing can attach or refresh credentials; guest market reads go out as
+ * public requests (`guestReadConfig`). The cache is cleared even when the
+ * session had already ended, so nothing of a previous user survives.
+ *
+ * Creates nothing: no user, account, wallet, token or server session.
+ * Resolves with the guest's generation; the caller opens the tabs only while
+ * it is still current. A sign-in begun meanwhile owns the session and the
+ * next screen: browsing then starts nothing at all.
+ */
+export async function beginGuestBrowsing(queryClient: SessionQueryClient) {
+  const ending = endSession(queryClient);
+  // The ended generation browsing belongs to (endSession invalidates first).
+  const owner = getSessionGeneration();
+  await ending;
+  if (!isCurrentSession(owner)) return owner;
+  clearSessionCache(queryClient);
+  setGuestBrowsing(true);
+  return owner;
 }
 
 type EndSessionOptions = {

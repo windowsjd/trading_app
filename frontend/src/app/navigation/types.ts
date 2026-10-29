@@ -102,6 +102,11 @@ export type MyStackParamList = {
   MembershipDeletion: undefined;
 };
 
+/** 투자모드: guest browsing's introduction of the three investment modes. */
+export type ModesStackParamList = {
+  Modes: undefined;
+};
+
 export type MainTabParamList = {
   QuestTab: NavigatorScreenParams<GuideStackParamList>;
   HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
@@ -110,6 +115,8 @@ export type MainTabParamList = {
   RankingTab: NavigatorScreenParams<RankingStackParamList> | undefined;
   WalletTab: NavigatorScreenParams<WalletStackParamList> | undefined;
   MyTab: NavigatorScreenParams<MyStackParamList> | undefined;
+  /** Guest browsing only: it takes MY's place (no account to show there). */
+  ModesTab: NavigatorScreenParams<ModesStackParamList> | undefined;
 };
 
 /** A tab a Market-tab screen can be opened from. */
@@ -193,6 +200,8 @@ export type SeasonJoinScreenProps = RootScreenProps<'SeasonJoin'>;
 export type SeasonFinalResultScreenProps = RootScreenProps<'SeasonFinalResult'>;
 
 export type ModeSelectionScreenProps = RootScreenProps<'ModeSelection'>;
+
+export type MainTabsScreenProps = RootScreenProps<'MainTabs'>;
 
 export type HomeScreenProps = CompositeScreenProps<
   StackScreenProps<HomeStackParamList, 'Home'>,

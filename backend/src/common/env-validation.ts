@@ -29,6 +29,7 @@ import { pushNotificationsConfig } from '../notifications/push-notifications.con
 import { dataRetentionConfig } from '../auth/data-retention.config';
 import { readUsStockPriceProvider } from '../providers/us-stock-price-provider.config';
 import { readTiingoConfig } from '../providers/tiingo/tiingo.config';
+import { readGuestMarketDataAssetTypes } from '../assets/guest-market-data.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -94,6 +95,9 @@ export function validateEnv(
       );
   });
   collect(errors, () => readGeneralFxFeeRate(env));
+  // GUEST_MARKET_DATA_ASSET_TYPES (2026-10-30): the market data a signed-out
+  // visitor may read. Unset exposes nothing; an unknown value never boots.
+  collect(errors, () => readGuestMarketDataAssetTypes(env));
   collect(errors, () => readProfileImageStorageConfig(config));
   collect(errors, () => readEmailAuthConfig(config));
   collect(errors, () => readAuthTrustProxyHops(config.AUTH_TRUST_PROXY_HOPS));

@@ -5,6 +5,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { findKrStocksByKoreanName } from '../../utils/krStockKoreanNames';
 import { findUsStocksByKoreanName } from '../../utils/usStockKoreanNames';
 import { getAssets, type AssetType, type MarketAssetItemDto } from './api';
+import { isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../auth/guestBrowsing.ts';
 import { prependKoreanNameMatches, type ListedStocks } from './koreanNameSearch';
 import { marketSortParams, nextMarketPage, type MarketPageParam, type MarketSort } from './marketSort';
 
@@ -95,7 +96,11 @@ export function useMarketAssetSearch({ scope, searchText, sort, enabled }: {
       const types = [...new Set(koreanMatches.map((match): NamedStockType => (match.market === 'KRX' ? 'domestic_stock' : 'us_stock')))];
       const lists = await Promise.all(types.map((type) => queryClient.fetchQuery({
         queryKey: QUERY_KEYS.market.koreanNameIndex({ ...sortParams, assetType: type }),
-        queryFn: () => fetchListedStocks(type, sortParams, sortRefresh),
+        // A market not served to a guest adds no Korean-name matches.
+        queryFn: () => fetchListedStocks(type, sortParams, sortRefresh).catch((error: unknown) => {
+          if (isGuestSignInRequired(error)) return { assets: [], priceErrors: [] };
+          throw error;
+        }),
         // A pull to refresh reloads it with the rows.
         staleTime: sortRefresh ? 0 : KOREAN_NAME_INDEX_STALE_MS,
       })));
@@ -105,6 +110,7 @@ export function useMarketAssetSearch({ scope, searchText, sort, enabled }: {
     getNextPageParam: nextMarketPage,
     initialPageParam: { offset: 0 },
     enabled,
+    ...(isGuestBrowsing() ? { retry: retryGuestRead } : {}),
   });
 
   const items = useMemo(() => {

@@ -5553,4 +5553,110 @@ describe('AppController (e2e)', () => {
         .expect(({ body }) => expect(body.error.code).toBe('UNAUTHORIZED'));
     });
   });
+
+  describe('guest market data: signed-out reads (2026-10-30)', () => {
+    const previousGuestTypes = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    afterEach(() => {
+      if (previousGuestTypes === undefined)
+        delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previousGuestTypes;
+    });
+
+    it.each([
+      '/api/v1/assets?assetType=crypto&withPrice=false',
+      '/api/v1/assets/asset-btc',
+      '/api/v1/assets/asset-btc/candles?range=1d',
+    ])(
+      'keeps %s signed-in only while no guest type is configured',
+      async (path) => {
+        delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+        await expectUnauthorizedWithoutToken('get', path);
+        expect(prisma.asset.count).not.toHaveBeenCalled();
+        expect(prisma.asset.findMany).not.toHaveBeenCalled();
+        expect(prisma.asset.findUnique).not.toHaveBeenCalled();
+      },
+    );
+
+    it('keeps authentication ahead of query validation until a guest type is configured', async () => {
+      delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      await expectUnauthorizedWithoutToken(
+        'get',
+        '/api/v1/assets?limit=20&limit=30',
+      );
+      // Configured, the read is public for that scope and validated like any other.
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'crypto';
+      resetPrismaMocks();
+      await request(app.getHttpServer())
+        .get('/api/v1/assets?limit=20&limit=30')
+        .expect(400);
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+    });
+
+    it('serves a configured type without a token and nothing else', async () => {
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'crypto';
+      resetPrismaMocks();
+      prisma.asset.count.mockResolvedValue(0);
+      prisma.asset.findMany.mockResolvedValue([]);
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/assets?assetType=crypto&withPrice=false')
+        .expect(200);
+      expect(response.body as unknown).toMatchObject({
+        data: { filters: { assetType: 'crypto' } },
+      });
+      const [[read]] = prisma.asset.findMany.mock.calls as [
+        [{ where: Record<string, unknown> }],
+      ];
+      expect(read.where).toMatchObject({ assetType: 'crypto', isActive: true });
+      // No identity was read: the request stayed anonymous.
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+
+      await expectUnauthorizedWithoutToken(
+        'get',
+        '/api/v1/assets?assetType=domestic_stock&withPrice=false',
+      );
+      // A token that is sent is still verified.
+      await expectUnauthorizedWithAuthorization(
+        'get',
+        '/api/v1/assets?assetType=crypto&withPrice=false',
+        'Bearer invalid-token',
+      );
+    });
+
+    it.each([
+      ['get', '/api/v1/me'],
+      ['get', '/api/v1/home'],
+      ['get', '/api/v1/wallets'],
+      ['get', '/api/v1/positions'],
+      ['get', '/api/v1/orders'],
+      ['get', '/api/v1/trading-accounts'],
+      ['get', '/api/v1/trading-accounts/trading-account-1'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/portfolio'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/portfolio/equity'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/wallets'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/wallet-transactions'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/positions'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/orders'],
+      ['post', '/api/v1/trading-accounts/trading-account-1/orders/quote'],
+      ['post', '/api/v1/trading-accounts/trading-account-1/orders'],
+      ['post', '/api/v1/trading-accounts/trading-account-1/fx/quote'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/futures/instruments'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/futures/positions'],
+      ['post', '/api/v1/trading-accounts/general'],
+      ['post', '/api/v1/seasons/season-1/join'],
+      ['get', '/api/v1/assets/asset-btc/price'],
+      ['get', '/api/v1/futures/instruments/instrument-1/candles'],
+    ] as const)(
+      'still rejects %s %s without a token while guest market data is on',
+      async (method, path) => {
+        process.env.GUEST_MARKET_DATA_ASSET_TYPES =
+          'domestic_stock,us_stock,crypto';
+        await expectUnauthorizedWithoutToken(
+          method,
+          path,
+          method === 'post' ? {} : undefined,
+        );
+      },
+    );
+  });
 });

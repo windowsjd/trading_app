@@ -48,12 +48,48 @@ Historical holdings and financial reads retain their IDs and existing evidence.
 - Positions API: full list of positions the user already holds.
 - Assets API: list/detail of assets the user can search and select before placing an order.
 
+## Guest (signed-out) reads — 2026-10-30
+
+The app's 「로그인 없이 둘러보기」 reads market data without a token. Three
+account-free routes are `@OptionalAuth()`: `GET /api/v1/assets` (list/search),
+`GET /api/v1/assets/:assetId` and `GET /api/v1/assets/:assetId/candles`. A
+request that sends `Authorization` is still verified by the global guard, and
+a signed-in read is unchanged.
+
+- `GUEST_MARKET_DATA_ASSET_TYPES` (comma-separated `domestic_stock`,
+  `us_stock`, `crypto`) is the whole anonymous scope. Unset/empty — the
+  default — keeps every anonymous read at the existing `401 UNAUTHORIZED`
+  before query validation and any database read (`GuestMarketDataGuard` runs
+  after the global guard, before pipes). An unknown or repeated value refuses
+  to boot.
+- Enable a type only after confirming that its provider contract allows
+  display to unauthenticated users: KOSCOM (domestic stocks), Tiingo/KIS (US
+  stocks), Binance (crypto), and the USD/KRW sources behind KRW conversions.
+  Rights were not confirmed when this shipped, so production stays empty
+  until the operator decides.
+- Anonymous list: an explicit `assetType` outside the scope is `401
+  UNAUTHORIZED`; an all-type list/search reads only the scope (reported as
+  `filters.assetTypes`, which also keys the sort snapshot apart from signed-in
+  lists). `includeInactive` is read as `false` and `sortRefresh` as `false`
+  (the snapshot reuse window is 2 s), so an anonymous caller cannot force a
+  whole-universe rebuild.
+- Anonymous detail/candles: `404 ASSET_NOT_FOUND` as before, then `401
+  UNAUTHORIZED` for an asset outside the scope, before any candle or provider
+  read.
+- Not guest-readable: `GET /assets/:assetId/price`, `/api/v1/ws` (tickers,
+  candles, order books), futures instrument candles and every account,
+  portfolio, wallet, order, position, FX, futures, record and ranking route.
+  `src/auth/route-access.spec.ts` pins the full set of tokenless routes.
+- Admin diagnostics stay role-gated (`request.user.role === 'admin'`), so an
+  anonymous response never carries them.
+
 ## Tradability responsibilities
 
 Assets list/detail `tradable` describes only the asset, market session and
 selected price data. It does not query the current season, participation,
 participant status, or a selected trading account. Authentication remains
-required, but no accountId is required for market data.
+required (except the guest-readable types above), but no accountId is required
+for market data.
 
 The blocking order is inactive asset → closed/unknown market → unavailable or
 stale price/FX conversion evidence under the existing source policies. The

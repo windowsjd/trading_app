@@ -142,6 +142,7 @@ failure invalidates that challenge; user must resend after the cooldown.
   - `DELETE /api/v1/me/profile-image`
 - Access tokens are signed Bearer JWTs; the global guard checks current DB status, role and tokenVersion.
 - Protected API identity remains `request.user.userId`; the guard also attaches current DB `role` for operator/admin authorization.
+- Routes reachable without a token are pinned by `src/auth/route-access.spec.ts`: the public auth/health routes, optional-auth `GET /api/v1/seasons` and `/seasons/current`, and (guest browsing, 2026-10-30) optional-auth `GET /api/v1/assets`, `/assets/:assetId` and `/assets/:assetId/candles`, which serve only `GUEST_MARKET_DATA_ASSET_TYPES` (default none) to anonymous callers ([assets contract](assets-api-contract.md)).
 - `x-user-id` fallback is not supported.
 - Cookie/session auth is not part of this MVP.
 - Password reset revokes access through per-user tokenVersion; no JWT blacklist is used.

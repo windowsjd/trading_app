@@ -2248,6 +2248,46 @@ describe('AssetsService', () => {
         expectNoAssetWrites(h.prisma);
       },
     );
+    it('keys an anonymous all-type list apart from a signed-in one and never re-sorts on its request', async () => {
+      const previous = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'domestic_stock';
+      try {
+        const h = sortedSetup();
+        const query = { sortBy: 'turnover', limit: '2', search: 'S' };
+        const member = (await h.service.getAssets('user', query)).data;
+        const guest = (await h.service.getAssets(undefined, query)).data;
+
+        // Separate snapshots: neither audience can be served the other's set.
+        expect(guest.sortSnapshot).not.toBe(member.sortSnapshot);
+        expect(member.filters).not.toHaveProperty('assetTypes');
+        expect(guest.filters).toMatchObject({
+          assetType: null,
+          assetTypes: ['domestic_stock'],
+        });
+        const reads = h.prisma.asset.findMany.mock.calls as [
+          { where: Record<string, unknown> },
+        ][];
+        expect(reads[1][0].where).toMatchObject({
+          assetType: { in: ['domestic_stock'] },
+          isActive: true,
+        });
+        // A forced rebuild stays a signed-in action: the anonymous request
+        // reuses the snapshot still inside its reuse window.
+        const refreshed = (
+          await h.service.getAssets(undefined, {
+            ...query,
+            sortRefresh: 'true',
+          })
+        ).data;
+        expect(refreshed.sortSnapshot).toBe(guest.sortSnapshot);
+        expect(h.prisma.asset.findMany).toHaveBeenCalledTimes(2);
+        expectNoAssetWrites(h.prisma);
+      } finally {
+        if (previous === undefined)
+          delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+        else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previous;
+      }
+    });
     it('shares immutable pages across instances through the existing Redis connection', async () => {
       const previous = process.env.REDIS_URL;
       process.env.REDIS_URL = 'redis://fixture.invalid';
@@ -3481,6 +3521,151 @@ describe('AssetsService', () => {
           ][]
         ).map(([args]) => args.where.openTime.gte.toISOString()),
       ).toEqual(['2026-10-16T04:00:00.000Z']);
+    });
+  });
+
+  describe('guest market data: signed-out reads (2026-10-30)', () => {
+    const previousGuestTypes = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    const guestTypes = (value: string | undefined) => {
+      if (value === undefined) delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      else process.env.GUEST_MARKET_DATA_ASSET_TYPES = value;
+    };
+    afterEach(() => guestTypes(previousGuestTypes));
+
+    const btc = () =>
+      asset({
+        id: 'asset-btc',
+        symbol: 'BTC',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      });
+    const samsung = () => asset({ id: 'asset-samsung', symbol: '005930' });
+    // The where clause of the n-th asset list read, typed.
+    const whereOf = (prisma: ReturnType<typeof createPrisma>, call: number) =>
+      (
+        prisma.asset.findMany.mock.calls as [
+          { where: Record<string, unknown> },
+        ][]
+      )[call][0].where;
+
+    it('keeps the existing 401 before any read while no type is configured', async () => {
+      guestTypes(undefined);
+      const { prisma, service } = createService();
+
+      await expectApiError(
+        service.getAssets(undefined, { assetType: 'crypto' }),
+        401,
+        'UNAUTHORIZED',
+      );
+      await expectApiError(
+        service.getAsset(undefined, 'asset-btc'),
+        401,
+        'UNAUTHORIZED',
+      );
+      expect(prisma.asset.count).not.toHaveBeenCalled();
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+      expect(prisma.asset.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('lists only the configured types, active rows only, for an anonymous request', async () => {
+      guestTypes('crypto');
+      const { prisma, service } = createService();
+
+      await expectApiError(
+        service.getAssets(undefined, { assetType: 'domestic_stock' }),
+        401,
+        'UNAUTHORIZED',
+      );
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+
+      prisma.asset.count.mockResolvedValue(1);
+      prisma.asset.findMany.mockResolvedValue([btc()]);
+      const typed = await service.getAssets(undefined, {
+        assetType: 'crypto',
+        withPrice: 'false',
+        includeInactive: 'true',
+      });
+      expect(typed.data.assets.map((item) => item.id)).toEqual(['asset-btc']);
+      expect(whereOf(prisma, 0)).toMatchObject({
+        assetType: 'crypto',
+        isActive: true,
+      });
+
+      // An all-type search reads the guest-readable types only.
+      const search = await service.getAssets(undefined, {
+        search: 'b',
+        withPrice: 'false',
+      });
+      expect(whereOf(prisma, 1)).toMatchObject({
+        assetType: { in: ['crypto'] },
+        isActive: true,
+      });
+      expect(search.data.filters).toMatchObject({
+        assetType: null,
+        assetTypes: ['crypto'],
+      });
+      expectNoAssetWrites(prisma);
+    });
+
+    it('needs no type filter once every type is configured', async () => {
+      guestTypes('domestic_stock,us_stock,crypto');
+      const { prisma, service } = createService();
+      prisma.asset.count.mockResolvedValue(0);
+      prisma.asset.findMany.mockResolvedValue([]);
+
+      const list = await service.getAssets(undefined, { withPrice: 'false' });
+
+      expect(whereOf(prisma, 0)).not.toHaveProperty('assetType');
+      expect(list.data.filters).not.toHaveProperty('assetTypes');
+    });
+
+    it('reads a guest-readable detail and refuses any other type after the lookup', async () => {
+      guestTypes('crypto');
+      const { prisma, service } = createService();
+
+      prisma.asset.findUnique.mockResolvedValueOnce(btc());
+      const detail = await service.getAsset(undefined, 'asset-btc');
+      expect(detail.data.asset.id).toBe('asset-btc');
+
+      prisma.asset.findUnique.mockResolvedValueOnce(samsung());
+      await expectApiError(
+        service.getAsset(undefined, 'asset-samsung'),
+        401,
+        'UNAUTHORIZED',
+      );
+      prisma.asset.findUnique.mockResolvedValueOnce(null);
+      await expectApiError(
+        service.getAsset(undefined, 'asset-missing'),
+        404,
+        'ASSET_NOT_FOUND',
+      );
+      // The single price read stays signed-in only.
+      await expectApiError(
+        service.getAssetPrice(undefined, 'asset-btc'),
+        401,
+        'UNAUTHORIZED',
+      );
+      expectNoAssetWrites(prisma);
+    });
+
+    it('leaves a signed-in read unchanged by the guest scope', async () => {
+      guestTypes('crypto');
+      const { prisma, service } = createService();
+      prisma.asset.count.mockResolvedValue(1);
+      prisma.asset.findMany.mockResolvedValue([samsung()]);
+
+      const list = await service.getAssets('user-1', {
+        withPrice: 'false',
+        includeInactive: 'true',
+      });
+
+      expect(list.data.filters).not.toHaveProperty('assetTypes');
+      expect(whereOf(prisma, 0)).not.toHaveProperty('assetType');
+      expect(whereOf(prisma, 0)).not.toHaveProperty('isActive');
+      prisma.asset.findUnique.mockResolvedValueOnce(samsung());
+      await expect(
+        service.getAsset('user-1', 'asset-samsung'),
+      ).resolves.toMatchObject({ data: { asset: { id: 'asset-samsung' } } });
     });
   });
 });

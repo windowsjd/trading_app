@@ -28,6 +28,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MarketStackParamList } from '../../app/navigation/types';
 import { TEST_IDS } from '../../constants/testIds';
 import ErrorState from '../../components/states/ErrorState';
+import { isGuestBrowsing, isGuestSignInRequired } from '../../features/auth/guestBrowsing';
+import { GuestSignInPanel } from '../../components/guest/GuestSignIn';
 import EmptyState from '../../components/states/EmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import WhaleLoader from '../../components/states/WhaleLoader';
@@ -57,7 +59,8 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
   const { tickersByAssetId, staleAssetIds } = useMarketTickers({
     assetIds,
     wsUrl: wsUrl ?? '',
-    enabled: !!wsUrl,
+    // Guest browsing has no realtime socket: REST results only.
+    enabled: !!wsUrl && !isGuestBrowsing(),
   });
 
   const openAsset = useCallback((assetId: string) => {
@@ -68,13 +71,18 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
   const viewState = useMemo(() => {
     if (!trimmedSearchText) return 'market_search_idle';
     if (searchQuery.isLoading) return 'market_search_loading';
-    if (searchQuery.isError && !searchQuery.data) return 'market_search_error';
+    // A guest searching markets not served to signed-out visitors: a sign-in
+    // panel under the field, never a failure that replaces it.
+    if (searchQuery.isError && !searchQuery.data) {
+      return isGuestSignInRequired(searchQuery.error) ? 'market_search_sign_in' : 'market_search_error';
+    }
     if (!items.length) return 'market_search_empty';
     return 'market_search_ready';
   }, [
     trimmedSearchText,
     searchQuery.isLoading,
     searchQuery.isError,
+    searchQuery.error,
     searchQuery.data,
     items.length,
   ]);
@@ -167,6 +175,8 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
               title="검색어를 입력해주세요."
               message="종목명 또는 심볼로 검색할 수 있습니다."
             />
+          ) : viewState === 'market_search_sign_in' ? (
+            <GuestSignInPanel testID="market-search-sign-in" title="로그인하면 이 시장의 종목을 검색할 수 있습니다." />
           ) : viewState === 'market_search_loading' ? (
             // Drawn under the search field, never instead of it: replacing the
             // screen unmounted the field (and closed the keyboard) on every
