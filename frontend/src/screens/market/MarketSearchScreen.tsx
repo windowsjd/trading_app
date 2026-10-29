@@ -1,5 +1,6 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useIsFocused } from '@react-navigation/native';
 import MarketSortControl from '../../features/market/MarketSortControl';
 import type { MarketSort } from '../../features/market/marketSort';
 import {
@@ -28,7 +29,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MarketStackParamList } from '../../app/navigation/types';
 import { TEST_IDS } from '../../constants/testIds';
 import ErrorState from '../../components/states/ErrorState';
-import { isGuestBrowsing, isGuestSignInRequired } from '../../features/auth/guestBrowsing';
+import { GUEST_LIST_REFRESH_MS, guestRefetchInterval, isGuestBrowsing, isGuestSignInRequired } from '../../features/auth/guestBrowsing';
 import { GuestSignInPanel } from '../../components/guest/GuestSignIn';
 import EmptyState from '../../components/states/EmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
@@ -42,13 +43,18 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
   const [assetType, setAssetType] = useState<MarketSearchScope>('all');
   const [searchText, setSearchText] = useState('');
   const headerHeight = useHeaderHeight();
+  // Guest browsing (no socket): the focused results re-read themselves, and a
+  // return to them re-reads stale ones.
+  const guest = isGuestBrowsing();
+  const focused = useIsFocused();
   // Search screen policy: no request until there is a search text.
   const { searchQuery, items, hasPriceErrors, trimmedSearchText, refreshSort } =
     useMarketAssetSearch({
       scope: assetType,
       searchText,
       sort,
-      enabled: searchText.trim().length > 0,
+      enabled: searchText.trim().length > 0 && (!guest || focused),
+      refetchInterval: guestRefetchInterval(focused, GUEST_LIST_REFRESH_MS),
     });
 
   const refresh = usePullToRefresh([{ ...searchQuery, enabled: trimmedSearchText.length > 0 }],
@@ -60,7 +66,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
     assetIds,
     wsUrl: wsUrl ?? '',
     // Guest browsing has no realtime socket: REST results only.
-    enabled: !!wsUrl && !isGuestBrowsing(),
+    enabled: !!wsUrl && !guest,
   });
 
   const openAsset = useCallback((assetId: string) => {

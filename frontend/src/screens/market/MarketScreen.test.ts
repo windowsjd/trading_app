@@ -59,12 +59,16 @@ describe('MarketScreen partial-price warning policy', () => {
 it('uses the shared socket for market and search session transitions without per-client REST polling', () => {
   assert.match(marketScreen, /useMarketTickers/u);
   assert.match(marketSearch, /useMarketTickers/u);
-  assert.doesNotMatch(marketScreen, /refetchInterval/u);
-  assert.doesNotMatch(marketSearch, /refetchInterval/u);
   const detailChart = read('screens/asset/AssetChartScreen.tsx');
   assert.match(detailChart, /applyTickerMarketState/u);
   assert.match(detailChart, /latestTicker: ticker/u);
-  assert.doesNotMatch(detailChart, /refetchInterval/u);
+  // A member is never polled here: the only re-read is guest browsing's (no
+  // socket), and guestRefetchInterval is false for members (guestBrowsing.test).
+  for (const source of [marketScreen, marketSearch, detailChart]) {
+    const polls = source.match(/refetchInterval\b[^\n]*/gu) ?? [];
+    assert.equal(polls.length > 0, true);
+    for (const poll of polls) assert.match(poll, /^refetchInterval: guestRefetchInterval\(/u, poll);
+  }
 });
 
 describe('MarketScreen market switching', () => {
@@ -82,6 +86,7 @@ describe('MarketScreen market switching', () => {
     const results: Record<string, any> = {};
     const keys: string[] = [], refetches: string[] = [], subscribed: string[][] = [];
     const Screen = h.load('src/screens/market/MarketScreen.tsx', {
+      '@react-navigation/native': { useIsFocused: () => true },
       './FuturesMarketList': { FuturesMarketControls: 'FuturesMarketControls', FuturesMarketRows: 'FuturesMarketRows', useFuturesMarket: () => ({}), __esModule: true },
       '@tanstack/react-query': { useInfiniteQuery: (options: any) => {
         const assetType = options.queryKey[2];

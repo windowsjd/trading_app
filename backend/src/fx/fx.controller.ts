@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
+import { GuestFuturesMarketDataRead } from '../assets/guest-market-data.guard';
 import { FxService } from './fx.service';
 import type {
   FxCurrentRateQuery,
@@ -19,6 +20,10 @@ type AuthenticatedRequest = Request & {
 export class FxController {
   constructor(private readonly fxService: FxService) {}
 
+  // The USD/KRW display rate is market data, not account data: guest browsing
+  // reads it for a futures contract's won figure (crypto_futures guest scope,
+  // 2026-10-30). An anonymous read never asks for a provider refresh.
+  @GuestFuturesMarketDataRead()
   @Get('rates/current')
   currentRate(
     @Query(
@@ -29,8 +34,11 @@ export class FxController {
       } satisfies Record<keyof FxCurrentRateQuery, string>),
     )
     query: FxCurrentRateQuery,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.fxService.currentRate(query);
+    return this.fxService.currentRate(query, {
+      allowRefresh: !!this.extractUserId(request),
+    });
   }
 
   @Get('exchanges')

@@ -585,6 +585,30 @@ describe('FxService', () => {
     });
   });
 
+  it('never starts a provider refresh for an anonymous (guest) current-rate read', async () => {
+    const ingestion = { ensureFreshUsdKrwSnapshot: jest.fn() };
+    const { prisma, service } = createService(ingestion);
+    prisma.fxRateSnapshot.findMany.mockResolvedValue([
+      {
+        id: 'stored',
+        rate: new Prisma.Decimal('1390'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: freshEffectiveAt,
+        capturedAt: now,
+      },
+    ]);
+    await expect(
+      service.currentRate({ refresh: true }, { allowRefresh: false }),
+    ).resolves.toMatchObject({ data: { rate: '1390.00000000' } });
+    expect(ingestion.ensureFreshUsdKrwSnapshot).not.toHaveBeenCalled();
+    // Still validated like any other read.
+    await expectErrorCode(
+      service.currentRate({ refresh: 'yes' }, { allowRefresh: false }),
+      'INVALID_REFRESH',
+    );
+  });
+
   it('rejects a 301-second provider quote even though current-rate display accepts it', async () => {
     const { prisma, service } = createService();
     const observedAt = new Date(now.getTime() - 301_000);

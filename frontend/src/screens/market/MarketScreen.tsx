@@ -10,7 +10,7 @@ import { getHeaderScreenContentStyle, SCREEN_SECTION_GAP } from '../../theme/scr
 import { SafeAreaView } from '../../theme/safeArea';
 import { getMarketSessionLabel } from '../../features/market/marketPresentation';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
-import { isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../../features/auth/guestBrowsing';
+import { GUEST_LIST_REFRESH_MS, guestRefetchInterval, isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../../features/auth/guestBrowsing';
 import { GuestSignInPanel } from '../../components/guest/GuestSignIn';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -23,6 +23,7 @@ import {
 import ActionPressable from '../../components/common/ActionPressable';
 import SegmentedControl from '../../components/common/SegmentedControl';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useIsFocused } from '@react-navigation/native';
 
 import type { MarketScreenProps } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -52,10 +53,13 @@ const TABS: Array<{ key: AssetType; label: string }> = [
 export default function MarketScreen({ navigation, route }: Props) {
   const isAdmin = useAdminDiagnostics();
   const guide = useQuestGuide();
-  // Guest browsing: account-free REST reads only (no realtime socket, no
-  // account-scoped futures list); a market the server does not serve to
-  // signed-out visitors shows a sign-in panel instead of an error.
+  // Guest browsing: account-free REST reads only (no realtime socket; 선물 is
+  // the contracts' market data, not an account's list); a market the server
+  // does not serve to signed-out visitors shows a sign-in panel instead of an
+  // error. Without the socket, the focused list re-reads itself, and a return
+  // to it re-reads a stale list.
   const guest = isGuestBrowsing();
+  const focused = useIsFocused();
   const [cryptoProduct, setCryptoProduct] = useState<'spot' | 'futures'>('spot');
   const [selectedTab, setSelectedTab] = useState<AssetType>(route?.params?.assetType ?? 'domestic_stock');
   // Consume each explicit navigation intent. Clearing it also lets a later
@@ -96,8 +100,8 @@ export default function MarketScreen({ navigation, route }: Props) {
       }),
     getNextPageParam: nextMarketPage,
     initialPageParam: { offset: 0 },
-    enabled: !futuresMarket,
-    ...(guest ? { retry: retryGuestRead } : {}),
+    enabled: !futuresMarket && (!guest || focused),
+    ...(guest ? { retry: retryGuestRead, refetchInterval: guestRefetchInterval(focused, GUEST_LIST_REFRESH_MS) } : {}),
   });
 
   const refresh = usePullToRefresh([marketQuery],
@@ -144,11 +148,13 @@ export default function MarketScreen({ navigation, route }: Props) {
     [navigation],
   );
   const openFutures = useCallback(
-    // Like a spot row: the contract's detail (chart, 매수하기/매도하기) before its order screen.
-    (accountId: string, instrumentId: string) => navigation.navigate('FuturesDetail', { accountId, instrumentId }),
+    // Like a spot row: the contract's detail (chart, 매수하기/매도하기) before its
+    // order screen. A guest opens its market data only (no account to bind).
+    (accountId: string | null, instrumentId: string) =>
+      navigation.navigate('FuturesDetail', accountId ? { accountId, instrumentId } : { instrumentId }),
     [navigation],
   );
-  const futures = useFuturesMarket({ active: futuresMarket && !guest, sort, refreshVersion: futuresRefresh, onSelect: openFutures });
+  const futures = useFuturesMarket({ active: futuresMarket, sort, refreshVersion: futuresRefresh, onSelect: openFutures });
 
   const viewState = useMemo(() => {
     if (marketQuery.isLoading) return 'market_loading';
@@ -194,7 +200,7 @@ export default function MarketScreen({ navigation, route }: Props) {
                   { key: 'futures', label: '선물', accessibilityLabel: '암호화폐 선물', testID: 'crypto-product-futures' },
                 ]} />
             ) : null}
-            {futuresMarket ? (guest ? null : <FuturesMarketControls market={futures} sort={sort} onSortChange={setSort} />) : <>
+            {futuresMarket ? <FuturesMarketControls market={futures} sort={sort} onSortChange={setSort} /> : <>
             <ActionPressable
               style={styles.searchEntry}
               onPress={() => navigation.navigate('MarketSearch', { sort })}
@@ -227,11 +233,7 @@ export default function MarketScreen({ navigation, route }: Props) {
             ) : null}
             </>}
           </View>
-          {futuresMarket ? (guest
-            // Contracts are read through an investment account.
-            ? <GuestSignInPanel testID="market-futures-sign-in" title="로그인하면 선물 상품을 확인할 수 있습니다."
-              message="선물 목록과 거래는 가상투자 계정에서 이용할 수 있습니다." />
-            : <FuturesMarketRows market={futures} />) : null}
+          {futuresMarket ? <FuturesMarketRows market={futures} /> : null}
           </View>
         }
         ListEmptyComponent={futuresMarket ? null : viewState === 'market_loading' ? (

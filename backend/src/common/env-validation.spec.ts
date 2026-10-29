@@ -67,18 +67,27 @@ describe('validateEnv guest market data', () => {
     'crypto',
     'crypto, us_stock',
     'domestic_stock,us_stock,crypto',
+    'crypto_futures',
+    'domestic_stock,us_stock,crypto,crypto_futures',
+    'none',
   ])('boots with GUEST_MARKET_DATA_ASSET_TYPES=%j', (value) => {
     expect(() =>
       validateEnv({ ...BASE, GUEST_MARKET_DATA_ASSET_TYPES: value }),
     ).not.toThrow();
   });
 
-  it.each(['CRYPTO', 'cryto', 'crypto,crypto', 'crypto,', 'all', 'futures'])(
-    'fails startup for GUEST_MARKET_DATA_ASSET_TYPES=%j',
-    (value) => {
-      expect(() =>
-        validateEnv({ ...BASE, GUEST_MARKET_DATA_ASSET_TYPES: value }),
-      ).toThrow(/GUEST_MARKET_DATA_ASSET_TYPES/u);
-    },
-  );
+  it.each([
+    'CRYPTO',
+    'cryto',
+    'crypto,crypto',
+    'crypto,',
+    'all',
+    'futures',
+    'crypto_futures,crypto_futures',
+    'none,crypto',
+  ])('fails startup for GUEST_MARKET_DATA_ASSET_TYPES=%j', (value) => {
+    expect(() =>
+      validateEnv({ ...BASE, GUEST_MARKET_DATA_ASSET_TYPES: value }),
+    ).toThrow(/GUEST_MARKET_DATA_ASSET_TYPES/u);
+  });
 });

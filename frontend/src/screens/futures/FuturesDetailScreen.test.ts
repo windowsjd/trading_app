@@ -360,3 +360,59 @@ describe('futures order screen opened from the detail', () => {
     assert.equal(same.node('futures-direction-held') === undefined, true);
   });
 });
+
+describe('futures contract detail in guest browsing (2026-10-30)', () => {
+  const { resolve } = require('node:path');
+  // The module instance the screen loads natively: flipping it is guest browsing.
+  const guestState = require(resolve('src/features/auth/guestBrowsing.ts'));
+
+  const guestDetail = () => {
+    const h = futuresHarness({ screen: 'detail' });
+    // No account: none selected, none in the route.
+    h.accountId = null;
+    h.routeAccountId = null;
+    return h;
+  };
+
+  it("shows the contract's market data — Last, won figure, 전일대비, chart — from public reads only", async (t) => {
+    guestState.setGuestBrowsing(true);
+    t.after(() => guestState.setGuestBrowsing(false));
+    const h = guestDetail();
+    await h.start(); t.after(h.close);
+    assert.equal(h.node('futures-detail-unbound') === undefined, true, 'no account to bind');
+    assert.equal(words(h.node('futures-detail-name')), '비트코인');
+    assert.equal(words(h.node('futures-detail-primary-price')), '$102');
+    assert.equal(words(h.node('futures-detail-secondary-price')), '142,800원');
+    assert.equal(words(h.node('futures-day-change')), '전일대비 +0.99%');
+    assert.equal(chart(h).props.currentPrice, '102');
+    // Only the market-data routes, each without credentials; never an account.
+    assert.equal(h.reads.some((path: string) => path.startsWith('/trading-accounts/')), false);
+    assert.equal(h.reads.includes('/futures/instruments'), true);
+    assert.deepEqual([...new Set(h.readConfigs.map((read: any) => read.public))], [true]);
+    assert.equal(h.fxReads > 0, true, 'the won figure reads the display rate');
+  });
+
+  it('매수하기/매도하기 open the sign-in sheet; no order screen, position or learning read', async (t) => {
+    guestState.setGuestBrowsing(true);
+    t.after(() => guestState.setGuestBrowsing(false));
+    const h = guestDetail();
+    await h.start(); t.after(h.close);
+    const actions = h.renderer.root.findAll((n: any) => n.type === 'CTAButton').map((n: any) => [n.props.label, n.props.state]);
+    assert.deepEqual(actions, [['매도하기', 'enabled'], ['매수하기', 'enabled']]);
+    for (const id of ['futures-detail-long', 'futures-detail-short']) {
+      await h.press(id);
+      assert.equal(h.text().includes('선물 매수·매도 주문은 로그인한 뒤 나의 가상투자 계정으로 할 수 있습니다.'), true, id);
+    }
+    assert.deepEqual(h.navigation.filter((args: unknown[]) => args[0] === 'Futures'), []);
+    assert.equal(h.reads.some((path: string) => path.includes('positions') || path.includes('quests')), false);
+    assert.deepEqual(h.requests, []);
+  });
+
+  it('a member keeps the account route and its credentials', async (t) => {
+    const h = futuresHarness({ screen: 'detail' });
+    await h.start(); t.after(h.close);
+    assert.equal(h.reads.includes('/trading-accounts/A/futures/instruments'), true);
+    assert.equal(h.reads.includes('/futures/instruments'), false);
+    assert.deepEqual([...new Set(h.readConfigs.map((read: any) => read.public))], [false]);
+  });
+});

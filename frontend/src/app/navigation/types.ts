@@ -39,7 +39,8 @@ export type WalletStackParamList = {
 export type MarketStackParamList = {
   /** `direction`: the new entry the detail's 매수하기 (long) / 매도하기 (short) asked for. */
   Futures: { accountId: string; instrumentId?: string; direction?: 'long' | 'short' };
-  FuturesDetail: { accountId: string; instrumentId: string };
+  /** `accountId`: the member's bound account; guest browsing (no account) omits it. */
+  FuturesDetail: { accountId?: string; instrumentId: string };
   Market: { assetType?: import('../../features/market/api').AssetType } | undefined;
   MarketSearch: { returnToAsset?: boolean; sort?: import('../../features/market/marketSort').MarketSort } | undefined;
   /** `returnTab`: opened from that tab, where back returns (marketTabEntry). */

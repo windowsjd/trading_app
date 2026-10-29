@@ -3,7 +3,7 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
-import { isGuestBrowsing, retryGuestRead } from '../../features/auth/guestBrowsing';
+import { GUEST_CANDLE_REFRESH_MS, GUEST_DETAIL_REFRESH_MS, guestRefetchInterval, isGuestBrowsing, retryGuestRead } from '../../features/auth/guestBrowsing';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
@@ -89,9 +89,10 @@ export function AssetMarketChart({
   React.useEffect(() => { registerQuestGuideReveal('asset', node => revealView(node, 'start')); return () => registerQuestGuideReveal('asset', null); }, [revealView]);
   const isFocused = useIsFocused();
   const isAdmin = useAdminDiagnostics();
-  // Guest browsing: REST detail and candles only; the realtime socket needs a session.
+  // Guest browsing: REST detail and candles only; the realtime socket needs a
+  // session, so while in front they re-read themselves instead.
   const guest = isGuestBrowsing();
-  const guestRead = guest ? { retry: retryGuestRead } : {};
+  const guestRead = (ms: number) => (guest ? { retry: retryGuestRead, refetchInterval: guestRefetchInterval(isFocused, ms) } : {});
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [selectedTimeframe, setSelectedTimeframe] =
     useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
@@ -101,7 +102,7 @@ export function AssetMarketChart({
     queryKey: QUERY_KEYS.asset.detail(assetId),
     queryFn: () => getAssetDetail(assetId),
     enabled: isFocused,
-    ...guestRead,
+    ...guestRead(GUEST_DETAIL_REFRESH_MS),
   });
   // The selected tab's request window depends on the market (KRX session
   // windows, the long-range 4h window); it waits for the asset type instead
@@ -126,7 +127,7 @@ export function AssetMarketChart({
         limit: chartWindow.limit,
       }),
     enabled: isFocused && requestTimeframe !== null,
-    ...guestRead,
+    ...guestRead(GUEST_CANDLE_REFRESH_MS),
   });
   const refresh = usePullToRefresh([
     { ...detailQuery, enabled: isFocused && variant === 'detail' },

@@ -331,10 +331,18 @@ describe('AssetsService', () => {
   ): Record<string, unknown> =>
     expect.objectContaining(value) as Record<string, unknown>;
 
-  it('rejects missing authenticated user', async () => {
-    const { service } = createService();
+  it('rejects missing authenticated user while guest market data is off', async () => {
+    const previous = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'none';
+    try {
+      const { service } = createService();
 
-    await expectApiError(service.getAssets(undefined), 401, 'UNAUTHORIZED');
+      await expectApiError(service.getAssets(undefined), 401, 'UNAUTHORIZED');
+    } finally {
+      if (previous === undefined)
+        delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previous;
+    }
   });
 
   it('exposes provider display decimals on list, detail and ticker payloads', async () => {
@@ -3548,8 +3556,8 @@ describe('AssetsService', () => {
         ][]
       )[call][0].where;
 
-    it('keeps the existing 401 before any read while no type is configured', async () => {
-      guestTypes(undefined);
+    it('keeps the existing 401 before any read while guest market data is off (none)', async () => {
+      guestTypes('none');
       const { prisma, service } = createService();
 
       await expectApiError(
@@ -3607,17 +3615,29 @@ describe('AssetsService', () => {
       expectNoAssetWrites(prisma);
     });
 
-    it('needs no type filter once every type is configured', async () => {
-      guestTypes('domestic_stock,us_stock,crypto');
-      const { prisma, service } = createService();
-      prisma.asset.count.mockResolvedValue(0);
-      prisma.asset.findMany.mockResolvedValue([]);
+    it.each([undefined, '', 'domestic_stock,us_stock,crypto'])(
+      'needs no type filter once every type is served (%j; unset is the default: every market)',
+      async (value) => {
+        guestTypes(value);
+        const { prisma, service } = createService();
+        prisma.asset.count.mockResolvedValue(0);
+        prisma.asset.findMany.mockResolvedValue([]);
 
-      const list = await service.getAssets(undefined, { withPrice: 'false' });
+        const list = await service.getAssets(undefined, {
+          withPrice: 'false',
+          includeInactive: 'true',
+        });
 
-      expect(whereOf(prisma, 0)).not.toHaveProperty('assetType');
-      expect(list.data.filters).not.toHaveProperty('assetTypes');
-    });
+        expect(whereOf(prisma, 0)).not.toHaveProperty('assetType');
+        // Still an anonymous list: active rows only.
+        expect(whereOf(prisma, 0)).toMatchObject({ isActive: true });
+        expect(list.data.filters).not.toHaveProperty('assetTypes');
+        for (const assetType of ['domestic_stock', 'us_stock', 'crypto'])
+          await expect(
+            service.getAssets(undefined, { assetType, withPrice: 'false' }),
+          ).resolves.toMatchObject({ success: true });
+      },
+    );
 
     it('reads a guest-readable detail and refuses any other type after the lookup', async () => {
       guestTypes('crypto');

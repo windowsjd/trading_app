@@ -145,3 +145,62 @@ describe('Futures catalog 24h statistics', () => {
     expect(response.data.instruments[0].marketStats.state).toBe('unavailable');
   });
 });
+
+describe('Futures catalog as market data (guest browsing, 2026-10-30)', () => {
+  const previous = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+  afterEach(() => {
+    if (previous === undefined)
+      delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previous;
+  });
+  const read = () =>
+    Promise.resolve(
+      new Map([['BTCUSDT', stats('BTCUSDT', new Date(+now - 2_000))]]),
+    );
+
+  it('is the account list without its account, capability or position fields', async () => {
+    process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'crypto_futures';
+    const account = await service(read).instruments('user', 'account');
+    const market = service(read);
+    const response = await market.marketInstruments(undefined);
+    expect(Object.keys(response.data).sort()).toEqual([
+      'evaluatedAt',
+      'instruments',
+    ]);
+    // The same contracts, Last/Mark evidence and 24h statistics.
+    expect(response.data).toEqual({
+      evaluatedAt: account.data.evaluatedAt,
+      instruments: account.data.instruments,
+    });
+    // No account was looked up for it.
+    const access = (market as unknown as { access: Record<string, jest.Mock> })
+      .access;
+    expect(access.getOwnedAccountOrThrow).not.toHaveBeenCalled();
+  });
+
+  it('is readable anonymously by default (unset: every market)', async () => {
+    delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    await expect(
+      service(read).marketInstruments(undefined),
+    ).resolves.toMatchObject({ success: true });
+  });
+
+  it.each(['none', 'domestic_stock,us_stock,crypto'])(
+    'refuses an anonymous read without the crypto_futures scope (%j)',
+    async (scope) => {
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = scope;
+      const market = service(read);
+      let status: number | null = null;
+      try {
+        await market.marketInstruments(undefined);
+      } catch (error) {
+        status = (error as { getStatus: () => number }).getStatus();
+      }
+      expect(status).toBe(401);
+      // Signed in, it is the same market data whatever the guest scope.
+      await expect(market.marketInstruments('user')).resolves.toMatchObject({
+        success: true,
+      });
+    },
+  );
+});

@@ -43,6 +43,7 @@ async function searchHarness(t: TestContext) {
     },
   };
   const Screen = h.load('src/screens/market/MarketSearchScreen.tsx', {
+    '@react-navigation/native': { useIsFocused: () => true },
     '@react-navigation/elements': { useHeaderHeight: () => 56 },
     '../../features/market/MarketSortControl': { __esModule: true, default: 'SortControl' },
     '../../features/market/MarketAssetRow': { __esModule: true, default: 'AssetRow' },

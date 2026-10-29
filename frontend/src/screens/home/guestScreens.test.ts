@@ -74,6 +74,7 @@ function guestHome(hot: (params: { assetType: string }) => Promise<unknown>) {
   });
   const Screen = h.load('src/screens/home/GuestHomeScreen.tsx', {
     ...h.common, './HomeAssetHero': hero, './HomeHoldings': holdings, './HomeHotMarket': hotMarket,
+    '@react-navigation/native': { useIsFocused: () => h.focused !== false },
   }).default;
   h.mount(Screen);
   return h;
@@ -143,6 +144,30 @@ describe('guest Home (로그인 없이 둘러보기)', () => {
     assert.equal(notice[0].props.title, '로그인하면 국내주식 거래대금 TOP 5를 확인할 수 있습니다.');
     assert.equal(h.renderer.root.findAll((n: any) => n.type === 'ErrorState').length, 0);
     assert.equal(h.requests.length, 1, 'a refused market is not retried');
+  });
+
+  it('HOT re-reads only while Home is in front (no socket), and a member HOT never polls', async (t) => {
+    const probe = (focused: boolean) => {
+      const h = harness();
+      const options: any[] = [];
+      const { useHomeHotMarket } = h.load('src/screens/home/HomeHotMarket.tsx', {
+        ...h.common,
+        '@tanstack/react-query': { useQuery: (value: unknown) => { options.push(value); return { refetch: async () => ({}) }; } },
+        '../../features/market/api': { getAssets: async () => ({}) },
+      });
+      function Probe() { useHomeHotMarket(focused); return null; }
+      const renderer = h.render(React.createElement(Probe));
+      t.after(() => act(() => renderer.unmount()));
+      return options.at(-1);
+    };
+    assert.equal(probe(true).refetchInterval, undefined, 'members: no polling');
+    guestState.setGuestBrowsing(true);
+    const front = probe(true);
+    assert.equal(front.enabled, true);
+    assert.equal(front.refetchInterval({ state: { error: null } }), guestState.GUEST_LIST_REFRESH_MS);
+    const behind = probe(false);
+    assert.equal(behind.enabled, false, 'Home behind another screen reads nothing');
+    assert.equal(behind.refetchInterval, false);
   });
 });
 

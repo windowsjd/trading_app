@@ -14,7 +14,7 @@ import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
-import { isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../../features/auth/guestBrowsing';
+import { GUEST_LIST_REFRESH_MS, guestRefetchInterval, isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../../features/auth/guestBrowsing';
 
 const CATEGORIES: { key: AssetType; label: string }[] = [
   { key: 'domestic_stock', label: '국내주식' },
@@ -32,8 +32,9 @@ export function useHomeHotMarket(enabled: boolean) {
     queryKey: QUERY_KEYS.market.assetPreview(params),
     queryFn: () => getAssets({ ...params, sortRefresh: refreshingCategory.current === assetType }),
     enabled,
-    // A guest's 401 is "sign in to see this market", not a blip to retry.
-    ...(isGuestBrowsing() ? { retry: retryGuestRead } : {}),
+    // A guest's 401 is "sign in to see this market", not a blip to retry; with
+    // no socket, a guest's shown TOP 5 re-reads itself (`enabled` = in front).
+    ...(isGuestBrowsing() ? { retry: retryGuestRead, refetchInterval: guestRefetchInterval(enabled, GUEST_LIST_REFRESH_MS) } : {}),
   });
   const refetch = async (options?: { cancelRefetch?: boolean }) => {
     refreshingCategory.current = assetType;

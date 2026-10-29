@@ -1,4 +1,5 @@
 import React from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import { Platform, SafeAreaView, ScrollView, StyleSheet, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
@@ -16,13 +17,15 @@ import HomeHotMarket, { useHomeHotMarket } from './HomeHotMarket';
  * Home in guest browsing (「로그인 없이 둘러보기」, 2026-10-30): the general
  * Home's layout, canvas, cards and scroll, with every account-scoped part
  * replaced by what signing in shows there. No account box, no asset trend,
- * no holdings read — the only request is HOT's account-free market list, and
- * no 「비회원으로 둘러보는 중」 banner is added on top.
+ * no holdings read — the only request is HOT's account-free market list
+ * (re-read while in front: no socket), and no 「비회원으로 둘러보는 중」 banner
+ * is added on top.
  */
 export default function GuestHomeScreen(_props: HomeScreenProps) {
   const rootNavigation = useRootNavigation();
   const { mode } = useAppearance();
-  const hot = useHomeHotMarket(true);
+  // HOT reads (and re-reads) only while Home is in front; a return re-reads a stale list.
+  const hot = useHomeHotMarket(useIsFocused());
   const refresh = usePullToRefresh([hot.refreshQuery]);
 
   const openAsset = (assetId: string) =>

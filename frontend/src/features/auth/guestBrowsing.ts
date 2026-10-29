@@ -45,3 +45,24 @@ export function isGuestSignInRequired(error: unknown) {
 export function retryGuestRead(failureCount: number, error: unknown) {
   return failureCount < 1 && !isGuestSignInRequired(error);
 }
+
+/**
+ * A guest has no realtime socket, and a REST price is judged at the moment it
+ * is read: without a re-read an aging price would keep looking current. So a
+ * guest's focused market screen re-reads its REST data on these intervals
+ * (2026-10-30). The server answers from its stored price snapshots and shared
+ * candle caches, so visitors never multiply provider calls.
+ */
+export const GUEST_LIST_REFRESH_MS = 10_000;
+export const GUEST_DETAIL_REFRESH_MS = 5_000;
+export const GUEST_CANDLE_REFRESH_MS = 30_000;
+
+/**
+ * React Query `refetchInterval` for a guest's market read: every `ms` while
+ * its screen is focused, never after a sign-in-required 401 (nothing to
+ * refresh). Members (the socket) are never polled by it.
+ */
+export function guestRefetchInterval(focused: boolean, ms: number): false | ((query: { state: { error: unknown } }) => number | false) {
+  if (!browsing || !focused) return false;
+  return (query: { state: { error: unknown } }) => (isGuestSignInRequired(query.state.error) ? false : ms);
+}

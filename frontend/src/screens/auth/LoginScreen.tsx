@@ -286,21 +286,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  // A secondary button at the login button's width and height (50): the app's
+  // secondary action colors (CTAButton's `secondary`) with a hairline edge, so
+  // it reads as a button — never a link or an input — yet below the
+  // brand-filled 로그인. A minimum, not a fixed height: a large text size wraps
+  // instead of clipping.
   guestButton: {
-    minHeight: 48,
+    minHeight: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: semantic.border,
     borderRadius: 12,
+    backgroundColor: semantic.secondaryActionSurface,
   },
   guestButtonText: {
     textAlign: 'center',
-    color: semantic.secondary,
-    fontSize: 15,
+    flexShrink: 1,
+    color: semantic.secondaryActionForeground,
+    fontSize: 16,
     lineHeight: 22,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
+    fontWeight: '700',
   },
   errorText: {
     color: semantic.error,

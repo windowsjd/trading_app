@@ -10,6 +10,8 @@ import CTAButton from '../../components/common/CTAButton';
 import DisclosureTriangle from '../../components/common/DisclosureTriangle';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import FullPageLoading from '../../components/states/FullPageLoading';
+import GuestSignInSheet from '../../components/guest/GuestSignInSheet';
+import { GuestSignInPanel } from '../../components/guest/GuestSignIn';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import type { FuturesDetailScreenProps } from '../../app/navigation/types';
 import {
@@ -20,8 +22,13 @@ import {
   FUTURES_CHART_REFRESH_MS,
   getFuturesInstrumentCandles,
   getFuturesInstruments,
+  getFuturesMarketInstruments,
   getFuturesPositions,
+  isAccountFuturesInstruments,
+  type FuturesInstruments,
+  type FuturesMarketInstruments,
 } from '../../features/futures/api';
+import { guestRefetchInterval, isGuestBrowsing, isGuestSignInRequired } from '../../features/auth/guestBrowsing';
 import {
   FUTURES_PREVIOUS_DAY_RETRY_MS,
   FUTURES_PREVIOUS_DAY_WINDOW,
@@ -46,7 +53,7 @@ export default function FuturesDetailScreen(props: FuturesDetailScreenProps) {
   // Another contract (the picker) or account recreates the whole view: no
   // price, 봉 시간, currency or chart of the previous contract stays.
   const { accountId, instrumentId } = props.route.params;
-  return <FuturesDetailContent key={`${accountId}:${instrumentId}`} {...props} />;
+  return <FuturesDetailContent key={`${accountId ?? ''}:${instrumentId}`} {...props} />;
 }
 
 /**
@@ -64,14 +71,23 @@ export default function FuturesDetailScreen(props: FuturesDetailScreenProps) {
  * Prices are the contract's own Last (never Mark or a Spot price); the won
  * figure is display only (the contract trades, margins and settles in USD) and
  * appears only with a fresh Last and a current USD/KRW rate.
+ *
+ * Guest browsing (2026-10-30) shows the same market data with no account: the
+ * contract list's market-data route (same Last, polled the same way), the same
+ * chart, 전일대비 and won rate; 매수하기/매도하기 open the sign-in sheet, never
+ * the order screen, a position or a learning gate.
  */
 function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
-  const { accountId, instrumentId } = route.params;
+  const guest = isGuestBrowsing();
+  const { instrumentId } = route.params;
+  const accountId = route.params.accountId ?? '';
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { accounts, selectedAccountId, selectedAccount, isLoading } = useTradingAccount();
   const binding = resolveAccountBinding({ boundAccountId: accountId, selectedAccountId, accounts, accountsLoading: isLoading });
-  const bound = binding.state === 'bound';
+  // What the reads below wait for: the bound account, or nothing for a guest.
+  const bound = guest || binding.state === 'bound';
+  const [signInOpen, setSignInOpen] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<'USD' | 'KRW'>('USD');
   const [timeframe, setTimeframe] = useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -84,19 +100,26 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [focused]);
-  // The picker never stays over another screen.
+  // The picker (and a guest's sign-in sheet) never stays over another screen.
   useEffect(() => {
-    if (!focused) setPickerOpen(false);
+    if (!focused) {
+      setPickerOpen(false);
+      setSignInOpen(false);
+    }
   }, [focused]);
-  // The futures screen's own contract list (same key): its Last, polled while in front.
-  const instruments = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.futures.instruments(accountId),
-    queryFn: ({ signal }) => getFuturesInstruments(accountId, signal),
+  // The futures screen's own contract list (same key): its Last, polled while
+  // in front. A guest reads the same contracts as market data.
+  const instruments = useQuery<FuturesInstruments | FuturesMarketInstruments>({
+    queryKey: guest ? QUERY_KEYS.futuresMarket.instruments() : QUERY_KEYS.tradingAccount.futures.instruments(accountId),
+    queryFn: ({ signal }) => (guest ? getFuturesMarketInstruments(signal) : getFuturesInstruments(accountId, signal)),
     enabled: focused && bound,
     refetchInterval: focused && bound ? 2000 : false,
     retry: false,
+    // A guest: the same poll, which stops after a sign-in 401.
+    ...(guest ? { refetchInterval: guestRefetchInterval(focused, 2000) } : {}),
   });
-  const data = instruments.data?.tradingAccountId === accountId ? instruments.data : undefined;
+  const data = guest || (instruments.data && isAccountFuturesInstruments(instruments.data) && instruments.data.tradingAccountId === accountId)
+    ? instruments.data : undefined;
   // A failed poll keeps the last list (its Last ages out by its own evidence).
   const catalog = data?.instruments ?? [];
   const instrument = catalog.find((item) => item.id === instrumentId);
@@ -135,7 +158,7 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
     enabled: focused && bound && beginner,
     retry: false,
   });
-  if (binding.state === 'loading') return <FullPageLoading message="선물 계정을 확인하고 있습니다." />;
+  if (!guest && binding.state === 'loading') return <FullPageLoading message="선물 계정을 확인하고 있습니다." />;
   if (!bound)
     return (
       <View style={[styles.card, styles.unbound]} testID="futures-detail-unbound">
@@ -160,7 +183,13 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
     last, lastFresh, previousClose: futuresPreviousDayClose(daily.data, instrument, serverNow),
   });
   const name = instrument?.underlying.name ?? '선물 상품';
-  const open = (direction: 'long' | 'short') => navigation.navigate('Futures', { accountId, instrumentId, direction });
+  const open = (direction: 'long' | 'short') => {
+    if (guest) {
+      setSignInOpen(true);
+      return;
+    }
+    navigation.navigate('Futures', { accountId, instrumentId, direction });
+  };
   const tradable = !!instrument;
   const heldPositions = positions.data?.tradingAccountId === accountId ? positions.data.positions : undefined;
   const heldHere = heldPositions?.some((position) => position.instrumentId === instrumentId && Number(position.quantity) > 0);
@@ -224,7 +253,12 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
               {futuresPreviousDayChangeLabel(change)}
             </Text>
           </View>
-          {instruments.isError ? (
+          {/* A guest's 401 is "sign in to see this", never a failure. */}
+          {instruments.isError && isGuestSignInRequired(instruments.error) ? (
+            <View style={styles.notice}>
+              <GuestSignInPanel testID="futures-detail-sign-in" title="로그인하면 선물 시세를 확인할 수 있습니다." />
+            </View>
+          ) : instruments.isError ? (
             <ErrorNotice error={instruments.error} style={styles.notice}
               message="상품 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요." />
           ) : null}
@@ -257,6 +291,10 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
           setPickerOpen(false);
           if (next !== instrumentId) navigation.setParams({ instrumentId: next });
         }} />
+      {guest ? (
+        <GuestSignInSheet testID="futures-sign-in" visible={signInOpen && focused} onClose={() => setSignInOpen(false)}
+          message="선물 매수·매도 주문은 로그인한 뒤 나의 가상투자 계정으로 할 수 있습니다." />
+      ) : null}
     </SafeAreaView>
   );
 }

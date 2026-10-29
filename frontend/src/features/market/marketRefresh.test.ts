@@ -44,6 +44,7 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
       },
     };
     const Screen = h.load(`src/screens/market/${screen}.tsx`, {
+      '@react-navigation/native': { useIsFocused: () => true },
       '@react-navigation/elements': { useHeaderHeight: () => 56 },
       './FuturesMarketList': { FuturesMarketControls: 'FuturesMarketControls', FuturesMarketRows: 'FuturesMarketRows', useFuturesMarket: () => ({}), __esModule: true },
       '../../features/market/MarketSortControl': {
@@ -164,6 +165,7 @@ it('Market consumes repeated Home category intents and preserves subsequent manu
   h.native.FlatList = props => React.createElement('FlatList', props, props.ListHeaderComponent);
   const categories: string[] = [];
   const Screen = h.load('src/screens/market/MarketScreen.tsx', {
+    '@react-navigation/native': { useIsFocused: () => true },
     './FuturesMarketList': { FuturesMarketControls: 'FuturesMarketControls', FuturesMarketRows: 'FuturesMarketRows', useFuturesMarket: () => ({}), __esModule: true },
     '@tanstack/react-query': { useInfiniteQuery: options => {
       categories.push(options.queryKey[2]);

@@ -50,23 +50,28 @@ Historical holdings and financial reads retain their IDs and existing evidence.
 
 ## Guest (signed-out) reads — 2026-10-30
 
-The app's 「로그인 없이 둘러보기」 reads market data without a token. Three
+The app's 「로그인 없이 둘러보기」 reads market data without a token. These
 account-free routes are `@OptionalAuth()`: `GET /api/v1/assets` (list/search),
-`GET /api/v1/assets/:assetId` and `GET /api/v1/assets/:assetId/candles`. A
-request that sends `Authorization` is still verified by the global guard, and
-a signed-in read is unchanged.
+`GET /api/v1/assets/:assetId`, `GET /api/v1/assets/:assetId/candles`, and for
+futures `GET /api/v1/futures/instruments` (the contract list),
+`GET /api/v1/futures/instruments/:instrumentId/candles` and
+`GET /api/v1/fx/rates/current` (the contract's won figure). A request that
+sends `Authorization` is still verified by the global guard, and a signed-in
+read is unchanged.
 
 - `GUEST_MARKET_DATA_ASSET_TYPES` (comma-separated `domestic_stock`,
-  `us_stock`, `crypto`) is the whole anonymous scope. Unset/empty — the
-  default — keeps every anonymous read at the existing `401 UNAUTHORIZED`
-  before query validation and any database read (`GuestMarketDataGuard` runs
-  after the global guard, before pipes). An unknown or repeated value refuses
-  to boot.
-- Enable a type only after confirming that its provider contract allows
-  display to unauthenticated users: KOSCOM (domestic stocks), Tiingo/KIS (US
-  stocks), Binance (crypto), and the USD/KRW sources behind KRW conversions.
-  Rights were not confirmed when this shipped, so production stays empty
-  until the operator decides.
+  `us_stock`, `crypto`, `crypto_futures`, or `none`) is the whole anonymous
+  scope. Unset/empty — the default — is every market: the operator confirmed
+  on 2026-10-30 that the providers (KOSCOM for domestic stocks, Tiingo/KIS for
+  US stocks, Binance Spot and USDⓈ-M, and the USD/KRW sources Korea EXIM and
+  ExchangeRate-API behind won figures) allow display to signed-out visitors.
+  A list narrows it; `none` turns guest market data off, so every anonymous
+  read is the existing `401 UNAUTHORIZED` before query validation and any
+  database read (`GuestMarketDataGuard` / `GuestFuturesMarketDataGuard` run
+  after the global guard, before pipes). The three asset types open the spot
+  reads only; `crypto_futures` opens the three futures reads only (spot
+  `crypto` never opens futures, nor the reverse). An unknown or repeated value,
+  or `none` with others, refuses to boot.
 - Anonymous list: an explicit `assetType` outside the scope is `401
   UNAUTHORIZED`; an all-type list/search reads only the scope (reported as
   `filters.assetTypes`, which also keys the sort snapshot apart from signed-in
@@ -76,10 +81,20 @@ a signed-in read is unchanged.
 - Anonymous detail/candles: `404 ASSET_NOT_FOUND` as before, then `401
   UNAUTHORIZED` for an asset outside the scope, before any candle or provider
   read.
+- Anonymous futures list: `{ evaluatedAt, instruments }` — the account route's
+  instrument projection (Futures Last, Mark, their evidence, 24h
+  `marketStats`), without `tradingAccountId` or `capabilities`. Contract
+  candles are the same response a member reads. The USD/KRW read never
+  refreshes the provider for an anonymous caller.
 - Not guest-readable: `GET /assets/:assetId/price`, `/api/v1/ws` (tickers,
-  candles, order books), futures instrument candles and every account,
-  portfolio, wallet, order, position, FX, futures, record and ranking route.
+  candles, order books) and every account, portfolio, wallet, order, position,
+  account-scoped futures (`/trading-accounts/:accountId/futures/*`), FX
+  quote/execute/exchanges, record and ranking route.
   `src/auth/route-access.spec.ts` pins the full set of tokenless routes.
+- Without the socket the app re-reads these routes while a screen is in front
+  (lists 10 s, detail 5 s, spot charts 30 s, futures at the member intervals);
+  every read is served from the server's stored snapshots and shared candle
+  caches, never a per-visitor provider call.
 - Admin diagnostics stay role-gated (`request.user.role === 'admin'`), so an
   anonymous response never carries them.
 

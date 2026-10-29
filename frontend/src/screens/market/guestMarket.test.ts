@@ -28,6 +28,7 @@ describe('Market list in guest browsing', () => {
     h.futures = [];
     h.queries = [];
     const Screen = h.load('src/screens/market/MarketScreen.tsx', {
+      '@react-navigation/native': { useIsFocused: () => true },
       ...signInMocks,
       './FuturesMarketList': {
         FuturesMarketControls: 'FuturesMarketControls', FuturesMarketRows: 'FuturesMarketRows', __esModule: true,
@@ -49,8 +50,9 @@ describe('Market list in guest browsing', () => {
       '../../constants/env': { buildWsUrl: () => 'ws://fixture/api/v1/ws' },
       ...Object.fromEntries(['ErrorState', 'EmptyState', 'AdminDiagnosticPanel'].map((name) => ['../../components/states/' + name, { default: name, __esModule: true }])),
     }).default;
-    const navigation = { navigate() {}, setParams() {} };
-    h.renderer = h.render(React.createElement(Screen, { navigation, route: { params: {} } }));
+    const navigation: any = { navigate() {}, setParams() {} };
+    h.navigation = navigation;
+    h.renderer = h.render(React.createElement(Screen, { navigation: { navigate: (...args: unknown[]) => navigation.navigate(...args), setParams: () => {} }, route: { params: {} } }));
     h.all = (type: string) => h.renderer.root.findAll((n: any) => n.type === type);
     h.tab = (id: string) => act(() => h.renderer.root.findAll((n: any) => n.type === 'Pressable' && n.props.testID === id)[0].props.onPress());
     return h;
@@ -69,17 +71,31 @@ describe('Market list in guest browsing', () => {
     assert.equal(h.queries.at(-1).retry(0, unauthorized()), false);
   });
 
-  it("선물 needs an account: a sign-in panel replaces the account's contract list", (t) => {
+  it("선물 is the contracts' market data for a guest: the list, its controls, and a detail without an account", (t) => {
     guestState.setGuestBrowsing(true);
     const h = marketHarness({ data: { pages: [{ assets: [] }] } });
+    const navigated: unknown[][] = [];
     t.after(() => act(() => h.renderer.unmount()));
     h.tab('market-tab-crypto');
     h.tab('crypto-product-futures');
-    assert.equal(h.all('FuturesMarketRows').length, 0);
-    assert.equal(h.all('FuturesMarketControls').length, 0);
-    const panel = h.renderer.root.findAll((n: any) => n.type === 'GuestSignInPanel' && n.props.testID === 'market-futures-sign-in');
-    assert.equal(panel.length, 1);
-    assert.equal(h.futures.at(-1).active, false, 'no contract list is read');
+    assert.equal(h.all('FuturesMarketRows').length, 1);
+    assert.equal(h.all('FuturesMarketControls').length, 1);
+    assert.equal(h.futures.at(-1).active, true, 'the contract list is read');
+    // A row opens the contract's detail with no account to bind.
+    h.navigation.navigate = (...args: unknown[]) => navigated.push(args);
+    h.futures.at(-1).onSelect(null, 'fut-btc');
+    assert.deepEqual(navigated, [['FuturesDetail', { instrumentId: 'fut-btc' }]]);
+  });
+
+  it('a guest list re-reads itself only while in front, and stops after a sign-in 401', (t) => {
+    guestState.setGuestBrowsing(true);
+    const h = marketHarness({ data: { pages: [{ assets: [] }] } });
+    t.after(() => act(() => h.renderer.unmount()));
+    const options = h.queries.at(-1);
+    assert.equal(options.enabled, true);
+    assert.equal(typeof options.refetchInterval, 'function');
+    assert.equal(options.refetchInterval({ state: { error: null } }), guestState.GUEST_LIST_REFRESH_MS);
+    assert.equal(options.refetchInterval({ state: { error: unauthorized() } }), false, 'nothing to refresh');
   });
 
   it("members keep the error state, the socket and the account's futures list", (t) => {
@@ -88,10 +104,92 @@ describe('Market list in guest browsing', () => {
     assert.equal(h.all('ErrorState').length, 1);
     assert.equal(h.all('GuestSignInPanel').length, 0);
     assert.equal(h.queries.at(-1).retry, undefined, 'the default retry policy is untouched');
+    assert.equal(h.queries.at(-1).refetchInterval, undefined, 'a member is never polled (the socket)');
     h.tab('market-tab-crypto');
     h.tab('crypto-product-futures');
     assert.equal(h.all('FuturesMarketRows').length, 1);
     assert.equal(h.futures.at(-1).active, true);
+  });
+});
+
+describe('Futures market list in guest browsing', () => {
+  const instrument = (id: string, symbol: string, quoteVolume: string) => ({
+    id, isActive: true, productType: 'synthetic_perpetual', settlementCurrency: 'USD',
+    underlying: { assetId: `asset-${id}`, symbol, name: symbol, market: 'BINANCE', displayPriceDecimals: 2 },
+    referencePrice: '100.00000000', referencePriceEvidence: { effectiveAt: new Date().toISOString(), capturedAt: new Date().toISOString() },
+    markPrice: '100.00000000', markState: 'fresh',
+    marketStats: { state: 'available', priceChangePercent: '1.5', quoteVolume, windowOpenTime: 'x', windowCloseTime: 'y', receivedAt: 'z' },
+  });
+
+  function futuresHarness(market: () => Promise<unknown>) {
+    const h: any = interactionHarness();
+    h.native.TextInput = 'TextInput';
+    h.reads = [] as string[];
+    h.selected = [] as unknown[][];
+    const module = h.load('src/screens/market/FuturesMarketList.tsx', {
+      ...signInMocks,
+      '@react-navigation/native': { useIsFocused: () => true },
+      '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccountId: null }) },
+      '../../features/futures/api': {
+        getFuturesInstruments: async () => { h.reads.push('account'); throw new Error('account read'); },
+        getFuturesMarketInstruments: async () => { h.reads.push('market'); return market(); },
+        isAccountFuturesInstruments: (read: object) => 'tradingAccountId' in read,
+      },
+      '../../features/market/MarketSortControl': { default: 'SortControl', __esModule: true },
+      '../../features/market/MarketAssetRow': { default: 'AssetRow', __esModule: true },
+      '../../components/states/ErrorState': { default: 'ErrorState', __esModule: true },
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // The list's query options, as passed (its poll).
+    const observe = client.getQueryCache().subscribe((event: any) => { if (event?.query?.options) h.options = event.query.options; });
+    function Probe() {
+      const market = module.useFuturesMarket({ active: true, sort: 'turnover_desc', onSelect: (...args: unknown[]) => h.selected.push(args) });
+      h.market = market;
+      return React.createElement(React.Fragment, null,
+        React.createElement(module.FuturesMarketControls, { market, sort: 'turnover_desc', onSortChange() {} }),
+        React.createElement(module.FuturesMarketRows, { market }));
+    }
+    h.renderer = h.render(React.createElement(QueryClientProvider, { client }, React.createElement(Probe)));
+    h.close = () => { observe(); act(() => h.renderer.unmount()); client.clear(); };
+    h.all = (type: string) => h.renderer.root.findAll((n: any) => n.type === type);
+    return h;
+  }
+
+  it('lists the contracts from the market-data route with no account, and opens one without an account', async (t) => {
+    guestState.setGuestBrowsing(true);
+    const h = futuresHarness(async () => ({ evaluatedAt: new Date().toISOString(), clientRequestedAt: Date.now(),
+      instruments: [instrument('fut-eth', 'ETHUSDT', '200'), instrument('fut-btc', 'BTCUSDT', '900')] }));
+    t.after(h.close);
+    await flush();
+    assert.deepEqual(h.reads, ['market'], 'never the account route');
+    assert.equal(h.market.state, 'ready');
+    assert.deepEqual(h.all('AssetRow').map((row: any) => row.props.testID), ['futures-market-fut-btc', 'futures-market-fut-eth']);
+    // No capabilities in market data: no trading-restriction notice.
+    assert.equal(JSON.stringify(h.renderer.toJSON()).includes('신규 선물 거래가 제한'), false);
+    act(() => h.market.press('fut-btc'));
+    assert.deepEqual(h.selected, [[null, 'fut-btc']]);
+  });
+
+  it('a 401 is a sign-in panel; any other failure stays the error state', async (t) => {
+    guestState.setGuestBrowsing(true);
+    const refused = futuresHarness(async () => { throw unauthorized(); });
+    t.after(refused.close);
+    await flush();
+    assert.equal(refused.market.state, 'signIn');
+    assert.equal(refused.all('GuestSignInPanel').length, 1);
+    assert.equal(refused.all('ErrorState').length, 0);
+
+    assert.deepEqual(refused.reads, ['market'], 'a 401 is final: no retry');
+    assert.equal(refused.options.refetchInterval({ state: { error: unauthorized() } }), false, 'and no more polling');
+
+    const failed = futuresHarness(async () => { throw Object.assign(new Error('503'), { isAxiosError: true, response: { status: 503 } }); });
+    t.after(failed.close);
+    // One retry for a blip (React Query's 1 s delay), then the error state.
+    await act(async () => { await new Promise((done) => setTimeout(done, 1300)); });
+    assert.deepEqual(failed.reads, ['market', 'market']);
+    assert.equal(failed.market.state, 'error');
+    assert.equal(failed.all('ErrorState').length, 1);
+    assert.equal(failed.all('GuestSignInPanel').length, 0);
   });
 });
 
@@ -104,6 +202,7 @@ describe('Market search in guest browsing', () => {
     h.native.FlatList = (props: any) => React.createElement('FlatList', {}, props.ListHeaderComponent, props.ListEmptyComponent);
     h.tickers = [];
     const Screen = h.load('src/screens/market/MarketSearchScreen.tsx', {
+      '@react-navigation/native': { useIsFocused: () => true },
       ...signInMocks,
       '@react-navigation/elements': { useHeaderHeight: () => 56 },
       '../../features/market/useMarketAssetSearch': {

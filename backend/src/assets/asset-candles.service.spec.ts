@@ -425,14 +425,22 @@ describe('AssetCandlesService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   };
 
-  it('rejects missing authenticated user', async () => {
-    const { service } = createService();
+  it('rejects missing authenticated user while guest market data is off', async () => {
+    const previous = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'none';
+    try {
+      const { service } = createService();
 
-    await expectApiError(
-      service.getAssetCandles(undefined, 'asset-samsung'),
-      401,
-      'UNAUTHORIZED',
-    );
+      await expectApiError(
+        service.getAssetCandles(undefined, 'asset-samsung'),
+        401,
+        'UNAUTHORIZED',
+      );
+    } finally {
+      if (previous === undefined)
+        delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previous;
+    }
   });
 
   describe('guest market data: signed-out candles (2026-10-30)', () => {
@@ -443,8 +451,8 @@ describe('AssetCandlesService', () => {
       else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previousGuestTypes;
     });
 
-    it('keeps the existing 401 before any read while no type is configured', async () => {
-      delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    it('keeps the existing 401 before any read while guest market data is off (none)', async () => {
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'none';
       const { prisma, serving, service } = createService();
 
       await expectApiError(
@@ -495,6 +503,26 @@ describe('AssetCandlesService', () => {
         service.getAssetCandles(undefined, 'asset-btc'),
       ).resolves.toBe(served);
       expect(serving.serve).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves every market by default (unset)', async () => {
+      delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      const { prisma, serving, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: 'asset-samsung',
+          symbol: '005930',
+          name: 'Samsung Electronics',
+          market: 'KRX',
+          assetType: AssetType.domestic_stock,
+          currencyCode: CurrencyCode.KRW,
+        }),
+      );
+      const served = { success: true, data: { candles: [] } };
+      serving.serve.mockResolvedValueOnce(served as never);
+      await expect(
+        service.getAssetCandles(undefined, 'asset-samsung'),
+      ).resolves.toBe(served);
     });
   });
 

@@ -91,6 +91,15 @@ Return the current USD/KRW rate without changing wallets, quotes, or exchange ro
 
 Only `USD/KRW` is supported. Other pairs return `UNSUPPORTED_FX_PAIR`.
 
+Guest browsing (2026-10-30): with `crypto_futures` in the guest scope
+(`GUEST_MARKET_DATA_ASSET_TYPES`, every market by default) this read also
+answers without a token (the won figure of a futures contract; see
+[assets-api-contract](assets-api-contract.md) 「Guest (signed-out) reads」).
+Without that scope (`none`, or a list without it) an anonymous read is the
+existing `401 UNAUTHORIZED` before query validation. An anonymous read is validated the same way but always reads
+DB rows only, as if `refresh=false`: it never starts a provider refresh. Quote,
+execute and exchange history stay signed-in only.
+
 When `refresh=true` or `refresh=1`, the backend may refresh Korea EXIM exchange data only when both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`. If either flag is disabled or the provider refresh fails with a provider config/HTTP error, the endpoint still attempts existing DB snapshot fallback and returns `FX_RATE_UNAVAILABLE` only when no usable DB row exists. When `refresh=false`, `refresh=0`, or the query is omitted, it reads DB rows only and does not call external provider APIs. Invalid refresh values return `INVALID_REFRESH`.
 
 Current-rate DB selection order:

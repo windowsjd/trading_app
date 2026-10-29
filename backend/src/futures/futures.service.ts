@@ -48,6 +48,7 @@ import {
 } from './futures-input';
 import { assertFuturesOperation, futuresTradingMode } from './futures.config';
 import { verifiedFuturesInstrument } from './futures-instrument-coverage';
+import { isGuestFuturesMarketDataEnabled } from '../assets/guest-market-data.config';
 import { pinFuturesExecutionFxEvidence } from './futures-fx-evidence';
 import { settleFuturesCash } from './futures-settlement';
 import { FuturesPerformanceService } from './futures-performance.service';
@@ -789,6 +790,37 @@ export class FuturesService {
     requireUser(userId);
     const account = await this.access.getOwnedAccountOrThrow(userId, accountId);
     const now = await this.dbNow(this.prisma);
+    return {
+      success: true,
+      data: {
+        tradingAccountId: accountId,
+        capabilities: futuresCapabilities(account, now),
+        evaluatedAt: now.toISOString(),
+        instruments: await this.marketInstrumentRows(now),
+      },
+    };
+  }
+
+  /**
+   * The contract list as market data (guest browsing, 2026-10-30): the same
+   * verified instruments, Futures Last/Mark evidence and 24h statistics as
+   * the account route, without its account, capability or position fields.
+   * Anonymous only with the `crypto_futures` guest scope.
+   */
+  async marketInstruments(userId: string | undefined) {
+    if (!userId && !isGuestFuturesMarketDataEnabled())
+      futuresError('UNAUTHORIZED', 'Unauthorized', HttpStatus.UNAUTHORIZED);
+    const now = await this.dbNow(this.prisma);
+    return {
+      success: true,
+      data: {
+        evaluatedAt: now.toISOString(),
+        instruments: await this.marketInstrumentRows(now),
+      },
+    };
+  }
+
+  private async marketInstrumentRows(now: Date) {
     const rows = await this.prisma.futuresInstrument.findMany({
       where: {
         isActive: true,
@@ -807,44 +839,33 @@ export class FuturesService {
       this.marketStats?.read() ??
         Promise.resolve(new Map<string, FuturesMarketStats>()),
     ]);
-    return {
-      success: true,
-      data: {
-        tradingAccountId: accountId,
-        capabilities: futuresCapabilities(account, now),
-        evaluatedAt: now.toISOString(),
-        instruments: verified.map((row) => {
-          const { mark, last: price } = references.get(row.id)!;
-          return {
-            ...presentFuturesInstrument(row),
-            // Rolling 24h ticker of this USDⓈ-M contract (never Spot, never
-            // derived from Mark or Last).
-            marketStats: presentFuturesMarketStats(
-              currentFuturesMarketStats(
-                stats.get(row.underlyingAsset.symbol),
-                now,
-              ),
-            ),
-            markPrice: mark?.price.toFixed(8) ?? null,
-            referencePrice: price?.price.toFixed(8) ?? null,
-            markState: mark ? 'fresh' : 'unavailable_or_stale',
-            markCapturedAt: mark?.capturedAt.toISOString() ?? null,
-            markEvidence: mark
-              ? {
-                  snapshotId: mark.id,
-                  source: mark.source,
-                  effectiveAt: mark.effectiveAt.toISOString(),
-                  capturedAt: mark.capturedAt.toISOString(),
-                }
-              : null,
-            referencePriceEvidence: price
-              ? presentFuturesLastEvidence(price)
-              : null,
-            coverageVerifiedAt: row.markVerifiedAt!.toISOString(),
-          };
-        }),
-      },
-    };
+    return verified.map((row) => {
+      const { mark, last: price } = references.get(row.id)!;
+      return {
+        ...presentFuturesInstrument(row),
+        // Rolling 24h ticker of this USDⓈ-M contract (never Spot, never
+        // derived from Mark or Last).
+        marketStats: presentFuturesMarketStats(
+          currentFuturesMarketStats(stats.get(row.underlyingAsset.symbol), now),
+        ),
+        markPrice: mark?.price.toFixed(8) ?? null,
+        referencePrice: price?.price.toFixed(8) ?? null,
+        markState: mark ? 'fresh' : 'unavailable_or_stale',
+        markCapturedAt: mark?.capturedAt.toISOString() ?? null,
+        markEvidence: mark
+          ? {
+              snapshotId: mark.id,
+              source: mark.source,
+              effectiveAt: mark.effectiveAt.toISOString(),
+              capturedAt: mark.capturedAt.toISOString(),
+            }
+          : null,
+        referencePriceEvidence: price
+          ? presentFuturesLastEvidence(price)
+          : null,
+        coverageVerifiedAt: row.markVerifiedAt!.toISOString(),
+      };
+    });
   }
 
   async positions(userId: string | undefined, accountId: string) {

@@ -211,11 +211,71 @@ describe('FuturesCandlesService', () => {
         ),
       ).toBe('400:FUTURES_CANDLES_INVALID_QUERY');
     }
-    expect(
-      await errorCode(
-        create([]).service.getInstrumentCandles(undefined, 'fut-btc', {}, now),
-      ),
-    ).toBe('401:UNAUTHORIZED');
+  });
+
+  it('serves an anonymous (guest) read only with the crypto_futures scope', async () => {
+    const previous = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    try {
+      // Guest market data off: the existing 401 before any read.
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'none';
+      expect(
+        await errorCode(
+          create([]).service.getInstrumentCandles(
+            undefined,
+            'fut-btc',
+            {},
+            now,
+          ),
+        ),
+      ).toBe('401:UNAUTHORIZED');
+      // The default (unset) is every market, futures included.
+      delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      expect(
+        (
+          await create([
+            stored(currentStart - H4, true),
+          ]).service.getInstrumentCandles(undefined, 'fut-btc', {}, now)
+        ).data.candles.length,
+      ).toBe(1);
+      // Spot crypto alone never opens the contract chart.
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES =
+        'domestic_stock,us_stock,crypto';
+      const closed = create([stored(currentStart - H4, true)]);
+      expect(
+        await errorCode(
+          closed.service.getInstrumentCandles(undefined, 'fut-btc', {}, now),
+        ),
+      ).toBe('401:UNAUTHORIZED');
+      expect(closed.prisma.futuresInstrument.findUnique).not.toHaveBeenCalled();
+
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'crypto_futures';
+      const open = create([stored(currentStart - H4, true)]);
+      const anonymous = await open.service.getInstrumentCandles(
+        undefined,
+        'fut-btc',
+        {},
+        now,
+      );
+      const member = await create([
+        stored(currentStart - H4, true),
+      ]).service.getInstrumentCandles('user-1', 'fut-btc', {}, now);
+      // The same market data a signed-in member reads, validated the same way.
+      expect(anonymous).toEqual(member);
+      expect(
+        await errorCode(
+          open.service.getInstrumentCandles(
+            undefined,
+            'fut-btc',
+            { limit: '0' },
+            now,
+          ),
+        ),
+      ).toBe('400:FUTURES_CANDLES_INVALID_QUERY');
+    } finally {
+      if (previous === undefined)
+        delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previous;
+    }
   });
 
   describe('on-demand timeframes (5m/15m/30m/1h/1d)', () => {

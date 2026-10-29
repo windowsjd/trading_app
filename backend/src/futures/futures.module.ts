@@ -10,6 +10,7 @@ import { Module } from '@nestjs/common';
 import { TradingAccountsModule } from '../trading-accounts/trading-accounts.module';
 import { GeneralPerformanceModule } from '../portfolio/general-performance.module';
 import { FuturesController } from './futures.controller';
+import { FuturesMarketController } from './futures-market.controller';
 import { FuturesService } from './futures.service';
 import { FuturesPerformanceService } from './futures-performance.service';
 import { FuturesMarkRetentionService } from './futures-mark-retention.service';
@@ -35,6 +36,7 @@ import { FuturesTpSlWorker } from './futures-tp-sl-worker.service';
   ],
   controllers: [
     FuturesController,
+    FuturesMarketController,
     FuturesLimitController,
     FuturesConditionalEntryController,
     FuturesTpSlController,

@@ -5,7 +5,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { findKrStocksByKoreanName } from '../../utils/krStockKoreanNames';
 import { findUsStocksByKoreanName } from '../../utils/usStockKoreanNames';
 import { getAssets, type AssetType, type MarketAssetItemDto } from './api';
-import { isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../auth/guestBrowsing.ts';
+import { GUEST_LIST_REFRESH_MS, isGuestBrowsing, isGuestSignInRequired, retryGuestRead } from '../auth/guestBrowsing.ts';
 import { prependKoreanNameMatches, type ListedStocks } from './koreanNameSearch';
 import { marketSortParams, nextMarketPage, type MarketPageParam, type MarketSort } from './marketSort';
 
@@ -52,11 +52,13 @@ async function fetchListedStocks(assetType: NamedStockType, sort: ReturnType<typ
  * only English names and symbols, so they are taken from the whole US/KRX list
  * by market and symbol (koreanNameSearch).
  */
-export function useMarketAssetSearch({ scope, searchText, sort, enabled }: {
+export function useMarketAssetSearch({ scope, searchText, sort, enabled, refetchInterval }: {
   scope: MarketSearchScope;
   searchText: string;
   sort: MarketSort;
   enabled: boolean;
+  /** Guest browsing's re-read of the focused search (no realtime socket). */
+  refetchInterval?: false | ((query: { state: { error: unknown } }) => number | false);
 }) {
   const queryClient = useQueryClient();
   const sortParams = marketSortParams(sort);
@@ -101,8 +103,9 @@ export function useMarketAssetSearch({ scope, searchText, sort, enabled }: {
           if (isGuestSignInRequired(error)) return { assets: [], priceErrors: [] };
           throw error;
         }),
-        // A pull to refresh reloads it with the rows.
-        staleTime: sortRefresh ? 0 : KOREAN_NAME_INDEX_STALE_MS,
+        // A pull to refresh reloads it with the rows, and so does a guest's
+        // re-read (its prices have no socket either).
+        staleTime: sortRefresh ? 0 : isGuestBrowsing() ? GUEST_LIST_REFRESH_MS : KOREAN_NAME_INDEX_STALE_MS,
       })));
       const listed: ListedStocks = { assets: lists.flatMap((list) => list.assets), priceErrors: lists.flatMap((list) => list.priceErrors) };
       return prependKoreanNameMatches(page, listed, koreanMatches);
@@ -111,6 +114,7 @@ export function useMarketAssetSearch({ scope, searchText, sort, enabled }: {
     initialPageParam: { offset: 0 },
     enabled,
     ...(isGuestBrowsing() ? { retry: retryGuestRead } : {}),
+    ...(refetchInterval ? { refetchInterval } : {}),
   });
 
   const items = useMemo(() => {

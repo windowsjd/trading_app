@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable, Optional } from '@nestjs/common';
 import { createApiError } from '../common/api-error';
+import { isGuestFuturesMarketDataEnabled } from './guest-market-data.config';
 import type { FuturesMarketCandle } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -139,7 +140,8 @@ export class FuturesCandlesService {
     query: FuturesCandlesQuery = {},
     now: Date = new Date(),
   ): Promise<FuturesCandlesResponse> {
-    if (!userId) {
+    // Anonymous (guest browsing) only with the crypto_futures guest scope.
+    if (!userId && !isGuestFuturesMarketDataEnabled()) {
       throw createApiError(
         'UNAUTHORIZED',
         'Unauthorized',

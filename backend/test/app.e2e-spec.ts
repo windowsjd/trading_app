@@ -219,6 +219,7 @@ import { TradingAccountWalletFxTransferService } from '../src/wallets/trading-ac
 import { emptyProtectionState } from './support/empty-protection-state';
 import { ConditionalService } from '../src/conditional/conditional.service';
 import { FuturesService } from '../src/futures/futures.service';
+import { FxService } from '../src/fx/fx.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 import { adminDiagnosticRequestMiddleware } from './../src/common/admin-diagnostics';
 import * as argon2 from 'argon2';
@@ -230,6 +231,7 @@ type HttpMethod = 'get' | 'patch' | 'post';
 
 type PrismaMock = ReturnType<typeof emptyProtectionState> & {
   futuresLimitOrder: { findMany: jest.Mock; count: jest.Mock };
+  futuresInstrument: { findMany: jest.Mock };
   $connect: jest.Mock;
   $disconnect: jest.Mock;
   $queryRaw: jest.Mock;
@@ -538,6 +540,7 @@ describe('AppController (e2e)', () => {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
+      futuresInstrument: { findMany: jest.fn() },
       $connect: jest.fn(),
       $disconnect: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([{ result: 1 }]),
@@ -4309,7 +4312,8 @@ describe('AppController (e2e)', () => {
       '/api/v1/ranking/qualification',
     ],
     ['GET /api/v1/wallets', 'get', '/api/v1/wallets'],
-    ['GET /api/v1/assets', 'get', '/api/v1/assets'],
+    // GET /api/v1/assets is guest market data (public by default since
+    // 2026-10-30): its tokenless cases are in 「guest market data」 below.
     ['GET /api/v1/positions', 'get', '/api/v1/positions'],
     ['GET /api/v1/records', 'get', '/api/v1/records'],
     ['GET /api/v1/records/me/seasons', 'get', '/api/v1/records/me/seasons'],
@@ -5403,7 +5407,14 @@ describe('AppController (e2e)', () => {
       expect(again.body.data.priceErrors[0].diagnostic.requestId).toBe(
         'admin-next',
       );
-      await request(app.getHttpServer()).get(path).expect(401);
+      // An anonymous read (guest market data, public by default since
+      // 2026-10-30) gets market rows, never an admin's diagnostics.
+      const anonymous = await request(app.getHttpServer())
+        .get(path)
+        .expect(200);
+      expect(JSON.stringify(anonymous.body).includes('"diagnostic"')).toBe(
+        false,
+      );
       await request(app.getHttpServer())
         .get(path + `&market=NAS&sortSnapshot=${admin.body.data.sortSnapshot}`)
         .set('Authorization', `Bearer ${await createValidAccessToken()}`)
@@ -5546,11 +5557,19 @@ describe('AppController (e2e)', () => {
       },
     );
 
-    it('keeps authentication ahead of malformed-query validation', async () => {
-      await request(app.getHttpServer())
-        .get('/api/v1/assets?limit=20&limit=30')
-        .expect(401)
-        .expect(({ body }) => expect(body.error.code).toBe('UNAUTHORIZED'));
+    it('keeps authentication ahead of malformed-query validation while guest market data is off', async () => {
+      const previous = process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'none';
+      try {
+        await request(app.getHttpServer())
+          .get('/api/v1/assets?limit=20&limit=30')
+          .expect(401)
+          .expect(({ body }) => expect(body.error.code).toBe('UNAUTHORIZED'));
+      } finally {
+        if (previous === undefined)
+          delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+        else process.env.GUEST_MARKET_DATA_ASSET_TYPES = previous;
+      }
     });
   });
 
@@ -5567,9 +5586,9 @@ describe('AppController (e2e)', () => {
       '/api/v1/assets/asset-btc',
       '/api/v1/assets/asset-btc/candles?range=1d',
     ])(
-      'keeps %s signed-in only while no guest type is configured',
+      'keeps %s signed-in only while guest market data is off (none)',
       async (path) => {
-        delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+        process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'none';
         await expectUnauthorizedWithoutToken('get', path);
         expect(prisma.asset.count).not.toHaveBeenCalled();
         expect(prisma.asset.findMany).not.toHaveBeenCalled();
@@ -5577,8 +5596,8 @@ describe('AppController (e2e)', () => {
       },
     );
 
-    it('keeps authentication ahead of query validation until a guest type is configured', async () => {
-      delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+    it('keeps authentication ahead of query validation while guest market data is off', async () => {
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'none';
       await expectUnauthorizedWithoutToken(
         'get',
         '/api/v1/assets?limit=20&limit=30',
@@ -5590,6 +5609,50 @@ describe('AppController (e2e)', () => {
         .get('/api/v1/assets?limit=20&limit=30')
         .expect(400);
       expect(prisma.asset.findMany).not.toHaveBeenCalled();
+    });
+
+    it('serves every market without a token by default (unset), and never reads an identity', async () => {
+      delete process.env.GUEST_MARKET_DATA_ASSET_TYPES;
+      resetPrismaMocks();
+      prisma.asset.count.mockResolvedValue(0);
+      prisma.asset.findMany.mockResolvedValue([]);
+      const all = await request(app.getHttpServer())
+        .get('/api/v1/assets?withPrice=false')
+        // A bare x-user-id never identifies anyone: still the anonymous scope.
+        .set('x-user-id', user.id)
+        .expect(200);
+      expect(all.body as unknown).toMatchObject({
+        data: { filters: { assetType: null } },
+      });
+      const [[read]] = prisma.asset.findMany.mock.calls as [
+        [{ where: Record<string, unknown> }],
+      ];
+      expect(read.where).toMatchObject({ isActive: true });
+      expect(read.where).not.toHaveProperty('assetType');
+      for (const assetType of ['domestic_stock', 'us_stock', 'crypto'])
+        await request(app.getHttpServer())
+          .get(`/api/v1/assets?assetType=${assetType}&withPrice=false`)
+          .expect(200);
+
+      const evaluatedAt = new Date('2026-10-30T01:00:00.000Z');
+      prisma.$queryRaw.mockResolvedValueOnce([{ now: evaluatedAt }]);
+      prisma.futuresInstrument.findMany.mockResolvedValue([]);
+      await request(app.getHttpServer())
+        .get('/api/v1/futures/instruments')
+        .expect(200)
+        .expect(({ body }) =>
+          expect(body).toEqual({
+            success: true,
+            data: { evaluatedAt: evaluatedAt.toISOString(), instruments: [] },
+          }),
+        );
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      // A sent token is still verified.
+      await expectUnauthorizedWithAuthorization(
+        'get',
+        '/api/v1/assets?withPrice=false',
+        'Bearer invalid-token',
+      );
     });
 
     it('serves a configured type without a token and nothing else', async () => {
@@ -5624,6 +5687,85 @@ describe('AppController (e2e)', () => {
     });
 
     it.each([
+      '/api/v1/futures/instruments',
+      '/api/v1/futures/instruments/instrument-1/candles',
+      '/api/v1/fx/rates/current?baseCurrency=USD&quoteCurrency=KRW&refresh=false',
+    ])(
+      'keeps %s signed-in only without the crypto_futures scope',
+      async (path) => {
+        for (const scope of ['none', 'domestic_stock,us_stock,crypto']) {
+          process.env.GUEST_MARKET_DATA_ASSET_TYPES = scope;
+          await expectUnauthorizedWithoutToken('get', path);
+          expect(prisma.futuresInstrument.findMany).not.toHaveBeenCalled();
+        }
+      },
+    );
+
+    it('serves the futures contract list without a token under crypto_futures, with no account field', async () => {
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'crypto_futures';
+      resetPrismaMocks();
+      const evaluatedAt = new Date('2026-10-30T01:00:00.000Z');
+      prisma.$queryRaw.mockResolvedValueOnce([{ now: evaluatedAt }]);
+      prisma.futuresInstrument.findMany.mockResolvedValue([]);
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/futures/instruments')
+        .expect(200);
+      expect(response.body).toEqual({
+        success: true,
+        data: { evaluatedAt: evaluatedAt.toISOString(), instruments: [] },
+      });
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(prisma.tradingAccount.findFirst).not.toHaveBeenCalled();
+      // Spot stays closed under a futures-only scope.
+      await expectUnauthorizedWithoutToken(
+        'get',
+        '/api/v1/assets?assetType=crypto&withPrice=false',
+      );
+      // A token that is sent is still verified.
+      await expectUnauthorizedWithAuthorization(
+        'get',
+        '/api/v1/futures/instruments',
+        'Bearer invalid-token',
+      );
+    });
+
+    it('reads the USD/KRW display rate without a token under crypto_futures, never refreshing it', async () => {
+      process.env.GUEST_MARKET_DATA_ASSET_TYPES = 'crypto_futures';
+      resetPrismaMocks();
+      const observedAt = new Date();
+      prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+      prisma.fxRateSnapshot.findMany.mockResolvedValue([
+        {
+          id: 'fx-stored',
+          rate: new Prisma.Decimal('1390'),
+          sourceType: 'provider_api',
+          sourceName: 'korea_exim_exchange_rate',
+          effectiveAt: observedAt,
+          capturedAt: observedAt,
+        },
+      ]);
+      const refresh = jest.spyOn(app.get(FxService), 'currentRate');
+      try {
+        const response = await request(app.getHttpServer())
+          .get(
+            '/api/v1/fx/rates/current?baseCurrency=USD&quoteCurrency=KRW&refresh=true',
+          )
+          .expect(200);
+        expect(response.body).toMatchObject({
+          success: true,
+          data: { pair: 'USD/KRW', rate: '1390.00000000' },
+        });
+        expect(refresh).toHaveBeenCalledWith(
+          { baseCurrency: 'USD', quoteCurrency: 'KRW', refresh: 'true' },
+          { allowRefresh: false },
+        );
+        expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      } finally {
+        refresh.mockRestore();
+      }
+    });
+
+    it.each([
       ['get', '/api/v1/me'],
       ['get', '/api/v1/home'],
       ['get', '/api/v1/wallets'],
@@ -5642,20 +5784,42 @@ describe('AppController (e2e)', () => {
       ['post', '/api/v1/trading-accounts/trading-account-1/fx/quote'],
       ['get', '/api/v1/trading-accounts/trading-account-1/futures/instruments'],
       ['get', '/api/v1/trading-accounts/trading-account-1/futures/positions'],
+      ['get', '/api/v1/trading-accounts/trading-account-1/futures/executions'],
+      [
+        'get',
+        '/api/v1/trading-accounts/trading-account-1/futures/liquidations',
+      ],
+      ['post', '/api/v1/trading-accounts/trading-account-1/futures/execute'],
+      [
+        'get',
+        '/api/v1/trading-accounts/trading-account-1/futures/limit-orders',
+      ],
+      [
+        'post',
+        '/api/v1/trading-accounts/trading-account-1/futures/limit-orders',
+      ],
+      [
+        'get',
+        '/api/v1/trading-accounts/trading-account-1/futures/conditional-entries',
+      ],
+      ['get', '/api/v1/fx/exchanges'],
+      ['post', '/api/v1/fx/quote'],
+      ['post', '/api/v1/fx/execute'],
       ['post', '/api/v1/trading-accounts/general'],
       ['post', '/api/v1/seasons/season-1/join'],
       ['get', '/api/v1/assets/asset-btc/price'],
-      ['get', '/api/v1/futures/instruments/instrument-1/candles'],
+      ['get', '/api/v1/operator/me'],
     ] as const)(
-      'still rejects %s %s without a token while guest market data is on',
+      'still rejects %s %s without a token while every guest market is on',
       async (method, path) => {
         process.env.GUEST_MARKET_DATA_ASSET_TYPES =
-          'domestic_stock,us_stock,crypto';
+          'domestic_stock,us_stock,crypto,crypto_futures';
         await expectUnauthorizedWithoutToken(
           method,
           path,
           method === 'post' ? {} : undefined,
         );
+        expect(prisma.futuresInstrument.findMany).not.toHaveBeenCalled();
       },
     );
   });

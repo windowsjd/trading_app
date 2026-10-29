@@ -384,12 +384,15 @@ export class FxService {
 
   async currentRate(
     query: FxCurrentRateQuery = {},
+    // An anonymous (guest) read is validated the same way but only selects
+    // the stored rate: it can never start a provider refresh.
+    { allowRefresh = true }: { allowRefresh?: boolean } = {},
   ): Promise<FxCurrentRateResponse> {
     const request = this.validateCurrentRateQuery(query);
     let now = new Date();
     let refreshedProviderSnapshot: FxProviderRateSnapshot | null = null;
 
-    if (request.refresh) {
+    if (request.refresh && allowRefresh) {
       const refreshEligibility = resolveFxProviderEligibility({
         workflow: 'fx_quote',
         baseCurrency: CurrencyCode.USD,

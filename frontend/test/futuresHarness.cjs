@@ -8,7 +8,7 @@ const { deferred } = require('./walletTransferHarness.cjs');
 const { conditionalFixture } = require('./conditionalFixtures.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 function futuresHarness(options = {}) {
-  const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], invalidations: [], navigation: [], orderBookRequests: [], alerts: [], options, session: 1,
+  const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], readConfigs: [], invalidations: [], navigation: [], orderBookRequests: [], alerts: [], options, session: 1,
     // Screen focus (another screen in front when false) and the signed-in role (admin diagnostics).
     focused: true, role: options.role ?? (options.diagnostics ? 'admin' : 'user'),
     // The full-screen chart route's params (`screen: 'chart'`).
@@ -19,6 +19,8 @@ function futuresHarness(options = {}) {
   const transport = { apiClient: {
       get: async (path, config) => {
         const id = path.split('/')[2]; h.reads.push(path);
+        // Whether each read went out with the session's credentials (guest browsing sends public ones).
+        h.readConfigs.push({ path, public: config?.skipSessionAuth === true });
         if (h.readGate) await h.readGate.promise;
         if (h.readFailure) throw h.readFailure;
         if (h.readFailures?.[path]) throw h.readFailures[path];
@@ -35,6 +37,11 @@ function futuresHarness(options = {}) {
           return { data: { success: true, data: h.futuresCandles?.(instrumentId, interval) ?? futuresCandlesFixture(instrumentId, Date.now(), interval) } };
         }
         const f = futuresFixture(h.wrongScope ?? id, h.options);
+        // The contract list as market data (guest browsing): no account fields.
+        if (path === '/futures/instruments') {
+          const { tradingAccountId: _account, capabilities: _capabilities, ...market } = f.catalog;
+          return { data: { success: true, data: market } };
+        }
         // 손절가/익절가 plans on pending entries: closed unless a test opens them.
         if (path.includes('entry-tp-sl-plans')) {
           // One entry's plans (the sheet) or the account's open/ended plans (lists).
@@ -187,7 +194,8 @@ function futuresHarness(options = {}) {
   // `options.routeDirection`: the detail's 매수하기 (long) / 매도하기 (short) request on the futures
   // screen (`options.direction` is the fixture position's own side).
   const params = () => options.screen === 'chart' ? { accountId: h.routeAccountId, ...h.chart }
-    : options.screen === 'detail' ? { accountId: h.routeAccountId, instrumentId: options.instrumentId ?? 'btc' }
+    // A guest's detail route has no account (`h.routeAccountId = null`).
+    : options.screen === 'detail' ? { ...(h.routeAccountId === null ? {} : { accountId: h.routeAccountId }), instrumentId: options.instrumentId ?? 'btc' }
       : { accountId: h.routeAccountId, instrumentId: options.instrumentId, ...(options.routeDirection ? { direction: options.routeDirection } : {}) };
   // The detail's contract picker changes the route's instrument (setParams).
   const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: params() }, navigation: { navigate: (...args) => h.navigation.push(args), goBack: () => h.navigation.push(['goBack']),

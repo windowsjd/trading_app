@@ -456,7 +456,7 @@ export class AssetCandlesService {
     query: AssetCandlesQuery = {},
   ): Promise<AssetCandlesResponse> {
     // Anonymous (guest browsing): only GUEST_MARKET_DATA_ASSET_TYPES; with
-    // none configured, the existing 401 before any read.
+    // guest market data off (`none`), the existing 401 before any read.
     const guestTypes = userId ? null : readGuestMarketDataAssetTypes();
     if (guestTypes && !guestTypes.length) {
       this.throwApiError(

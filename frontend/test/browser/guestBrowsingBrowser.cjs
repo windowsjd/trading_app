@@ -126,9 +126,10 @@ async function run() {
       layouts.push(`tabs-${width}-x${fontScale}`);
     }
 
-    for (const guestTypes of ['', 'crypto']) for (const appearance of ['light', 'dark'])
+    for (const guestTypes of ['', 'crypto,crypto_futures']) for (const appearance of ['light', 'dark'])
       for (const width of quick ? [320] : [320, 390]) for (const fontScale of [1, 2]) {
-        const id = `${guestTypes || 'none'}-${appearance}-${width}-x${fontScale}`;
+        const id = `${guestTypes ? guestTypes.replace(',', '+') : 'none'}-${appearance}-${width}-x${fontScale}`;
+        const futuresOn = guestTypes.includes('crypto_futures');
         const context = { id };
         await page.setViewportSize({ width, height: width === 320 ? 640 : 844 });
         await page.emulateMedia({ colorScheme: appearance, reducedMotion: 'no-preference' });
@@ -136,6 +137,30 @@ async function run() {
         await page.getByTestId('auth-guest-browse').waitFor();
         assert.equal(await page.getByTestId('auth-guest-browse').innerText(), '로그인 없이 둘러보기');
         await check(context, 'login');
+        // A secondary button: 로그인's width, at least its height, an edge and a
+        // fill apart from the canvas and the fields, a readable label, no underline.
+        const button = await page.evaluate(() => {
+          const box = (id) => document.querySelector(`[data-testid="${id}"]`).getBoundingClientRect();
+          const el = document.querySelector('[data-testid="auth-guest-browse"]');
+          const label = [...el.querySelectorAll('div')].find((node) => node.childElementCount === 0 && node.textContent.trim());
+          const surface = [el, ...el.querySelectorAll('div')].find((node) => getComputedStyle(node).borderTopWidth !== '0px') ?? el;
+          const fill = [el, ...el.querySelectorAll('div')].map((node) => getComputedStyle(node).backgroundColor).find((color) => color !== 'rgba(0, 0, 0, 0)');
+          const input = getComputedStyle(document.querySelector('[data-testid="auth-login-email-input"]') ?? document.querySelector('input')).backgroundColor;
+          const canvas = [...document.querySelectorAll('div')].map((node) => getComputedStyle(node).backgroundColor).find((color) => color !== 'rgba(0, 0, 0, 0)');
+          const rgb = (color) => color.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+          const lum = (color) => rgb(color).map((v) => v / 255).map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+            .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+          const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+          const style = getComputedStyle(label);
+          return { width: box('auth-guest-browse').width, height: box('auth-guest-browse').height, login: box('auth-login-submit'),
+            border: getComputedStyle(surface).borderTopWidth, fill, input, canvas, decoration: style.textDecorationLine,
+            labelContrast: ratio(style.color, fill), labelFits: label.scrollWidth <= label.clientWidth + 1 };
+        });
+        assert.ok(Math.abs(button.width - button.login.width) <= 1, JSON.stringify(button));
+        assert.ok(button.height >= 48 && button.height >= button.login.height - 1, JSON.stringify(button));
+        assert.ok(button.border !== '0px' && button.decoration === 'none' && button.labelFits, JSON.stringify(button));
+        assert.ok(button.fill && button.fill !== button.canvas && button.fill !== button.input, JSON.stringify(button));
+        assert.ok(button.labelContrast >= 4.5, JSON.stringify(button));
 
         await page.getByTestId('auth-guest-browse').click();
         await page.getByTestId('home-guest-hero').waitFor();
@@ -179,8 +204,26 @@ async function run() {
           await check(context, 'market-sign-in');
         }
         await page.getByTestId('crypto-product-futures').last().click();
-        await page.getByTestId('market-futures-sign-in').waitFor();
-        await check(context, 'market-futures');
+        if (futuresOn) {
+          // The contracts' market data: list → detail (Last, won, chart) → sign-in sheet.
+          await page.getByTestId('futures-market-btc').waitFor();
+          await check(context, 'market-futures');
+          await page.getByTestId('futures-market-btc').click();
+          await page.getByTestId('futures-detail-screen').waitFor();
+          assert.equal(await page.getByTestId('futures-detail-primary-price').innerText(), '$102');
+          assert.equal(await page.getByTestId('futures-detail-unbound').count(), 0);
+          await check(context, 'futures-detail');
+          await page.getByTestId('futures-detail-long').click();
+          await page.getByTestId('futures-sign-in').waitFor();
+          await check(context, 'futures-sign-in-sheet');
+          await page.getByTestId('futures-sign-in-close').click();
+          await page.getByTestId('futures-sign-in').waitFor({ state: 'detached' });
+          await page.evaluate(() => window.fixture.navigationRef.goBack());
+          await page.getByRole('tab', { name: '마켓' }).waitFor();
+        } else {
+          await page.getByTestId('market-futures-sign-in').waitFor();
+          await check(context, 'market-futures');
+        }
 
         await tab('가이드').click();
         await page.getByRole('heading', { name: '가이드' }).last().waitFor();
@@ -205,7 +248,8 @@ async function run() {
 
         const log = await page.evaluate(() => globalThis.guestLog);
         assert.deepEqual(log.credentialed.filter((p) => /trading-accounts|wallet|orders|positions|portfolio|\/fx\//.test(p)), [], 'no account read');
-        assert.ok(log.public.every((p) => p.startsWith('/assets')), JSON.stringify(log.public));
+        assert.ok(log.public.every((p) => p.startsWith('/assets') || /^\/(futures\/instruments|fx\/rates\/current)/.test(p)), JSON.stringify(log.public));
+        assert.equal(log.public.some((p) => p.startsWith('/futures/instruments')), true, 'the 선물 list asked the market-data route');
         if (!guestTypes) assert.deepEqual(log.public.length, log.refused.length, 'every market refused');
       }
     assert.deepEqual(errors, []);

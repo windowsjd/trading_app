@@ -1,4 +1,5 @@
 import { apiClient } from '../../services/api/client';
+import { guestReadConfig } from '../auth/guestBrowsing.ts';
 import type {
   ApiSuccessResponse,
   BpsString,
@@ -188,6 +189,8 @@ export async function getCurrentFxRate(
   quoteCurrency: WalletCurrency = 'KRW',
   refresh = false,
 ) {
+  // Guest browsing reads the display rate (a futures contract's won figure)
+  // as a public request; the server never refreshes it for a guest.
   const response = await apiClient.get<ApiSuccessResponse<FxRateDto>>(
     '/fx/rates/current',
     {
@@ -196,6 +199,7 @@ export async function getCurrentFxRate(
         quoteCurrency,
         refresh,
       },
+      ...guestReadConfig(),
     },
   );
 

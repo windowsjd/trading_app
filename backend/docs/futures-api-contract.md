@@ -64,6 +64,19 @@ close retains a closed lifetime row and its cumulative realized PnL; reopening
 creates a new row and may choose any valid leverage/direction. A SQL partial unique
 index permits only one open position per account/instrument.
 
+### Contract list (market data, 2026-10-30)
+
+`GET /api/v1/futures/instruments` is NOT under `/trading-accounts/:accountId`:
+it returns `{ evaluatedAt, instruments }` with exactly the account route's
+instrument projection (verified contracts, Futures Last/Mark and their
+evidence, 24h `marketStats`) and no `tradingAccountId`, `capabilities`,
+position or collateral field. Guest browsing reads it (and the contract chart
+below) without a token while `crypto_futures` is in the guest scope
+(`GUEST_MARKET_DATA_ASSET_TYPES`, every market by default;
+[assets-api-contract](assets-api-contract.md) 「Guest (signed-out) reads」);
+otherwise an anonymous read is `401`. Members keep
+the account route, whose capabilities decide what may be traded.
+
 ### Contract chart (market data, 2026-10-13)
 
 `GET /api/v1/futures/instruments/:instrumentId/candles?interval=4h&range=96d&limit=600`

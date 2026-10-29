@@ -139,6 +139,8 @@ export const QUERY_KEYS = {
     /** The futures detail's 전일대비 read, per previous UTC day (a new day is a new read). */
     previousDayCandles: (instrumentId: string, previousDayStart: number) =>
       ['futuresMarket', 'previousDayCandles', instrumentId, previousDayStart] as const,
+    /** The contract list as market data (guest browsing): no account in the key. */
+    instruments: () => ['futuresMarket', 'instruments'] as const,
   },
 
   asset: {

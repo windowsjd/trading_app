@@ -1,4 +1,5 @@
 import { apiClient } from "../../services/api/client";
+import { guestReadConfig } from "../auth/guestBrowsing.ts";
 import { assertAccountScope } from "../tradingAccount/accountScope";
 import type { OffsetPagination } from "../../models/dto/common";
 import type { ProtectionLeg } from '../conditional/api';
@@ -131,6 +132,17 @@ export type FuturesInstruments = SentAt & {
   capabilities: FuturesCapabilities;
   instruments: FuturesInstrument[];
 };
+/** The same contracts as market data: no account, capability or position field. */
+export type FuturesMarketInstruments = SentAt & {
+  evaluatedAt: string;
+  instruments: FuturesInstrument[];
+};
+/** An account's contract list (with its capabilities), not the market-data one. */
+export function isAccountFuturesInstruments(
+  read: FuturesInstruments | FuturesMarketInstruments,
+): read is FuturesInstruments {
+  return "tradingAccountId" in read;
+}
 export type FuturesExecution = {
   positionId: string;
   leverage: number;
@@ -280,9 +292,10 @@ export async function getFuturesInstrumentCandles(
     range: window.range,
     limit: String(window.limit),
   });
+  // Guest browsing reads it as a public request (no credentials).
   const response = await apiClient.get<{ success: true; data: FuturesCandles }>(
     `/futures/instruments/${encodeURIComponent(instrumentId)}/candles?${query.toString()}`,
-    { signal },
+    { signal, ...guestReadConfig() },
   );
   const data = response.data.data;
   // Never show another contract's, or another interval's, candles here.
@@ -314,6 +327,19 @@ async function sentRead<T extends SentAt>(
 }
 export const getFuturesInstruments = (id: string, signal?: AbortSignal) =>
   sentRead<FuturesInstruments>(id, "instruments", signal);
+/**
+ * The contract list as market data (guest browsing, 2026-10-30): the
+ * account route's contracts, Last/Mark and 24h statistics without an account.
+ * Members keep the account route, whose capabilities decide trading.
+ */
+export async function getFuturesMarketInstruments(signal?: AbortSignal): Promise<FuturesMarketInstruments> {
+  const clientRequestedAt = Date.now();
+  const response = await apiClient.get<{ success: true; data: FuturesMarketInstruments }>(
+    "/futures/instruments",
+    { signal, ...guestReadConfig() },
+  );
+  return { ...response.data.data, clientRequestedAt };
+}
 export const getFuturesPositions = (id: string, signal?: AbortSignal) =>
   sentRead<FuturesPositions>(id, "positions", signal);
 export const getFuturesHistory = (

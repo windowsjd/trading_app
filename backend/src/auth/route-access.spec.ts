@@ -87,14 +87,22 @@ function tokenlessRoutes(): Route[] {
 
 describe('routes reachable without an access token', () => {
   it('are exactly the reviewed public and optional-auth routes', () => {
-    // Guest browsing (2026-10-30) added only the three account-free market
-    // reads, which serve GUEST_MARKET_DATA_ASSET_TYPES alone. Every account,
-    // portfolio, wallet, order, position, futures, record, ranking and
-    // operator route keeps requiring a token: adding one here is a review.
+    // Guest browsing (2026-10-30) added only account-free market reads, which
+    // serve GUEST_MARKET_DATA_ASSET_TYPES alone: the three spot reads, and for
+    // crypto_futures the contract list, the contract candles and the USD/KRW
+    // display rate. Every account, portfolio, wallet, order, position,
+    // account-scoped futures, FX quote/execute, record, ranking and operator
+    // route keeps requiring a token: adding one here is a review.
     expect(tokenlessRoutes()).toEqual([
       { access: 'optional', route: 'GET /api/v1/assets' },
       { access: 'optional', route: 'GET /api/v1/assets/:assetId' },
       { access: 'optional', route: 'GET /api/v1/assets/:assetId/candles' },
+      { access: 'optional', route: 'GET /api/v1/futures/instruments' },
+      {
+        access: 'optional',
+        route: 'GET /api/v1/futures/instruments/:instrumentId/candles',
+      },
+      { access: 'optional', route: 'GET /api/v1/fx/rates/current' },
       { access: 'optional', route: 'GET /api/v1/seasons' },
       { access: 'optional', route: 'GET /api/v1/seasons/current' },
       // Pre-existing: health checks, sign-in/recovery, deletion receipts and
