@@ -16,6 +16,7 @@ import {
   futuresChartWindow,
   getFuturesInstrumentCandles,
 } from '../../features/futures/api';
+import { useFuturesChartPriceLines } from './useFuturesChartPriceLines';
 
 /** Never below the old inline strip; with less room the screen scrolls. */
 export const FUTURES_CHART_MIN_HEIGHT = 280;
@@ -24,6 +25,12 @@ export const FUTURES_DETAIL_CHART_MIN_HEIGHT = 260;
 
 type Props = {
   instrumentId: string;
+  /**
+   * The account whose position, limit entries and watched triggers are drawn
+   * on the chart: the screen's bound account when it is the selected one;
+   * null (a guest, another selection) draws none and reads nothing.
+   */
+  accountId?: string | null;
   displayPriceDecimals: number | null;
   /** Fresh Futures Last only; null hides the current-price line. */
   currentPrice: string | null;
@@ -51,6 +58,7 @@ type Props = {
  */
 export default function FuturesCandleChart({
   instrumentId,
+  accountId = null,
   displayPriceDecimals,
   currentPrice,
   timeframe,
@@ -84,6 +92,7 @@ export default function FuturesCandleChart({
       })),
     [data],
   );
+  const priceLines = useFuturesChartPriceLines({ accountId, instrumentId, focused });
   const detail = variant === 'detail';
   const selector = (
     <View style={styles.toolbar}>
@@ -142,6 +151,7 @@ export default function FuturesCandleChart({
               displayPriceDecimals={displayPriceDecimals}
               currentPrice={currentPrice}
               viewportResetKey={`${instrumentId}:${window.interval}`}
+              priceLines={priceLines}
             />
           </View>
         ) : (

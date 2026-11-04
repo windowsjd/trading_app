@@ -345,10 +345,10 @@ async function run() {
       await expectSpotlight([id('wallet-fx-direction-row')], { stepLabel: '2/6', context: `${context} direction` });
       await page.screenshot({ path: path.join(out, `fx-2-direction-${context}.png`) });
       await id('quest-guide-next').click();
-      await expectSpotlight([id('wallet-fx-amount-input')], { stepLabel: '3/6', context: `${context} amount` });
+      await expectSpotlight([id('wallet-fx-krw-amount-input')], { stepLabel: '3/6', context: `${context} amount` });
       assert.equal(await id('quest-guide-next').getAttribute('aria-disabled'), 'true', 'no amount, no next');
       // Idle, then typing (the form and the card update under the spotlight).
-      await expectSteady(`${context} amount`, 1500, () => id('wallet-fx-amount-input').fill('135000'));
+      await expectSteady(`${context} amount`, 1500, () => id('wallet-fx-krw-amount-input').fill('135000'));
       await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
       await page.screenshot({ path: path.join(out, `fx-3-amount-${context}.png`) });
       await id('quest-guide-next').click();
@@ -439,7 +439,7 @@ async function run() {
       await id(`wallet-${quest}`).click();
       await page.getByTestId('quest-guide-card').waitFor();
       if (quest === 'exchange') {
-        await id('quest-guide-next').click(); await id('wallet-fx-amount-input').fill('13500');
+        await id('quest-guide-next').click(); await id('wallet-fx-krw-amount-input').fill('13500');
       } else {
         await id('quest-guide-next').click(); await id('quest-guide-next').click(); await id('wallet-transfer-amount').fill('10');
       }
@@ -474,17 +474,19 @@ async function run() {
       for (const currency of ['KRW', 'USD']) {
         await id(currency === 'KRW' ? 'wallet-fx-direction-krw-usd' : 'wallet-fx-direction-usd-krw').click();
         const cash = await available(currency);
-        await id('wallet-fx-amount-input').fill((cash + 1).toFixed(8));
+        // The paying wallet's own field (KRW on top, USD below).
+        const paying = id(currency === 'KRW' ? 'wallet-fx-krw-amount-input' : 'wallet-fx-usd-amount-input');
+        await paying.fill((cash + 1).toFixed(8));
         await page.getByText('잔액이 부족합니다.', { exact: true }).filter({ visible: true }).waitFor();
         assert.equal(await id('wallet-fx-execute-submit').getAttribute('aria-disabled'), 'true');
         await contentFits('wallet-fx-screen');
         await id('wallet-fx-execute-submit').scrollIntoViewIfNeeded();
         await page.getByText('잔액이 부족합니다.', { exact: true }).filter({ visible: true }).scrollIntoViewIfNeeded();
         await page.screenshot({ path: path.join(out, `insufficient-fx-${account}-${currency}.png`), fullPage: true });
-        await id('wallet-fx-amount-input').fill(cash.toFixed(8));
+        await paying.fill(cash.toFixed(8));
         await page.waitForFunction(() => document.querySelector('[data-testid="wallet-fx-execute-submit"]')?.getAttribute('aria-disabled') !== 'true');
         assert.equal(await page.getByText('잔액이 부족합니다.', { exact: true }).count(), 0);
-        await id('wallet-fx-amount-input').fill('1e3');
+        await paying.fill('1e3');
         assert.equal(await page.getByText('잔액이 부족합니다.', { exact: true }).count(), 0);
         assert.equal(await id('wallet-fx-execute-submit').getAttribute('aria-disabled'), 'true');
       }
@@ -516,7 +518,7 @@ async function run() {
     await page.getByTestId('quest-guide-ring').waitFor();
     assert.equal(await page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches), true);
     await id('quest-guide-next').click();
-    await id('wallet-fx-amount-input').fill('27000');
+    await id('wallet-fx-krw-amount-input').fill('27000');
     for (const step of ['4/6', '5/6', '6/6']) {
       await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
       await id('quest-guide-next').click();
@@ -535,7 +537,7 @@ async function run() {
     await tab('퀘스트').click(); await id('quest-card-exchange-start').click();
     await id('wallet-exchange').click();
     await id('quest-guide-next').click();
-    await id('wallet-fx-amount-input').fill('13500');
+    await id('wallet-fx-krw-amount-input').fill('13500');
     for (const step of ['4/6', '5/6', '6/6']) {
       await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
       await id('quest-guide-next').click();
@@ -623,34 +625,35 @@ async function run() {
     assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0);
     flows.push({ context: 'held-moves-exit-back-switch', held: 7, notices: 1, noResume: true, pass: true });
 
-    // F: the FX screen for every mode: no account switcher, three equal rows.
+    // F: the FX sheet for every mode: no account switcher; the KRW wallet on
+    // top, the two arrows, the USD wallet below; nothing clipped.
     for (const [account, width, fontScale, theme] of [['general', 320, 2, 'light'], ['season', 360, 1, 'dark'], ['beginner', 320, 1, 'dark']]) {
       await page.setViewportSize({ width, height: 844 });
       await open(`account=${account}&fxState=available&fontScale=${fontScale}&theme=${theme}${account === 'beginner' ? '&practice=1' : '&holdings=1'}`);
       await tab('지갑').click(); await id('wallet-exchange').click();
-      await id('fx-wallet-summary').waitFor();
+      await id('fx-wallet-krw').waitFor();
       await settled('wallet-fx-screen');
       const fxScreen = page.getByTestId('wallet-fx-screen').filter({ visible: true }).first();
       assert.equal(await fxScreen.getByTestId('trading-account-switcher-trigger').count(), 0, `${account}: no switcher on FX`);
       assert.equal(await fxScreen.getByText('투자 계정', { exact: true }).count(), 0, `${account}: no switcher label on FX`);
-      const summary = await page.getByTestId('fx-wallet-summary').filter({ visible: true }).first().evaluate(el => [...el.children].map(row => [...row.querySelectorAll('div')]
-        .filter(node => node.childNodes.length === 1 && node.firstChild.nodeType === Node.TEXT_NODE)
-        .map(node => ({ text: node.textContent, size: getComputedStyle(node).fontSize, weight: getComputedStyle(node).fontWeight }))));
-      assert.deepEqual(summary.map(row => row[0].text), ['KRW Wallet', 'USD Wallet', '환율']);
-      assert.equal(new Set(summary.flat().map(cell => `${cell.size}/${cell.weight}`)).size, 1, 'one size and weight');
-      assert.equal(summary.flat()[0].size, `${18 * fontScale}px`);
+      const tops = await fxScreen.evaluate(el => ['fx-wallet-krw', 'wallet-fx-direction-row', 'fx-wallet-usd']
+        .map(testId => el.querySelector(`[data-testid="${testId}"]`).getBoundingClientRect().top));
+      assert.ok(tops[0] < tops[1] && tops[1] < tops[2], `${account}: KRW, the arrows, then USD`);
+      assert.match(await text('fx-wallet-krw'), /^KRW Wallet사용 가능 [\d,]+원보낼 금액$/u);
+      assert.match(await text('fx-wallet-usd'), /^USD Wallet사용 가능 \$[\d,.]+받을 금액 \(예상\)$/u);
+      assert.equal(await text('wallet-fx-direction-row'), '', 'arrows only, no words');
       const fxText = await text('wallet-fx-screen');
       assert.doesNotMatch(fxText, /지갑 요약|USD 환산|수집 시각|대체 환율/);
-      await contentFits('fx-wallet-summary');
-      await page.screenshot({ path: path.join(out, `fx-summary-${account}-${width}-${fontScale}-${theme}.png`) });
-      results.push({ fxSummary: account, width, fontScale, theme, switcher: 'absent', rows: 3 });
+      for (const part of ['fx-wallet-krw', 'fx-wallet-usd', 'wallet-fx-ratio', 'fx-indicative-preview']) await contentFits(part);
+      await page.screenshot({ path: path.join(out, `fx-wallets-${account}-${width}-${fontScale}-${theme}.png`) });
+      results.push({ fxWallets: account, width, fontScale, theme, switcher: 'absent', order: 'KRW/arrows/USD' });
     }
     await open('account=general&fontScale=2&theme=light&holdings=1');
     await tab('지갑').click(); await id('wallet-exchange').click();
     await id('fx-rate-unavailable').waitFor();
-    assert.equal(await text('fx-summary-rate'), '-', 'no invented rate');
+    assert.match(await text('fx-preview-rate'), /-$/u, 'no invented rate');
     await contentFits('fx-rate-unavailable');
-    await page.screenshot({ path: path.join(out, 'fx-summary-rate-unavailable.png'), fullPage: true });
+    await page.screenshot({ path: path.join(out, 'fx-rate-unavailable.png'), fullPage: true });
 
     // G: delayed answers and switching keep every account's data separate.
     await page.setViewportSize({ width: 390, height: 844 });

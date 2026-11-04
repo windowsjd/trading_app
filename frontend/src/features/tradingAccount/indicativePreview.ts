@@ -124,6 +124,52 @@ export function fxPreview(input: {
   };
 }
 
+/**
+ * The smallest 8-decimal amount to pay whose exact proceeds reach `target`,
+ * so `fxPreview` — the server's formula and rounding at this rate and fee —
+ * receives at least `target`. The fee still comes out of the received
+ * currency; this only answers "how much do I pay to receive this", and the
+ * quote/execute stay source-based.
+ */
+export function fxSourceForTarget(input: {
+  target: string;
+  fromCurrency: 'KRW' | 'USD';
+  rate: FxRateDto | null | undefined;
+  feeRate: string | null | undefined;
+  now: number;
+}) {
+  if (
+    !isPositiveInput(input.target, 8) ||
+    !validFee(input.feeRate) ||
+    !isPreviewFxAvailable(input.rate, input.now)
+  )
+    return null;
+  // Exact inverse at a wider precision, rounded UP: never short of the target.
+  const W = Decimal.clone({ precision: 40 });
+  const kept = new W(1).sub(input.feeRate);
+  if (kept.lte(0)) return null;
+  const gross = new W(input.target).div(kept);
+  const exact =
+    input.fromCurrency === 'KRW'
+      ? gross.mul(input.rate.rate)
+      : gross.div(input.rate.rate);
+  let source = W.max(exact.toDecimalPlaces(8, Decimal.ROUND_UP), '0.00000001');
+  // The forward preview has the final word; one 1e-8 step covers its rounding.
+  for (let step = 0; step < 3; step += 1) {
+    const preview = fxPreview({
+      amount: source.toFixed(8),
+      fromCurrency: input.fromCurrency,
+      rate: input.rate,
+      feeRate: input.feeRate,
+      now: input.now,
+    });
+    if (preview && new D(preview.netTargetAmount).gte(input.target))
+      return source.toFixed(8);
+    source = source.add('0.00000001');
+  }
+  return null;
+}
+
 /** Crypto buy preview uses gross principal. Quantity is indicative only. */
 export function amountBuyPreview(amount: string, feeRate?: string | null) {
   if (!isPositiveInput(amount, 8) || !validFee(feeRate)) return null;

@@ -57,7 +57,9 @@ export const TEST_IDS = {
 
   walletFx: {
     screen: 'wallet-fx-screen',
-    amountInput: 'wallet-fx-amount-input',
+    /** KRW on top, USD below: either can be typed (pay or receive). */
+    krwAmountInput: 'wallet-fx-krw-amount-input',
+    usdAmountInput: 'wallet-fx-usd-amount-input',
     quoteSubmit: 'wallet-fx-quote-submit',
     executeSubmit: 'wallet-fx-execute-submit',
     directionKrwUsd: 'wallet-fx-direction-krw-usd',

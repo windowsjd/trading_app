@@ -20,6 +20,8 @@ import {
   type AssetChartTimeframe,
 } from '../../features/asset/api';
 import { useAssetCandle } from '../../features/asset/useAssetCandle';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { useSpotChartPriceLines } from './useSpotChartPriceLines';
 import {
   isTrialPriceSource,
   trialCandleNotice,
@@ -150,6 +152,15 @@ export function AssetMarketChart({
     interval: selectedTimeframe.interval,
     wsUrl: wsUrl ?? '',
     enabled: isFocused && !!wsUrl && !guest,
+  });
+  // The selected account's own prices on the chart; never a guest's, never
+  // while the selection is still changing.
+  const { selectedAccountId, selectedAccount } = useTradingAccount();
+  const priceLines = useSpotChartPriceLines({
+    accountId: !guest && selectedAccount?.id === selectedAccountId ? selectedAccountId : null,
+    assetId,
+    currencyCode: detailQuery.data?.asset?.priceCurrency,
+    focused: isFocused,
   });
   const refetchCandles = candlesQuery.refetch;
   useEffect(() => {
@@ -377,6 +388,7 @@ export function AssetMarketChart({
               displayPrice.isRealtime ? displayPrice.priceLocal : null
             }
             viewportResetKey={`${assetId}:${selectedTimeframe.interval}`}
+            priceLines={priceLines}
           />
         ) : (
           <InlineEmptyState message="표시할 차트 데이터가 없습니다." />

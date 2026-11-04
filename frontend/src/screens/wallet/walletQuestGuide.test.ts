@@ -28,7 +28,7 @@ async function executeFx(h: any) {
   h.quote = { tradingAccountId: 'account-1', quoteId: 'quote-1', fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '100000' };
   h.result = { ...h.quote, exchangeId: 'exchange-1', netTargetAmount: '73.82', wallets: { KRW: '900000', USD: '173.82' } };
   let tree = h.render();
-  h.control(tree, TEST_IDS.walletFx.amountInput).props.onChangeText('100000');
+  h.control(tree, TEST_IDS.walletFx.krwAmountInput).props.onChangeText('100000');
   tree = h.render();
   h.control(tree, TEST_IDS.walletFx.executeSubmit).props.onPress();
   await h.flush();
@@ -43,7 +43,7 @@ describe('FX screen and the quest guide', () => {
       screen: 'fx', accountId: 'account-1', blocked: false, fromCurrency: 'KRW', amountValid: false, rate: 'available',
       previewReady: false, canExecute: false, pending: false, failed: false,
     });
-    h.control(tree, TEST_IDS.walletFx.amountInput).props.onChangeText('100000');
+    h.control(tree, TEST_IDS.walletFx.krwAmountInput).props.onChangeText('100000');
     tree = h.render();
     const ready = bridge.getQuestGuideFacts('fx');
     assert.deepEqual([ready.amountValid, ready.previewReady, ready.canExecute], [true, true, true]);
@@ -70,7 +70,7 @@ describe('FX screen and the quest guide', () => {
         idempotencyKey: h.requests[1].body.idempotencyKey });
       assert.deepEqual(adopted, [{ kind: 'fx', accountId: 'account-1', fromCurrency: 'KRW', toCurrency: 'USD', summary: '받은 금액 USD 73.82' }]);
       assert.equal(elements(tree, 'FxReceipt').length, 0, 'the guide presents the server-checked outcome');
-      assert.equal(h.control(tree, TEST_IDS.walletFx.amountInput).props.value, '');
+      assert.equal(h.control(tree, TEST_IDS.walletFx.krwAmountInput).props.value, '');
       assert.equal(h.renderCta(h.control(tree, TEST_IDS.walletFx.executeSubmit)).props.disabled, true, 'no second execute');
     } finally { dispose(); }
   });
@@ -91,7 +91,8 @@ describe('FX screen and the quest guide', () => {
       const h = fxHarness(mode);
       const form = h.render();
       assert.equal(elements(form).some((node: any) => node.type === 'AccountSwitcher'), false);
-      assert.equal(elements(form).some((node: any) => node.props.testID === 'fx-wallet-summary'), true);
+      for (const wallet of ['fx-wallet-krw', 'fx-wallet-usd'])
+        assert.equal(elements(form).some((node: any) => node.props.testID === wallet), true, wallet);
       h.account.status = 'closed';
       const blocked = h.render();
       assert.match(textContent(blocked), /환전이 제한된 계정입니다/);
@@ -109,13 +110,14 @@ describe('FX screen and the quest guide', () => {
     assert.match(source, /isFxResponseInScope\(request\.scope, readScope\(\)\)/);
   });
 
-  it('shows no invented rate: the summary says "-" and the retry lives outside it', () => {
+  it('shows no invented rate: the estimate says "-" and the retry lives outside it', () => {
     const h = fxHarness();
     h.rateQuery.isError = true;
     const tree = h.render();
-    const summary = elements(tree).find((node: any) => node.props.testID === 'fx-wallet-summary');
-    assert.equal(textContent(elements(summary).find((node: any) => node.props.testID === 'fx-summary-rate')), '-');
-    assert.doesNotMatch(textContent(summary), /1350|중단/);
+    const estimate = elements(tree).find((node: any) => node.props.testID === 'fx-indicative-preview');
+    const rows = elements(estimate, 'PreviewAmounts')[0].props.rows;
+    assert.deepEqual(rows.map((row: any) => [row.label, row.value]), [['적용 환율 (USD/KRW)', '-'], ['예상 수수료', '-'], ['예상 수령액', '-']]);
+    assert.doesNotMatch(textContent(estimate), /1350|중단/);
     const unavailable = elements(tree).find((node: any) => node.props.testID === 'fx-rate-unavailable');
     assert.match(textContent(unavailable), /현재 환율을 사용할 수 없어 환전 기능이 잠시 중단되었습니다/);
     assert.equal(elements(unavailable, 'CTAButton')[0].props.label, '환율 다시 불러오기');

@@ -21,28 +21,30 @@ const receipt = load(resolve('src/screens/wallet/FxReceipt.tsx'), {
 async function exchange(h: any) {
   h.quote = { tradingAccountId: 'account-1', quoteId: 'quote-1', fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '100000' };
   h.result = { ...h.quote, exchangeId: 'exchange-1', wallets: { KRW: '900000', USD: '173.82' } };
-  h.control(h.render(), TEST_IDS.walletFx.amountInput).props.onChangeText('100000');
+  h.control(h.render(), TEST_IDS.walletFx.krwAmountInput).props.onChangeText('100000');
   h.control(h.render(), TEST_IDS.walletFx.executeSubmit).props.onPress();
   await h.flush();
   return h.render();
 }
 
-// The wallet summary is exactly KRW Wallet / USD Wallet / 환율 in one row
-// structure, at one size and weight. No title, account name, USD→KRW
-// conversion, capture time or other side notes.
-function assertCleanRateDisplay(h: any, tree: any) {
-  const summary = elements(tree, 'View').find((node: any) => node.props.testID === 'fx-wallet-summary');
-  assert.ok(summary);
-  const rows = elements(summary, 'View').filter((node: any) => elements(node, 'Text').length === 2 && node !== summary);
-  assert.deepEqual(rows.map((row: any) => elements(row, 'Text').map((text: any) => textContent(text))), [
-    ['KRW Wallet', '1,000,000'], ['USD Wallet', '100'], ['환율', '1350'],
-  ]);
-  const fonts = rows.flatMap((row: any) => elements(row, 'Text').map((text: any) => {
-    const style = flat(text.props.style);
-    return `${style.fontSize}/${style.fontWeight}`;
-  }));
-  assert.deepEqual([...new Set(fonts)], ['18/700'], 'same size and weight, larger than before');
-  assert.equal(rows.every((row: any) => flat(row.props.style).flexWrap === 'wrap'), true, 'long values wrap, never clip');
+// KRW on top and USD below, each card its name and spendable amount in one row
+// (a long amount wraps, never clips), then the amount field; the arrows sit
+// between them, and the rate is the estimate's first row. No title, account
+// name, USD→KRW conversion, capture time or other side notes.
+function assertCleanRateDisplay(h: any, tree: any, rate = '1350') {
+  const scroll = elements(tree, 'ScrollView').find((node: any) => node.props.testID === TEST_IDS.walletFx.screen);
+  const order = elements(scroll).map((node: any) => node.props.testID)
+    .filter((id: string) => ['fx-wallet-krw', 'wallet-fx-direction-row', 'fx-wallet-usd', 'wallet-fx-ratio', 'fx-indicative-preview', TEST_IDS.walletFx.executeSubmit].includes(id));
+  assert.deepEqual([...new Set(order)], ['fx-wallet-krw', 'wallet-fx-direction-row', 'fx-wallet-usd', 'wallet-fx-ratio', 'fx-indicative-preview', TEST_IDS.walletFx.executeSubmit]);
+  const header = (id: string) => {
+    const card = elements(tree, 'View').find((node: any) => node.props.testID === id);
+    const row = elements(card, 'View').find((node: any) => flat(node.props.style).flexWrap === 'wrap');
+    return { texts: elements(row, 'Text').map((text: any) => textContent(text)), style: flat(row.props.style) };
+  };
+  assert.deepEqual(header('fx-wallet-krw').texts, ['KRW Wallet', '사용 가능 1,000,000원']);
+  assert.deepEqual(header('fx-wallet-usd').texts, ['USD Wallet', '사용 가능 $100']);
+  const estimate = elements(tree).find((node: any) => node.props.testID === 'fx-indicative-preview');
+  assert.deepEqual(elements(estimate, 'PreviewAmounts')[0].props.rows[0].value, rate);
   const text = textContent(tree);
   for (const hidden of ['지갑 요약', '일반모드', 'USD 환산', '수집 시각', formatKstDateTime(h.rateQuery.data.capturedAt),
     '대체 환율', '원장 보기', '기준 시각', '최신성', '최신 환율 기준', '2026-01-01']) {
@@ -51,20 +53,15 @@ function assertCleanRateDisplay(h: any, tree: any) {
   assert.equal(elements(tree).some((node: any) => node.type === 'AccountSwitcher'), false, 'no account switcher on FX');
 }
 
-it('retains the measured loading rate space after arrival without limiting larger text', () => {
-  for (const height of [96, 218]) {
-    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
-    const rate = h.rateQuery.data;
-    h.rateQuery = { data: undefined, isLoading: true, isError: false };
-    const status = () => elements(h.render(), 'View').find((node: any) => node.props.testID === 'fx-rate-status');
-    status().props.onLayout({ nativeEvent: { layout: { height } } });
-    h.rateQuery = { data: rate, isLoading: false, isError: false };
-    const ready = status();
-    assert.equal(ready.props.style[1].minHeight, height);
-    assert.equal(ready.props.onLayout, undefined);
-    assert.equal(ready.props.style[1].height, undefined, 'content may grow');
-    assertCleanRateDisplay(h, h.render());
-  }
+it('keeps the rate row in place from loading to arrival without a placeholder number', () => {
+  const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
+  const rate = h.rateQuery.data;
+  h.rateQuery = { data: undefined, isLoading: true, isError: false };
+  const rateRow = () => elements(elements(h.render()).find((node: any) => node.props.testID === 'fx-indicative-preview'), 'PreviewAmounts')[0].props.rows[0];
+  assert.deepEqual([rateRow().label, rateRow().value], ['적용 환율 (USD/KRW)', '불러오는 중']);
+  h.rateQuery = { data: rate, isLoading: false, isError: false };
+  assert.deepEqual([rateRow().label, rateRow().value], ['적용 환율 (USD/KRW)', '1350']);
+  assertCleanRateDisplay(h, h.render());
 });
 
 describe('FX screen information display', () => {
@@ -103,7 +100,7 @@ describe('FX screen information display', () => {
     const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     let tree = h.render();
     assertCleanRateDisplay(h, tree);
-    h.control(tree, TEST_IDS.walletFx.amountInput).props.onChangeText('100000');
+    h.control(tree, TEST_IDS.walletFx.krwAmountInput).props.onChangeText('100000');
     tree = h.render();
     assertCleanRateDisplay(h, tree);
     assert.match(textContent(tree), /예상 환전 견적/);
@@ -146,7 +143,7 @@ describe('FX screen information display', () => {
         h.control(tree, TEST_IDS.walletFx.directionUsdKrw).props.onPress();
         tree = h.render();
       }
-      h.control(tree, TEST_IDS.walletFx.amountInput).props.onChangeText(sourceAmount);
+      h.control(tree, fromCurrency === 'KRW' ? TEST_IDS.walletFx.krwAmountInput : TEST_IDS.walletFx.usdAmountInput).props.onChangeText(sourceAmount);
       tree = h.render();
       const execute = h.control(tree, TEST_IDS.walletFx.executeSubmit);
       assert.equal(h.renderCta(execute).props.disabled, false);
@@ -172,7 +169,8 @@ describe('FX screen information display', () => {
       success[0].props.onDone();
       tree = h.render();
       assert.equal(elements(tree, 'FxReceipt').length, 0);
-      assert.equal(h.control(tree, TEST_IDS.walletFx.amountInput).props.value, '');
+      for (const field of [TEST_IDS.walletFx.krwAmountInput, TEST_IDS.walletFx.usdAmountInput])
+        assert.equal(h.control(tree, field).props.value, '', field);
       assert.equal(h.renderCta(h.control(tree, TEST_IDS.walletFx.executeSubmit)).props.disabled, true);
     });
   }

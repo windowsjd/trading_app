@@ -76,8 +76,8 @@ export const QUEST_GUIDE_COPY = {
     },
     direction: {
       title: '환전 방향',
-      body: 'KRW → USD가 선택되어 있어요. 원화(KRW)를 내고 달러(USD)를 받는 환전이에요.',
-      wrong: '이 퀘스트는 KRW → USD 환전이에요. KRW → USD를 선택해 주세요.',
+      body: '아래 화살표(KRW → USD)가 선택되어 있어요. 위의 원화(KRW)를 내고 아래의 달러(USD)를 받는 환전이에요.',
+      wrong: '이 퀘스트는 KRW → USD 환전이에요. 아래 화살표를 선택해 주세요.',
     },
     amount: {
       title: '환전 금액',

@@ -194,7 +194,7 @@ async function run() {
       const limit = await id('order-limit-price-input').boundingBox(); assert.ok(limit.y >= 0 && limit.y + limit.height <= 381);
       await page.goto(`${base}/navigation?navigation=1&account=general&fontScale=${fontScale}`); await id('home-total-asset').waitFor();
       await page.getByRole('tab', { name: '지갑', exact: true }).click(); await id('wallet-exchange').click();
-      const fx = id('wallet-fx-amount-input'); await fx.fill('123.456'); await page.waitForTimeout(150);
+      const fx = id('wallet-fx-krw-amount-input'); await fx.fill('123.456'); await page.waitForTimeout(150);
       const fxBox = await fx.boundingBox(); assert.ok(fxBox.y >= 0 && fxBox.y + fxBox.height <= 381);
       await id('wallet-fx-execute-submit').scrollIntoViewIfNeeded(); assert.equal(await fx.inputValue(), '123.456');
       await page.setViewportSize({ width: 844, height: width }); await fx.focus(); await page.waitForTimeout(150); assert.equal(await fx.inputValue(), '123.456');

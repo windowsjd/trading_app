@@ -263,7 +263,7 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
               message="상품 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요." />
           ) : null}
           {missing ? <Text testID="futures-detail-missing" style={[styles.muted, styles.notice]}>현재 거래할 수 있는 선물 상품이 아닙니다.</Text> : null}
-          <FuturesCandleChart key={instrumentId} instrumentId={instrumentId} variant="detail"
+          <FuturesCandleChart key={instrumentId} instrumentId={instrumentId} variant="detail" accountId={guest || !accountId ? null : accountId}
             displayPriceDecimals={decimals ?? 2} currentPrice={lastFresh ? last : null}
             timeframe={timeframe} onTimeframeChange={setTimeframe} />
         </ScrollView>

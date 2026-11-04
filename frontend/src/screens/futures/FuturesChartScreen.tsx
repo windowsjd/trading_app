@@ -14,6 +14,8 @@ import {
   type AssetChartTimeframe,
 } from '../../features/asset/chartTimeframes';
 import { formatAssetPrice } from '../../utils/format';
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { isGuestBrowsing } from '../../features/auth/guestBrowsing';
 import FuturesCandleChart from './FuturesCandleChart';
 
 /**
@@ -32,6 +34,9 @@ import FuturesCandleChart from './FuturesCandleChart';
 export default function FuturesChartScreen({ route, navigation }: FuturesChartScreenProps) {
   const { accountId, instrumentId, symbol, displayPriceDecimals } = route.params;
   const focused = useIsFocused();
+  // The futures screen's account draws its own prices only while it is the selected one.
+  const { selectedAccountId } = useTradingAccount();
+  const lineAccountId = !isGuestBrowsing() && selectedAccountId === accountId ? accountId : null;
   // AssetChart's own default; each 봉 시간 is its own contract query.
   const [timeframe, setTimeframe] = useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
   const [clock, setClock] = useState(() => Date.now());
@@ -76,6 +81,7 @@ export default function FuturesChartScreen({ route, navigation }: FuturesChartSc
         <FuturesCandleChart
           key={instrumentId}
           instrumentId={instrumentId}
+          accountId={lineAccountId}
           displayPriceDecimals={displayPriceDecimals}
           currentPrice={lastFresh ? last : null}
           timeframe={timeframe}

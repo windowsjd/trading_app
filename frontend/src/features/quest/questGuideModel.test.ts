@@ -91,7 +91,7 @@ describe('QUEST 01 spotlight follows the real exchange screen', () => {
   it('never runs ahead of the form: direction, amount and rate gate the later steps', () => {
     const wrong = spot(resolveGuideView(session({ step: 4 }), 'fx', facts({ fx: fx({ fromCurrency: 'USD' }) })));
     assert.deepEqual([wrong.step, wrong.card.tone, wrong.card.next], [1, 'warning', 'disabled']);
-    assert.match(wrong.card.body, /KRW → USD를 선택/);
+    assert.match(wrong.card.body, /KRW → USD 환전이에요\. 아래 화살표를 선택/);
     const empty = spot(resolveGuideView(session({ step: 5 }), 'fx', facts({ fx: fx({ amountValid: false, canExecute: false }) })));
     assert.deepEqual([empty.step, empty.card.next], [2, 'disabled']);
     const unavailable = spot(resolveGuideView(session({ step: 3 }), 'fx', facts({ fx: fx({ rate: 'unavailable', previewReady: false, canExecute: false }) })));

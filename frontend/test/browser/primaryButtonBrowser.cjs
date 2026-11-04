@@ -202,7 +202,7 @@ async function run() {
       // 환전 is a sheet over Wallet (2026-10-20).
       await page.evaluate(() => window.fixture.navigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet' } }));
       await id('wallet-exchange').click();
-      await id('wallet-fx-amount-input').fill('10000');
+      await id('wallet-fx-krw-amount-input').fill('10000');
       await page.waitForFunction(() => document.querySelector('[data-testid="wallet-fx-execute-submit"]')?.getAttribute('aria-disabled') !== 'true');
       await visual(id('wallet-fx-execute-submit'), `${mode}-fx`, true, true); await visual(id('wallet-fx-direction-krw-usd'), `${mode}-fx-selected`, false);
       await page.screenshot({ path: path.join(out, `${mode}-fx-screen.png`) });

@@ -70,7 +70,7 @@ async function run() {
     await page.evaluate(markers => { window.motionMarkers = markers; }, [destination, data, ...(
       flow.includes('AssetDetail') && !flow.includes('→ Order') ? ['asset-detail-name', 'asset-detail-primary-price', 'asset-detail-secondary-price', 'motion-asset-chart', 'asset-timeframe-selector', 'asset-order-actions'] :
       flow.includes('→ Order') ? ['asset-pair-header', 'order-quantity-input', 'order-quantity-slider', 'order-indicative-preview', 'order-execute-submit', 'account-holdings', 'holdings-count'] :
-      flow.includes('→ FX') ? ['wallet-fx-direction-krw-usd', 'wallet-fx-amount-input', 'wallet-fx-execute-submit'] :
+      flow.includes('→ FX') ? ['wallet-fx-direction-krw-usd', 'wallet-fx-krw-amount-input', 'wallet-fx-execute-submit'] :
       flow.includes('→ ProfitAnalysis') ? ['record-profit-total', 'motion-profit-chart', 'record-profit-best', 'record-profit-orders-cta'] :
       flow.includes('→ SeasonDetail') ? ['record-detail-return', 'record-detail-assets', 'record-season-detail-profit-analysis-cta'] : []
     )].filter(Boolean));
@@ -111,7 +111,7 @@ async function run() {
       }
     }
     if (!process.env.MOTION_REUSE_BUNDLE && condition === 'delayed' && flow === 'Wallet → FX' && fxState === 'available') {
-      for (const marker of ['wallet-fx-direction-krw-usd', 'wallet-fx-amount-input', 'wallet-fx-execute-submit']) {
+      for (const marker of ['wallet-fx-direction-krw-usd', 'wallet-fx-krw-amount-input', 'wallet-fx-execute-submit']) {
         const positions = record.geometry.flatMap(g => g.markers[marker] ? [g.markers[marker].y] : []);
         assert.ok(positions.length && Math.max(...positions) - Math.min(...positions) < 1.1, `${marker}: delayed rate must retain form position`);
       }

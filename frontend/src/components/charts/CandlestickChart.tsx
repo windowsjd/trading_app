@@ -20,6 +20,7 @@ import CandlestickChartRenderer, {
   type CandlestickChartGeometry,
   type RenderedCandle,
 } from './CandlestickChartRenderer';
+import { describeChartPriceLines, type ChartPriceLine } from './chartPriceLines';
 // Platform-resolved: `.native.tsx` on iOS/Android, `.web.tsx` on web (the
 // base file is the type contract + no-gesture fallback).
 import CandlestickGestures from './CandlestickGestures';
@@ -85,6 +86,12 @@ export type CandlestickChartProps = {
    * when React Query serves the new candles from cache.
    */
   viewportResetKey?: string | number;
+  /**
+   * The account's own prices for this chart (holding average, open limit
+   * orders, watched triggers), in the candles' currency. Drawn at their real
+   * price; they never change the price range, pan or zoom.
+   */
+  priceLines?: ChartPriceLine[];
 };
 
 type ParsedCandle = {
@@ -190,6 +197,7 @@ export default function CandlestickChart({
   height: heightOverride,
   emptyMessage = '표시할 차트 데이터가 없습니다.',
   viewportResetKey,
+  priceLines,
 }: CandlestickChartProps) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const displayRate = displayRateProp != null && Number.isFinite(displayRateProp) && displayRateProp > 0 ? displayRateProp : undefined;
@@ -206,6 +214,8 @@ export default function CandlestickChart({
   const [crosshair, setCrosshair] = useState<{ x: number; y: number } | null>(
     null,
   );
+  // Where the 최신 button ends, so price labels start below it.
+  const [resetBottom, setResetBottom] = useState(0);
 
   const [manualPriceScale, setManualPriceScale] = useState<ManualPriceScale | null>(null);
   const manualPriceScaleRef = useRef(manualPriceScale);
@@ -466,6 +476,10 @@ export default function CandlestickChart({
       displayPriceDecimals,
       displayRate,
     )}`,
+    ...(priceLines?.length
+      ? [describeChartPriceLines(priceLines, (price) =>
+          formatChartPrice(price, currencyCode, displayPriceDecimals, displayRate))]
+      : []),
   ].join(', ');
 
   return (
@@ -504,6 +518,9 @@ export default function CandlestickChart({
             formatTimeLabel={formatSeoulDateTimeLabel}
             firstVisibleTime={parsed[startIndex]?.time ?? null}
             lastVisibleTime={parsed[endIndex - 1]?.time ?? null}
+            priceLines={priceLines}
+            // Before the button is measured, its default 28 dp plus its 8 dp inset.
+            labelTop={canResetViewport ? (resetBottom || 36) + 4 : 0}
           />
         </CandlestickGestures>
       </View>
@@ -514,6 +531,10 @@ export default function CandlestickChart({
       {canResetViewport ? (
         <ActionPressable
           style={styles.resetButton}
+          onLayout={(event: LayoutChangeEvent) => {
+            const { y, height } = event.nativeEvent.layout;
+            setResetBottom(Math.ceil(y + height));
+          }}
           onPress={resetToLatest}
           accessibilityRole="button"
           accessibilityLabel="차트를 최신 구간으로 초기화"

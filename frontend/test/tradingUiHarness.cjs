@@ -120,9 +120,16 @@ function createTradingUiHarness(screenName) {
         if (resource === 'conditionalBuyOrders') return { ...base, ...h.conditionalQuery, data: h.conditionalQuery?.data ?? { tradingAccountId: h.account.id,
           capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
           conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
-        if (resource === 'conditionalSellOrders') return { ...base, ...h.sellQuery, data: h.sellQuery?.data ?? { tradingAccountId: h.account.id,
-          capabilities: { enabled: false, condition: { enabled: false, canCreate: false, canUseLimit: false }, protection: { enabled: false, canCreate: false, canUseLimit: false }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 30 },
-          conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
+        if (resource === 'conditionalSellOrders') {
+          const data = h.sellQuery?.data ?? { tradingAccountId: h.account.id,
+            capabilities: { enabled: false, condition: { enabled: false, canCreate: false, canUseLimit: false }, protection: { enabled: false, canCreate: false, canUseLimit: false }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 30 },
+            conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } };
+          // The open reads are per kind, as the server answers them.
+          const kind = options.queryKey[3] === 'open' ? options.queryKey[4] : null;
+          return { ...base, ...h.sellQuery, data: kind ? { ...data, conditionalOrders: data.conditionalOrders.filter(row => (row.kind === 'condition') === (kind === 'condition')) } : data };
+        }
+        // The account's open limit orders (all assets): none unless a test sets them.
+        if (resource === 'orders') return { ...base, ...h.ordersQuery, data: h.ordersQuery?.data ?? { tradingAccountId: h.account.id, items: [] } };
         if (resource === 'orderCapabilities') return { ...base, ...h.capabilityQuery, data: h.capabilityQuery?.data ?? { tradingAccountId: h.account.id,
           limitOrder: { enabled: true, autoExecutionEnabled: false }, limitOnClose: { enabled: false, markets: ['KRX'], sides: ['buy'], attachedProtection: false } } };
         if (resource === 'protections') return { ...base, data: { tradingAccountId: 'account-1', capabilities: { enabled: false, canCreateSpot: false, canUseSpotLimit: false, canCancel: true }, groups: [] } };
@@ -156,7 +163,8 @@ function createTradingUiHarness(screenName) {
     '../../app/navigation/navigationHooks': { useRootNavigation: () => navigation },
     '../../features/tradingAccount/api': api,
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({
-      accounts: [h.account], selectedAccountId: h.account.id, selectedAccount: h.account,
+      // `h.selectedAccountId` set: a selection that is still changing (it differs from the account).
+      accounts: [h.account], selectedAccountId: h.selectedAccountId === undefined ? h.account.id : h.selectedAccountId, selectedAccount: h.account,
       capabilities: getTradingAccountCapabilities(h.account), isLoading: false, isEmpty: false,
     }) },
     '../../constants/env': { buildWsUrl: () => null },

@@ -106,8 +106,10 @@ function load(file, mocks) {
         quoteCurrency: 'KRW', rate: '1350', validUntil: new Date(Date.now() + 60_000).toISOString() }) };
     }
     // The ratio slider's native build needs gesture-handler; screen tests pass
-    // its browser input. Shared sheets outside the order screen get the same.
-    if (name.endsWith('/QuantityRatioSlider') && !file.includes('/src/screens/order/')) {
+    // its browser input. Shared sheets outside the order screen get the same,
+    // and so does the order folder's own OrderRatioControls when a sheet
+    // elsewhere (the FX sheet) renders it without a slider mock.
+    if (name.endsWith('/QuantityRatioSlider')) {
       return mocks['./QuantityRatioSlider'] ?? mocks['../order/QuantityRatioSlider']
         ?? load(resolve(__dirname, '../src/screens/order/QuantityRatioSlider.web.tsx'), {});
     }

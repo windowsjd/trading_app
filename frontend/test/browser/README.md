@@ -1,5 +1,16 @@
 # Trading UI browser regression
 
+차트 거래 가격선(2026-11-04)은 `NODE_PATH=/path/to/browser-tools/node_modules BROWSER_EXECUTABLE_PATH=…
+node test/browser/chartPriceLinesBrowser.cjs` (`CHART_LINES_WIDTHS=320` for one width). 실제 CandlestickChart를
+`chartPriceLinesFixture.jsx`로 렌더링해 320/360/390px × Light/Dark × 시나리오 3개(떨어진 선·한 가격대 7개·범위 밖) ×
+USD/원화(36개)에서 라벨이 상자·플롯 안, 라벨끼리 겹침 없음, 선 = 라벨 수(범위 밖은 선 없이 ▲/▼), 평단가 라벨 빨강·부호 있는
+수익률, P&L 문구 없음, 접근성 이름에 선 목록, 드래그 후 `최신` 버튼 아래 라벨을 확인한다. 출력 `CHART_LINES_BROWSER_OUTPUT`.
+
+환전 시트(2026-11-04)는 `… node test/browser/fxSheetBrowser.cjs` (`FX_SHEET_QUICK=1`: 320px/2x only). 전체 앱
+fixture(`beginnerMocks.js`, 일반 계정 `holdings=1`)에서 KRW 카드·화살표·USD 카드·비율·견적·환전하기 순서, 글자 없는 44dp 화살표와
+선택 표시, 글자 넘침 없음, 받을 금액 입력 중 포커스·커서 유지와 보낼 금액 계산, 50% 비율(사용 가능 잔액 기준), 방향 전환 후 칸
+유지·재계산·잔액 부족, 받을 금액 기준 실행의 quote `sourceAmount` = 화면의 보낼 금액을 확인한다. 출력 `FX_SHEET_BROWSER_OUTPUT`.
+
 호가 고정 색상 회귀(2026-10-18)는 `orderBookColorsBrowser.cjs`를 사용한다.
 기존 trading/futures fixture로 실제 화면을 렌더링하고, 320px × 글꼴 1/2배 ×
 Light/Dark × 금융 색상 2설정의 16개 화면에서 Ask 빨강·Bid 파랑, 행 배경,

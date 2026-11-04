@@ -123,7 +123,9 @@ describe('order quote display and safety contract', () => {
 
     assert.match(orderScreen, /value=\{orderInput\}/u);
     assert.match(orderScreen, /value=\{limitPrice\}/u);
-    assert.match(walletScreen, /value=\{amount\}/u);
+    // Both FX fields: the typed one verbatim, the other computed (resolveFxAmounts).
+    assert.match(walletScreen, /value=\{amounts\.fields\.KRW\}/u);
+    assert.match(walletScreen, /value=\{amounts\.fields\.USD\}/u);
     assert.doesNotMatch(orderScreen, /<TextInput[^>]*value=\{formatDisplayDecimal\(/u);
     assert.doesNotMatch(walletScreen, /<TextInput[^>]*value=\{formatDisplayDecimal\(/u);
   });

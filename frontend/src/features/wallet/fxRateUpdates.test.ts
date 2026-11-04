@@ -41,18 +41,24 @@ function transport() {
 }
 
 describe('FX rate notifications', () => {
-  for (const direction of ['KRW', 'USD']) {
-    it(`resyncs canonical REST and updates ${direction} preview without clearing input`, async () => {
+  const fieldOf = (currency: string) => currency === 'KRW' ? TEST_IDS.walletFx.krwAmountInput : TEST_IDS.walletFx.usdAmountInput;
+  // The amount typed as the amount to pay (its own wallet) or to receive (the other).
+  for (const direction of ['KRW', 'USD']) for (const basis of ['pay', 'receive']) {
+    it(`resyncs canonical REST and updates a ${direction}-paying preview typed as the amount to ${basis} without clearing input`, async () => {
       const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
       let tree = h.render();
       if (direction === 'USD') {
         h.control(tree, TEST_IDS.walletFx.directionUsdKrw).props.onPress();
         tree = h.render();
       }
-      const amount = direction === 'KRW' ? '900000' : '100';
-      h.control(tree, TEST_IDS.walletFx.amountInput).props.onChangeText(amount);
+      const typed = basis === 'pay' ? direction : direction === 'KRW' ? 'USD' : 'KRW';
+      const computed = typed === 'KRW' ? 'USD' : 'KRW';
+      const amount = typed === 'KRW' ? '900000' : '100';
+      h.control(tree, fieldOf(typed)).props.onChangeText(amount);
       tree = h.render();
       const before = elements(tree, 'PreviewAmounts')[0].props.rows;
+      const computedBefore = h.control(tree, fieldOf(computed)).props.value;
+      assert.notEqual(computedBefore, '');
       let canonicalRate = '1350';
       let reads = 0;
       const wire = transport();
@@ -76,10 +82,17 @@ describe('FX rate notifications', () => {
       const after = elements(tree, 'PreviewAmounts')[0].props.rows;
       assert.notDeepEqual(after, before);
       assert.notEqual(after[0].value, before[0].value);
-      assert.notEqual(after[1].value, before[1].value);
-      assert.notEqual(after[2].value, before[2].value);
+      if (basis === 'pay') {
+        // The same amount to pay buys a different amount at the new rate.
+        assert.notEqual(after[1].value, before[1].value);
+        assert.notEqual(after[2].value, before[2].value);
+      } else {
+        // The same amount to receive now costs a different amount to pay.
+        assert.equal(after[2].value, before[2].value);
+      }
+      assert.notEqual(h.control(tree, fieldOf(computed)).props.value, computedBefore);
       assert.equal(
-        h.control(tree, TEST_IDS.walletFx.amountInput).props.value,
+        h.control(tree, fieldOf(typed)).props.value,
         amount,
       );
       assert.equal(
@@ -129,17 +142,17 @@ describe('FX rate notifications', () => {
   it('keeps the existing account-switch reset while rates remain account-independent', async () => {
     const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     let tree = h.render();
-    h.control(tree, TEST_IDS.walletFx.amountInput).props.onChangeText('100000');
+    h.control(tree, TEST_IDS.walletFx.krwAmountInput).props.onChangeText('100000');
     tree = h.render();
     assert.equal(
-      h.control(tree, TEST_IDS.walletFx.amountInput).props.value,
+      h.control(tree, TEST_IDS.walletFx.krwAmountInput).props.value,
       '100000',
     );
     h.account = { ...h.account, id: 'account-2' };
     h.render();
     tree = h.render();
     assert.equal(
-      h.control(tree, TEST_IDS.walletFx.amountInput).props.value,
+      h.control(tree, TEST_IDS.walletFx.krwAmountInput).props.value,
       '',
     );
     const wire = transport();
@@ -150,7 +163,7 @@ describe('FX rate notifications', () => {
     await flush();
     tree = h.render();
     assert.equal(
-      h.control(tree, TEST_IDS.walletFx.amountInput).props.value,
+      h.control(tree, TEST_IDS.walletFx.krwAmountInput).props.value,
       '',
     );
     assert.equal(h.requests.length, 0);

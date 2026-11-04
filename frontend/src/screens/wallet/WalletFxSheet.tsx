@@ -41,12 +41,19 @@ import {
 } from '../../features/wallet/fxAccountScope';
 import {
   getFxExecuteSuccessDisplay,
-  getWalletBalanceAmount,
   getWalletByCurrency,
   getWalletViewState,
   isFxIdempotencyConflictCode,
   isFxRequoteRequiredCode,
 } from '../../features/wallet/mapper';
+import {
+  fxSourceAtRatio,
+  fxSourceShare,
+  otherFxCurrency,
+  resolveFxAmounts,
+  spendableDisplayAmount,
+  type FxAmountEntry,
+} from '../../features/wallet/fxAmountEntry';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import type { WalletFxViewState } from '../../models/enums/viewState';
 import {
@@ -59,20 +66,19 @@ import {
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { transferAvailableAmount, transferAmountFits, WalletBalanceCheckError } from '../../features/wallet/walletTransfer';
-import {
-  formatDisplayDecimal,
-  formatKrw,
-  formatUsd,
-} from '../../utils/format';
+import { formatDisplayDecimal, formatMoney } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import BlockedState from '../../components/states/BlockedState';
-import { formatPreviewMoney, fxPreview, isPositiveInput, isPreviewFxAvailable } from '../../features/tradingAccount/indicativePreview';
+import { formatPreviewMoney, isPositiveInput, isPreviewFxAvailable } from '../../features/tradingAccount/indicativePreview';
 import { runQuotedAction, type QuotedAction } from '../../features/tradingAccount/quotedAction';
 import { useStaleRecheck } from '../../features/asset/useStaleRecheck';
 import PreviewAmounts from '../../components/tradingAccount/PreviewAmounts';
 import CTAButton from '../../components/common/CTAButton';
+import Svg, { Path } from 'react-native-svg';
+import { useAppearance } from '../../theme/appearance';
+import OrderRatioControls from '../order/OrderRatioControls';
 import FxReceipt from './FxReceipt';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { useFxRateUpdates } from '../../features/wallet/useFxRateUpdates';
@@ -117,6 +123,9 @@ const QUOTE_EXPIRED_MESSAGE =
 const REQUOTE_REQUIRED_MESSAGE = '환율이 변경되어 환전하지 못했습니다. 환전하기를 다시 눌러주세요.';
 const IDEMPOTENCY_CONFLICT_MESSAGE =
   '이미 처리 중인 요청입니다. 환전 내역을 확인해주세요.';
+const SOURCE_BASIS_HELPER = '받는 통화에서 수수료가 차감됩니다. 실제 환전 금액은 실행 시 확정됩니다.';
+const TARGET_BASIS_HELPER =
+  '받을 금액에 맞춰 보낼 금액을 계산했습니다. 받는 통화에서 수수료가 차감되며, 실제 수령액은 실행 시 확정됩니다.';
 
 function getFxDomainErrorMessage(
   code?: string | null,
@@ -139,11 +148,20 @@ function getFxDomainErrorMessage(
  * idempotency key, re-quote on expiry/rate change, uncertain-result retry,
  * account scope fences — is the former full screen's, unchanged. The receipt
  * replaces the form inside the same sheet.
+ *
+ * The form (2026-11-04): the KRW wallet on top and the USD wallet below, never
+ * moving; two arrows between them pick the direction. Either wallet's amount
+ * can be typed: in the paying wallet it is the amount to pay, in the other the
+ * amount to receive, converted into the amount to pay at the current rate and
+ * fee (`resolveFxAmounts`). The request is still the server's source-based
+ * quote; the ratio slider sizes that amount from the paying wallet's spendable
+ * balance.
  */
 export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onGoMarket, onExchanged, onBusyChange }: Props) {
   const inputScroll = useFocusedInputScroll();
   const { onInputBlur: clearInputFocus } = inputScroll;
-  const amountRef = useRef<View>(null);
+  const krwFieldRef = useRef<View>(null);
+  const usdFieldRef = useRef<View>(null);
   const queryClient = useQueryClient();
   const rootNavigation = useRootNavigation();
   const {
@@ -196,13 +214,15 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
   });
 
   const [fromCurrency, setFromCurrency] = useState<Currency>(initialFromCurrency);
-  const [amount, setAmount] = useState('');
+  // The field typed last, as typed; the other field is computed from it.
+  const [entry, setEntry] = useState<FxAmountEntry>({ currency: initialFromCurrency, text: '' });
+  // The ratio that sized the amount to pay, while it still describes it.
+  const [chosenRatio, setChosenRatio] = useState<number | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
   const [diagnosticError, setDiagnosticError] = useState<unknown>(null);
   const [fxDomainState, setFxDomainState] = useState<FxDomainState | null>(null);
   const [successData, setSuccessData] = useState<FxExecuteDto | null>(null);
-  const [rateStatusMinHeight, setRateStatusMinHeight] = useState(0);
   const [, setPreviewClock] = useState(0);
   useStaleRecheck(true, () => setPreviewClock((value) => value + 1));
   const mountedRef = useRef(true);
@@ -298,7 +318,8 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
         // A host continuing elsewhere (back to its transfer) takes the result; else the receipt.
         if (committed && onExchanged) onExchanged(data.result);
         else if (!adopted) setSuccessData(data.result);
-        setAmount('');
+        setEntry((current) => ({ currency: current.currency, text: '' }));
+        setChosenRatio(null);
         setFxDomainState(null);
         setFieldError(null);
         setDomainError(null);
@@ -315,6 +336,12 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
       balanceFailureRead.current = walletsQuery.dataUpdatedAt;
       action.uncertain = !(error instanceof WalletBalanceCheckError) && !!action.quote &&
         (!getApiErrorInfo(error).hasResponse || (getApiErrorStatus(error) ?? 0) >= 500);
+      // An unknown outcome is retried as the same command: the form shows the
+      // amount that command pays, never a re-converted amount to receive.
+      if (action.uncertain) {
+        const { fromCurrency: paying, sourceAmount: paid } = action.request.payload;
+        setEntry((current) => (current.currency === paying ? current : { currency: paying, text: paid }));
+      }
       setDiagnosticError(error);
       const code = getApiErrorCode(error);
       if (isFxRequoteRequiredCode(code)) {
@@ -332,12 +359,12 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
     },
   });
 
-  const toCurrency: Currency = fromCurrency === 'KRW' ? 'USD' : 'KRW';
+  const toCurrency: Currency = otherFxCurrency(fromCurrency);
 
-  const inputInvalidReason = !amount.trim() ? '금액을 입력해주세요.'
-    : !isPositiveInput(amount, 8) ? '0보다 큰 금액을 소수점 이하 8자리까지 입력해주세요.' : null;
-  const preview = fxPreview({ amount: amount.trim(), fromCurrency, rate: availableRate,
+  const amounts = resolveFxAmounts({ fromCurrency, entry, rate: availableRate,
     feeRate: !feeQuery.isError ? feeQuery.data?.feePolicy?.fxFeeRate : null, now: Date.now() });
+  const { preview, sourceAmount } = amounts;
+  const entryText = entry.text.trim();
 
   const walletLookupState = useMemo(
     () =>
@@ -363,7 +390,8 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
 
   useEffect(() => {
     clearInputFocus();
-    setAmount('');
+    setEntry((current) => ({ currency: current.currency, text: '' }));
+    setChosenRatio(null);
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
@@ -378,19 +406,23 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
   const balanceReady = !walletsQuery.isError && !walletsQuery.isLoading && !walletsQuery.isFetching;
   const sourceAvailable = balanceReady && walletsQuery.data?.tradingAccountId === accountId
     ? transferAvailableAmount(getWalletByCurrency(walletsQuery.data, fromCurrency)) : null;
-  const amountFits = !inputInvalidReason && transferAmountFits(amount.trim(), sourceAvailable);
+  // Spendable (balance − reserved) as last read, for the wallets and the ratio;
+  // the balance check above still waits for a settled read.
+  const spendable = (currency: Currency) => walletsQuery.data?.tradingAccountId === accountId
+    ? transferAvailableAmount(getWalletByCurrency(walletsQuery.data, currency)) : null;
+  const amountFits = !!sourceAmount && transferAmountFits(sourceAmount, sourceAvailable);
   const uncertainRetry = !!actionRef.current?.uncertain && !!actionRef.current.quote;
-  const insufficient = !inputInvalidReason && sourceAvailable !== null && !amountFits && !uncertainRetry;
+  const insufficient = !!sourceAmount && sourceAvailable !== null && !amountFits && !uncertainRetry;
   useEffect(() => {
     if (domainError === '잔액이 부족합니다.' && balanceReady && amountFits &&
       walletsQuery.dataUpdatedAt !== balanceFailureRead.current) setDomainError(null);
   }, [amountFits, balanceReady, domainError, walletsQuery.dataUpdatedAt]);
   const viewState: WalletFxViewState = walletLookupState !== 'wallet_ready'
     ? walletLookupState : pending ? 'fx_execute_submitting'
-      : fxDomainState ?? (amount.trim() && inputInvalidReason ? 'fx_input_invalid' : 'fx_input_idle');
+      : fxDomainState ?? (entryText && amounts.invalidReason ? 'fx_input_invalid' : 'fx_input_idle');
   const canExecute = walletLookupState === 'wallet_ready' && !!availableRate &&
-    !!preview && !inputInvalidReason && (amountFits || uncertainRetry) && capabilities?.canExchange && !pending && !successData && !actionRef.current?.completed;
-  const inputErrorMessage = fieldError ?? (amount.trim() ? inputInvalidReason : null) ?? (insufficient ? '잔액이 부족합니다.' : null);
+    !!preview && !!sourceAmount && (amountFits || uncertainRetry) && capabilities?.canExchange && !pending && !successData && !actionRef.current?.completed;
+  const inputErrorMessage = fieldError ?? (entryText ? amounts.invalidReason : null) ?? (insufficient ? '잔액이 부족합니다.' : null);
 
   // What the beginner quest guide may point at next; it reads, never drives.
   const guideRate = availableRate ? 'available' : rateQuery.isLoading ? 'loading' : 'unavailable';
@@ -400,9 +432,9 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
       accountId,
       blocked: !capabilities?.canExchange,
       fromCurrency,
-      amountValid: !inputInvalidReason && (amountFits || uncertainRetry),
+      amountValid: !!sourceAmount && (amountFits || uncertainRetry),
       rate: guideRate,
-      previewReady: !inputInvalidReason && !!preview && !!availableRate,
+      previewReady: !!sourceAmount && !!preview && !!availableRate,
       canExecute: !!canExecute,
       pending,
       failed: !!domainError,
@@ -426,22 +458,60 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
     setFxDomainState(null);
     setSuccessData(null);
   };
+  const chooseDirection = (currency: Currency) => {
+    if (submitLockRef.current) return;
+    setFromCurrency(currency);
+    setChosenRatio(null);
+    resetFxActionState();
+  };
+  const editAmount = (currency: Currency, text: string) => {
+    if (submitLockRef.current) return;
+    setEntry({ currency, text });
+    setChosenRatio(null);
+    resetFxActionState();
+  };
+  // The ratio bar sizes the amount to pay from the paying wallet's spendable
+  // balance; a typed amount (either field) moves the thumb back, never the text.
+  const ratioBase = spendable(fromCurrency);
+  const ratioDisabledReason = ratioBase === null ? '보내는 지갑의 사용 가능 금액을 확인할 수 없습니다.'
+    : !(Number(ratioBase) > 0) ? '보내는 지갑에 사용 가능한 금액이 없습니다.' : null;
+  const activeRatio = !ratioDisabledReason && chosenRatio !== null && entry.currency === fromCurrency &&
+    (chosenRatio === 0 ? !entry.text : fxSourceAtRatio(ratioBase, chosenRatio) === entry.text) ? chosenRatio : null;
+  const displayedRatio = activeRatio ?? fxSourceShare(sourceAmount, ratioBase);
+  const applyRatio = (value: number) => {
+    if (submitLockRef.current || ratioDisabledReason || !Number.isFinite(value)) return;
+    const ratio = Math.max(0, Math.min(1, value));
+    const text = ratio === 0 ? '' : fxSourceAtRatio(ratioBase, ratio);
+    if (text === null || (ratio > 0 && !(Number(text) > 0))) {
+      setFieldError('계산된 환전 금액이 너무 작습니다.');
+      return;
+    }
+    setEntry({ currency: fromCurrency, text });
+    setChosenRatio(ratio);
+    resetFxActionState();
+  };
   const retryWalletLookup = () => {
     void walletsQuery.refetch();
     void rateQuery.refetch();
   };
   const executeQuote = () => {
-    if (submitLockRef.current || !canExecute) return;
+    if (submitLockRef.current || !canExecute || !sourceAmount) return;
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
     setFxDomainState(null);
+    // A kept command is resent only while it pays what the form shows: an
+    // amount to receive is re-converted at each rate, so a moved conversion is
+    // a new intent. An unknown outcome keeps its command (see onError).
+    const kept = actionRef.current?.request.payload;
+    if (kept && !uncertainRetry && (kept.fromCurrency !== fromCurrency ||
+      kept.toCurrency !== toCurrency || kept.sourceAmount !== sourceAmount)) actionRef.current = null;
     actionRef.current ??= {
       request: {
         scope: readScope(), seasonUi: capabilities?.isSeason ?? false,
         isGeneral: capabilities?.isGeneral === true,
         reportQuestCommand: captureQuestGuideCommand(),
-        payload: { fromCurrency, toCurrency, sourceAmount: amount.trim() },
+        payload: { fromCurrency, toCurrency, sourceAmount },
       },
       idempotencyKey: createIdempotencyKey('fx'),
     };
@@ -559,9 +629,6 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
     );
   }
 
-  const krwWallet = getWalletBalanceAmount(walletsQuery.data, 'KRW');
-  const usdWallet = getWalletBalanceAmount(walletsQuery.data, 'USD');
-
   // The sheet supplies keyboard room; the scroll keeps the input and CTA visible.
   return (
       <View ref={questGuideTarget('fx-viewport')} collapsable={false} style={styles.viewport}>
@@ -581,30 +648,8 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
           <FxReceipt payload={successData} onGoMarket={onGoMarket}
             onDone={() => { if (onDone) onDone(); else setSuccessData(null); }} />
         ) : <>
-        {/* Three equal rows only. An unavailable rate is never replaced by a
-            number; its explanation, retry and diagnostics sit below. */}
-        <View style={styles.card} testID="fx-wallet-summary">
-          <SummaryRow label="KRW Wallet" value={formatKrw(krwWallet)} testID="fx-summary-krw" />
-          <SummaryRow label="USD Wallet" value={formatUsd(usdWallet)} testID="fx-summary-usd" />
-          <View
-            testID="fx-rate-status"
-            style={[styles.summaryRow, { minHeight: rateStatusMinHeight }]}
-            // Keep the measured loading row height when the shorter rate
-            // arrives. Text may still grow with wrapping or accessibility size.
-            onLayout={rateQuery.isLoading ? (event) => {
-              const height = event.nativeEvent.layout.height;
-              setRateStatusMinHeight(previous => Math.max(previous, height));
-            } : undefined}
-          >
-            <Text style={styles.summaryLabel}>환율</Text>
-            <Text style={styles.summaryValue} testID="fx-summary-rate">
-              {availableRate
-                ? formatDisplayDecimal(availableRate.rate)
-                : rateQuery.isLoading ? '불러오는 중' : '-'}
-            </Text>
-          </View>
-        </View>
-
+        {/* An unavailable rate is never replaced by a number: its
+            explanation, retry and diagnostics come first. */}
         {!availableRate && !rateQuery.isLoading ? (
           <View ref={questGuideTarget('fx-rate-error')} collapsable={false} style={styles.card} testID="fx-rate-unavailable">
             <Text style={styles.errorText}>
@@ -635,106 +680,96 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
           <AdminDiagnosticPanel runtime={fxRuntime} />
         ) : null}
 
-        <View style={styles.card}>
-          <Text style={styles.label}>환전 방향</Text>
-
-          <View ref={questGuideTarget('fx-direction')} collapsable={false} style={styles.row} testID="wallet-fx-direction-row">
-            <ActionPressable
-              testID={TEST_IDS.walletFx.directionKrwUsd}
-              disabled={pending}
-              style={[
-                styles.directionChip,
-                fromCurrency === 'KRW' && styles.directionChipActive,
-              ]}
-              onPress={() => {
-                if (submitLockRef.current) return;
-                setFromCurrency('KRW');
-                resetFxActionState();
-              }}
-            >
-              <Text
-                style={
-                  fromCurrency === 'KRW'
-                    ? styles.directionChipTextActive
-                    : styles.directionChipText
-                }
-              >
-                KRW → USD
-              </Text>
-            </ActionPressable>
-
-            <ActionPressable
-              testID={TEST_IDS.walletFx.directionUsdKrw}
-              disabled={pending}
-              style={[
-                styles.directionChip,
-                fromCurrency === 'USD' && styles.directionChipActive,
-              ]}
-              onPress={() => {
-                if (submitLockRef.current) return;
-                setFromCurrency('USD');
-                resetFxActionState();
-              }}
-            >
-              <Text
-                style={
-                  fromCurrency === 'USD'
-                    ? styles.directionChipTextActive
-                    : styles.directionChipText
-                }
-              >
-                USD → KRW
-              </Text>
-            </ActionPressable>
-          </View>
-
-          <View ref={amountRef} collapsable={false}>
-            <TextInput
-              ref={questGuideTarget('fx-amount')}
-              testID={TEST_IDS.walletFx.amountInput}
-              editable={!pending}
-              style={styles.input}
-              value={amount}
-              onChangeText={(value) => {
-                if (submitLockRef.current) return;
-                setAmount(value);
-                resetFxActionState();
-              }}
-              keyboardType="decimal-pad"
-              placeholder="환전 금액"
-              onFocus={() => inputScroll.onInputFocus(amountRef.current)}
-              onBlur={inputScroll.onInputBlur}
-            />
-          </View>
-
-          {inputErrorMessage ? (
-            <Text style={styles.errorText}>{inputErrorMessage}</Text>
-          ) : null}
-          {domainError ? <Text style={styles.errorText}>{domainError}</Text> : null}
-          {domainError ? (
-            <AdminDiagnosticPanel error={diagnosticError} />
-          ) : null}
+        {/* KRW always on top, USD always below; only the arrows say which pays. */}
+        <FxWalletField
+          currency="KRW"
+          paying={fromCurrency === 'KRW'}
+          spendable={spendable('KRW')}
+          value={amounts.fields.KRW}
+          editable={!pending}
+          fieldRef={krwFieldRef}
+          inputRef={fromCurrency === 'KRW' ? questGuideTarget('fx-amount') : undefined}
+          onChangeText={(text) => editAmount('KRW', text)}
+          onFocus={() => inputScroll.onInputFocus(krwFieldRef.current)}
+          onBlur={inputScroll.onInputBlur}
+        />
+        <View
+          ref={questGuideTarget('fx-direction')}
+          collapsable={false}
+          style={styles.directionRow}
+          testID="wallet-fx-direction-row"
+          accessibilityRole="radiogroup"
+          accessibilityLabel="환전 방향"
+        >
+          <DirectionArrow
+            testID={TEST_IDS.walletFx.directionKrwUsd}
+            direction="down"
+            accessibilityLabel="KRW에서 USD로 환전"
+            selected={fromCurrency === 'KRW'}
+            disabled={pending}
+            onPress={() => chooseDirection('KRW')}
+          />
+          <DirectionArrow
+            testID={TEST_IDS.walletFx.directionUsdKrw}
+            direction="up"
+            accessibilityLabel="USD에서 KRW로 환전"
+            selected={fromCurrency === 'USD'}
+            disabled={pending}
+            onPress={() => chooseDirection('USD')}
+          />
         </View>
+        <FxWalletField
+          currency="USD"
+          paying={fromCurrency === 'USD'}
+          spendable={spendable('USD')}
+          value={amounts.fields.USD}
+          editable={!pending}
+          fieldRef={usdFieldRef}
+          inputRef={fromCurrency === 'USD' ? questGuideTarget('fx-amount') : undefined}
+          onChangeText={(text) => editAmount('USD', text)}
+          onFocus={() => inputScroll.onInputFocus(usdFieldRef.current)}
+          onBlur={inputScroll.onInputBlur}
+        />
 
-        {!inputInvalidReason ? (
-          <View ref={questGuideTarget('fx-preview')} collapsable={false} style={styles.card} testID="fx-indicative-preview">
-            <Text ref={questGuideTarget('fx-quote-title')} style={styles.label} testID="fx-quote-title">예상 환전 견적</Text>
-            {preview && availableRate ? <>
-              <PreviewAmounts rows={[
-                { label: '적용 환율 (USD/KRW)', value: formatDisplayDecimal(availableRate.rate), ref: questGuideTarget('fx-rate-row'), testID: 'fx-preview-rate' },
-                { label: '예상 수수료', value: formatPreviewMoney(preview.feeAmount, preview.feeCurrency), ref: questGuideTarget('fx-fee-row'), testID: 'fx-preview-fee' },
-                { label: '예상 수령액', value: formatPreviewMoney(preview.netTargetAmount, toCurrency), ref: questGuideTarget('fx-net-row'), testID: 'fx-preview-net' },
-              ]} />
-              <Text style={styles.helper}>받는 통화에서 수수료가 차감됩니다. 실제 환전 금액은 실행 시 확정됩니다.</Text>
-            </> : <>
-              <Text style={styles.errorText}>{!availableRate ? '현재 환율이 없거나 오래되어 예상 수령액을 표시할 수 없습니다.' : feeQuery.isPending ? '수수료 정보를 확인하는 중입니다.' : '수수료 정보를 불러오지 못해 예상 수령액을 표시할 수 없습니다.'}</Text>
-              {feeQuery.isError ? (
-                <AdminDiagnosticPanel error={feeQuery.error} />
-              ) : null}
-              {feeQuery.isError ? <CTAButton variant="neutral" label="수수료 다시 불러오기" onPress={() => void feeQuery.refetch()} /> : null}
-            </>}
+        {inputErrorMessage || domainError ? (
+          <View style={styles.messages}>
+            {inputErrorMessage ? <Text style={styles.errorText}>{inputErrorMessage}</Text> : null}
+            {domainError ? <Text style={styles.errorText}>{domainError}</Text> : null}
+            {domainError ? <AdminDiagnosticPanel error={diagnosticError} /> : null}
           </View>
         ) : null}
+
+        <View style={styles.ratio}>
+          <OrderRatioControls
+            testID="wallet-fx-ratio"
+            label="환전 비율"
+            accessibilityLabel="보내는 지갑의 사용 가능 금액 중 환전할 비율"
+            pickLabel="사용 가능 금액"
+            value={displayedRatio}
+            active={activeRatio}
+            disabled={pending || !!ratioDisabledReason}
+            reason={ratioDisabledReason}
+            onChange={applyRatio}
+          />
+        </View>
+
+        <View ref={questGuideTarget('fx-preview')} collapsable={false} style={styles.card} testID="fx-indicative-preview">
+          <Text ref={questGuideTarget('fx-quote-title')} style={styles.label} testID="fx-quote-title">예상 환전 견적</Text>
+          <PreviewAmounts rows={[
+            { label: '적용 환율 (USD/KRW)', value: availableRate ? formatDisplayDecimal(availableRate.rate) : rateQuery.isLoading ? '불러오는 중' : '-', ref: questGuideTarget('fx-rate-row'), testID: 'fx-preview-rate' },
+            { label: '예상 수수료', value: preview ? formatPreviewMoney(preview.feeAmount, preview.feeCurrency) : '-', ref: questGuideTarget('fx-fee-row'), testID: 'fx-preview-fee' },
+            { label: '예상 수령액', value: preview ? formatPreviewMoney(preview.netTargetAmount, toCurrency) : '-', ref: questGuideTarget('fx-net-row'), testID: 'fx-preview-net' },
+          ]} />
+          {preview && availableRate ? (
+            <Text style={styles.helper}>{amounts.basis === 'target' ? TARGET_BASIS_HELPER : SOURCE_BASIS_HELPER}</Text>
+          ) : entryText && !amounts.invalidReason ? <>
+            <Text style={styles.errorText}>{!availableRate ? '현재 환율이 없거나 오래되어 예상 금액을 계산할 수 없습니다.' : feeQuery.isPending ? '수수료 정보를 확인하는 중입니다.' : '수수료 정보를 불러오지 못해 예상 금액을 계산할 수 없습니다.'}</Text>
+            {feeQuery.isError ? (
+              <AdminDiagnosticPanel error={feeQuery.error} />
+            ) : null}
+            {feeQuery.isError ? <CTAButton variant="neutral" label="수수료 다시 불러오기" onPress={() => void feeQuery.refetch()} /> : null}
+          </> : null}
+        </View>
         <View ref={inputScroll.submitRef} collapsable={false}>
           <View ref={questGuideTarget('fx-submit')} collapsable={false}>
             <CTAButton testID={TEST_IDS.walletFx.executeSubmit} label="환전하기"
@@ -748,12 +783,81 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
   );
 }
 
-function SummaryRow({ label, value, testID }: { label: string; value: string; testID: string }) {
+/**
+ * One wallet: its name and spendable amount (balance − reserved, rounded
+ * down), and its amount field — the amount to pay in the paying wallet, the
+ * amount to receive in the other. Either can be typed.
+ */
+function FxWalletField({ currency, paying, spendable, value, editable, fieldRef, inputRef, onChangeText, onFocus, onBlur }: {
+  currency: Currency;
+  paying: boolean;
+  spendable: string | null;
+  value: string;
+  editable: boolean;
+  fieldRef: React.RefObject<View | null>;
+  /** The quest guide's amount target, on the paying wallet's field. */
+  inputRef?: ReturnType<typeof questGuideTarget>;
+  onChangeText: (text: string) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+}) {
+  const shown = spendableDisplayAmount(spendable, currency);
+  const role = paying ? '보낼 금액' : '받을 금액 (예상)';
   return (
-    <View style={styles.summaryRow} testID={testID}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>{value}</Text>
+    <View style={styles.card} testID={`fx-wallet-${currency.toLowerCase()}`}>
+      <View style={styles.walletHeader}>
+        <Text style={styles.walletName}>{currency} Wallet</Text>
+        <Text style={styles.walletSpendable} testID={`fx-wallet-${currency.toLowerCase()}-spendable`}>
+          사용 가능 {shown === null ? '-' : formatMoney(shown, currency)}
+        </Text>
+      </View>
+      <View ref={fieldRef} collapsable={false} style={styles.field}>
+        <Text style={styles.label}>{role}</Text>
+        <TextInput
+          ref={inputRef}
+          testID={currency === 'KRW' ? TEST_IDS.walletFx.krwAmountInput : TEST_IDS.walletFx.usdAmountInput}
+          accessibilityLabel={`${currency} ${role}`}
+          editable={editable}
+          style={styles.input}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType="decimal-pad"
+          placeholder={role}
+          onFocus={onFocus}
+          onBlur={onBlur}
+        />
+      </View>
     </View>
+  );
+}
+
+/** A direction is an arrow alone; its spoken name says which way. */
+function DirectionArrow({ direction, selected, disabled, testID, accessibilityLabel, onPress }: {
+  direction: 'down' | 'up';
+  selected: boolean;
+  disabled: boolean;
+  testID: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  const { colors } = useAppearance();
+  return (
+    <ActionPressable
+      testID={testID}
+      accessibilityRole="radio"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected, checked: selected, disabled }}
+      aria-checked={selected}
+      aria-disabled={disabled}
+      disabled={disabled}
+      style={[styles.arrow, selected && styles.arrowSelected]}
+      onPress={onPress}
+    >
+      <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={selected ? colors.onAccent : colors.muted}
+        strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+        <Path d={direction === 'down' ? 'M12 4v16M5 13l7 7 7-7' : 'M12 20V4M5 11l7-7 7 7'} />
+      </Svg>
+    </ActionPressable>
   );
 }
 
@@ -761,7 +865,6 @@ const styles = StyleSheet.create({
   viewport: { flexShrink: 1, minHeight: 0 },
   scroll: { flexGrow: 0 },
   content: { gap: 12, paddingTop: 4, paddingBottom: 4 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     borderWidth: 1,
     borderColor: semantic.border,
@@ -770,9 +873,9 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.surface,
     gap: 10,
   },
-  // One row structure for all three summary items: label and value share the
-  // size and weight; a long value wraps under its label instead of clipping.
-  summaryRow: {
+  // The wallet's name and what it can spend share a row; a long amount or a
+  // large font wraps it under the name instead of clipping.
+  walletHeader: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'baseline',
@@ -780,18 +883,33 @@ const styles = StyleSheet.create({
     columnGap: 12,
     rowGap: 2,
   },
-  summaryLabel: { fontSize: 18, fontWeight: '700', lineHeight: 26, color: semantic.secondary, flexShrink: 0 },
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 26,
-    color: semantic.text,
+  walletName: { fontSize: 18, fontWeight: '700', lineHeight: 26, color: semantic.text, flexShrink: 0 },
+  walletSpendable: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: semantic.secondary,
     flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
     textAlign: 'right',
     fontVariant: ['tabular-nums'],
   },
+  field: { gap: 6 },
+  directionRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  // Same size selected or not (the border only changes color).
+  arrow: {
+    width: 64,
+    minHeight: 44,
+    borderWidth: 2,
+    borderColor: semantic.border,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: semantic.raised,
+  },
+  arrowSelected: { backgroundColor: semantic.selected, borderColor: semantic.text },
+  messages: { gap: 6, paddingHorizontal: 4 },
+  ratio: { paddingHorizontal: 4 },
   label: { fontSize: 13, color: semantic.secondary },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21, flexShrink: 1 },
   // Full text, wrapped: a capability notice that is cut to one ellipsised line
@@ -807,33 +925,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: semantic.input,
     fontSize: 16,
-  },
-  directionChip: {
-    flex: 1,
-    minWidth: 130,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: semantic.raised,
-  },
-  directionChipActive: {
-    backgroundColor: semantic.selected,
-    borderColor: semantic.selected,
-  },
-  directionChipText: {
-    color: semantic.text,
-    fontWeight: '600',
-    lineHeight: 21,
-    textAlign: 'center',
-    flexShrink: 1,
-  },
-  directionChipTextActive: {
-    color: semantic.onAccent,
-    fontWeight: '600',
-    lineHeight: 21,
-    textAlign: 'center',
-    flexShrink: 1,
   },
 });

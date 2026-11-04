@@ -16,6 +16,15 @@ import {
   chartLabelWidth,
 } from './candlestickLayout';
 import { formatChartPrice } from './candlestickPriceFormat';
+import {
+  CHART_PRICE_LINE_COLORS,
+  CHART_PRICE_LINE_DASH,
+  PRICE_LABEL_HEIGHT,
+  chartPriceLineLabel,
+  layoutPriceLabels,
+  priceLabelBox,
+  type ChartPriceLine,
+} from './chartPriceLines';
 
 /**
  * The ONE candlestick renderer, shared by every platform. Gesture adapters
@@ -83,6 +92,10 @@ export type CandlestickChartRendererProps = {
   /** First/last visible candle times for the static x-axis. */
   firstVisibleTime: number | null;
   lastVisibleTime: number | null;
+  /** The account's price lines (average, limit orders, watched triggers). */
+  priceLines?: ChartPriceLine[];
+  /** Labels start below this y (the chart's own button sits above it). */
+  labelTop?: number;
 };
 
 const GRID_LINES = 4;
@@ -99,8 +112,10 @@ export default function CandlestickChartRenderer({
   formatTimeLabel,
   firstVisibleTime,
   lastVisibleTime,
+  priceLines,
+  labelTop = 0,
 }: CandlestickChartRendererProps) {
-  const { colors, financialColors } = useAppearance();
+  const { colors, financialColors, mode } = useAppearance();
   const gridColor = colors.border;
   const axisColor = colors.muted;
   const crosshairColor = colors.secondary;
@@ -220,6 +235,95 @@ export default function CandlestickChartRenderer({
     axisColor,
   ]);
 
+  // The account's prices, each at its real price: one outside the visible
+  // range draws no line, only its label pinned to that edge. The labels sit at
+  // the plot's left (the right axis belongs to the current price), never over
+  // each other and never under the chart's own button above `labelTop`.
+  const priceLineNodes = useMemo(() => {
+    if (!priceLines?.length) return null;
+    const placed = priceLines.map((line) => {
+      const y = yForPrice(line.price);
+      const edge = y < padding.top ? ('above' as const) : y > bottomY ? ('below' as const) : null;
+      return { line, y, edge };
+    });
+    const bounds = { top: Math.max(padding.top, labelTop), bottom: bottomY };
+    const tops = layoutPriceLabels(
+      placed.map(({ line, y, edge }) => ({
+        key: line.key,
+        kind: line.kind,
+        y: edge === 'above' ? bounds.top : edge === 'below' ? bounds.bottom : y,
+      })),
+      bounds,
+    );
+    const labelX = padding.left + 4;
+    const labelMaxWidth = Math.max(innerWidth - 8, 1);
+    // Lines go under the current price line; labels over it, so it never
+    // crosses their text.
+    return {
+      lines: placed.map(({ line, y, edge }) => (edge ? null : (
+        <SvgLine
+          key={`price-line-${line.key}`}
+          x1={padding.left}
+          y1={y}
+          x2={rightEdgeX}
+          y2={y}
+          stroke={CHART_PRICE_LINE_COLORS[line.kind][mode]}
+          strokeWidth={1}
+          strokeDasharray={CHART_PRICE_LINE_DASH[line.kind]}
+        />
+      ))),
+      labels: placed.map(({ line, edge }) => {
+        const top = tops.get(line.key);
+        if (top === undefined) return null;
+        const color = CHART_PRICE_LINE_COLORS[line.kind][mode];
+        const text = chartPriceLineLabel(
+          line,
+          formatChartPrice(line.price, currencyCode, displayPriceDecimals, displayRate),
+          edge,
+        );
+        const box = priceLabelBox(text, labelMaxWidth);
+        return (
+          <G key={`price-label-${line.key}`}>
+            <Rect
+              x={labelX}
+              y={top}
+              width={box.width}
+              height={PRICE_LABEL_HEIGHT}
+              rx={3}
+              fill={colors.surface}
+              fillOpacity={0.92}
+              stroke={color}
+              strokeWidth={1}
+            />
+            <SvgText
+              x={labelX + box.textInset}
+              y={top + PRICE_LABEL_HEIGHT / 2 + box.fontSize * 0.35}
+              fontSize={box.fontSize}
+              fontWeight="bold"
+              fill={color}
+            >
+              {text}
+            </SvgText>
+          </G>
+        );
+      }),
+    };
+  }, [
+    priceLines,
+    yForPrice,
+    padding.top,
+    padding.left,
+    bottomY,
+    labelTop,
+    innerWidth,
+    rightEdgeX,
+    currencyCode,
+    displayPriceDecimals,
+    displayRate,
+    mode,
+    colors.surface,
+  ]);
+
   const crosshairCandle =
     crosshair != null
       ? candles.find((candle) => candle.index === crosshair.index)
@@ -288,6 +392,8 @@ export default function CandlestickChartRenderer({
         */}
         <G clipPath={`url(#${plotClipId})`}>{candleNodes}</G>
 
+        {priceLineNodes?.lines}
+
         {showCurrentPrice && currentPriceY !== null ? (
           <G>
             <SvgLine
@@ -318,6 +424,8 @@ export default function CandlestickChartRenderer({
             </SvgText>
           </G>
         ) : null}
+
+        {priceLineNodes?.labels}
 
         {crosshair && crosshairCandle ? (
           <G>
