@@ -17,7 +17,7 @@ export type ChartPriceLine = {
   price: number;
   /** What the price is: 평단가, 지정가 매수, 손절가 … */
   title: string;
-  /** After the price: the holding's return rate, or how many orders share it. */
+  /** The holding's return rate (the average's left label), or how many orders share it (after the price). */
   note?: string | null;
 };
 
@@ -66,10 +66,25 @@ export function mergeChartPriceLines(lines: ChartPriceLine[]): ChartPriceLine[] 
     count > 1 ? { ...line, note: `${count}건` } : line);
 }
 
+const edgeArrow = (edge: 'above' | 'below' | null) => (edge === 'above' ? '▲ ' : edge === 'below' ? '▼ ' : '');
+
 /** `title price · note` — the price already formatted for the chart's currency. */
 export function chartPriceLineLabel(line: ChartPriceLine, formattedPrice: string, edge: 'above' | 'below' | null) {
-  const arrow = edge === 'above' ? '▲ ' : edge === 'below' ? '▼ ' : '';
-  return `${arrow}${line.title} ${formattedPrice}${line.note ? ` · ${line.note}` : ''}`;
+  return `${edgeArrow(edge)}${line.title} ${formattedPrice}${line.note ? ` · ${line.note}` : ''}`;
+}
+
+/**
+ * The words a line shows on the chart. The average price is split: its return
+ * rate at the plot's left (none when there is no rate) and on the right axis
+ * its title (평단가, 롱/숏 진입가) over the price itself, where the price reads
+ * against the scale and the current price. Every other line keeps one left
+ * label. (A pinned average's arrow goes on the title row, so the price keeps
+ * the size the axis was made for.)
+ */
+export function chartPriceLineTexts(line: ChartPriceLine, formattedPrice: string, edge: 'above' | 'below' | null) {
+  if (line.kind !== 'average') return { plot: chartPriceLineLabel(line, formattedPrice, edge), axis: null };
+  const arrow = edgeArrow(edge);
+  return { plot: line.note ? `${arrow}${line.note}` : null, axis: { title: `${arrow}${line.title}`, price: formattedPrice } };
 }
 
 /** Label box width and font size so the text fits `maxWidth`. */
@@ -120,6 +135,40 @@ export function layoutPriceLabels(
       tops[index] = Math.min(tops[index], tops[index + 1] - step);
   }
   return new Map(kept.map((request, index) => [request.key, tops[index]]));
+}
+
+/** The average's axis box: a title row over a price row the size of the current price's box. */
+export const AXIS_TITLE_HEIGHT = 12;
+export const AXIS_LABEL_HEIGHT = AXIS_TITLE_HEIGHT + PRICE_LABEL_HEIGHT;
+
+/**
+ * Right-axis box tops between `top` and `bottom`: each box's price row
+ * centered on its own line when it can be, otherwise the box at the nearest
+ * free spot, never over a fixed label (the current price's box, centered at
+ * each of `fixed`) or another. One that finds no room gets no label (its line
+ * stays).
+ */
+export function layoutAxisLabels(
+  requests: Omit<PriceLabelRequest, 'kind'>[],
+  fixed: number[],
+  bounds: { top: number; bottom: number },
+): Map<string, number> {
+  const lowest = bounds.bottom - AXIS_LABEL_HEIGHT;
+  const taken = fixed.map((y) => ({ top: y - PRICE_LABEL_HEIGHT / 2, bottom: y + PRICE_LABEL_HEIGHT / 2 }));
+  const free = (top: number) => taken.every((other) =>
+    top + AXIS_LABEL_HEIGHT + PRICE_LABEL_GAP <= other.top + 1e-9 || top >= other.bottom + PRICE_LABEL_GAP - 1e-9);
+  const tops = new Map<string, number>();
+  for (const request of [...requests].sort((a, b) => a.y - b.y || (a.key < b.key ? -1 : 1))) {
+    const wanted = Math.min(Math.max(request.y - AXIS_TITLE_HEIGHT - PRICE_LABEL_HEIGHT / 2, bounds.top), lowest);
+    // The nearest free top is the wanted one or the edge of a taken label.
+    const [top] = [wanted, ...taken.flatMap((other) => [other.top - PRICE_LABEL_GAP - AXIS_LABEL_HEIGHT, other.bottom + PRICE_LABEL_GAP])]
+      .filter((candidate) => candidate >= bounds.top && candidate <= lowest && free(candidate))
+      .sort((a, b) => Math.abs(a - wanted) - Math.abs(b - wanted));
+    if (top === undefined) continue;
+    tops.set(request.key, top);
+    taken.push({ top, bottom: top + AXIS_LABEL_HEIGHT });
+  }
+  return tops;
 }
 
 /** The lines in words, for the chart's accessibility label. */

@@ -1,5 +1,16 @@
 # 프로젝트 인수인계서
 
+## 2026-11-04 (2) — 차트 평단가 라벨: 왼쪽 수익률 · 오른쪽 가격축 `평단가` + 가격 (main, push, `[skip render]`)
+
+- **기준/범위:** 시작 HEAD = origin/main `ba67bcee`. 작업 트리에 미기록으로 남아 있던 1단계(평단가 라벨을 왼쪽 수익률 / 오른쪽 축 가격으로 분리)를 이어받아 `평단가` 문구를 더해 함께 커밋. 공용 `CandlestickChartRenderer`·`chartPriceLines.ts`·테스트·인수인계서만 → 현물·선물 차트 4곳 모두 적용. 평단가·수익률 계산/조회(현물 서버 `valuation.returnRate`, 선물 `getFuturesPositionDisplay` ROI), 선 생성(`spot/futuresChartPriceLines`), 백엔드·금융 로직 무변경.
+- **의도:** 평단가를 현재가처럼 가격축에서 눈금과 바로 비교하고, 플롯 왼쪽에는 수익률만 남겨 라벨을 짧게. 가격 줄과 수익률 라벨은 같은 빨간 실선 높이에 놓아 한 선의 두 값으로 읽히게.
+- **표시:** 왼쪽 = `-10.52%`(부호 유지, 빨강; 수익률이 없으면 왼쪽 라벨 없음 — 만들어 내지 않음). 오른쪽 축 = 빨간 테두리 상자 2줄 `평단가`(보통 9px) / `242,242원`(굵게, 현재가 상자와 같은 글자 크기 규칙). 채운 현재가 상자와 달리 테두리만(상승 현재가도 빨강이라 구분). 선물은 같은 자리에 기존 제목 `롱/숏 진입가`(두 방향 포지션 구분). 범위 밖이면 `▲/▼`는 제목 줄에(가격 글자 크기 유지). 지정가·감시가 왼쪽 라벨, 현재가 선·상자, 접근성 이름(`평단가 $X · +5.2%`)은 그대로.
+- **배치(`layoutAxisLabels`):** 가격 줄(16px)을 선 높이 중앙에, 제목 줄(12px)은 그 위 → 상자(28px)는 위로만 커짐. 현재가 상자는 고정(절대 이동 안 함)이고 겹치면 평단가 상자가 가까운 쪽 위/아래로 비켜남(간격 2px). 자리가 없으면 축 라벨만 생략(선 유지). 상자에 가리는 눈금 글자는 생략(눈금선 유지), 크로스헤어 상자가 맨 위. 선의 Y 위치·가격 범위·제스처·원화 보기(라벨만 `displayRate`) 불변.
+- **검증:** lint:accounts·lint:guides·typecheck PASS. 차트 관련 217 tests PASS. 전체 `npm test` 3,548 중 3,543 PASS, 실패 5건은 모두 선물 주문 제출 비활성(`FuturesLimitEntry`·`FuturesOrderSafety`·`FuturesScreen`) — 재실행마다 다른 테스트가 실패, 단조 시계 preload로는 작업 트리 150/150 ×2, 변경 없는 `git archive HEAD` 사본도 같은 증상(1/2회) → WSL 벽시계 튐 flake, 이번 변경과 무관. 브라우저 `chartPriceLinesBrowser.cjs` 120개(320/360/390px × Light/Dark × 글꼴 1x/2x × 시나리오 5 × USD/원화) PASS: 두 줄 글자가 상자 안, 제목이 가격 바로 위, 가격 줄이 평단가 선 위(현재가 회피 때 제외), 현재가 상자·눈금 글자와 안 겹침. 최소 글자 크기: 제목 9 / 가격 8.34(긴 원화).
+- **미검증:** Android/iOS 실기기 NOT_VERIFIED(연결 기기 없음; RN-Web·RNGH 하네스로만 확인).
+- **이전 항목 CI:** `ba67bcee` CI 전 job + Futures release fixture PASS(run 41804031739/41804031743) — 아래 11-04 항목의 로컬 `wallet-fx-transfer` 실패는 WSL 시계 문제로 확정.
+- **배포:** frontend·인수인계서만 → `[skip render]`, Render 배포 없음. 앱 반영은 새 EAS 빌드.
+
 ## 2026-11-04 — 차트 거래 가격선(평단가·지정가·감시가) · 환전 KRW/USD 양방향 입력·방향 화살표·비율 바 (main, push, `[skip render]`)
 
 - **기준/범위:** 시작 HEAD = origin/main `d4c8e0c2`. `frontend/` + 인수인계서만. 백엔드·API·DB·환율/수수료/원장/주문·체결·환전 실행 정책·운영 env·배포 무변경.

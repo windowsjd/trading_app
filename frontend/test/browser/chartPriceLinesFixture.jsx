@@ -14,6 +14,7 @@ const candles = Array.from({ length: 120 }, (_, i) => {
     open: base, high: Math.max(base, close) + 120, low: Math.min(base, close) - 140, close };
 });
 const line = (key, kind, price, title, note) => ({ key, kind, price, title, note });
+const last = candles[candles.length - 1].close;
 const scenarios = {
   // One of each, apart: the holding's average, two limit orders, two watched triggers.
   spread: [
@@ -34,6 +35,17 @@ const scenarios = {
     line('avg', 'average', 80000, '롱 진입가', '-106.17%'),
     line('limit', 'limit', 50000, '지정가 롱'),
     line('watch', 'trigger', 90000, '조건 숏 감시가'),
+  ],
+  // No return rate (unavailable valuation / stale ROI): the price on the axis, no left label.
+  norate: [
+    line('avg', 'average', 67350.5, '평단가', null),
+    line('buy', 'limit', 66900, '지정가 매수'),
+    line('tp', 'trigger', 68250, '익절가'),
+  ],
+  // The average at the current price: its axis box steps aside for the current price's.
+  current: [
+    line('avg', 'average', last, '숏 진입가', '-0.42%'),
+    line('buy', 'limit', last - 400, '지정가 숏'),
   ],
 };
 

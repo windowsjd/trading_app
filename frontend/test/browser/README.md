@@ -1,10 +1,13 @@
 # Trading UI browser regression
 
 차트 거래 가격선(2026-11-04)은 `NODE_PATH=/path/to/browser-tools/node_modules BROWSER_EXECUTABLE_PATH=…
-node test/browser/chartPriceLinesBrowser.cjs` (`CHART_LINES_WIDTHS=320` for one width). 실제 CandlestickChart를
-`chartPriceLinesFixture.jsx`로 렌더링해 320/360/390px × Light/Dark × 시나리오 3개(떨어진 선·한 가격대 7개·범위 밖) ×
-USD/원화(36개)에서 라벨이 상자·플롯 안, 라벨끼리 겹침 없음, 선 = 라벨 수(범위 밖은 선 없이 ▲/▼), 평단가 라벨 빨강·부호 있는
-수익률, P&L 문구 없음, 접근성 이름에 선 목록, 드래그 후 `최신` 버튼 아래 라벨을 확인한다. 출력 `CHART_LINES_BROWSER_OUTPUT`.
+node test/browser/chartPriceLinesBrowser.cjs` (`CHART_LINES_WIDTHS=320` for one width, `CHART_LINES_FONTS=1` for one font
+scale). 실제 CandlestickChart를 `chartPriceLinesFixture.jsx`로 렌더링해 320/360/390px × Light/Dark × 글꼴 1x/2x × 시나리오 5개(떨어진
+선·한 가격대 7개·범위 밖·수익률 없음·현재가와 같은 평단가) × USD/원화(120개)에서 왼쪽 라벨이 상자·플롯 안, 라벨끼리 겹침 없음, 선 수
+(범위 밖은 선 없이 ▲/▼), 평단가는 왼쪽 = 부호 있는 수익률만(없으면 라벨 없음)·오른쪽 축 = 제목(`평단가`/`롱·숏 진입가`) 바로
+아래 가격의 두 줄(가격 줄이 평단가 선 위, 현재가 상자를 비켜날 때 제외), 둘 다 빨강, 축 상자가 차트 안·두 줄 글자가 상자 안·현재가
+상자와 눈금 글자와 겹치지 않음, P&L 문구 없음, 접근성 이름에 선 목록, 드래그 후 `최신` 버튼 아래
+라벨을 확인하고 왼쪽 라벨·축 가격·축 제목의 최소 글자 크기를 출력한다. 출력 `CHART_LINES_BROWSER_OUTPUT`.
 
 환전 시트(2026-11-04)는 `… node test/browser/fxSheetBrowser.cjs` (`FX_SHEET_QUICK=1`: 320px/2x only). 전체 앱
 fixture(`beginnerMocks.js`, 일반 계정 `holdings=1`)에서 KRW 카드·화살표·USD 카드·비율·견적·환전하기 순서, 글자 없는 44dp 화살표와

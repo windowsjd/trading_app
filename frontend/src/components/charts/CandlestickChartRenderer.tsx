@@ -17,10 +17,13 @@ import {
 } from './candlestickLayout';
 import { formatChartPrice } from './candlestickPriceFormat';
 import {
+  AXIS_LABEL_HEIGHT,
+  AXIS_TITLE_HEIGHT,
   CHART_PRICE_LINE_COLORS,
   CHART_PRICE_LINE_DASH,
   PRICE_LABEL_HEIGHT,
-  chartPriceLineLabel,
+  chartPriceLineTexts,
+  layoutAxisLabels,
   layoutPriceLabels,
   priceLabelBox,
   type ChartPriceLine,
@@ -195,71 +198,59 @@ export default function CandlestickChartRenderer({
     ],
   );
 
-  const gridNodes = useMemo(() => {
-    const { minY, range } = geometry;
-    return Array.from({ length: GRID_LINES + 1 }, (_, index) => {
-      const value = minY + (range * index) / GRID_LINES;
-      const y = yForPrice(value);
-      const label = formatChartPrice(value, currencyCode, displayPriceDecimals, displayRate);
-      return (
-        <G key={`grid-${index}`}>
-          <SvgLine
-            x1={padding.left}
-            y1={y}
-            x2={rightEdgeX}
-            y2={y}
-            stroke={gridColor}
-            strokeWidth={1}
-          />
-          <SvgText
-            x={rightEdgeX + 4}
-            y={y + 3}
-            fontSize={chartLabelFontSize(label, padding.right - 8)}
-            fill={axisColor}
-          >
-            {label}
-          </SvgText>
-        </G>
-      );
-    });
-  }, [
-    geometry,
-    yForPrice,
-    padding.left,
-    padding.right,
-    rightEdgeX,
-    currencyCode,
-    displayPriceDecimals,
-    displayRate,
-    gridColor,
-    axisColor,
-  ]);
+  const currentPriceY =
+    currentPrice != null && Number.isFinite(currentPrice)
+      ? yForPrice(currentPrice)
+      : null;
+  const showCurrentPrice =
+    currentPriceY !== null &&
+    currentPriceY >= padding.top - 1 &&
+    currentPriceY <= bottomY + 1;
 
   // The account's prices, each at its real price: one outside the visible
-  // range draws no line, only its label pinned to that edge. The labels sit at
-  // the plot's left (the right axis belongs to the current price), never over
-  // each other and never under the chart's own button above `labelTop`.
+  // range draws no line, only its labels pinned to that edge. The labels sit at
+  // the plot's left, never over each other and never under the chart's own
+  // button above `labelTop`. The average price's own price is the exception: it
+  // sits on the right axis like the current price, under its title (see
+  // `chartPriceLineTexts`).
   const priceLineNodes = useMemo(() => {
     if (!priceLines?.length) return null;
     const placed = priceLines.map((line) => {
       const y = yForPrice(line.price);
       const edge = y < padding.top ? ('above' as const) : y > bottomY ? ('below' as const) : null;
-      return { line, y, edge };
+      const texts = chartPriceLineTexts(
+        line,
+        formatChartPrice(line.price, currencyCode, displayPriceDecimals, displayRate),
+        edge,
+      );
+      return { line, y, edge, texts };
     });
     const bounds = { top: Math.max(padding.top, labelTop), bottom: bottomY };
     const tops = layoutPriceLabels(
-      placed.map(({ line, y, edge }) => ({
+      placed.filter(({ texts }) => texts.plot).map(({ line, y, edge }) => ({
         key: line.key,
         kind: line.kind,
         y: edge === 'above' ? bounds.top : edge === 'below' ? bounds.bottom : y,
       })),
       bounds,
     );
+    // The price row centered on the line (a pinned one on that edge) like the
+    // current price's box, the title row above it, and the box stepping aside
+    // for the current price's: that one never moves.
+    const axisTops = layoutAxisLabels(
+      placed.filter(({ texts }) => texts.axis).map(({ line, y, edge }) => ({
+        key: line.key,
+        y: edge === 'above' ? padding.top : edge === 'below' ? bottomY : y,
+      })),
+      showCurrentPrice && currentPriceY !== null ? [currentPriceY] : [],
+      { top: padding.top - PRICE_LABEL_HEIGHT / 2, bottom: bottomY + PRICE_LABEL_HEIGHT / 2 },
+    );
     const labelX = padding.left + 4;
     const labelMaxWidth = Math.max(innerWidth - 8, 1);
     // Lines go under the current price line; labels over it, so it never
     // crosses their text.
     return {
+      axisTops: [...axisTops.values()],
       lines: placed.map(({ line, y, edge }) => (edge ? null : (
         <SvgLine
           key={`price-line-${line.key}`}
@@ -272,16 +263,11 @@ export default function CandlestickChartRenderer({
           strokeDasharray={CHART_PRICE_LINE_DASH[line.kind]}
         />
       ))),
-      labels: placed.map(({ line, edge }) => {
+      labels: placed.map(({ line, texts }) => {
         const top = tops.get(line.key);
-        if (top === undefined) return null;
+        if (top === undefined || !texts.plot) return null;
         const color = CHART_PRICE_LINE_COLORS[line.kind][mode];
-        const text = chartPriceLineLabel(
-          line,
-          formatChartPrice(line.price, currencyCode, displayPriceDecimals, displayRate),
-          edge,
-        );
-        const box = priceLabelBox(text, labelMaxWidth);
+        const box = priceLabelBox(texts.plot, labelMaxWidth);
         return (
           <G key={`price-label-${line.key}`}>
             <Rect
@@ -302,7 +288,47 @@ export default function CandlestickChartRenderer({
               fontWeight="bold"
               fill={color}
             >
-              {text}
+              {texts.plot}
+            </SvgText>
+          </G>
+        );
+      }),
+      // Its price row sized like the current price's box, but outlined in the
+      // line's color, so the two never read alike (a rising current price is
+      // red too). The crosshair's box is drawn last and covers it while
+      // scrubbing.
+      axisLabels: placed.map(({ line, texts }) => {
+        const top = axisTops.get(line.key);
+        if (top === undefined || !texts.axis) return null;
+        const color = CHART_PRICE_LINE_COLORS[line.kind][mode];
+        return (
+          <G key={`price-axis-${line.key}`}>
+            <Rect
+              x={rightEdgeX + 0.5}
+              y={top + 0.5}
+              width={padding.right - 1}
+              height={AXIS_LABEL_HEIGHT - 1}
+              rx={2}
+              fill={colors.surface}
+              stroke={color}
+              strokeWidth={1}
+            />
+            <SvgText
+              x={rightEdgeX + 4}
+              y={top + AXIS_TITLE_HEIGHT - 1}
+              fontSize={chartLabelFontSize(texts.axis.title, padding.right - 8)}
+              fill={color}
+            >
+              {texts.axis.title}
+            </SvgText>
+            <SvgText
+              x={rightEdgeX + 4}
+              y={top + AXIS_TITLE_HEIGHT + PRICE_LABEL_HEIGHT / 2 + 3}
+              fontSize={chartLabelFontSize(texts.axis.price, padding.right - 8)}
+              fontWeight="bold"
+              fill={color}
+            >
+              {texts.axis.price}
             </SvgText>
           </G>
         );
@@ -313,6 +339,7 @@ export default function CandlestickChartRenderer({
     yForPrice,
     padding.top,
     padding.left,
+    padding.right,
     bottomY,
     labelTop,
     innerWidth,
@@ -320,8 +347,57 @@ export default function CandlestickChartRenderer({
     currencyCode,
     displayPriceDecimals,
     displayRate,
+    showCurrentPrice,
+    currentPriceY,
     mode,
     colors.surface,
+  ]);
+
+  // A tick label under an axis label is left out rather than half covered
+  // (its text reaches about 5 px either side of the tick).
+  const axisTops = priceLineNodes?.axisTops;
+  const gridNodes = useMemo(() => {
+    const { minY, range } = geometry;
+    return Array.from({ length: GRID_LINES + 1 }, (_, index) => {
+      const value = minY + (range * index) / GRID_LINES;
+      const y = yForPrice(value);
+      const label = formatChartPrice(value, currencyCode, displayPriceDecimals, displayRate);
+      const covered = axisTops?.some((top) => y > top - 5 && y < top + AXIS_LABEL_HEIGHT + 5);
+      return (
+        <G key={`grid-${index}`}>
+          <SvgLine
+            x1={padding.left}
+            y1={y}
+            x2={rightEdgeX}
+            y2={y}
+            stroke={gridColor}
+            strokeWidth={1}
+          />
+          {covered ? null : (
+            <SvgText
+              x={rightEdgeX + 4}
+              y={y + 3}
+              fontSize={chartLabelFontSize(label, padding.right - 8)}
+              fill={axisColor}
+            >
+              {label}
+            </SvgText>
+          )}
+        </G>
+      );
+    });
+  }, [
+    geometry,
+    yForPrice,
+    padding.left,
+    padding.right,
+    rightEdgeX,
+    currencyCode,
+    displayPriceDecimals,
+    displayRate,
+    gridColor,
+    axisColor,
+    axisTops,
   ]);
 
   const crosshairCandle =
@@ -342,14 +418,6 @@ export default function CandlestickChartRenderer({
         (1 - (crosshair.y - padding.top) / innerHeight) * geometry.range
       : 0;
 
-  const currentPriceY =
-    currentPrice != null && Number.isFinite(currentPrice)
-      ? yForPrice(currentPrice)
-      : null;
-  const showCurrentPrice =
-    currentPriceY !== null &&
-    currentPriceY >= padding.top - 1 &&
-    currentPriceY <= bottomY + 1;
   const currentColor = currentBullish ? financialColors.candleUp : financialColors.candleDown;
   const currentPriceLabel = formatPrice(currentPrice);
   const crosshairPriceLabel = formatPrice(crosshairPrice);
@@ -426,6 +494,7 @@ export default function CandlestickChartRenderer({
         ) : null}
 
         {priceLineNodes?.labels}
+        {priceLineNodes?.axisLabels}
 
         {crosshair && crosshairCandle ? (
           <G>
