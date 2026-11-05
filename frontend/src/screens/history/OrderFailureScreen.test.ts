@@ -69,7 +69,7 @@ describe('주문 실패·만료 (push tap)', () => {
     assert.deepEqual(h.reads, ['acct-a/futures_tp_sl/tpsl-1']);
     const text = h.text();
     assert.match(text, /BTCUSDT 손절 실행 실패/);
-    assert.match(text, /Mark 시세를 확인할 수 없었습니다/);
+    assert.match(text, /평가 기준가를 확인할 수 없었습니다/);
     assert.match(text, /포지션은 그대로 열려 있고/);
     assert.match(text, /일반모드 · 선물/);
     assert.equal(/FUTURES_|execution_/.test(text), false, 'no raw server code');

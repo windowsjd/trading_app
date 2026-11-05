@@ -97,6 +97,14 @@ export type FuturesExecuteResult = {
     instrument: ReturnType<typeof presentFuturesInstrument>;
     execution: ReturnType<typeof presentFuturesExecution>;
     position: ReturnType<typeof presentFuturesPosition>;
+    /** An add that changed the lifetime's leverage (2026-11-06); absent in
+     * responses committed before, null for every other command. */
+    leverageChange?: {
+      fromLeverage: number;
+      toLeverage: number;
+      isolatedMarginBefore: string;
+      isolatedMarginAfter: string;
+    } | null;
     collateral: {
       walletId: string;
       currencyCode: 'USD';

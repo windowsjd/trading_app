@@ -6,6 +6,15 @@ import { STATUS_CODES } from 'node:http';
  * This catalog affects diagnostic projection, not public API codes or branching.
  */
 const SAFE_MESSAGES = new Set<string>([
+  // Two-way Futures positions and leverage changes (2026-11-06).
+  'This direction already has an open position; add to it instead.',
+  'Direction must match the position.',
+  'The position changed; review it and try again.',
+  'Leverage differs from the open position.',
+  'This direction already has a pending entry.',
+  'This direction already has a live conditional entry.',
+  "Check the new leverage, the position's current leverage and the request key.",
+  'Check the leverage, quantity and price of the preview.',
   // Independent TP/SL: Futures settings, entry plans, OCO retirement (2026-10-16).
   'New TP/SL protection uses independent stop-loss and take-profit settings.',
   'Futures stop-loss and take-profit settings are currently disabled.',

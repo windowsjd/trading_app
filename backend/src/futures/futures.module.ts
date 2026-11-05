@@ -12,6 +12,7 @@ import { GeneralPerformanceModule } from '../portfolio/general-performance.modul
 import { FuturesController } from './futures.controller';
 import { FuturesMarketController } from './futures-market.controller';
 import { FuturesService } from './futures.service';
+import { FuturesLeverageService } from './futures-leverage.service';
 import { FuturesPerformanceService } from './futures-performance.service';
 import { FuturesMarkRetentionService } from './futures-mark-retention.service';
 import { FuturesLimitController } from './futures-limit.controller';
@@ -50,6 +51,7 @@ import { FuturesTpSlWorker } from './futures-tp-sl-worker.service';
   providers: [
     FuturesPerformanceService,
     FuturesService,
+    FuturesLeverageService,
     FuturesLimitService,
     FuturesLimitWorker,
     FuturesConditionalEntryService,

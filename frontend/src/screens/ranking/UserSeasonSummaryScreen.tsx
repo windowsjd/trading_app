@@ -218,7 +218,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
               </Text>
             ) : null}
             {portfolio.futures.positions.length ? portfolio.futures.positions.map(position => (
-              <FuturesPositionRow key={position.assetId} position={position} testID={`friend-futures-${position.assetId}`}
+              <FuturesPositionRow key={`${position.assetId}:${position.direction}`} position={position} testID={`friend-futures-${position.assetId}`}
                 evaluatedAt={portfolio.futures.evaluatedAt} now={Date.parse(portfolio.futures.evaluatedAt)} />
             )) : <Text style={styles.helper}>포지션이 없습니다.</Text>}
           </View>

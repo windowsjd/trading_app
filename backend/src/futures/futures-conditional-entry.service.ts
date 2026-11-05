@@ -57,6 +57,7 @@ import {
   openFuturesConditionalEntry,
   type FuturesConditionalEntryLifecycleReason,
 } from './futures-conditional-entry-state';
+import { futuresEntryLeverageApproval } from './futures-position-policy';
 
 const ENTRY_INCLUDE = {
   instrument: { include: futuresInstrumentInclude },
@@ -152,21 +153,15 @@ export class FuturesConditionalEntryService {
           'FUTURES_INSTRUMENT_UNVERIFIED',
           'This Futures instrument is not yet available for new trades.',
         );
+      // Two-way positions (2026-11-06): per direction, one live watch and no
+      // submitted Limit entry beside it; the watch opens that direction's
+      // lifetime or adds to the open one, with a leverage change only as the
+      // user confirmed it now.
       const scope = {
         tradingAccountId: accountId,
         instrumentId: instrument.id,
+        direction: input.direction,
       };
-      // The current one-way position policy: a new position needs a flat
-      // instrument with no pending limit entry or other live watch.
-      if (
-        await tx.futuresPosition.findFirst({
-          where: { ...scope, status: 'open' },
-        })
-      )
-        futuresError(
-          'FUTURES_POSITION_ALREADY_OPEN',
-          'Close the existing one-way position before registering a new entry.',
-        );
       if (
         await tx.futuresLimitOrder.findFirst({
           where: { ...scope, status: 'submitted' },
@@ -183,8 +178,14 @@ export class FuturesConditionalEntryService {
       )
         futuresError(
           'FUTURES_CONDITIONAL_ENTRY_PENDING',
-          'This instrument already has a live conditional entry.',
+          'This direction already has a live conditional entry.',
         );
+      const approval = futuresEntryLeverageApproval(
+        input,
+        await tx.futuresPosition.findFirst({
+          where: { ...scope, status: 'open' },
+        }),
+      );
       const live = await tx.futuresConditionalEntry.count({
         where: { tradingAccountId: accountId, ...liveFuturesConditionalEntry },
       });
@@ -227,6 +228,7 @@ export class FuturesConditionalEntryService {
           idempotencyKey: input.idempotencyKey,
           requestHash: hash,
           createdAt: now,
+          ...approval,
         },
         include: ENTRY_INCLUDE,
       });
@@ -314,19 +316,12 @@ export class FuturesConditionalEntryService {
           'FUTURES_INSTRUMENT_UNVERIFIED',
           'This Futures instrument is not yet available for new trades.',
         );
+      // An open lifetime no longer blocks a change (two-way, 2026-11-06).
       const scope = {
         tradingAccountId: accountId,
         instrumentId: instrument.id,
+        direction: row.direction,
       };
-      if (
-        await tx.futuresPosition.findFirst({
-          where: { ...scope, status: 'open' },
-        })
-      )
-        futuresError(
-          'FUTURES_POSITION_ALREADY_OPEN',
-          'Close the existing one-way position before registering a new entry.',
-        );
       if (
         await tx.futuresLimitOrder.findFirst({
           where: { ...scope, status: 'submitted' },
@@ -785,6 +780,14 @@ export function presentFuturesConditionalEntry(row: EntryRecord) {
     triggerPrice: row.triggerPrice.toFixed(8),
     executionType: row.executionType,
     limitPrice: row.limitPrice?.toFixed(8) ?? null,
+    // The approved change of the open same-direction lifetime's leverage.
+    leverageChange:
+      row.leverageChangePositionId && row.leverageChangeFrom !== null
+        ? {
+            positionId: row.leverageChangePositionId,
+            fromLeverage: row.leverageChangeFrom,
+          }
+        : null,
     status: row.status,
     state:
       row.status !== 'ordered'

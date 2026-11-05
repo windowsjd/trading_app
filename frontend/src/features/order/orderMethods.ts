@@ -115,15 +115,15 @@ export function isEntryTpSlMarketSupported(
  * whether a new 조건주문 may be registered is the server's capability. Position
  * TP/SL is not an order method here: it is set from the position card.
  */
-export function getFuturesOrderMethodOptions(hasPosition: boolean, conditional: ServerGate): OrderMethodOption[] {
+/**
+ * Futures 주문방식 (two-way positions, 2026-11-06): every method opens the
+ * selected direction's position or adds to it, whether or not one is open.
+ */
+export function getFuturesOrderMethodOptions(conditional: ServerGate): OrderMethodOption[] {
   return [
     option('market', AVAILABLE),
-    option('limit', hasPosition
-      ? { state: 'unavailable', reason: '지정가는 새 포지션 진입에만 쓸 수 있어요. 보유 포지션은 시장가로 조정해 주세요.' }
-      : AVAILABLE),
-    option('conditional', hasPosition
-      ? { state: 'unavailable', reason: '조건주문은 새 포지션 진입에만 쓸 수 있어요. 보유 포지션의 손절·익절은 포지션 카드의 손절가/익절가 설정에서 해 주세요.' }
-      : fromGate(conditional)),
+    option('limit', AVAILABLE),
+    option('conditional', fromGate(conditional)),
   ];
 }
 

@@ -428,9 +428,25 @@ export const apiClient = {
     const pagination = {limit:100,offset:0,total:0,returned:0,nextOffset:null};
     if (path.includes('/futures/conditional-entries'))
       return response(futuresConditionalFixture(state.accountId, path.includes('state=ended') ? 'ended' : 'open', params.get('conditional')));
+    // A leverage change estimate (2026-11-06): `?leveragePreview=stale|refused` for the unknown/refused sheets.
+    if (path.includes('/leverage-preview')) {
+      const preview = params.get('leveragePreview');
+      const side = (leverage, margin, liquidation) => ({ leverage, quantity: '2.00000000', averageEntryPrice: '100.00000000',
+        isolatedMargin: margin, initialMargin: margin, initialRequirement: '1234567890123.12345678', liquidationPrice: liquidation, liquidationBuffer: '12.34567890' });
+      const to = Number(new URLSearchParams(path.split('?')[1] ?? '').get('leverage') ?? 50);
+      return response({ tradingAccountId: state.accountId, positionId: decodeURIComponent(path.split('/')[5]), evaluatedAt: new Date().toISOString(),
+        markState: preview === 'stale' ? 'unavailable_or_stale' : 'fresh', basisPrice: null,
+        before: side(100, '9876543210.12345678', '9876543210123.12345678'),
+        after: preview === 'stale' ? null : side(to, '19753086420.24691356', '9753086420123.12345678'),
+        collateral: preview === 'stale' ? null : { freeCollateralBefore: '9995.00000000', freeCollateralAfter: '-9876533215.12345678',
+          isolatedMarginDelta: '9876543210.12345678', initialRequirementDelta: '9876543210.12345678', estimatedFee: '123456.12345678',
+          crossLiquidationBufferBefore: null, crossLiquidationBufferAfter: null },
+        refusal: preview === 'stale' ? 'FUTURES_MARK_UNAVAILABLE' : preview === 'refused' ? 'INSUFFICIENT_FUTURES_FREE_COLLATERAL' : null });
+    }
     if(path.includes('/futures/')) {
-      // `?futuresPosition=1`: one open (large) position with its card and 손절가/익절가 sheet.
-      const f=futuresFixture(state.accountId,{large:true,position:params.get('futuresPosition')==='1'});
+      // `?futuresPosition=1`: one open (large) position with its card and 손절가/익절가 sheet;
+      // `&futuresHedge=1` adds the opposite direction's own position (two-way).
+      const f=futuresFixture(state.accountId,{large:true,position:params.get('futuresPosition')==='1',hedge:params.get('futuresHedge')==='1'});
       if(path.includes('limit-orders')) return response({...scoped,orders:pendingFutures ? ['long','short'].map((direction,i)=>({id:'entry-'+direction,direction,marginMode:i?'cross':'isolated',leverage:100,quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',reservedAmount:'12345678901234.12345678',instrument:f.catalog.instruments[0]}))
         : pendingMix ? [{id:'mix-fl',tradingAccountId:state.accountId,instrumentId:f.catalog.instruments[0].id,direction:'long',marginMode:'isolated',leverage:5,quantity:'0.5',limitPrice:'95000',reservedAmount:'9509.5',status:'submitted',executionId:null,terminalReason:null,createdAt:mixAt(0),endedAt:null,revision:0,instrument:f.catalog.instruments[0]}] : [],pagination});
       return response(path.includes('/instruments')?f.catalog:path.includes('/positions')?f.positions:path.includes('/executions')?f.executions:path.includes('/liquidations')?f.liquidations:f.final);
@@ -542,6 +558,12 @@ export const apiClient = {
           triggerCondition: kind === 'stop_loss' ? 'at_or_below' : 'at_or_above', triggerPrice: leg.triggerPrice, ratioPercent: leg.ratio, status: 'pending' })) });
     if (path.includes('/conditional-sell-orders/') && path.endsWith('/cancel'))
       return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrder: null });
+    // 레버리지만 변경 (2026-11-06): the server's change.
+    if (path.includes('/futures/positions/') && path.endsWith('/leverage'))
+      return response({ tradingAccountId: state.accountId, changeId: 'change', changedAt: new Date().toISOString(),
+        position: { id: decodeURIComponent(path.split('/')[5]), leverage: body.leverage },
+        leverageChange: { fromLeverage: body.fromLeverage, toLeverage: body.leverage, isolatedMarginBefore: '2', isolatedMarginAfter: '1' },
+        collateral: { balanceAmount: '10000', totalMarginUsed: '1', freeCollateral: '9996' } });
     // Futures conditional entries: registration and cancel answer the watch.
     if (path.includes('/futures/conditional-entries'))
       return response({ tradingAccountId: state.accountId, duplicate: false, entry: { id: 'entry', state: path.endsWith('/cancel') ? 'canceled' : 'watching', ...body } });

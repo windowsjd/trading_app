@@ -409,6 +409,7 @@ export const ModelName = {
   FuturesPosition: 'FuturesPosition',
   FuturesExecution: 'FuturesExecution',
   FuturesExecuteRequest: 'FuturesExecuteRequest',
+  FuturesLeverageChange: 'FuturesLeverageChange',
   FuturesLimitOrder: 'FuturesLimitOrder',
   ProtectionGroup: 'ProtectionGroup',
   ProtectionLeg: 'ProtectionLeg',
@@ -476,7 +477,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLeverageChange" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2327,6 +2328,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.FuturesExecuteRequestCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.FuturesExecuteRequestCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesLeverageChange: {
+      payload: Prisma.$FuturesLeverageChangePayload<ExtArgs>
+      fields: Prisma.FuturesLeverageChangeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesLeverageChangeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesLeverageChangeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesLeverageChangeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesLeverageChangeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>
+        }
+        findMany: {
+          args: Prisma.FuturesLeverageChangeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>[]
+        }
+        create: {
+          args: Prisma.FuturesLeverageChangeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>
+        }
+        createMany: {
+          args: Prisma.FuturesLeverageChangeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesLeverageChangeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesLeverageChangeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>
+        }
+        update: {
+          args: Prisma.FuturesLeverageChangeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesLeverageChangeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesLeverageChangeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesLeverageChangeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesLeverageChangeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLeverageChangePayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesLeverageChangeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesLeverageChange>
+        }
+        groupBy: {
+          args: Prisma.FuturesLeverageChangeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLeverageChangeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesLeverageChangeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLeverageChangeCountAggregateOutputType> | number
         }
       }
     }
@@ -6707,6 +6782,29 @@ export const FuturesExecuteRequestScalarFieldEnum = {
 export type FuturesExecuteRequestScalarFieldEnum = (typeof FuturesExecuteRequestScalarFieldEnum)[keyof typeof FuturesExecuteRequestScalarFieldEnum]
 
 
+export const FuturesLeverageChangeScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  positionId: 'positionId',
+  fromLeverage: 'fromLeverage',
+  toLeverage: 'toLeverage',
+  isolatedMarginBefore: 'isolatedMarginBefore',
+  isolatedMarginAfter: 'isolatedMarginAfter',
+  markPrice: 'markPrice',
+  markEffectiveAt: 'markEffectiveAt',
+  markCapturedAt: 'markCapturedAt',
+  executionId: 'executionId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  responsePayloadJson: 'responsePayloadJson',
+  transactionId: 'transactionId',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesLeverageChangeScalarFieldEnum = (typeof FuturesLeverageChangeScalarFieldEnum)[keyof typeof FuturesLeverageChangeScalarFieldEnum]
+
+
 export const FuturesLimitOrderScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -6727,7 +6825,9 @@ export const FuturesLimitOrderScalarFieldEnum = {
   endedAt: 'endedAt',
   revisedAt: 'revisedAt',
   revision: 'revision',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  leverageChangePositionId: 'leverageChangePositionId',
+  leverageChangeFrom: 'leverageChangeFrom'
 } as const
 
 export type FuturesLimitOrderScalarFieldEnum = (typeof FuturesLimitOrderScalarFieldEnum)[keyof typeof FuturesLimitOrderScalarFieldEnum]
@@ -6929,7 +7029,9 @@ export const FuturesConditionalEntryScalarFieldEnum = {
   endedAt: 'endedAt',
   revisedAt: 'revisedAt',
   revision: 'revision',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  leverageChangePositionId: 'leverageChangePositionId',
+  leverageChangeFrom: 'leverageChangeFrom'
 } as const
 
 export type FuturesConditionalEntryScalarFieldEnum = (typeof FuturesConditionalEntryScalarFieldEnum)[keyof typeof FuturesConditionalEntryScalarFieldEnum]
@@ -8983,6 +9085,7 @@ export type GlobalOmitConfig = {
   futuresPosition?: Prisma.FuturesPositionOmit
   futuresExecution?: Prisma.FuturesExecutionOmit
   futuresExecuteRequest?: Prisma.FuturesExecuteRequestOmit
+  futuresLeverageChange?: Prisma.FuturesLeverageChangeOmit
   futuresLimitOrder?: Prisma.FuturesLimitOrderOmit
   protectionGroup?: Prisma.ProtectionGroupOmit
   protectionLeg?: Prisma.ProtectionLegOmit

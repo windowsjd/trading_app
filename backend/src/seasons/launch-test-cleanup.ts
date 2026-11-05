@@ -55,6 +55,7 @@ export const LAUNCH_TEST_CLEANUP_STEPS: Step[] = [
     'protection_groups',
     'protection_commands',
     'limit_on_close_orders',
+    'futures_leverage_changes',
     'futures_execute_requests',
     'futures_limit_orders',
     'futures_liquidation_closes',

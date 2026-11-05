@@ -482,6 +482,7 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 - Market full fill, LONG/SHORT, One-way, Isolated + Cross를 지원한다. leverage는 1~100 모든 자연수,
   소수/잘못된 타입은 거절하며 열린 position lifetime의 leverage 변경/increase mismatch를 금지한다.
   반대 방향 open/초과 reduce/자동 flip은 없다. Full close 후 새 lifetime은 방향/leverage를 다시 선택한다.
+  (2026-11-06: One-way·leverage 고정은 아래 「선물 양방향 포지션·레버리지 변경」으로 대체.)
 - Isolated 초기 margin은 execution notional/leverage이며 cash에서 debit하지 않는다. 보수적인
   8자리 올림과 별도 entry-notional basis로 rounding 과소 배정을 막고 allocation을 합산한다.
   Cross는 별도 allocation 없이 현재 Mark notional/leverage로 initial requirement를 계산한다.
@@ -735,7 +736,7 @@ preserves financial atomicity without exchange-style fill event infrastructure.
   만든다. 근거: 금융 엔진을 복제하지 않고 기존 execution·limit entry를 유일한 체결 증거로 둔다.
 - 새 포지션 전용이다. 같은 계약에 포지션·대기 지정가 진입·다른 감시가 있으면 등록을 거부하고,
   감시 중 포지션이 생기면 발동 시 기존 엔진의 거부로 실패한다. 근거: one-way 포지션을 의도치 않게
-  증가·감소·반전시키지 않는다.
+  증가·감소·반전시키지 않는다. (2026-11-06: 아래 양방향 정책으로 대체 — 방향별 하나, 같은 방향은 추가.)
 - 이미 충족된 조건은 등록을 거부하고 등록 이후 수신·체결된 신선한 Futures Last만 발동한다.
   발동 후 30초·3회 안의 시세 일시 실패만 재시도하고 담보 부족 등 확정 실패는 즉시 `failed`다.
   근거: Spot 조건주문과 같은 즉시 실행 방지·무한 재시도 금지 규칙.
@@ -748,6 +749,7 @@ preserves financial atomicity without exchange-style fill event infrastructure.
 - Entry는 flat 신규 전량 진입이고 account/instrument당 pending 하나다. Cross/Isolated,
   LONG/SHORT, 정수 leverage 1–100을 기존 Futures 실행 코어로 처리한다.
   근거: v1 진입 의도를 기존 Position lifetime·one-way 회계에 연결한다.
+  (2026-11-06: account/instrument/direction당 하나, 체결 시 같은 방향 포지션에 추가 — 아래 양방향 정책.)
 - 제출은 초기 증거금과 기존 opening fee를 예약하며 현금 차감·Position·UPNL·fill count를
   만들지 않는다. 체결 transaction에서 자기 예약만 해제하고 담보를 다시 검증한다.
   근거: 예약 담보의 중복 사용을 막으면서 Short 가격 개선에 필요한 추가 담보도 확인한다.
@@ -813,3 +815,28 @@ preserves financial atomicity without exchange-style fill event infrastructure.
   매도 지정가·조건주문 절. 정규장·암호화폐·선물은 이 규칙 그대로.)
 - 새 플래그 `FUTURES_TP_SL_ORDERS_ENABLED`(기본 false). 현물은 기존
   `INDEPENDENT_TP_SL_ORDERS_ENABLED`를 그대로 쓴다.
+
+## 선물 양방향 포지션·레버리지 변경 (2026-11-06, current)
+
+- 한 계정·한 계약에서 롱과 숏은 서로 독립된 position lifetime이다(방향별 open lifetime 최대 1개,
+  partial unique `futures_positions_one_open_per_direction`). 같은 방향 거래는 그 방향의 open
+  lifetime에 합산하고, 반대 방향은 수량·평균가·손익·보호설정을 바꾸지 않는다. 자동 상계·감소·반전은
+  없다. 근거: 사용자가 고른 롱/숏이 실제 주문 의도와 일치해야 하며, 레버리지별·진입시각별 다중
+  포지션은 관리 계층만 늘린다. 상세 계약:
+  [futures-api-contract.md](futures-api-contract.md#two-way-positions-and-leverage-change-2026-11-06).
+- 주문방식(시장가·지정가·조건주문)과 관계없이 하나의 병합 규칙(`resolveFuturesEntryFill`)을 쓴다.
+  사용자 시장가는 open(해당 방향 무포지션)/increase(positionId 고정)로 명시하고, 대기 주문은 체결 시점
+  최신 포지션 기준으로 신규/추가를 결정한다. 근거: 등록 시점과 체결 시점의 포지션이 다를 수 있다.
+- 증거금 모드는 lifetime 동안 고정이다. 다른 모드로 같은 방향 추가는 거부하고 자동 전환은 없다.
+- 레버리지 변경은 사용자의 명시적 확인 후에만 적용한다(시장가 추가와 한 transaction, 레버리지만
+  변경 명령, 또는 대기 주문 체결 시 승인 범위 일치). 선택기 조작이나 대기 주문 등록만으로는 포지션이
+  바뀌지 않는다. 승인 범위(같은 lifetime·같은 기존 레버리지)를 벗어나면 적용하지 않는다(지정가는
+  `position_changed` 취소·예약 해제, 조건주문은 `failed`). 근거: 승인 없는 위험 변경을 막는다.
+- 레버리지 변경은 수량·평균진입가·체결이력·실현손익·손절가/익절가를 바꾸지 않고 현금·수수료·손익
+  원장도 만들지 않는다. 격리는 할당 증거금을 entry basis/새 레버리지로 재산정(추가 또는 해제),
+  교차는 할당 없이 Mark 초기 요구액만 바뀐다. 검증은 increase와 같은 유지증거금·교차 담보 검사다.
+  근거: 레버리지는 담보 요구의 설정이지 거래가 아니다.
+- 롱·숏 요구액은 각각 합산하고 상계·할인하지 않는다(교차 UPNL은 실제 평가값으로 합산).
+- 증거: `futures_leverage_changes`(append-only)가 모든 변경을 기록하고 DB deferred trigger가 같은
+  transaction의 증거 없는 레버리지 변경과 종료 lifetime의 변경을 거부한다.
+

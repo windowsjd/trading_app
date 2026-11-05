@@ -156,7 +156,8 @@ Market → Crypto → Spot/Futures (Spot default) links into an account-pinned
 Expo/React Query Futures screen. General and Season Home have no Futures entry
 card or separate tab; their Futures financial aggregates remain intact. Explicit
 Long/Short, Isolated/Cross, integer 1–100, Open/Increase/Reduce/Close, quantity and
-Market controls and flat-only Limit Entry respect lifetime settings and one-way semantics. Catalog
+Market controls and flat-only Limit Entry respect lifetime settings and one-way semantics
+(superseded 2026-11-06 by two-way lifetimes, [futures-api-contract.md](futures-api-contract.md#two-way-positions-and-leverage-change-2026-11-06)). Catalog
 search bounds the visible instrument choices. Spot reference and Mark risk prices
 have different labels. Isolated shows a liquidation price; Cross shows shared
 account metrics. No ROE formula or fictional Cross liquidation price is introduced.

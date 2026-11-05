@@ -57,7 +57,7 @@ describe('order failure copy', () => {
       ],
       [
         { kind: 'futures_tp_sl', market: 'futures', instrument: { name: null, symbol: 'ETHUSDT' }, protection: 'take_profit', side: null, failureCode: 'FUTURES_MARK_STALE' },
-        /ETHUSDT 익절 실행 실패/, /Mark 시세/,
+        /ETHUSDT 익절 실행 실패/, /평가 기준가/,
       ],
       [
         { kind: 'futures_tp_sl', market: 'futures', instrument: { name: null, symbol: 'ETHUSDT' }, protection: 'stop_loss', side: null, reasonCode: 'execution_window_expired', failureCode: 'SOMETHING_NEW' },

@@ -8,8 +8,8 @@ import FuturesDirectionBadge from './FuturesDirectionBadge';
 /**
  * The top of a futures position's bottom sheets (포지션 종료, 손절가/익절가),
  * laid out like an exchange's close sheet: the contract with 무기한, its side
- * and margin mode with leverage, then 진입가 and Mark Price as label–value
- * rows over a divider. Mark shows only while it is fresh, as on the card.
+ * and margin mode with leverage, then 진입가 and 평가 기준가 (the Mark Price)
+ * as label–value rows over a divider. It shows only while fresh, as on the card.
  */
 export default function FuturesPositionSheetSummary({ position, markFresh, testID = 'futures-sheet-summary' }: {
   position: FuturesPosition;
@@ -34,7 +34,7 @@ export default function FuturesPositionSheetSummary({ position, markFresh, testI
         <Text testID={`${testID}-entry`} selectable style={styles.value}>{price(position.averageEntryPrice)}</Text>
       </View>
       <View style={styles.row}>
-        <Text style={styles.label}>Mark Price (USD)</Text>
+        <Text style={styles.label}>평가 기준가 (USD)</Text>
         <Text testID={`${testID}-mark`} selectable style={styles.value}>{markFresh ? price(position.markPrice) : '-'}</Text>
       </View>
       <View style={styles.divider} />

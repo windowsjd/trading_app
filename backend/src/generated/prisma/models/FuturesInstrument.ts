@@ -223,6 +223,7 @@ export type FuturesInstrumentWhereInput = {
   marketCandles?: Prisma.FuturesMarketCandleListRelationFilter
   tpSlSettings?: Prisma.FuturesTpSlSettingListRelationFilter
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotListRelationFilter
+  leverageChanges?: Prisma.FuturesLeverageChangeListRelationFilter
 }
 
 export type FuturesInstrumentOrderByWithRelationInput = {
@@ -248,6 +249,7 @@ export type FuturesInstrumentOrderByWithRelationInput = {
   marketCandles?: Prisma.FuturesMarketCandleOrderByRelationAggregateInput
   tpSlSettings?: Prisma.FuturesTpSlSettingOrderByRelationAggregateInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotOrderByRelationAggregateInput
+  leverageChanges?: Prisma.FuturesLeverageChangeOrderByRelationAggregateInput
 }
 
 export type FuturesInstrumentWhereUniqueInput = Prisma.AtLeast<{
@@ -277,6 +279,7 @@ export type FuturesInstrumentWhereUniqueInput = Prisma.AtLeast<{
   marketCandles?: Prisma.FuturesMarketCandleListRelationFilter
   tpSlSettings?: Prisma.FuturesTpSlSettingListRelationFilter
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotListRelationFilter
+  leverageChanges?: Prisma.FuturesLeverageChangeListRelationFilter
 }, "id" | "underlyingAssetId_productType_settlementCurrency">
 
 export type FuturesInstrumentOrderByWithAggregationInput = {
@@ -331,6 +334,7 @@ export type FuturesInstrumentCreateInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateInput = {
@@ -355,6 +359,7 @@ export type FuturesInstrumentUncheckedCreateInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUpdateInput = {
@@ -379,6 +384,7 @@ export type FuturesInstrumentUpdateInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateInput = {
@@ -403,6 +409,7 @@ export type FuturesInstrumentUncheckedUpdateInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateManyInput = {
@@ -583,6 +590,20 @@ export type FuturesInstrumentUpdateOneRequiredWithoutExecutionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutExecutionsInput, Prisma.FuturesInstrumentUpdateWithoutExecutionsInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutExecutionsInput>
 }
 
+export type FuturesInstrumentCreateNestedOneWithoutLeverageChangesInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLeverageChangesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLeverageChangesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutLeverageChangesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+}
+
+export type FuturesInstrumentUpdateOneRequiredWithoutLeverageChangesNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLeverageChangesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLeverageChangesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutLeverageChangesInput
+  upsert?: Prisma.FuturesInstrumentUpsertWithoutLeverageChangesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutLeverageChangesInput, Prisma.FuturesInstrumentUpdateWithoutLeverageChangesInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutLeverageChangesInput>
+}
+
 export type FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput = {
   create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLimitOrdersInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLimitOrdersInput>
   connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutLimitOrdersInput
@@ -730,6 +751,7 @@ export type FuturesInstrumentCreateWithoutUnderlyingAssetInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutUnderlyingAssetInput = {
@@ -753,6 +775,7 @@ export type FuturesInstrumentUncheckedCreateWithoutUnderlyingAssetInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutUnderlyingAssetInput = {
@@ -817,6 +840,7 @@ export type FuturesInstrumentCreateWithoutMarketCandlesInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutMarketCandlesInput = {
@@ -840,6 +864,7 @@ export type FuturesInstrumentUncheckedCreateWithoutMarketCandlesInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutMarketCandlesInput = {
@@ -879,6 +904,7 @@ export type FuturesInstrumentUpdateWithoutMarketCandlesInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutMarketCandlesInput = {
@@ -902,6 +928,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutMarketCandlesInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutPositionsInput = {
@@ -925,6 +952,7 @@ export type FuturesInstrumentCreateWithoutPositionsInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutPositionsInput = {
@@ -948,6 +976,7 @@ export type FuturesInstrumentUncheckedCreateWithoutPositionsInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutPositionsInput = {
@@ -987,6 +1016,7 @@ export type FuturesInstrumentUpdateWithoutPositionsInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutPositionsInput = {
@@ -1010,6 +1040,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutPositionsInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutExecutionsInput = {
@@ -1033,6 +1064,7 @@ export type FuturesInstrumentCreateWithoutExecutionsInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutExecutionsInput = {
@@ -1056,6 +1088,7 @@ export type FuturesInstrumentUncheckedCreateWithoutExecutionsInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutExecutionsInput = {
@@ -1095,6 +1128,7 @@ export type FuturesInstrumentUpdateWithoutExecutionsInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutExecutionsInput = {
@@ -1108,6 +1142,119 @@ export type FuturesInstrumentUncheckedUpdateWithoutExecutionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  lastPrices?: Prisma.FuturesLastPriceSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
+  marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
+  tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
+  orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentCreateWithoutLeverageChangesInput = {
+  id?: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
+  positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  lastPrices?: Prisma.FuturesLastPriceSnapshotCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
+  limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
+  marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
+  tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
+  orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentUncheckedCreateWithoutLeverageChangesInput = {
+  id?: string
+  underlyingAssetId: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  lastPrices?: Prisma.FuturesLastPriceSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
+  marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
+  tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
+  orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+}
+
+export type FuturesInstrumentCreateOrConnectWithoutLeverageChangesInput = {
+  where: Prisma.FuturesInstrumentWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLeverageChangesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLeverageChangesInput>
+}
+
+export type FuturesInstrumentUpsertWithoutLeverageChangesInput = {
+  update: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutLeverageChangesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutLeverageChangesInput>
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLeverageChangesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLeverageChangesInput>
+  where?: Prisma.FuturesInstrumentWhereInput
+}
+
+export type FuturesInstrumentUpdateToOneWithWhereWithoutLeverageChangesInput = {
+  where?: Prisma.FuturesInstrumentWhereInput
+  data: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutLeverageChangesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutLeverageChangesInput>
+}
+
+export type FuturesInstrumentUpdateWithoutLeverageChangesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
+  positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  lastPrices?: Prisma.FuturesLastPriceSnapshotUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
+  limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
+  marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
+  tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
+  orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+}
+
+export type FuturesInstrumentUncheckedUpdateWithoutLeverageChangesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  underlyingAssetId?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
   marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
   lastPrices?: Prisma.FuturesLastPriceSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
@@ -1141,6 +1288,7 @@ export type FuturesInstrumentCreateWithoutLimitOrdersInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutLimitOrdersInput = {
@@ -1164,6 +1312,7 @@ export type FuturesInstrumentUncheckedCreateWithoutLimitOrdersInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutLimitOrdersInput = {
@@ -1203,6 +1352,7 @@ export type FuturesInstrumentUpdateWithoutLimitOrdersInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutLimitOrdersInput = {
@@ -1226,6 +1376,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutLimitOrdersInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutConditionalEntriesInput = {
@@ -1249,6 +1400,7 @@ export type FuturesInstrumentCreateWithoutConditionalEntriesInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutConditionalEntriesInput = {
@@ -1272,6 +1424,7 @@ export type FuturesInstrumentUncheckedCreateWithoutConditionalEntriesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutConditionalEntriesInput = {
@@ -1311,6 +1464,7 @@ export type FuturesInstrumentUpdateWithoutConditionalEntriesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutConditionalEntriesInput = {
@@ -1334,6 +1488,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutConditionalEntriesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutTpSlSettingsInput = {
@@ -1357,6 +1512,7 @@ export type FuturesInstrumentCreateWithoutTpSlSettingsInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutTpSlSettingsInput = {
@@ -1380,6 +1536,7 @@ export type FuturesInstrumentUncheckedCreateWithoutTpSlSettingsInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutTpSlSettingsInput = {
@@ -1419,6 +1576,7 @@ export type FuturesInstrumentUpdateWithoutTpSlSettingsInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutTpSlSettingsInput = {
@@ -1442,6 +1600,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutTpSlSettingsInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutLastPricesInput = {
@@ -1465,6 +1624,7 @@ export type FuturesInstrumentCreateWithoutLastPricesInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutLastPricesInput = {
@@ -1488,6 +1648,7 @@ export type FuturesInstrumentUncheckedCreateWithoutLastPricesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutLastPricesInput = {
@@ -1527,6 +1688,7 @@ export type FuturesInstrumentUpdateWithoutLastPricesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutLastPricesInput = {
@@ -1550,6 +1712,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutLastPricesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutMarksInput = {
@@ -1573,6 +1736,7 @@ export type FuturesInstrumentCreateWithoutMarksInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutMarksInput = {
@@ -1596,6 +1760,7 @@ export type FuturesInstrumentUncheckedCreateWithoutMarksInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutMarksInput = {
@@ -1635,6 +1800,7 @@ export type FuturesInstrumentUpdateWithoutMarksInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutMarksInput = {
@@ -1658,6 +1824,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutMarksInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutOrderBookSnapshotsInput = {
@@ -1681,6 +1848,7 @@ export type FuturesInstrumentCreateWithoutOrderBookSnapshotsInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutOrderBookSnapshotsInput = {
@@ -1704,6 +1872,7 @@ export type FuturesInstrumentUncheckedCreateWithoutOrderBookSnapshotsInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutOrderBookSnapshotsInput = {
@@ -1743,6 +1912,7 @@ export type FuturesInstrumentUpdateWithoutOrderBookSnapshotsInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutOrderBookSnapshotsInput = {
@@ -1766,6 +1936,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutOrderBookSnapshotsInput = {
   conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutLiquidationClosesInput = {
@@ -1789,6 +1960,7 @@ export type FuturesInstrumentCreateWithoutLiquidationClosesInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput = {
@@ -1812,6 +1984,7 @@ export type FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutLiquidationClosesInput = {
@@ -1851,6 +2024,7 @@ export type FuturesInstrumentUpdateWithoutLiquidationClosesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput = {
@@ -1874,6 +2048,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutSeasonPricesInput = {
@@ -1897,6 +2072,7 @@ export type FuturesInstrumentCreateWithoutSeasonPricesInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutSeasonPricesInput = {
@@ -1920,6 +2096,7 @@ export type FuturesInstrumentUncheckedCreateWithoutSeasonPricesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutSeasonPricesInput = {
@@ -1959,6 +2136,7 @@ export type FuturesInstrumentUpdateWithoutSeasonPricesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutSeasonPricesInput = {
@@ -1982,6 +2160,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutSeasonPricesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutSeasonClosesInput = {
@@ -2005,6 +2184,7 @@ export type FuturesInstrumentCreateWithoutSeasonClosesInput = {
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutSeasonClosesInput = {
@@ -2028,6 +2208,7 @@ export type FuturesInstrumentUncheckedCreateWithoutSeasonClosesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutInstrumentInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutSeasonClosesInput = {
@@ -2067,6 +2248,7 @@ export type FuturesInstrumentUpdateWithoutSeasonClosesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutSeasonClosesInput = {
@@ -2090,6 +2272,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutSeasonClosesInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateManyUnderlyingAssetInput = {
@@ -2124,6 +2307,7 @@ export type FuturesInstrumentUpdateWithoutUnderlyingAssetInput = {
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutUnderlyingAssetInput = {
@@ -2147,6 +2331,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutUnderlyingAssetInput = {
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
   tpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentNestedInput
   orderBookSnapshots?: Prisma.FuturesOrderBookSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  leverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetInput = {
@@ -2178,6 +2363,7 @@ export type FuturesInstrumentCountOutputType = {
   marketCandles: number
   tpSlSettings: number
   orderBookSnapshots: number
+  leverageChanges: number
 }
 
 export type FuturesInstrumentCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2193,6 +2379,7 @@ export type FuturesInstrumentCountOutputTypeSelect<ExtArgs extends runtime.Types
   marketCandles?: boolean | FuturesInstrumentCountOutputTypeCountMarketCandlesArgs
   tpSlSettings?: boolean | FuturesInstrumentCountOutputTypeCountTpSlSettingsArgs
   orderBookSnapshots?: boolean | FuturesInstrumentCountOutputTypeCountOrderBookSnapshotsArgs
+  leverageChanges?: boolean | FuturesInstrumentCountOutputTypeCountLeverageChangesArgs
 }
 
 /**
@@ -2289,6 +2476,13 @@ export type FuturesInstrumentCountOutputTypeCountOrderBookSnapshotsArgs<ExtArgs 
   where?: Prisma.FuturesOrderBookSnapshotWhereInput
 }
 
+/**
+ * FuturesInstrumentCountOutputType without action
+ */
+export type FuturesInstrumentCountOutputTypeCountLeverageChangesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesLeverageChangeWhereInput
+}
+
 
 export type FuturesInstrumentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2313,6 +2507,7 @@ export type FuturesInstrumentSelect<ExtArgs extends runtime.Types.Extensions.Int
   marketCandles?: boolean | Prisma.FuturesInstrument$marketCandlesArgs<ExtArgs>
   tpSlSettings?: boolean | Prisma.FuturesInstrument$tpSlSettingsArgs<ExtArgs>
   orderBookSnapshots?: boolean | Prisma.FuturesInstrument$orderBookSnapshotsArgs<ExtArgs>
+  leverageChanges?: boolean | Prisma.FuturesInstrument$leverageChangesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesInstrumentCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresInstrument"]>
 
@@ -2369,6 +2564,7 @@ export type FuturesInstrumentInclude<ExtArgs extends runtime.Types.Extensions.In
   marketCandles?: boolean | Prisma.FuturesInstrument$marketCandlesArgs<ExtArgs>
   tpSlSettings?: boolean | Prisma.FuturesInstrument$tpSlSettingsArgs<ExtArgs>
   orderBookSnapshots?: boolean | Prisma.FuturesInstrument$orderBookSnapshotsArgs<ExtArgs>
+  leverageChanges?: boolean | Prisma.FuturesInstrument$leverageChangesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesInstrumentCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FuturesInstrumentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2394,6 +2590,7 @@ export type $FuturesInstrumentPayload<ExtArgs extends runtime.Types.Extensions.I
     marketCandles: Prisma.$FuturesMarketCandlePayload<ExtArgs>[]
     tpSlSettings: Prisma.$FuturesTpSlSettingPayload<ExtArgs>[]
     orderBookSnapshots: Prisma.$FuturesOrderBookSnapshotPayload<ExtArgs>[]
+    leverageChanges: Prisma.$FuturesLeverageChangePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2815,6 +3012,7 @@ export interface Prisma__FuturesInstrumentClient<T, Null = never, ExtArgs extend
   marketCandles<T extends Prisma.FuturesInstrument$marketCandlesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$marketCandlesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesMarketCandlePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tpSlSettings<T extends Prisma.FuturesInstrument$tpSlSettingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$tpSlSettingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesTpSlSettingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orderBookSnapshots<T extends Prisma.FuturesInstrument$orderBookSnapshotsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$orderBookSnapshotsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesOrderBookSnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  leverageChanges<T extends Prisma.FuturesInstrument$leverageChangesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$leverageChangesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesLeverageChangePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3539,6 +3737,30 @@ export type FuturesInstrument$orderBookSnapshotsArgs<ExtArgs extends runtime.Typ
   take?: number
   skip?: number
   distinct?: Prisma.FuturesOrderBookSnapshotScalarFieldEnum | Prisma.FuturesOrderBookSnapshotScalarFieldEnum[]
+}
+
+/**
+ * FuturesInstrument.leverageChanges
+ */
+export type FuturesInstrument$leverageChangesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesLeverageChange
+   */
+  select?: Prisma.FuturesLeverageChangeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesLeverageChange
+   */
+  omit?: Prisma.FuturesLeverageChangeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesLeverageChangeInclude<ExtArgs> | null
+  where?: Prisma.FuturesLeverageChangeWhereInput
+  orderBy?: Prisma.FuturesLeverageChangeOrderByWithRelationInput | Prisma.FuturesLeverageChangeOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesLeverageChangeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesLeverageChangeScalarFieldEnum | Prisma.FuturesLeverageChangeScalarFieldEnum[]
 }
 
 /**

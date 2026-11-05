@@ -185,11 +185,25 @@ export type FuturesCommand = {
   leverage: number;
   quantity: string;
   idempotencyKey: string;
+  /**
+   * An add that changes the position's leverage to `leverage` (2026-11-06):
+   * the leverage the user saw and confirmed changing. Never sent otherwise.
+   */
+  fromLeverage?: number;
+};
+/** A leverage change the server applied (from → to) and the allocation it moved. */
+export type FuturesLeverageChange = {
+  fromLeverage: number;
+  toLeverage: number;
+  isolatedMarginBefore: string;
+  isolatedMarginAfter: string;
 };
 export type FuturesResult = {
   tradingAccountId: string;
   commandId: string;
   execution: Omit<FuturesExecution, "instrument">;
+  /** Absent from an older server and from responses committed before 2026-11-06. */
+  leverageChange?: FuturesLeverageChange | null;
 };
 export type FuturesHistory = {
   tradingAccountId: string;
@@ -384,6 +398,8 @@ export type FuturesLimitOrder = {
   instrument: FuturesInstrument;
   /** 설정 변경 (2026-11-05): absent on an older server (0). */
   revision?: number; revisedAt?: string | null;
+  /** The confirmed change of the open same-direction position's leverage at the fill. */
+  leverageChange?: { positionId: string; fromLeverage: number } | null;
 };
 export type FuturesLimitResult = { tradingAccountId: string; order: Omit<FuturesLimitOrder, 'instrument'> };
 export async function getFuturesLimitOrders(id: string, signal?: AbortSignal) {
@@ -435,6 +451,8 @@ export type FuturesConditionalEntry = {
   createdAt: string; endedAt: string | null; updatedAt: string;
   /** 설정 변경 (2026-11-05): absent on an older server (0). */
   revision?: number; revisedAt?: string | null;
+  /** The confirmed change of the open same-direction position's leverage at the fill. */
+  leverageChange?: { positionId: string; fromLeverage: number } | null;
 };
 export type FuturesConditionalEntries = {
   tradingAccountId: string;
@@ -446,6 +464,8 @@ export type FuturesConditionalEntryCommand = {
   instrumentId: string; direction: Direction; marginMode: MarginMode; leverage: number; quantity: string;
   triggerCondition: FuturesConditionalTrigger; triggerPrice: string;
   executionType: FuturesConditionalExecution; limitPrice?: string; idempotencyKey: string;
+  /** The open same-direction position's leverage the user confirmed changing. */
+  fromLeverage?: number;
 };
 export type FuturesConditionalEntryResult = { tradingAccountId: string; entry: FuturesConditionalEntry; duplicate: boolean };
 /** Ended rows: the newest page only (state history, not a ledger). */
@@ -476,4 +496,76 @@ export async function cancelFuturesConditionalEntry(id: string, entryId: string)
   const url = path(id, `conditional-entries/${encodeURIComponent(entryId)}/cancel`);
   const response = await apiClient.post<{ success: true; data: FuturesConditionalEntryResult }>(url, {});
   return assertAccountScope(url, id, response.data.data);
+}
+
+/**
+ * Leverage change of an open position (2026-11-06): the user confirms it
+ * naming the leverage the position has now (`fromLeverage`). Quantity, entry
+ * price, history and TP/SL stay; the margin is re-derived. Same key + same
+ * body replays the first answer.
+ */
+export type FuturesLeverageChangeResult = {
+  tradingAccountId: string;
+  changeId: string;
+  position: Pick<FuturesPosition, 'id' | 'instrumentId' | 'direction' | 'marginMode' | 'quantity' | 'averageEntryPrice' | 'leverage' | 'isolatedMargin' | 'initialMargin'>;
+  leverageChange: FuturesLeverageChange;
+  collateral: { balanceAmount: string; totalMarginUsed: string; freeCollateral: string };
+  changedAt: string;
+};
+export async function changeFuturesLeverage(
+  id: string,
+  positionId: string,
+  command: { leverage: number; fromLeverage: number; idempotencyKey: string },
+) {
+  const url = path(id, `positions/${encodeURIComponent(positionId)}/leverage`);
+  const response = await apiClient.post<{ success: true; data: FuturesLeverageChangeResult }>(url, command);
+  return assertAccountScope(url, id, response.data.data);
+}
+
+/** One side of a preview: the position's terms and Mark risk (null when unknown). */
+export type FuturesLeverageSide = {
+  leverage: number;
+  quantity: string;
+  averageEntryPrice: string;
+  isolatedMargin: string;
+  initialMargin: string;
+  initialRequirement: string | null;
+  liquidationPrice: string | null;
+  liquidationBuffer: string | null;
+};
+/**
+ * The server's estimate of a leverage change, alone or with an add of
+ * `quantity` at `price` (the current Futures Last when omitted), from the
+ * same plan and checks as the commands. Values it cannot evaluate are null
+ * (never guessed); `refusal` names the check that would refuse it now.
+ */
+export type FuturesLeveragePreview = {
+  tradingAccountId: string;
+  positionId: string;
+  evaluatedAt: string;
+  markState: string;
+  basisPrice: string | null;
+  before: FuturesLeverageSide;
+  after: FuturesLeverageSide | null;
+  collateral: {
+    freeCollateralBefore: string | null;
+    freeCollateralAfter: string;
+    isolatedMarginDelta: string;
+    initialRequirementDelta: string;
+    estimatedFee: string;
+    crossLiquidationBufferBefore: string | null;
+    crossLiquidationBufferAfter: string | null;
+  } | null;
+  refusal: string | null;
+};
+export function getFuturesLeveragePreview(
+  id: string,
+  positionId: string,
+  query: { leverage: number; quantity?: string | null; price?: string | null },
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({ leverage: String(query.leverage) });
+  if (query.quantity) params.set('quantity', query.quantity);
+  if (query.quantity && query.price) params.set('price', query.price);
+  return read<FuturesLeveragePreview>(id, `positions/${encodeURIComponent(positionId)}/leverage-preview?${params.toString()}`, signal);
 }

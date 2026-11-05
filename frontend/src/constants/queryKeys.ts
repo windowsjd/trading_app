@@ -410,6 +410,9 @@ export const QUERY_KEYS = {
       conditionalEntries: (id: string, state: 'open' | 'ended') => ['tradingAccount', 'futures', id, 'conditional-entries', state] as const,
       /** Independent 손절가/익절가 settings on open lifetimes. */
       tpSl: (id: string, state: 'open' | 'ended') => ['tradingAccount', 'futures', id, 'tp-sl', state] as const,
+      /** The server's estimate of a leverage change (alone, or with an add of `quantity` at `price`). */
+      leveragePreview: (id: string, positionId: string, leverage: number, quantity: string | null, price: string | null) =>
+        ['tradingAccount', 'futures', id, 'leverage-preview', positionId, leverage, quantity, price] as const,
     },
     /** Everything account-scoped; the logout-time clear target. */
     all: ['tradingAccount'] as const,

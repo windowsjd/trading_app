@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 const require = createRequire(import.meta.url);
-const { futuresHarness, deferred } = require('../../../test/futuresHarness.cjs');
+const { futuresHarness, deferred, leveragePreviewFixture } = require('../../../test/futuresHarness.cjs');
 const { getQuestGuideFacts } = require('../../features/quest/questGuideBridge.ts');
 
 // Fixture: contract btc, Futures Last 102, Mark 101, fee 0.1%, flat unless
@@ -44,10 +44,9 @@ test('removed copy: the book note and the 시장가 price box; 주문가능 show
   assert.equal(text(h, 'futures-available-collateral'), '주문가능 9,995 USD');
   assert.equal(h.node('futures-amount').props.placeholder, 'USD 금액');
   assert.match(h.text(), /주문 금액 \(USD\)/);
-  // No separate wallet card repeats it; Last and Mark stay distinct.
+  // No separate wallet card repeats it; no Last/Mark row over the form (the book keeps the price).
   assert.equal(/사용 가능 담보|선물 USD 현금/.test(h.text()), false);
-  assert.match(text(h, 'futures-last-price'), /102/);
-  assert.match(text(h, 'futures-mark-price'), /101/);
+  assert.equal(h.node('futures-last-price') === undefined && h.node('futures-mark-price') === undefined, true);
   const unknown = futuresHarness({ freeCollateral: null });
   await unknown.start(); t.after(unknown.close);
   assert.equal(text(unknown, 'futures-available-collateral'), '주문가능 평가 대기');
@@ -160,7 +159,7 @@ test('a new 100x isolated long that would start under maintenance on Mark is ref
   await h.start(); t.after(h.close);
   await h.setLeverage(100);
   await h.amount('100');
-  assert.equal(text(h, 'futures-collateral-insufficient'), '현재 Mark 기준으로 유지 증거금을 충족하지 못합니다. 레버리지를 낮춰주세요.');
+  assert.equal(text(h, 'futures-collateral-insufficient'), '현재 평가 기준가로는 유지 증거금을 충족하지 못합니다. 레버리지를 낮춰주세요.');
   assert.equal(h.node('futures-submit').props.state, 'disabled');
   await h.choose('숏(Short)');
   assert.equal(h.node('futures-collateral-insufficient') === undefined, true, 'for a short that Mark is a gain');
@@ -180,56 +179,152 @@ test('an unknown fee rate leaves the slider unavailable with its reason; a typed
   assert.equal(h.node('futures-submit').props.state, 'enabled');
 });
 
-test('reduce: the ratio is of the position (never the collateral); 100% is the existing 전량 종료', async t => {
+test('the trade form only enters: no 수량 감소/전량 종료 there (포지션 종료 reduces or closes)', async t => {
   const h = futuresHarness({ position: true });
   await h.start(); t.after(h.close);
-  await h.choose('수량 감소(Reduce)');
-  // 2 BTC at Futures Last 102 = $204.
-  assert.equal(text(h, 'futures-available-collateral'), '보유 2 BTC · 약 204 USD');
-  await h.press('futures-ratio-25');
-  assert.equal(h.node('futures-amount').props.value, '51');
-  await h.press('futures-ratio-75');
-  assert.equal(h.node('futures-amount').props.value, '153');
-  await h.press('futures-submit');
-  assert.equal(h.requests[0].body.operation, 'reduce');
-  assert.equal(h.requests[0].body.quantity, '1.5');
-  await h.choose('수량 감소(Reduce)');
-  await h.press('futures-ratio-100');
-  assert.equal(h.node('futures-amount') === undefined, true, '전량 종료 takes no amount');
-  assert.match(text(h, 'futures-close-quantity'), /보유 수량 2 BTC 전체/);
-  assert.equal(h.node('futures-operation-close') !== undefined, true);
-  assert.equal(h.node('futures-submit').props.label, '롱(Long) 전량 종료');
-  await h.press('futures-submit');
-  assert.equal(h.requests[1].body.operation, 'close');
-  assert.equal(h.requests[1].body.quantity, '2');
+  for (const removed of ['futures-operation', 'futures-operation-reduce', 'futures-operation-close', 'futures-close-summary'])
+    assert.equal(h.node(removed) === undefined, true, removed);
+  assert.equal(h.node('futures-amount').props.accessibilityLabel, '추가 금액 (USD)');
+  assert.equal(h.node('futures-submit').props.label, '롱(Long) 수량 추가');
+  // The card's 포지션 종료 keeps the reduce/close (its own tests cover the sheet).
+  assert.equal(h.node('futures-position-A:position-close').props.label, '포지션 종료');
 });
 
-test('a typed reduce of the whole notional is shown and sent as 전량 종료; more than the position is refused', async t => {
-  const h = futuresHarness({ position: true });
-  await h.start(); t.after(h.close);
-  await h.choose('수량 감소(Reduce)');
-  await h.amount('205');
-  assert.equal(text(h, 'futures-amount-error'), '보유 수량을 초과할 수 없습니다.');
-  assert.equal(h.node('futures-submit').props.state, 'disabled');
-  await h.amount('204');
-  assert.match(h.text(), /보유 수량 전체 · 전량 종료로 처리됩니다/);
-  assert.equal(h.node('futures-submit').props.label, '롱(Long) 전량 종료');
-  await h.press('futures-submit');
-  assert.equal(h.requests[0].body.operation, 'close');
-  assert.equal(h.requests[0].body.quantity, '2');
-});
-
-test('increase uses the collateral like an entry; the position keeps direction, leverage and margin mode', async t => {
+test('increase uses the collateral like an entry; the form follows the held position\'s direction terms', async t => {
   const h = futuresHarness({ position: true, direction: 'short', marginMode: 'cross', leverage: 37 });
   await h.start(); t.after(h.close);
-  assert.equal(h.node('futures-leverage-select') === undefined, true);
+  // Two-way: 롱/숏, margin mode and leverage stay in the form; the short side shows the short's terms.
+  assert.equal(h.node('futures-direction') !== undefined && h.node('futures-leverage-select') !== undefined, true);
+  await h.choose('숏(Short)');
+  assert.equal(h.leverage(), '37x');
   assert.equal(text(h, 'futures-available-collateral'), '주문가능 9,995 USD');
   assert.equal(h.node('futures-amount').props.accessibilityLabel, '추가 금액 (USD)');
   await h.press('futures-ratio-25');
   assert.notEqual(h.node('futures-amount').props.value, '');
   await h.press('futures-submit');
-  assert.deepEqual([h.requests[0].body.operation, h.requests[0].body.direction, h.requests[0].body.leverage, h.requests[0].body.marginMode],
-    ['increase', 'short', 37, 'cross']);
+  assert.deepEqual([h.requests[0].body.operation, h.requests[0].body.positionId, h.requests[0].body.direction, h.requests[0].body.leverage, h.requests[0].body.marginMode],
+    ['increase', 'A:position', 'short', 37, 'cross']);
+});
+
+test('two-way: with a long held, 숏 opens an independent short and 롱 adds to the long', async t => {
+  const h = futuresHarness({ position: true, markPrice: '102' });
+  await h.start(); t.after(h.close);
+  // Never forced to the held direction: the selector stays as chosen.
+  await h.choose('숏(Short)');
+  assert.equal(h.node('futures-position-add-hint') === undefined, true, 'no short is held: a new position');
+  assert.equal(h.leverage(), '100x', 'the shown leverage carries over to the new side');
+  await h.setLeverage(5);
+  await h.amount('102');
+  assert.equal(h.node('futures-submit').props.label, '숏(Short) 진입');
+  await h.press('futures-submit');
+  assert.deepEqual([h.requests[0].body.operation, h.requests[0].body.direction, h.requests[0].body.leverage, h.requests[0].body.positionId],
+    ['open', 'short', 5, undefined]);
+  await h.choose('롱(Long)');
+  assert.equal(h.leverage(), '100x', 'back on the long: its own leverage');
+  assert.match(text(h, 'futures-position-add-hint'), /보유 롱 포지션에 추가/);
+  await h.amount('102');
+  await h.press('futures-submit');
+  assert.deepEqual([h.requests[1].body.operation, h.requests[1].body.direction, h.requests[1].body.positionId, h.requests[1].body.leverage],
+    ['increase', 'long', 'A:position', 100]);
+});
+
+test('a held position\'s margin mode is fixed: another mode is explained and never sent', async t => {
+  const h = futuresHarness({ position: true, markPrice: '102' });
+  await h.start(); t.after(h.close);
+  await h.choose('교차(Cross)');
+  assert.equal(text(h, 'futures-margin-locked').replace(/\s+/gu, ' '), '보유 롱 포지션은 격리로 고정돼 있어요. 격리로만 추가할 수 있어요.');
+  await h.amount('102');
+  assert.equal(h.node('futures-submit').props.state, 'disabled');
+  await h.press('futures-submit');
+  assert.equal(h.requests.length, 0);
+  // Its own mode adds again.
+  await h.choose('격리(Isolated)');
+  assert.equal(h.node('futures-margin-locked') === undefined, true);
+  assert.equal(h.node('futures-submit').props.state, 'enabled');
+});
+
+test('another leverage than the position\'s changes nothing until the user confirms it with the server estimate', async t => {
+  const h = futuresHarness({ position: true, markPrice: '102' });
+  await h.start(); t.after(h.close);
+  await h.setLeverage(50);
+  // Choosing changes nothing: no request, and the form says what an order would do.
+  assert.equal(h.requests.length, 0);
+  assert.match(text(h, 'futures-leverage-change-notice') + [h.node('futures-leverage-change-notice')?.findAll((n: any) => n.type === 'Text').map((n: any) => [n.props.children].flat().join(''))].flat().join(' '), /포지션 레버리지 100x → 50x/);
+  await h.amount('102');
+  await h.press('futures-submit');
+  assert.equal(h.requests.length, 0, 'the confirmation comes first');
+  assert.equal(h.node('futures-leverage-change-sheet')?.props.pointerEvents, 'auto');
+  assert.equal(text(h, 'futures-leverage-change-leverage'), '100x → 50x');
+  assert.equal(text(h, 'futures-leverage-change-margin'), '$2 → $4');
+  assert.match(text(h, 'futures-leverage-change-delta'), /\$2/);
+  assert.match(text(h, 'futures-leverage-change-liquidation'), /→/);
+  assert.equal(text(h, 'futures-leverage-change-apply'), '레버리지 변경과 추가 진입이 함께 적용돼요.');
+  assert.equal((h.previewReads ?? []).some((path: string) => /positions\/A%3Aposition\/leverage-preview\?leverage=50&quantity=1/.test(path)), true);
+  // 취소: nothing is sent.
+  await h.press('futures-leverage-change-cancel');
+  assert.equal(h.requests.length, 0);
+  // Confirmed: one add carrying the leverage it changes from.
+  await h.press('futures-submit');
+  await h.press('futures-leverage-change-confirm');
+  assert.equal(h.requests.length, 1);
+  assert.deepEqual([h.requests[0].body.operation, h.requests[0].body.positionId, h.requests[0].body.leverage, h.requests[0].body.fromLeverage],
+    ['increase', 'A:position', 50, 100]);
+  assert.match(text(h, 'futures-order-notice'), /^레버리지 100x → 50x 변경 · /);
+});
+
+test('the change is not offered while the server cannot estimate it or would refuse it', async t => {
+  for (const [preview, expected] of [
+    [{ markState: 'unavailable_or_stale', after: null, collateral: null, refusal: 'FUTURES_MARK_UNAVAILABLE' }, /평가 기준가를 확인할 수 없어 예상 값을 표시하지 않아요/],
+    [{ refusal: 'INSUFFICIENT_FUTURES_FREE_COLLATERAL' }, /담보가 부족해 이 레버리지로 바꿀 수 없어요/],
+    [{ refusal: 'FUTURES_MAINTENANCE_UNSAFE' }, /바로 청산될 위험/],
+  ] as const) {
+    const h = futuresHarness({ position: true, markPrice: '102' });
+    h.leveragePreview = (positionId: string) => ({ ...leveragePreviewFixture(positionId), ...preview });
+    await h.start(); t.after(h.close);
+    await h.setLeverage(50);
+    await h.press('futures-leverage-only');
+    assert.match(text(h, preview.after === null ? 'futures-leverage-change-unknown' : 'futures-leverage-change-refused'), expected);
+    assert.equal(h.node('futures-leverage-change-confirm').props.state, 'disabled');
+    if (preview.after === null) assert.equal(text(h, 'futures-leverage-change-margin'), '-', 'no guessed value');
+    assert.equal(h.requests.length, 0);
+  }
+});
+
+test('레버리지만 변경 sends the leverage change alone, once per confirmation', async t => {
+  const h = futuresHarness({ position: true, markPrice: '102' });
+  await h.start(); t.after(h.close);
+  await h.setLeverage(50);
+  await h.press('futures-leverage-only');
+  assert.equal(text(h, 'futures-leverage-change-confirm') || h.node('futures-leverage-change-confirm').props.label, '레버리지 변경');
+  assert.match(text(h, 'futures-leverage-change-apply'), /보유 수량·평균 진입가·체결 내역과 손절가\/익절가 설정은 그대로/);
+  assert.equal(h.node('futures-leverage-change-quantity') === undefined, true, 'no add');
+  await h.press('futures-leverage-change-confirm');
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.requests[0].path, '/trading-accounts/A/futures/positions/A%3Aposition/leverage');
+  assert.deepEqual({ ...h.requests[0].body, idempotencyKey: '<key>' }, { leverage: 50, fromLeverage: 100, idempotencyKey: '<key>' });
+  assert.match(h.requests[0].body.idempotencyKey, /^futures-leverage/);
+  assert.equal(text(h, 'futures-order-notice'), '레버리지 100x → 50x 변경 완료');
+  assert.equal(h.requests.some((r: any) => r.path.endsWith('/execute')), false, 'no order');
+});
+
+test('a position card\'s top opens its contract and direction in the form, never an order', async t => {
+  const h = futuresHarness({ position: true, hedge: true, futuresOnly: true });
+  await h.start(); t.after(h.close);
+  await h.selectInstrument('hype');
+  await h.amount('77');
+  // The short card (hedge, 10x) of BTC: the form switches to BTC 숏 with the short's terms.
+  await h.press('futures-position-A:hedge-trade');
+  assert.equal(h.requests.length, 0, 'the tap orders nothing');
+  assert.equal(h.node('futures-amount').props.value, '', 'another contract\'s amount never carries over');
+  assert.equal(h.node('futures-direction-short').props['aria-selected'] ?? h.node('futures-direction-short').props.accessibilityState?.selected, true);
+  assert.equal(h.leverage(), '10x');
+  assert.match(text(h, 'futures-position-add-hint'), /보유 숏 포지션에 추가/);
+  // The long card: same contract, its own direction and leverage.
+  await h.press('futures-position-A:position-trade');
+  assert.equal(h.leverage(), '100x');
+  assert.match(text(h, 'futures-position-add-hint'), /보유 롱 포지션에 추가/);
+  // The card's buttons stay separate targets.
+  assert.equal(h.node('futures-position-A:position-protection') !== undefined && h.node('futures-position-A:position-close') !== undefined, true);
 });
 
 test('leverage: presets, 직접 설정하기 for any integer 1–100, cancel keeps the previous value', async t => {
@@ -346,7 +441,7 @@ test('a lost response keeps its key for the same-request check, unlike a refusal
 
 test('other refusals say what failed instead of asking for a result check', async t => {
   for (const [code, message] of [
-    ['FUTURES_MAINTENANCE_UNSAFE', '현재 Mark 기준으로 유지 증거금을 충족하지 못합니다. 레버리지를 낮춰주세요.'],
+    ['FUTURES_MAINTENANCE_UNSAFE', '현재 평가 기준가로는 유지 증거금을 충족하지 못합니다. 레버리지를 낮춰주세요.'],
     ['FUTURES_VALUE_TOO_SMALL', '주문 금액이 너무 작습니다. 금액을 늘려주세요.'],
     ['SOMETHING_NEW', '주문이 접수되지 않았습니다. 입력값과 거래 가능 상태를 확인해주세요.'],
   ]) {
@@ -384,16 +479,4 @@ test('large fonts in the narrow column: 롱/숏 segment labels keep Long/Short a
   const wide = futuresHarness({ dimensions: { width: 390, height: 844, fontScale: 1 } });
   await wide.start(); t.after(wide.close);
   assert.deepEqual(labels(wide), [['롱(Long)', '롱(Long)'], ['숏(Short)', '숏(Short)']]);
-});
-
-test('large fonts in the narrow column list the three position operations vertically', async t => {
-  const narrow = futuresHarness({ position: true, dimensions: { width: 320, height: 640, fontScale: 2 } });
-  await narrow.start(); t.after(narrow.close);
-  assert.equal(narrow.node('futures-operation').props.accessibilityRole, 'radiogroup');
-  await narrow.choose('수량 감소(Reduce)');
-  assert.equal(narrow.node('futures-operation-reduce').props['aria-selected'], true);
-  assert.equal(narrow.node('futures-amount').props.accessibilityLabel, '감소 금액 (USD)');
-  const wide = futuresHarness({ position: true, dimensions: { width: 430, height: 932, fontScale: 1 } });
-  await wide.start(); t.after(wide.close);
-  assert.equal(wide.node('futures-operation').props.accessibilityRole, 'tablist');
 });

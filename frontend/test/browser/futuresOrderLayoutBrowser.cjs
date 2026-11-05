@@ -104,7 +104,9 @@ async function main() {
       // 2026-10-16: no 선물 지갑 summary card and no header description; Last and Mark keep their names.
       assert.equal(await id('futures-wallet').count(), 0, `${label}: no wallet card`);
       assert.equal(await page.getByText(/USD 가상 무기한 계약/).count(), 0, `${label}: no header description`);
-      assert.deepEqual(await page.locator('[aria-label="현재가 Last"], [aria-label="Mark 가격"]').allInnerTexts(), ['Last', 'Mark'], `${label}: price names`);
+      // 2026-11-06: the Last / Mark row over the form is gone (the book keeps the current price).
+      assert.deepEqual(await page.locator('[aria-label="현재가 Last"], [aria-label="Mark 가격"], [data-testid="futures-prices"]').count(), 0, `${label}: no price row`);
+      assert.equal(await page.getByTestId('futures-order-book-last').count(), 1, `${label}: the book's current price`);
       assert.deepEqual(await page.evaluate(clipped), [], `${label}: clipped text`);
       if (kind === 'open') {
         for (const target of ['futures-amount', 'futures-ratio-25', 'futures-leverage-select', 'futures-margin-info']) assert.ok(await hittable(target), `${label}: ${target} tappable`);
@@ -171,17 +173,18 @@ async function main() {
         assert.ok(collapsedForm.x + collapsedForm.width <= collapsedBook.x + 1, `${label}: collapsed book keeps its column`);
         await id('futures-order-book-toggle').click(); await id('asset-order-book').waitFor();
       } else {
-        // 수량 감소 stays in the trade form for the selected contract (the card's
-        // 포지션 종료 opens its own sheet since 2026-10-28; futuresCloseSheetBrowser).
-        await id('futures-operation-reduce').scrollIntoViewIfNeeded();
-        await id('futures-operation-reduce').click();
-        assert.equal(await id('futures-amount').getAttribute('aria-label'), '감소 금액 (USD)');
-        await id('futures-ratio-50').click();
-        assert.equal(await id('futures-amount').inputValue(), '102', `${label}: 50% of the 2 BTC position at 102`);
+        // Two-way (2026-11-06): the form only enters — on the held short's side it
+        // adds to that short; reducing is the card's 포지션 종료 (futuresCloseSheetBrowser).
+        await id('futures-direction-short').scrollIntoViewIfNeeded();
+        await id('futures-direction-short').click();
+        assert.equal(await id('futures-operation-reduce').count(), 0, `${label}: no reduce in the form`);
+        assert.equal(await id('futures-amount').getAttribute('aria-label'), '추가 금액 (USD)');
+        assert.match(await id('futures-submit').textContent(), /수량 추가/);
+        await id('futures-amount').fill('51');
+        // A focused amount keeps the screen on itself (useFocusedInputScroll): done typing.
+        await id('futures-amount').evaluate((el) => el.blur());
         assert.ok(await hittable('futures-submit'), `${label}: submit tappable`);
-        assert.deepEqual(await page.evaluate(clipped), [], `${label}: reduce form text`);
-        await id('futures-ratio-100').click(); await id('futures-close-summary').waitFor();
-        assert.match(await id('futures-submit').textContent(), /전량 종료/);
+        assert.deepEqual(await page.evaluate(clipped), [], `${label}: add form text`);
       }
       if (fontScale !== 1.5 && (width === 320 || width === 430)) {
         await page.evaluate(() => document.querySelector('[data-testid="futures-screen"]').scrollTo(0, 0));

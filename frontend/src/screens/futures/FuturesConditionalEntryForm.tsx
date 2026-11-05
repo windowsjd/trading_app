@@ -1,3 +1,4 @@
+import { futuresErrorMessage } from '../../features/futures/orderFeedback';
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import React, { useEffect, useRef, useState } from 'react';
@@ -122,10 +123,14 @@ export function FuturesConditionalFields({ draft, onChange, lastPrice, disabled,
  * Before sending, the decided 이상/이하 is checked against the latest Last;
  * when it no longer holds it is decided again and the user confirms again.
  */
-export default function FuturesConditionalEntryForm({ accountId, instrumentId, direction, marginMode, leverage, quantity, draft, onDraftChange, lastPrice, displayDecimals, allowed, onBusy }: {
+export default function FuturesConditionalEntryForm({ accountId, instrumentId, direction, marginMode, leverage, quantity, draft, onDraftChange, lastPrice, displayDecimals, allowed, leverageChange, onBusy }: {
   accountId: string; instrumentId: string; direction: Direction; marginMode: MarginMode; leverage: string; quantity: string;
   draft: FuturesConditionalDraft; onDraftChange: (update: (draft: FuturesConditionalDraft) => FuturesConditionalDraft) => void;
-  lastPrice: string | null; displayDecimals: number | null; allowed: boolean; onBusy: (busy: boolean) => void;
+  lastPrice: string | null; displayDecimals: number | null; allowed: boolean;
+  /** The open position of the direction changes leverage when this watch's order runs: the
+   * screen's confirmation runs first, and the watch then carries the leverage it changes from. */
+  leverageChange: { fromLeverage: number; confirm: (proceed: () => void) => void } | null;
+  onBusy: (busy: boolean) => void;
 }) {
   const learning = useLearningAccess(accountId).gate('allTrading');
   const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false);
@@ -150,7 +155,7 @@ export default function FuturesConditionalEntryForm({ accountId, instrumentId, d
   const current = () => alive.current && selected.current === accountId && isCurrentSession(session);
   const price = (value: string) => formatAssetPrice(value, 'USD', displayDecimals);
   const side = direction === 'long' ? '롱(Long)' : '숏(Short)';
-  const submit = async () => {
+  const submit = async (confirmed = false) => {
     if (locked.current || !current() || (!uncertain && !permission.current)) return;
     if (!uncertain) {
       // Never send a direction the latest Futures Last no longer supports.
@@ -164,11 +169,14 @@ export default function FuturesConditionalEntryForm({ accountId, instrumentId, d
           ? triggerDirectionChangedText(LAST) : getTriggerDirectionText(next, triggerPrice, 'USD', LAST) ?? triggerDirectionChangedText(LAST) });
         return;
       }
+      // Another leverage than the position's: asked first, applied only when the order runs.
+      if (leverageChange && !confirmed) { leverageChange.confirm(() => void submit(true)); return; }
       request.current = {
         instrumentId, direction, marginMode, leverage: Number(leverage), quantity,
         triggerCondition: condition, triggerPrice: draft.triggerPrice, executionType: draft.executionType,
         ...(limit ? { limitPrice: draft.limitPrice } : {}),
         idempotencyKey: createIdempotencyKey('futures-conditional'),
+        ...(leverageChange ? { fromLeverage: leverageChange.fromLeverage } : {}),
       };
     }
     if (!request.current) return;
@@ -177,8 +185,9 @@ export default function FuturesConditionalEntryForm({ accountId, instrumentId, d
     try {
       await createFuturesConditionalEntry(accountId, request.current);
       if (!current()) return;
+      const changing = request.current.fromLeverage !== undefined;
       request.current = null; setUncertain(false);
-      setMessage('조건주문이 등록되었습니다. 감시 중이며, 담보는 주문이 실행될 때 확인합니다.');
+      setMessage(`조건주문이 등록되었습니다. 감시 중이며, 담보는 주문이 실행될 때 확인합니다.${changing ? ' 포지션 레버리지는 주문이 실행될 때 함께 바뀌어요.' : ''}`);
       await client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.futures.all(accountId) });
     } catch (error) {
       if (!current()) return;
@@ -224,9 +233,10 @@ function conditionalErrorMessage(code: string | null) {
   if (code === 'FUTURES_CONDITIONAL_ENTRY_ALREADY_MET')
     return '현재 선물 Last가 이미 감시가격을 지나 접수하지 않았습니다. 다시 정해진 감시 조건을 확인한 뒤 등록해주세요.';
   if (code === 'FUTURES_CONDITIONAL_ENTRY_PENDING')
-    return '이 상품에는 이미 감시 중인 조건주문이 있습니다. 대기 주문에서 확인해주세요.';
-  if (code === 'FUTURES_ENTRY_PENDING') return '대기 중인 지정가 진입 주문이 있어 등록할 수 없습니다.';
-  if (code === 'FUTURES_POSITION_ALREADY_OPEN') return '보유 포지션이 있어 새 조건주문을 등록할 수 없습니다.';
+    return '이 상품의 같은 방향에 이미 감시 중인 조건주문이 있습니다. 대기 주문에서 확인해주세요.';
+  if (code === 'FUTURES_ENTRY_PENDING') return '같은 방향의 대기 중인 지정가 주문이 있어 등록할 수 없습니다.';
+  if (code === 'FUTURES_LEVERAGE_MISMATCH' || code === 'FUTURES_POSITION_CHANGED' || code === 'FUTURES_MARGIN_MODE_MISMATCH')
+    return futuresErrorMessage(code, false);
   if (code === 'FUTURES_CONDITIONAL_ENTRY_LIMIT_EXCEEDED') return '감시 중인 조건주문이 많아 더 등록할 수 없습니다.';
   if (code === 'FUTURES_CONDITIONAL_ENTRY_DISABLED') return '현재 선물 조건주문을 등록할 수 없습니다.';
   if (code === 'FUTURES_PRICE_UNAVAILABLE' || code === 'FUTURES_PRICE_STALE')

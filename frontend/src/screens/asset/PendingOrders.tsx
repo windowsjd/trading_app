@@ -43,6 +43,13 @@ type Props = {
   seasonUi: boolean;
   /** Kept for callers; the list always covers every pending kind (2026-11-05). */
   conditional?: boolean;
+  /**
+   * `futures` (the futures screen, 2026-11-06): Futures limit and conditional
+   * entries, Futures stop-loss/take-profit, the plans of Futures entries and
+   * Futures OCO protections only — no Spot source is read. Every other screen
+   * keeps the whole list (`all`).
+   */
+  scope?: 'all' | 'futures';
 };
 
 /**
@@ -75,6 +82,7 @@ const SOURCE_LABEL = {
   plans: '체결 후 손절가/익절가',
 } as const;
 type Source = keyof typeof SOURCE_LABEL;
+const FUTURES_SOURCES: readonly Source[] = ['futuresLimits', 'futuresWatches', 'futuresTpSl', 'plans'];
 
 function useAppActive() {
   const [state, setState] = useState<AppStateStatus>(AppState.currentState);
@@ -103,17 +111,20 @@ function scoped<T extends { tradingAccountId: string }>(query: UseQueryResult<T>
   return query.data?.tradingAccountId === accountId ? query.data : undefined;
 }
 
-function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
+function BoundPendingOrders({ accountId, isFocused, seasonUi, scope = 'all' }: Props) {
+  const futuresOnly = scope === 'futures';
   const client = useQueryClient();
   const active = useAppActive();
   // Live rows are followed closely; an empty source only looks for rows added elsewhere (another
   // device) — this device's own registrations, changes and cancels refresh at once.
   const every = (data: unknown) => (isFocused && active ? (rowCount(data) ? LIVE_POLL_MS : IDLE_POLL_MS) : false);
   const common = { refetchOnMount: 'always' as const, refetchIntervalInBackground: false };
-  const spot = useQuery({ queryKey: QUERY_KEYS.tradingAccount.pendingOrders(accountId), queryFn: () => getAccountPendingOrders(accountId, getTradingAccountOrders), refetchInterval: (query) => every(query.state.data), ...common });
-  const buys = useQuery({ queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.open(accountId), queryFn: ({ signal }) => getOpenConditionalBuyOrders(accountId, getConditionalBuyOrders, signal), refetchInterval: (query) => every(query.state.data), ...common });
-  const sellConditions = useQuery({ queryKey: QUERY_KEYS.tradingAccount.conditionalSell.open(accountId, 'condition'), queryFn: ({ signal }) => getOpenConditionalSellOrders(accountId, 'condition', getConditionalSellOrders, signal), refetchInterval: (query) => every(query.state.data), ...common });
-  const sellProtections = useQuery({ queryKey: QUERY_KEYS.tradingAccount.conditionalSell.open(accountId, 'protection'), queryFn: ({ signal }) => getOpenConditionalSellOrders(accountId, 'protection', getConditionalSellOrders, signal), refetchInterval: (query) => every(query.state.data), ...common });
+  // The futures screen reads no Spot source at all (it shows none of them).
+  const spotRead = { ...common, enabled: !futuresOnly };
+  const spot = useQuery({ queryKey: QUERY_KEYS.tradingAccount.pendingOrders(accountId), queryFn: () => getAccountPendingOrders(accountId, getTradingAccountOrders), refetchInterval: (query) => every(query.state.data), ...spotRead });
+  const buys = useQuery({ queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.open(accountId), queryFn: ({ signal }) => getOpenConditionalBuyOrders(accountId, getConditionalBuyOrders, signal), refetchInterval: (query) => every(query.state.data), ...spotRead });
+  const sellConditions = useQuery({ queryKey: QUERY_KEYS.tradingAccount.conditionalSell.open(accountId, 'condition'), queryFn: ({ signal }) => getOpenConditionalSellOrders(accountId, 'condition', getConditionalSellOrders, signal), refetchInterval: (query) => every(query.state.data), ...spotRead });
+  const sellProtections = useQuery({ queryKey: QUERY_KEYS.tradingAccount.conditionalSell.open(accountId, 'protection'), queryFn: ({ signal }) => getOpenConditionalSellOrders(accountId, 'protection', getConditionalSellOrders, signal), refetchInterval: (query) => every(query.state.data), ...spotRead });
   const futuresLimits = useQuery({ queryKey: QUERY_KEYS.tradingAccount.futures.pending(accountId), queryFn: ({ signal }) => getFuturesLimitOrders(accountId, signal), refetchInterval: (query) => every(query.state.data), ...common, retry: false });
   const futuresWatches = useQuery({ queryKey: QUERY_KEYS.tradingAccount.futures.conditionalEntries(accountId, 'open'), queryFn: ({ signal }) => getFuturesConditionalEntries(accountId, 'open', signal), refetchInterval: (query) => every(query.state.data), ...common, retry: false });
   const futuresTpSl = useQuery({ queryKey: QUERY_KEYS.tradingAccount.futures.tpSl(accountId, 'open'), queryFn: ({ signal }) => getFuturesTpSlSettings(accountId, 'open', signal), refetchInterval: (query) => every(query.state.data), ...common, retry: false });
@@ -121,6 +132,7 @@ function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
   // Live whole-position OCO protections (registration retired 2026-10-16) keep their own section.
   const oco = useQuery({ queryKey: QUERY_KEYS.tradingAccount.protections.pending(accountId), queryFn: ({ signal }) => getPendingProtections(accountId, signal), refetchOnMount: 'always', retry: false });
   const queries: Record<Source, UseQueryResult<{ tradingAccountId: string }>> = { spot, buys, sellConditions, sellProtections, futuresLimits, futuresWatches, futuresTpSl, plans };
+  const sources = futuresOnly ? FUTURES_SOURCES : (Object.keys(queries) as Source[]);
 
   const spotData = scoped(spot, accountId);
   const buysData = scoped(buys, accountId);
@@ -131,10 +143,18 @@ function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
   const futuresTpSlData = scoped(futuresTpSl, accountId);
   const plansData = scoped(plans, accountId);
   const ocoData = oco.data?.tradingAccountId === accountId && 'groups' in oco.data ? oco.data : null;
-  const liveOcoGroups = ocoData?.groups.filter((group) => group.status === 'holding' || group.status === 'active') ?? [];
+  const liveOcoGroups = ocoData?.groups.filter((group) => (group.status === 'holding' || group.status === 'active')
+    && (!futuresOnly || group.domain === 'futures')) ?? [];
   // An entry order a live OCO protects keeps its sizing: no change offered (the server refuses it).
   const ocoProtectedOrderIds = new Set(liveOcoGroups.flatMap((group) => [group.parentOrderId, group.parentFuturesOrderId].filter((id): id is string => !!id)));
-  const items = buildPendingItems({
+  const items = buildPendingItems(futuresOnly ? {
+    futuresLimits: futuresLimitsData?.orders,
+    futuresConditionals: futuresWatchesData?.entries,
+    futuresTpSl: futuresTpSlData?.settings,
+    // Plans waiting for a Futures entry's fill (never a Spot entry's).
+    entryPlans: plansData?.plans.filter((plan) => plan.domain === 'futures'),
+    ocoProtectedOrderIds,
+  } : {
     spotOrders: spotData?.items,
     conditionalBuys: buysData?.conditionalOrders,
     conditionalBuyLimitAvailable: buysData?.capabilities.canUseLimit,
@@ -146,8 +166,8 @@ function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
     entryPlans: plansData?.plans,
     ocoProtectedOrderIds,
   });
-  const failed = (Object.keys(queries) as Source[]).filter((source) => queries[source].isError);
-  const loading = (Object.keys(queries) as Source[]).some((source) => !queries[source].isError && !scoped(queries[source], accountId));
+  const failed = sources.filter((source) => queries[source].isError);
+  const loading = sources.some((source) => !queries[source].isError && !scoped(queries[source], accountId));
 
   // An item that left the list filled, triggered or was canceled: refresh what it touched.
   const keys = items.map((item) => item.key).join(',');
@@ -263,14 +283,15 @@ function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
       ) : null}
       {liveOco ? (
         <View style={styles.legacy} testID="pending-legacy-oco">
-          <PendingFuturesAndProtections accountId={accountId} focused={isFocused} seasonUi={seasonUi} protections />
+          <PendingFuturesAndProtections accountId={accountId} focused={isFocused} seasonUi={seasonUi} protections
+            domain={futuresOnly ? 'futures' : undefined} />
         </View>
       ) : null}
       <ActionPressable testID="pending-history-toggle" accessibilityRole="button" accessibilityState={{ expanded: history }} aria-expanded={history}
         onPress={() => setHistory((value) => !value)} style={styles.historyToggle}>
         <Text style={styles.historyText}>{history ? '종료 이력 닫기' : '종료 이력 보기'}</Text>
       </ActionPressable>
-      {history ? <PendingHistory accountId={accountId} isFocused={isFocused} /> : null}
+      {history ? <PendingHistory accountId={accountId} isFocused={isFocused} scope={scope} /> : null}
       <PendingOrderEditSheet accountId={accountId} item={isFocused ? editing : null} onClose={() => setEditing(null)} onChanged={changed} />
       <TpSlSheet target={isFocused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />
     </View>

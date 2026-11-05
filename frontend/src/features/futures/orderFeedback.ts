@@ -1,7 +1,7 @@
 import { getErrorMessageFromCode } from '../../services/api/errorMapper.ts';
 
 export const COLLATERAL_SHORT = "사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.";
-export const MAINTENANCE_SHORT = "현재 Mark 기준으로 유지 증거금을 충족하지 못합니다. 레버리지를 낮춰주세요.";
+export const MAINTENANCE_SHORT = "현재 평가 기준가로는 유지 증거금을 충족하지 못합니다. 레버리지를 낮춰주세요.";
 
 /**
  * A lost or failed response may have executed: it keeps its key and asks for
@@ -20,7 +20,7 @@ export function futuresErrorMessage(code: string | null, uncertain: boolean) {
   if (code === "FUTURES_TRADING_DISABLED")
     return "현재 선물 거래가 비활성 상태입니다.";
   if (code?.includes("MARK"))
-    return "Mark 정보를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.";
+    return "평가 기준가를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.";
   if (code === "FUTURES_MAINTENANCE_UNSAFE") return MAINTENANCE_SHORT;
   if (code?.includes("COLLATERAL")) return COLLATERAL_SHORT;
   if (code === "FUTURES_VALUE_TOO_SMALL")
@@ -29,16 +29,21 @@ export function futuresErrorMessage(code: string | null, uncertain: boolean) {
     return "보유 수량을 초과할 수 없습니다. 최신 포지션을 확인해주세요.";
   if (code === "FUTURES_POSITION_NOT_FOUND")
     return "포지션이 이미 종료되었거나 변경되었습니다. 최신 상태를 확인해주세요.";
-  // One-way: one position per contract, its direction, leverage and margin
-  // mode fixed for its lifetime (a stale screen meets the server's answer).
+  // Two-way (2026-11-06): one position per contract AND direction; its
+  // margin mode stays, and a leverage change needs the user's confirmation
+  // (a stale screen meets the server's answer).
   if (code === "FUTURES_POSITION_ALREADY_OPEN")
-    return "이 상품의 포지션이 이미 열려 있습니다. 같은 방향으로 수량을 추가하거나 전량 종료한 뒤 새로 진입해주세요.";
+    return "같은 방향의 포지션이 이미 열려 있습니다. 최신 포지션을 확인한 뒤 수량을 추가해주세요.";
   if (code === "FUTURES_ONE_WAY_VIOLATION")
-    return "보유 포지션과 반대 방향으로는 진입할 수 없습니다. 포지션을 전량 종료한 뒤 진입해주세요.";
+    return "선택한 포지션과 방향이 다릅니다. 최신 포지션을 확인해주세요.";
   if (code === "FUTURES_LEVERAGE_MISMATCH")
-    return "보유 포지션의 레버리지로만 수량을 추가할 수 있습니다. 최신 포지션을 확인해주세요.";
+    return "보유 포지션과 레버리지가 다릅니다. 레버리지 변경을 확인한 뒤 다시 주문해주세요.";
+  if (code === "FUTURES_POSITION_CHANGED")
+    return "포지션이 그사이 바뀌었습니다. 최신 레버리지와 수량을 확인한 뒤 다시 시도해주세요.";
   if (code === "FUTURES_MARGIN_MODE_MISMATCH")
-    return "보유 포지션의 증거금 방식으로만 수량을 추가할 수 있습니다. 최신 포지션을 확인해주세요.";
+    return "같은 방향의 보유 포지션과 증거금 방식이 다릅니다. 보유 포지션의 방식으로 주문해주세요.";
+  if (code === "FUTURES_ENTRY_PENDING")
+    return "같은 방향의 대기 중인 지정가 주문이 있습니다. 대기 주문을 확인해주세요.";
   // A beginner learning lock, not a rejected input (the server's staged rule).
   if (code === "BEGINNER_FEATURE_LOCKED") return getErrorMessageFromCode(code);
   return "주문이 접수되지 않았습니다. 입력값과 거래 가능 상태를 확인해주세요.";

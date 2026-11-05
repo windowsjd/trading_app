@@ -547,6 +547,7 @@ model TradingAccount {
   futuresLimitOrders            FuturesLimitOrder[]
   futuresConditionalEntries     FuturesConditionalEntry[]
   futuresTpSlSettings           FuturesTpSlSetting[]
+  futuresLeverageChanges        FuturesLeverageChange[]
   entryTpSlPlans                EntryTpSlPlan[]
   pendingOrderModifications     PendingOrderModification[]
   futuresLiquidations           FuturesLiquidation[]
@@ -1041,6 +1042,7 @@ model FuturesInstrument {
   marketCandles      FuturesMarketCandle[]
   tpSlSettings       FuturesTpSlSetting[]
   orderBookSnapshots FuturesOrderBookSnapshot[]
+  leverageChanges    FuturesLeverageChange[]
 
   @@unique([underlyingAssetId, productType, settlementCurrency])
   @@map("futures_instruments")
@@ -1082,7 +1084,10 @@ model FuturesMarketCandle {
 }
 
 // One row per lifetime. SQL partial unique permits only one OPEN lifetime per
-// account/instrument. Closed rows preserve cumulative realized PnL and identity.
+// account/instrument/direction (two-way since 2026-11-06: a long and a short
+// are independent lifetimes; same-direction trades merge into the open one).
+// Closed rows preserve cumulative realized PnL and identity. Leverage changes
+// only while open, with same-transaction FuturesLeverageChange evidence.
 model FuturesPosition {
   id                String                @id @default(uuid())
   tradingAccountId  String                @map("trading_account_id")
@@ -1108,6 +1113,10 @@ model FuturesPosition {
   seasonClose      FuturesSeasonClose?
   protectionGroups ProtectionGroup[]
   tpSlSettings     FuturesTpSlSetting[]
+  leverageChanges  FuturesLeverageChange[]
+  // Pending entries whose leverage change the user approved for this lifetime.
+  limitOrderLeverageApprovals       FuturesLimitOrder[]       @relation("FuturesLimitOrderLeverageChange")
+  conditionalEntryLeverageApprovals FuturesConditionalEntry[] @relation("FuturesConditionalEntryLeverageChange")
 
   @@unique([id, tradingAccountId, instrumentId])
   @@index([tradingAccountId, status, instrumentId])
@@ -1165,6 +1174,7 @@ model FuturesExecution {
   conditionalEntry   FuturesConditionalEntry?
   tpSlSetting        FuturesTpSlSetting?
   entryTpSlPlanFills EntryTpSlPlan[]
+  leverageChange     FuturesLeverageChange?
 
   @@unique([id, tradingAccountId])
   @@index([tradingAccountId, executedAt, id])
@@ -1197,6 +1207,47 @@ model FuturesExecuteRequest {
   @@map("futures_execute_requests")
 }
 
+// Append-only evidence of every leverage change of an open lifetime
+// (2026-11-06, docs/futures-api-contract.md 「Leverage change」): the
+// approved from/to leverage, the isolated allocation it moved (Cross keeps 0)
+// and the fresh Mark its risk was checked on. A change together with an add
+// links that add's FuturesExecution; a leverage-only command keeps its own
+// key, hash and first response for replay (SQL CHECK: exactly one of the
+// two). No cash, PnL or fee is ever written by a change. A deferred trigger
+// on futures_positions requires this row in the same transaction.
+model FuturesLeverageChange {
+  id                   String   @id @default(uuid(7))
+  tradingAccountId     String   @map("trading_account_id")
+  instrumentId         String   @map("instrument_id")
+  positionId           String   @map("position_id")
+  fromLeverage         Int      @map("from_leverage")
+  toLeverage           Int      @map("to_leverage")
+  isolatedMarginBefore Decimal  @map("isolated_margin_before") @db.Decimal(24, 8)
+  isolatedMarginAfter  Decimal  @map("isolated_margin_after") @db.Decimal(24, 8)
+  // Risk evidence copied from the Mark snapshot the change was checked on.
+  markPrice            Decimal  @map("mark_price") @db.Decimal(24, 8)
+  markEffectiveAt      DateTime @map("mark_effective_at")
+  markCapturedAt       DateTime @map("mark_captured_at")
+  executionId          String?  @unique @map("execution_id")
+  idempotencyKey       String?  @map("idempotency_key")
+  requestHash          String?  @map("request_hash")
+  responsePayloadJson  Json?    @map("response_payload_json")
+  // The writing transaction (txid_current()); the position guard matches it.
+  transactionId        BigInt   @default(dbgenerated("txid_current()")) @map("transaction_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  tradingAccount TradingAccount    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument     FuturesInstrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  position       FuturesPosition   @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
+  execution      FuturesExecution? @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+
+  @@unique([tradingAccountId, idempotencyKey])
+  @@unique([executionId, tradingAccountId])
+  @@index([positionId, createdAt])
+  @@index([instrumentId])
+  @@map("futures_leverage_changes")
+}
+
 enum ProtectionDomain {
   spot
   futures
@@ -1224,18 +1275,25 @@ model FuturesLimitOrder {
   revisedAt           DateTime?         @map("revised_at")
   revision            Int               @default(0)
   updatedAt           DateTime          @updatedAt @map("updated_at")
+  /// Approved leverage change (2026-11-06): the open same-direction lifetime
+  /// and its leverage when the user confirmed changing it to `leverage` at
+  /// the fill. Both null when no change was approved (SQL CHECK).
+  leverageChangePositionId String?      @map("leverage_change_position_id")
+  leverageChangeFrom       Int?         @map("leverage_change_from")
 
-  tradingAccount   TradingAccount           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  instrument       FuturesInstrument        @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
-  execution        FuturesExecution?        @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
-  protection       ProtectionGroup?
-  conditionalEntry FuturesConditionalEntry?
-  entryTpSlPlans   EntryTpSlPlan[]
+  tradingAccount         TradingAccount           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument             FuturesInstrument        @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  execution              FuturesExecution?        @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  leverageChangePosition FuturesPosition?         @relation("FuturesLimitOrderLeverageChange", fields: [leverageChangePositionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
+  protection             ProtectionGroup?
+  conditionalEntry       FuturesConditionalEntry?
+  entryTpSlPlans         EntryTpSlPlan[]
 
   @@unique([executionId, tradingAccountId])
   @@unique([tradingAccountId, idempotencyKey])
   @@index([status, id])
   @@index([tradingAccountId, createdAt, id])
+  @@index([leverageChangePositionId])
   @@map("futures_limit_orders")
 }
 
@@ -1575,14 +1633,19 @@ model FuturesConditionalEntry {
   revisedAt              DateTime?             @map("revised_at")
   revision               Int                   @default(0)
   updatedAt              DateTime              @updatedAt @map("updated_at")
+  /// Approved leverage change (2026-11-06), as on FuturesLimitOrder: carried
+  /// to the market execution or the limit entry the trigger creates.
+  leverageChangePositionId String?           @map("leverage_change_position_id")
+  leverageChangeFrom       Int?              @map("leverage_change_from")
 
-  tradingAccount       TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  instrument           FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
-  execution            FuturesExecution?         @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
-  limitOrder           FuturesLimitOrder?        @relation(fields: [limitOrderId], references: [id], onDelete: Restrict)
-  registrationSnapshot FuturesLastPriceSnapshot  @relation("FuturesConditionalEntryRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
-  triggerSnapshot      FuturesLastPriceSnapshot? @relation("FuturesConditionalEntryTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
-  entryTpSlPlans       EntryTpSlPlan[]
+  tradingAccount         TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument             FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  execution              FuturesExecution?         @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  limitOrder             FuturesLimitOrder?        @relation(fields: [limitOrderId], references: [id], onDelete: Restrict)
+  registrationSnapshot   FuturesLastPriceSnapshot  @relation("FuturesConditionalEntryRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
+  triggerSnapshot        FuturesLastPriceSnapshot? @relation("FuturesConditionalEntryTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
+  leverageChangePosition FuturesPosition?          @relation("FuturesConditionalEntryLeverageChange", fields: [leverageChangePositionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
+  entryTpSlPlans         EntryTpSlPlan[]
 
   @@unique([executionId, tradingAccountId])
   @@unique([tradingAccountId, idempotencyKey])
@@ -1591,6 +1654,7 @@ model FuturesConditionalEntry {
   @@index([instrumentId])
   @@index([registrationSnapshotId])
   @@index([triggerSnapshotId])
+  @@index([leverageChangePositionId])
   @@map("futures_conditional_entries")
 }
 

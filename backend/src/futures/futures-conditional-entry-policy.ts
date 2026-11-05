@@ -11,6 +11,7 @@ import {
 } from '../conditional/conditional-policy';
 import { futuresError } from './futures-error';
 import { parseFuturesCommand } from './futures-input';
+import { parseFuturesFromLeverage } from './futures-position-policy';
 import { futuresConditionalEntryEnabled } from './futures.config';
 
 /** Bounds the watched set per account and therefore the worker scan. */
@@ -86,6 +87,9 @@ export type FuturesConditionalEntryInput = {
   executionType: 'market' | 'limit';
   limitPrice: Prisma.Decimal | null;
   idempotencyKey: string;
+  /** The open same-direction lifetime's leverage the user confirmed
+   * changing at the fill (two-way positions, 2026-11-06). */
+  fromLeverage?: number;
 };
 
 const FIELDS = [
@@ -99,6 +103,7 @@ const FIELDS = [
   'executionType',
   'limitPrice',
   'idempotencyKey',
+  'fromLeverage',
 ];
 
 /**
@@ -152,6 +157,16 @@ export function parseFuturesConditionalEntryBody(
     quantity: row.quantity,
     idempotencyKey,
   });
+  const fromLeverage = parseFuturesFromLeverage(
+    row.fromLeverage,
+    command.leverage,
+    () =>
+      futuresError(
+        'INVALID_FUTURES_CONDITIONAL_ENTRY',
+        'Invalid Futures conditional entry.',
+        HttpStatus.BAD_REQUEST,
+      ),
+  );
   return {
     instrumentId: command.instrumentId,
     direction: command.direction,
@@ -163,6 +178,7 @@ export function parseFuturesConditionalEntryBody(
     executionType: row.executionType,
     limitPrice: row.executionType === 'limit' ? decimal(row.limitPrice) : null,
     idempotencyKey,
+    ...(fromLeverage === undefined ? {} : { fromLeverage }),
   };
 }
 
@@ -236,6 +252,10 @@ export function futuresConditionalEntryHash(
     triggerPrice: input.triggerPrice.toFixed(8),
     executionType: input.executionType,
     limitPrice: input.limitPrice?.toFixed(8) ?? null,
+    // Present only on an approved leverage change: earlier hashes stay.
+    ...(input.fromLeverage === undefined
+      ? {}
+      : { fromLeverage: input.fromLeverage }),
   });
 }
 

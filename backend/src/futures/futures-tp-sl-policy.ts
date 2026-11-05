@@ -40,15 +40,16 @@ export function futuresTpSlWindowExpired(triggeredAt: Date, now: Date) {
 /**
  * Transient outcomes that may succeed on the next worker cycle inside the
  * execution window: price evidence races, and a position that changed
- * between sizing and the execution transaction (a manual reduce/increase),
- * which the next attempt re-sizes from the live position. Everything else
- * (liquidation required, mode, account/Season gates, a closed lifetime)
- * ends the setting at once.
+ * between sizing and the execution transaction (a manual reduce/increase, or
+ * a leverage change since 2026-11-06), which the next attempt re-sizes from
+ * the live position. Everything else (liquidation required, mode,
+ * account/Season gates, a closed lifetime) ends the setting at once.
  */
 const RETRYABLE_EXECUTION_CODES = new Set([
   'FUTURES_PRICE_UNAVAILABLE',
   'FUTURES_PRICE_STALE',
   'INVALID_FUTURES_REDUCE_QUANTITY',
+  'FUTURES_LEVERAGE_MISMATCH',
   FUTURES_TP_SL_EXECUTION_FAILED,
 ]);
 

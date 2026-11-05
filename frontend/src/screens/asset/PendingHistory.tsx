@@ -21,12 +21,12 @@ type Part = { label: string; read: (signal?: AbortSignal) => Promise<Partial<Pen
  * newest ended rows of each kind together, newest end first. A kind that
  * could not be read is named, never shown as "no history".
  */
-async function readHistory(accountId: string, signal?: AbortSignal) {
+async function readHistory(accountId: string, scope: 'all' | 'futures', signal?: AbortSignal) {
   const scoped = <T extends { tradingAccountId: string }>(data: T) => {
     if (data.tradingAccountId !== accountId) throw new Error('ACCOUNT_SCOPE_MISMATCH');
     return data;
   };
-  const parts: Part[] = [
+  const all: Part[] = [
     { label: '조건부 매수', read: async (s) => ({ conditionalBuys: scoped(await getConditionalBuyOrders(accountId, { state: 'ended', limit: PAGE, offset: 0 }, s)).conditionalOrders }) },
     { label: '조건부 매도·익절가/손절가', read: async (s) => ({
       conditionalSells: [
@@ -36,12 +36,15 @@ async function readHistory(accountId: string, signal?: AbortSignal) {
     }) },
     { label: '선물 조건주문', read: async (s) => ({ futuresConditionals: scoped(await getFuturesConditionalEntries(accountId, 'ended', s)).entries }) },
     { label: '선물 손절가/익절가', read: async (s) => ({ futuresTpSl: scoped(await getFuturesTpSlSettings(accountId, 'ended', s)).settings }) },
-    { label: '체결 후 손절가/익절가', read: async (s) => ({ entryPlans: scoped(await getAccountEntryTpSlPlans(accountId, 'ended', s)).plans }) },
+    { label: '체결 후 손절가/익절가', read: async (s) => ({ entryPlans: scoped(await getAccountEntryTpSlPlans(accountId, 'ended', s)).plans
+      .filter((plan) => scope === 'all' || plan.domain === 'futures') }) },
     { label: '기존 손절가/익절가(OCO)', read: async (s) => {
       const data = scoped(await getProtectionHistory(accountId, s));
-      return { protections: 'groups' in data ? data.groups : [] };
+      return { protections: 'groups' in data ? data.groups.filter((group) => scope === 'all' || group.domain === 'futures') : [] };
     } },
   ];
+  // The futures screen's 종료 이력: its own kinds only.
+  const parts = scope === 'futures' ? all.filter((part) => !['조건부 매수', '조건부 매도·익절가/손절가'].includes(part.label)) : all;
   const settled = await Promise.allSettled(parts.map((part) => part.read(signal)));
   const sources: PendingHistorySources = {};
   const failed: string[] = [];
@@ -52,10 +55,10 @@ async function readHistory(accountId: string, signal?: AbortSignal) {
   return { tradingAccountId: accountId, items: buildPendingHistory(sources), failed };
 }
 
-export default function PendingHistory({ accountId, isFocused }: { accountId: string; isFocused: boolean }) {
+export default function PendingHistory({ accountId, isFocused, scope = 'all' }: { accountId: string; isFocused: boolean; scope?: 'all' | 'futures' }) {
   const query = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.pendingHistory(accountId),
-    queryFn: ({ signal }) => readHistory(accountId, signal),
+    queryKey: [...QUERY_KEYS.tradingAccount.pendingHistory(accountId), scope],
+    queryFn: ({ signal }) => readHistory(accountId, scope, signal),
     enabled: isFocused,
     refetchOnMount: 'always',
     retry: false,

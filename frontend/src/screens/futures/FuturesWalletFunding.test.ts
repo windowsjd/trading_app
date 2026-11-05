@@ -39,15 +39,15 @@ test('an unknown free collateral (Cross Mark not fresh) is never called empty or
   assert.equal(notice(h), null);
 });
 
-test('Reduce and Close need no money: only Open and Increase show the wallet', async (t) => {
+test('Reduce and Close need no money: the form (Open and Increase) shows the wallet, 포지션 종료 never', async (t) => {
   const h = futuresHarness({ position: true, balanceAmount: '0', freeCollateral: '0' });
   await h.start(); t.after(h.close);
   assert.equal(notice(h), EMPTY, 'Increase (the default with a position)');
-  for (const op of ['reduce', 'close']) {
-    await h.choose(op === 'reduce' ? '수량 감소(Reduce)' : '전량 종료(Close)');
-    assert.equal(notice(h), null, op);
-    assert.deepEqual(actions(h, 'futures-funding-actions'), [], op);
-  }
+  // A reduce or close is the card's 포지션 종료 sheet: no funding notice in it.
+  await h.press('futures-position-A:position-close');
+  const sheet = h.node('futures-close-sheet');
+  assert.equal(sheet.findAll((n: any) => typeof n.type === 'string' && /wallet-funding|funding-actions/.test(n.props.testID ?? '')).length, 0);
+  assert.equal(h.node('futures-close-submit').props.state, 'enabled');
 });
 
 test('이체하기 › opens the transfer sheet over the futures order, into the Futures wallet, and closes on success', async (t) => {

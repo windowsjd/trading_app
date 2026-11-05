@@ -1147,8 +1147,11 @@ async function run() {
             }),
             0,
           );
+          // One submitted entry per instrument AND direction (two-way since
+          // 2026-11-06; a market trade beside it is covered by
+          // futures-two-way-integration.ts).
           await reject(
-            entries.create(s.userId, s.accountId, body(s)),
+            entries.create(s.userId, s.accountId, body(s, { direction })),
             'FUTURES_ENTRY_PENDING',
           );
           await reject(
@@ -1158,15 +1161,6 @@ async function run() {
               limitPrice: undefined,
             } as never),
             'INVALID_FUTURES_COMMAND',
-          );
-          const { limitPrice: ignored, ...market } = intent;
-          void ignored;
-          await reject(
-            app.futures.execute(s.userId, s.accountId, {
-              ...market,
-              operation: 'open',
-            }),
-            'FUTURES_ENTRY_PENDING',
           );
           await fresh(s, direction === 'long' ? '101' : '99');
           const before = await snapshot(s);

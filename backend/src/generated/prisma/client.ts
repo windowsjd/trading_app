@@ -173,6 +173,11 @@ export type FuturesExecution = Prisma.FuturesExecutionModel
  */
 export type FuturesExecuteRequest = Prisma.FuturesExecuteRequestModel
 /**
+ * Model FuturesLeverageChange
+ * 
+ */
+export type FuturesLeverageChange = Prisma.FuturesLeverageChangeModel
+/**
  * Model FuturesLimitOrder
  * 
  */

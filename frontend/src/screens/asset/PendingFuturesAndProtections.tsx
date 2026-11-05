@@ -18,7 +18,8 @@ import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSl
 import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryTpSlSummaries';
 
 /** `excludeOrderIds`: Futures limit orders shown elsewhere in the same list (on their conditional entry). */
-export default function PendingFuturesAndProtections({ accountId, focused, protections = false, seasonUi, onCount, excludeOrderIds }: { accountId: string; focused: boolean; protections?: boolean; seasonUi: boolean; onCount?: (count: number | undefined) => void; excludeOrderIds?: ReadonlySet<string> }) {
+/** `domain`: only that product's OCO protections (the futures screen's list). */
+export default function PendingFuturesAndProtections({ accountId, focused, protections = false, seasonUi, onCount, excludeOrderIds, domain }: { accountId: string; focused: boolean; protections?: boolean; seasonUi: boolean; onCount?: (count: number | undefined) => void; excludeOrderIds?: ReadonlySet<string>; domain?: 'spot' | 'futures' }) {
   const { selectedAccountId } = useTradingAccount();
   const client = useQueryClient();
   const query = useQuery({ queryKey: protections ? QUERY_KEYS.tradingAccount.protections.pending(accountId) : QUERY_KEYS.tradingAccount.futures.pending(accountId), queryFn: async ({ signal }) => protections ? getPendingProtections(accountId, signal) : getFuturesLimitOrders(accountId, signal), enabled: focused && selectedAccountId === accountId, refetchInterval: focused ? 4000 : false });
@@ -60,7 +61,7 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
   if (selectedAccountId !== accountId) return null;
   if (query.isError) return <ErrorNotice error={query.error} message="대기 내역을 불러오지 못했습니다." />;
   if (!data) return <Text style={styles.hint}>대기 내역 확인 중…</Text>;
-  const pendingGroups = 'groups' in data ? data.groups.filter(g => g.status === 'holding' || g.status === 'active') : [];
+  const pendingGroups = 'groups' in data ? data.groups.filter(g => (g.status === 'holding' || g.status === 'active') && (!domain || g.domain === domain)) : [];
   const empty = orders ? !orders.length : !pendingGroups.length;
   // New OCO registration is retired (canCreate* false); watching existing groups is not.
   const canMonitor = (domain: 'spot' | 'futures') => 'groups' in data && data.capabilities.enabled && (domain === 'futures'

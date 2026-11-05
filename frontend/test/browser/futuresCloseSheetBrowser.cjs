@@ -149,7 +149,7 @@ async function run() {
       assert.equal((await id('futures-close-submit').innerText()).trim(), '포지션 종료', tag);
       assert.equal(await id('futures-close-amount').inputValue(), '204', `100% at Futures Last 102 (${tag})`);
       const sheetText = await id('futures-close-sheet').innerText();
-      for (const part of ['포지션 종료', '종목', '진입가 (USD)', 'Mark Price (USD)', '가격', '시장가', '종료 금액 (USD)', '포지션 규모', '예상 손익', '예상 수수료'])
+      for (const part of ['포지션 종료', '종목', '진입가 (USD)', '평가 기준가 (USD)', '가격', '시장가', '종료 금액 (USD)', '포지션 규모', '예상 손익', '예상 수수료'])
         assert.equal(sheetText.includes(part), true, `${part} (${tag})`);
       assert.equal(/Confirm|Market Price|Estimated|Entry Price/u.test(sheetText), false, `Korean only (${tag})`);
       const scroll = await id('futures-close-scroll').boundingBox();

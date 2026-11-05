@@ -16,6 +16,7 @@ import FuturesConditionalEntryForm, {
 } from './FuturesConditionalEntryForm';
 import FuturesInstrumentSheet from './FuturesInstrumentSheet';
 import FuturesCloseSheet, { type FuturesCloseRequest } from './FuturesCloseSheet';
+import FuturesLeverageChangeSheet, { type FuturesLeverageChangeRequest } from './FuturesLeverageChangeSheet';
 import FuturesAmountField from './FuturesAmountField';
 import FuturesLeverageSelect, { type FuturesLeverageSheet } from './FuturesLeverageSelect';
 import FuturesMarginModeField from './FuturesMarginModeField';
@@ -48,6 +49,7 @@ import { resolveAccountBinding } from "../../features/tradingAccount/accountBind
 import { getTradingAccount } from "../../features/tradingAccount/api";
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import {
+  changeFuturesLeverage,
   executeFutures,
   getFuturesConditionalEntries,
   getFuturesInstruments,
@@ -79,10 +81,8 @@ import {
   futuresAmountRatio,
   futuresEntryCapacity,
   futuresEntryEstimate,
-  futuresNotional,
   futuresPrice,
   futuresQuantityForAmount,
-  futuresWholePosition,
 } from "../../features/futures/orderSizing";
 import {
   DEFAULT_ORDER_METHOD,
@@ -124,15 +124,21 @@ const MARK_WATCH_GAP_MS = 3000;
 
 /**
  * The futures trading screen, laid out like the spot order screen: the
- * contract header (picker, 무기한, the full-screen chart button), its Last and
- * Mark prices, then one row with the trade form on the left (롱/숏, margin mode and leverage,
- * 주문방식, the USD order amount and its ratio, submit) and the contract's book
- * on the right — side by side on every phone width — then the positions and
- * pending views (records are in the central 거래 내역). The amount is the position's USD
- * notional; it becomes the contract quantity the existing commands take.
+ * contract header (picker, 무기한, the full-screen chart button), then one row
+ * with the trade form on the left (롱/숏, margin mode and leverage, 주문방식,
+ * the USD order amount and its ratio, submit) and the contract's book with its
+ * current price on the right — side by side on every phone width — then the
+ * positions and the futures-only pending views (records are in the central
+ * 거래 내역). The amount is the position's USD notional; it becomes the
+ * contract quantity the existing commands take.
+ * Two-way positions (2026-11-06): the form is the same whether or not a
+ * position is held; an order of a direction opens it or adds to its open
+ * position (never the other direction's), a held position's margin mode is
+ * fixed, and another leverage changes the position's only after the user
+ * confirms it. Reducing and closing stay in each card's 포지션 종료.
  * Futures keeps its own financial rules: execution on Futures Last, valuation
- * and liquidation on Mark, an individual liquidation price for isolated
- * positions only.
+ * and liquidation on Mark (평가 기준가), an individual liquidation price for
+ * isolated positions only.
  */
 export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const accountId = route.params.accountId;
@@ -165,8 +171,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const [instrumentSheetOpen, setInstrumentSheetOpen] = useState(false);
   // The detail's 매수하기 / 매도하기 open a new long / short entry; long otherwise.
   const [direction, setDirection] = useState<Direction>(route.params.direction ?? "long");
-  const [marginMode, setMarginMode] = useState<MarginMode>("isolated");
-  const [leverage, setLeverage] = useState("1");
+  // The user's own margin mode and leverage choices. Null follows the open
+  // position of the selected direction (its fixed margin mode, its current
+  // leverage), else 격리 and 1x: choosing never changes a position.
+  const [marginChoice, setMarginChoice] = useState<MarginMode | null>(null);
+  const [leverageChoice, setLeverageChoice] = useState<string | null>(null);
   const [leverageSheet, setLeverageSheet] = useState<FuturesLeverageSheet>(null);
   // The USD order amount: the notional to open, add or reduce (never contracts).
   const [amount, setAmount] = useState("");
@@ -187,7 +196,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const [closeTarget, setCloseTarget] = useState<string | null>(null);
   const [closeError, setCloseError] = useState<{ cause: unknown; message: string } | null>(null);
   const [closeNotice, setCloseNotice] = useState<string | null>(null);
-  const [operation, setOperation] = useState<Operation>("open");
+  // 레버리지 변경 확인: the change the user is asked to confirm, what the
+  // confirmation then sends (a limit or conditional form's own submit), and
+  // the leverage-only command's last refusal.
+  const [leverageConfirm, setLeverageConfirm] = useState<FuturesLeverageChangeRequest | null>(null);
+  const leverageProceed = useRef<(() => void) | null>(null);
+  const [leverageError, setLeverageError] = useState<{ cause: unknown; message: string } | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [collateralAttempted, setCollateralAttempted] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -307,8 +321,10 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       setFailure(null);
       setAmount("");
       setChosenRatio(null);
+      // The chosen leverage stays: once the positions refresh it is the position's own.
+      const change = result.leverageChange;
       setNotice(
-        `${operationLabel[result.execution.operation]} 체결 완료 · 수수료 $${formatUsd(result.execution.feeAmount)}`,
+        `${change ? `레버리지 ${change.fromLeverage}x → ${change.toLeverage}x 변경 · ` : ''}${operationLabel[result.execution.operation]} 체결 완료 · 수수료 $${formatUsd(result.execution.feeAmount)}`,
       );
     },
     onError: (error, request) => {
@@ -330,15 +346,70 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       submitLock.current = false;
     },
   });
+  // 레버리지만 변경: its own idempotent command (the same key while its answer is unknown).
+  const leverageAction = useRef<{
+    signature: string;
+    positionId: string;
+    command: { leverage: number; fromLeverage: number; idempotencyKey: string };
+    epoch: number;
+    session: number;
+    uncertain?: boolean;
+  } | null>(null);
+  const leverageMutation = useMutation({
+    mutationFn: (request: NonNullable<typeof leverageAction.current>) =>
+      changeFuturesLeverage(accountId, request.positionId, request.command),
+    onSuccess: (result, request) => {
+      if (!isCurrentSession(request.session)) return;
+      for (const queryKey of [
+        QUERY_KEYS.tradingAccount.futures.all(accountId),
+        QUERY_KEYS.tradingAccount.futuresCollateral(accountId),
+        QUERY_KEYS.tradingAccount.walletsAll(accountId),
+        QUERY_KEYS.tradingAccount.portfolioAll(accountId),
+      ])
+        void queryClient.invalidateQueries({ queryKey });
+      if (!scope.current.mounted || request.epoch !== scope.current.epoch) return;
+      leverageAction.current = null;
+      setLeverageConfirm(null);
+      setLeverageError(null);
+      setFailure(null);
+      setNotice(`레버리지 ${result.leverageChange.fromLeverage}x → ${result.leverageChange.toLeverage}x 변경 완료`);
+    },
+    onError: (error, request) => {
+      if (!scope.current.mounted || request.epoch !== scope.current.epoch || !isCurrentSession(request.session)) return;
+      const info = getApiErrorInfo(error);
+      // Only a lost or failed answer may have changed it: that one keeps its key.
+      request.uncertain = !info.hasResponse || (info.status ?? 0) >= 500;
+      if (!request.uncertain) leverageAction.current = null;
+      setLeverageError({
+        cause: error,
+        message: request.uncertain
+          ? '변경 여부를 확인해야 해요. 같은 요청으로 다시 확인해 주세요.'
+          : futuresErrorMessage(info.serverCode, false),
+      });
+    },
+  });
   const pendingResult = !!action.current?.uncertain && current(action.current);
   const retryResult = () => {
     if (!action.current || !pendingResult || submitLock.current) return;
     submitLock.current = true;
     mutation.mutate(action.current);
   };
+  // The terms the form shows for a contract: the user's choices, else the
+  // open position of the selected direction (two-way: each direction has its
+  // own), else 격리 · 1x.
+  const formTerms = (contractId: string | undefined) => {
+    const held = positions.data?.positions.find((p) => p.instrumentId === contractId && p.direction === direction);
+    return {
+      held,
+      marginMode: marginChoice ?? held?.marginMode ?? 'isolated',
+      leverage: leverageChoice ?? (held ? String(held.leverage) : '1'),
+    };
+  };
+  const guideTerms = formTerms(selectedId || instruments.data?.instruments[0]?.id || positions.data?.positions[0]?.instrumentId);
   const practicePosition = positions.data?.positions.find(p => p.id === guide?.active?.positionId)
+    ?? positions.data?.positions.find(p => p.instrumentId === selectedId && p.direction === direction)
     ?? positions.data?.positions.find(p => p.instrumentId === selectedId);
-  useTradingGuideFacts({ screen: 'futures', accountId, direction, leverage: Number(leverage), marginMode,
+  useTradingGuideFacts({ screen: 'futures', accountId, direction, leverage: Number(guideTerms.leverage), marginMode: guideTerms.marginMode,
     leverageSheet: leverageSheet ?? undefined, positionSheetOpen: !!closeTarget || !!tpSlTarget,
     positionId: practicePosition?.id, positionDirection: practicePosition?.direction, pending: mutation.isPending,
     blocked: (guide?.active?.step === 5 ? positions.data?.capabilities.canClose : positions.data?.capabilities.canOpen) !== true }, focused && bound);
@@ -374,14 +445,15 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     allInstruments.find((i) => i.id === selectedId) ??
     data.positions.find((p) => p.instrumentId === selectedId)?.instrument ??
     (selectedId ? undefined : allInstruments[0] ?? data.positions[0]?.instrument);
-  const position = data.positions.find(
-    (p) => p.instrumentId === instrument?.id,
-  );
-  const selectedOperation = position
-    ? operation === "open"
-      ? "increase"
-      : operation
-    : "open";
+  // The open position of the selected contract AND direction: an order adds
+  // to it; the other direction's position is never touched from the form.
+  const { held: position, marginMode, leverage } = formTerms(instrument?.id);
+  const selectedOperation: Operation = position ? "increase" : "open";
+  // A position's margin mode is fixed for its lifetime: another mode cannot add to it.
+  const marginLocked = !!position && marginMode !== position.marginMode;
+  // Another leverage changes the position's own — only after the user confirms it.
+  const leverageChange = position && /^(?:[1-9]\d?|100)$/u.test(leverage) && Number(leverage) !== position.leverage
+    ? { fromLeverage: position.leverage, toLeverage: Number(leverage) } : null;
   // Each read is judged on its own server clock (evaluatedAt + time since the
   // request was sent), not on the device clock: a device a second or two ahead
   // of the server made a fresh Mark flash "Mark 확인 불가" before every poll.
@@ -436,9 +508,9 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         : instrument?.referencePriceEvidence,
       position ? positionsNow : instrumentsNow,
     );
-  const selectedLeverage = position ? String(position.leverage) : leverage;
-  const orderDirection = position?.direction ?? direction;
-  const orderMarginMode = position?.marginMode ?? marginMode;
+  const selectedLeverage = leverage;
+  const orderDirection = direction;
+  const orderMarginMode = marginMode;
   const baseSymbol = instrument?.underlying.symbol.replace(/USDT$/u, "") ?? "";
   // The price an amount becomes contracts at: the current Futures Last for
   // 시장가, the entry price for 지정가, and for 조건주문 the watch (시장가 after
@@ -455,15 +527,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     : method === "conditional"
       ? conditionalLimit ? "주문가격(지정가)을 입력하면 계약 수량을 계산합니다." : "감시가격을 입력하면 계약 수량을 계산합니다."
       : "현재 선물 Last를 확인할 수 없어 계약 수량을 계산할 수 없습니다.";
-  const sizing = selectedOperation === "close" ? null : futuresQuantityForAmount(amount, basisPrice, unpriced);
-  // A reduce of the whole position is the existing full close.
-  const wholePosition = selectedOperation === "reduce" && !!position && sizing?.state === "ready"
-    && futuresWholePosition(sizing.quantity, position.quantity);
-  const effectiveOperation: Operation = wholePosition ? "close" : selectedOperation;
-  const selectedQuantity = selectedOperation === "close"
-    ? (position?.quantity ?? "")
-    : sizing?.state === "ready" ? sizing.quantity : "";
-  const amountError = sizing && (sizing.state === "invalid" || sizing.state === "unpriced" || sizing.state === "tooSmall")
+  const sizing = futuresQuantityForAmount(amount, basisPrice, unpriced);
+  // The form only enters (a new position or an add); a reduce or close is the
+  // position card's 포지션 종료.
+  const effectiveOperation: Operation = selectedOperation;
+  const selectedQuantity = sizing.state === "ready" ? sizing.quantity : "";
+  const amountError = sizing.state === "invalid" || sizing.state === "unpriced" || sizing.state === "tooSmall"
     ? sizing.message : null;
   const inputError = amountError ?? futuresInputError(
     selectedQuantity,
@@ -471,15 +540,13 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     effectiveOperation,
     position,
   );
-  const covered =
-    selectedOperation === "reduce" ||
-    selectedOperation === "close" ||
-    allInstruments.some((i) => i.id === instrument?.id);
+  const covered = allInstruments.some((i) => i.id === instrument?.id);
   const allowed =
     focused &&
     !pendingResult &&
     covered &&
     !!instrument &&
+    !marginLocked &&
     futuresActionAllowed(
       data.capabilities,
       effectiveOperation,
@@ -488,48 +555,37 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     );
   // A command in flight, an unresolved result or a held limit/conditional
   // entry keeps the contract, side and method that request was made with.
-  const locked = mutation.isPending || pendingResult || limitBusy || conditionalBusy;
-  const entering = effectiveOperation === "open" || effectiveOperation === "increase";
+  const locked = mutation.isPending || pendingResult || limitBusy || conditionalBusy || leverageMutation.isPending;
   const collateralKnown = timely && crossFresh;
   // 100% of an entry: what the free collateral carries after margin, fee and
   // the server's Cross/maintenance checks (an estimate; the server decides).
-  const capacity = entering
-    ? method !== "conditional" && !markFresh
-      ? { state: "unavailable" as const, reason: "mark" as const }
-      : futuresEntryCapacity({
-        freeCollateral: collateralKnown ? data.collateral.freeCollateral : null,
-        crossBase: collateralKnown ? data.cross.metrics?.crossBaseCollateral : null,
-        liquidationBuffer: collateralKnown ? data.cross.metrics?.liquidationBuffer : null,
-        leverage: Number(selectedLeverage),
-        feeRate,
-        marginMode: orderMarginMode,
-        direction: orderDirection,
-        price: basisPrice,
-        // Deferred estimates keep the existing fill-time pricing assumption.
-        // Market/limit entries still require fresh Mark evidence above.
-        deferred: method !== "market",
-        mark: method === "market" && markFresh ? (position?.markPrice ?? instrument?.markPrice ?? null) : null,
-        opening: !position,
-      })
-    : null;
-  // 100% of a reduce is the position (its notional at the current Last).
-  const positionNotional = position && marketPrice ? futuresNotional(position.quantity, marketPrice) : null;
-  const ratioBase = entering
-    ? capacity?.state === "ready" ? capacity.max : null
-    : selectedOperation === "reduce" ? positionNotional : null;
-  const ratioReason = selectedOperation === "close"
-    ? null
-    : entering
-      ? capacity?.state === "unavailable"
-        ? capacity.reason === "fee"
-          ? tradingAccount.isError ? "수수료 정보를 확인할 수 없어 비율을 계산할 수 없습니다." : "수수료 정보를 확인하는 중입니다."
-          : capacity.reason === "mark"
-            ? markNotice ? "Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다." : "가격을 확인하는 중입니다."
-            : capacity.reason === "price" ? unpriced
-            : capacity.reason === "maintenance" ? MAINTENANCE_SHORT
-              : "사용 가능한 담보를 평가하는 중입니다."
-        : ratioBase === "0" ? "주문가능 금액이 없습니다." : null
-      : positionNotional ? null : "현재 선물 Last를 확인할 수 없어 비율을 계산할 수 없습니다.";
+  const capacity = method !== "conditional" && !markFresh
+    ? { state: "unavailable" as const, reason: "mark" as const }
+    : futuresEntryCapacity({
+      freeCollateral: collateralKnown ? data.collateral.freeCollateral : null,
+      crossBase: collateralKnown ? data.cross.metrics?.crossBaseCollateral : null,
+      liquidationBuffer: collateralKnown ? data.cross.metrics?.liquidationBuffer : null,
+      leverage: Number(selectedLeverage),
+      feeRate,
+      marginMode: orderMarginMode,
+      direction: orderDirection,
+      price: basisPrice,
+      // Deferred estimates keep the existing fill-time pricing assumption.
+      // Market/limit entries still require fresh Mark evidence above.
+      deferred: method !== "market",
+      mark: method === "market" && markFresh ? (position?.markPrice ?? instrument?.markPrice ?? null) : null,
+      opening: !position,
+    });
+  const ratioBase = capacity.state === "ready" ? capacity.max : null;
+  const ratioReason = capacity.state === "unavailable"
+    ? capacity.reason === "fee"
+      ? tradingAccount.isError ? "수수료 정보를 확인할 수 없어 비율을 계산할 수 없습니다." : "수수료 정보를 확인하는 중입니다."
+      : capacity.reason === "mark"
+        ? markNotice ? "평가 기준가를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다." : "가격을 확인하는 중입니다."
+        : capacity.reason === "price" ? unpriced
+        : capacity.reason === "maintenance" ? MAINTENANCE_SHORT
+          : "사용 가능한 담보를 평가하는 중입니다."
+    : ratioBase === "0" ? "주문가능 금액이 없습니다." : null;
   const amountAtRatio = (ratio: number) => (ratioBase ? futuresAmountAtRatio(ratioBase, ratio) : null);
   // The chosen quick ratio survives cent rounding only while it still writes this amount.
   const activeRatio = !ratioReason && chosenRatio !== null
@@ -538,7 +594,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const displayedRatio = activeRatio ?? (ratioReason ? 0 : futuresAmountRatio(amount, ratioBase));
   // Live pre-checks (the server still decides): no free collateral, or an
   // amount above what it carries, is refused here; unknown is never short.
-  const entryProblem = !entering || method === "conditional" || !markFresh || !selectedQuantity || inputError
+  const entryProblem = method === "conditional" || !markFresh || !selectedQuantity || inputError
     ? null
     : capacity?.state === "unavailable" && capacity.reason === "maintenance"
       ? MAINTENANCE_SHORT
@@ -567,32 +623,36 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     if (ratioReason) { setRatioMessage(ratioReason); return; }
     setRatioMessage(null);
     if (ratio === 0) { setAmount(""); setChosenRatio(0); return; }
-    // 100% of a reduce is the whole position: the existing 전량 종료.
-    if (selectedOperation === "reduce" && ratio === 1) { setOperation("close"); setAmount(""); setChosenRatio(null); return; }
     const next = amountAtRatio(ratio);
     if (!next || next === "0") { setRatioMessage("계산된 금액이 너무 작습니다."); return; }
     setAmount(next);
     setChosenRatio(ratio);
   };
-  const changeOperation = (op: Exclude<Operation, "open">) => {
-    if (locked) return;
-    // An add and a reduce amount mean different things: start over.
-    setOperation(op);
-    clearFailure();
-    setAmount("");
-    setChosenRatio(null);
-    setRatioMessage(null);
+  // The margin mode and leverage the form shows next: the open position of
+  // that contract and direction if there is one (followed), else the values
+  // shown now (kept, as before for a new position).
+  const keepTerms = (contractId: string | undefined, side: Direction) => {
+    const held = data.positions.some((p) => p.instrumentId === contractId && p.direction === side);
+    setMarginChoice(held ? null : marginMode);
+    setLeverageChoice(held ? null : leverage);
   };
-  const choose = (id: string) => {
-    if (submitLock.current || pendingResult || limitBusy || conditionalBusy) return;
+  const switchDirection = (next: Direction) => {
+    if (locked || next === direction) return;
+    keepTerms(instrument?.id, next);
+    setDirection(next);
+    clearFailure();
+  };
+  const choose = (id: string, side: Direction = direction) => {
+    if (submitLock.current || pendingResult || limitBusy || conditionalBusy || leverageMutation.isPending) return;
     setInstrumentSheetOpen(false);
     setLeverageSheet(null);
+    keepTerms(id, side);
     setSelectedId(id);
+    setDirection(side);
     // Another contract's amount and ratio never carry over.
     setAmount("");
     setChosenRatio(null);
     setRatioMessage(null);
-    setOperation("open");
     clearFailure();
     action.current = null;
     // Another contract starts at 시장가 without a limit draft (the spot rule).
@@ -601,22 +661,21 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setLimitPrice("");
     setConditionalDraft(emptyFuturesConditionalDraft);
   };
-  // As on the server (B차): close/reduce reduce risk; a new position opens in
-  // its quest's direction (above 1x before every quest is complete); an
-  // increase needs every quest complete.
+  // As on the server (B차): a new position opens in its quest's direction
+  // (above 1x before every quest is complete); an increase needs every quest
+  // complete (close/reduce is the position card's 포지션 종료).
   const openGate = learning.gate(direction === 'short' ? 'futuresShortOpen' : 'futuresLongOpen');
   const practiceLeverage = effectiveOperation === 'open' && openGate.allowed && !learning.gate('allTrading').allowed
     && !(Number(selectedLeverage) > 1);
-  const entryGate = effectiveOperation === 'close' || effectiveOperation === 'reduce' ? learning.gate('riskReduction')
-    : effectiveOperation === 'increase' ? learning.gate('allTrading')
-      : practiceLeverage ? learning.lock(FUTURES_PRACTICE_LEVERAGE_MESSAGE) : openGate;
+  const entryGate = effectiveOperation === 'increase' ? learning.gate('allTrading')
+    : practiceLeverage ? learning.lock(FUTURES_PRACTICE_LEVERAGE_MESSAGE) : openGate;
   const advancedGate = learning.gate('allTrading');
   const conditionalGate = getFuturesConditionalGate({
     isLoading: conditionalEntries.isPending,
     isError: conditionalEntries.isError,
     data: conditionalEntries.data?.tradingAccountId === accountId ? conditionalEntries.data : null,
   });
-  const methodOptions = getFuturesOrderMethodOptions(!!position, conditionalGate);
+  const methodOptions = getFuturesOrderMethodOptions(conditionalGate);
   const selectedMethodOption = methodOptions.find((option) => option.method === method);
   // A method the position state no longer allows stays shown, never submits.
   const methodUnavailableReason = selectedMethodOption?.availability.state === 'unavailable'
@@ -645,6 +704,18 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       return;
     }
     setCollateralAttempted(false);
+    // Another leverage than the position's: the user confirms the change first.
+    if (leverageChange && position && !action.current?.uncertain) {
+      setLeverageError(null);
+      setLeverageConfirm({ kind: 'add', method: 'market', position, toLeverage: leverageChange.toLeverage,
+        quantity: selectedQuantity, price: null });
+      return;
+    }
+    send(null);
+  };
+  /** The market open or add, with the leverage the user confirmed changing from (or none). */
+  const send = (fromLeverage: number | null) => {
+    if (!instrument || submitLock.current) return;
     const signature = JSON.stringify([
       scope.current.epoch,
       instrument.id,
@@ -654,6 +725,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       selectedLeverage,
       direction,
       marginMode,
+      fromLeverage,
     ]);
     if (action.current?.signature !== signature) {
       const key = createIdempotencyKey("futures");
@@ -664,12 +736,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         epoch: scope.current.epoch,
         session,
         command: position
-          ? positionCommand(
-              position,
-              effectiveOperation === "open" ? "increase" : effectiveOperation,
-              selectedQuantity,
-              key,
-            )
+          ? {
+              ...positionCommand(position, "increase", selectedQuantity, key),
+              leverage: Number(leverage),
+              ...(fromLeverage === null ? {} : { fromLeverage }),
+            }
           : {
               instrumentId: instrument.id,
               operation: "open",
@@ -721,21 +792,82 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setCloseNotice(null);
     setCloseTarget(positionId);
   };
+  // A position card's top (name and side, PnL, 수익률): trade that contract
+  // in that direction — the form follows the position's terms, another
+  // contract's draft never carries over, and nothing is ordered by the tap.
+  const tradeFrom = (target: FuturesPosition) => {
+    if (submitLock.current || pendingResult || limitBusy || conditionalBusy || leverageMutation.isPending) return;
+    Keyboard.dismiss();
+    if (target.instrumentId !== instrument?.id) choose(target.instrumentId, target.direction);
+    else {
+      if (target.direction !== direction) {
+        setDirection(target.direction);
+        clearFailure();
+      }
+      setMarginChoice(null);
+      setLeverageChoice(null);
+    }
+    inputScroll.scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+  // 레버리지만 변경: the confirmation sheet without an order.
+  const openLeverageOnly = () => {
+    if (locked || !position || !leverageChange) return;
+    Keyboard.dismiss();
+    setLeverageError(null);
+    setLeverageConfirm({ kind: 'only', method: method === 'limit' || method === 'conditional' ? method : 'market', position,
+      toLeverage: leverageChange.toLeverage, quantity: null, price: null });
+  };
+  // A limit or conditional form's submit, after the user confirms the change.
+  const confirmEntryLeverage = (kind: 'limit' | 'conditional') => (proceed: () => void) => {
+    if (!position || !leverageChange) { proceed(); return; }
+    leverageProceed.current = proceed;
+    setLeverageError(null);
+    setLeverageConfirm({ kind: 'add', method: kind, position, toLeverage: leverageChange.toLeverage,
+      quantity: selectedQuantity || null, price: basisPrice });
+  };
+  const confirmLeverage = () => {
+    const request = leverageConfirm;
+    if (!request) return;
+    if (request.kind === 'only') {
+      if (leverageMutation.isPending) return;
+      const signature = JSON.stringify([scope.current.epoch, request.position.id, request.position.leverage, request.toLeverage]);
+      if (leverageAction.current?.signature !== signature)
+        leverageAction.current = { signature, positionId: request.position.id, epoch: scope.current.epoch, session,
+          command: { leverage: request.toLeverage, fromLeverage: request.position.leverage,
+            idempotencyKey: createIdempotencyKey('futures-leverage') } };
+      setLeverageError(null);
+      leverageMutation.mutate(leverageAction.current);
+      return;
+    }
+    // An add: the order itself carries the leverage it confirmed changing from.
+    setLeverageConfirm(null);
+    if (request.method === 'market') send(request.position.leverage);
+    else {
+      const proceed = leverageProceed.current;
+      leverageProceed.current = null;
+      proceed?.();
+    }
+  };
+  const closeLeverage = () => {
+    if (leverageMutation.isPending) return;
+    setLeverageConfirm(null);
+    setLeverageError(null);
+    leverageProceed.current = null;
+  };
   const estimateLines: string[] = [];
-  if (sizing?.state === "ready") {
+  if (sizing.state === "ready") {
     estimateLines.push(`예상 수량 ${formatDisplayDecimal(sizing.quantity)} ${baseSymbol}`);
-    const estimate = entering ? futuresEntryEstimate(amount, Number(selectedLeverage), feeRate) : null;
+    const estimate = futuresEntryEstimate(amount, Number(selectedLeverage), feeRate);
     if (estimate) {
-      estimateLines.push(`예상 증거금 $${formatUsd(estimate.margin)}`);
+      estimateLines.push(`${leverageChange ? '이번 주문 ' : ''}예상 증거금 $${formatUsd(estimate.margin)}`);
       if (estimate.fee !== null) estimateLines.push(`예상 수수료 $${formatUsd(estimate.fee)}`);
     }
-    if (wholePosition) estimateLines.push("보유 수량 전체 · 전량 종료로 처리됩니다.");
   }
   const freeCollateral = collateralKnown ? data.collateral.freeCollateral : null;
   // The Futures wallet for a new entry or an increase only (a reduce or close
   // needs no money): empty when this read's balance is exactly zero; all held
   // as margin or by orders when a known free collateral is none; else silent.
-  const fundingState = entering && timely
+  const fundingState = timely
     ? walletFundingState(data.collateral.balanceAmount, freeCollateral === null ? null : hasNoFreeCollateral(freeCollateral) ? '0' : freeCollateral)
     : null;
   const transferGate = learning.gate('transfer');
@@ -743,14 +875,9 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     if (action.kind === 'transfer' && questNavigationAllowed('WalletTransfer'))
       transferGate.guard(() => setFunding({ kind: 'transfer', destination: action.destination }));
   };
-  const availableText = selectedOperation === "reduce" && position
-    ? `보유 ${formatDisplayDecimal(position.quantity)} ${baseSymbol}${positionNotional ? ` · 약 ${formatUsd(positionNotional)} USD` : ""}`
-    : freeCollateral === null ? "주문가능 평가 대기" : `주문가능 ${formatUsd(freeCollateral)} USD`;
-  const amountLabel = selectedOperation === "reduce" ? "감소 금액 (USD)" : selectedOperation === "increase" ? "추가 금액 (USD)" : "주문 금액 (USD)";
+  const availableText = freeCollateral === null ? "주문가능 평가 대기" : `주문가능 ${formatUsd(freeCollateral)} USD`;
+  const amountLabel = selectedOperation === "increase" ? "추가 금액 (USD)" : "주문 금액 (USD)";
   const stackedControls = width / fontScale < 360;
-  // Three operation segments break words in the narrow form column at large
-  // fonts; there they become a vertical choice list.
-  const stackedOperations = width < 160 * fontScale + 100;
   // "(Short)" cannot fit half the column at large fonts: the segment shows 롱/숏
   // (the spoken names keep Long/Short).
   const compactSides = width < 220 * fontScale + 80;
@@ -812,23 +939,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             </ActionPressable>
           ) : null}
         </View>
+        {/* The contract's Last stays in the book beside the form and on the
+            detail screen; this screen only says when a missing price limits
+            new entries (orders still follow the fresh evidence checks). */}
         {instrument ? (
           <>
-            <View style={styles.prices} testID="futures-prices">
-              <View style={[styles.priceCell, stackedControls && styles.full]}>
-                <Text style={styles.priceLabel} accessibilityLabel="현재가 Last">Last</Text>
-                <Text selectable style={styles.price} testID="futures-last-price">
-                  {referenceFresh ? price(reference, instrument) : "시세 확인 불가"}
-                </Text>
-              </View>
-              <View style={[styles.priceCell, stackedControls && styles.full]}>
-                <Text style={styles.priceLabel} accessibilityLabel="Mark 가격">Mark</Text>
-                <Text selectable style={styles.price} testID="futures-mark-price">
-                  {markFresh ? price(position?.markPrice ?? instrument.markPrice, instrument)
-                    : markNotice ? "Mark 확인 불가" : "확인 중"}
-                </Text>
-              </View>
-            </View>
             {markNotice === "diagnostic" ? (
               <>
                 <Text testID="futures-mark-diagnostic" style={styles.warning}>
@@ -881,52 +996,58 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               <Text style={styles.muted}>현재 검증된 선물 상품이 없습니다.</Text>
             ) : (
               <>
+                {/* Two-way: 롱/숏, margin mode and leverage are always offered; an
+                    order of a direction adds to its open position, never to the other. */}
+                <View ref={questGuideTarget('futures-direction')} collapsable={false}>
+                  <OrderSideSegment
+                    testID="futures-direction"
+                    side={direction === 'long' ? 'buy' : 'sell'}
+                    labels={compactSides ? { buy: '롱', sell: '숏' } : { buy: directionLabel.long, sell: directionLabel.short }}
+                    accessibilityLabels={{ buy: directionLabel.long, sell: directionLabel.short }}
+                    testIDs={{ buy: 'futures-direction-long', sell: 'futures-direction-short' }}
+                    disabled={locked}
+                    onChange={(side) => switchDirection(side === 'buy' ? 'long' : 'short')}
+                  />
+                </View>
                 {position ? (
-                  <View style={styles.group} testID="futures-position-terms">
-                    <View style={styles.terms}>
-                      <Text style={[styles.termsDirection, { color: position.direction === 'long' ? BUY_COLOR : SELL_COLOR }]}>
-                        {directionLabel[position.direction]}
-                      </Text>
-                      <Text style={styles.termsText}>{marginLabel[position.marginMode]} · {position.leverage}x 고정</Text>
-                    </View>
-                    <Text style={styles.helper}>
-                      방향·레버리지·증거금 모드는 전량 종료 후 새 포지션에서
-                      선택할 수 있습니다.
+                  <Text testID="futures-position-add-hint" style={styles.helper}>
+                    보유 {position.direction === 'long' ? '롱' : '숏'} 포지션에 추가 · {position.marginMode === 'cross' ? '교차' : '격리'} {position.leverage}x
+                  </Text>
+                ) : null}
+                <View ref={questGuideTarget('futures-margin')} collapsable={false} style={styles.controls}>
+                  <FuturesMarginModeField value={marginMode} onChange={(value) => { setMarginChoice(value); clearFailure(); }} disabled={locked} />
+                  {marginLocked && position ? (
+                    <Text testID="futures-margin-locked" accessibilityLiveRegion="polite" style={styles.error}>
+                      보유 {position.direction === 'long' ? '롱' : '숏'} 포지션은 {position.marginMode === 'cross' ? '교차' : '격리'}로 고정돼 있어요.
+                      {' '}{position.marginMode === 'cross' ? '교차' : '격리'}로만 추가할 수 있어요.
                     </Text>
-                    {/* Asked for the other side (detail's 매수하기/매도하기): one-way, so say why
-                        instead of turning the request into a reduce or close. */}
-                    {route.params.direction && route.params.direction !== position.direction ? (
-                      <Text testID="futures-direction-held" style={styles.helper}>
-                        {directionLabel[position.direction]} 포지션이 열려 있어 {directionLabel[route.params.direction]}으로
-                        새로 진입할 수 없습니다. 이 포지션을 전량 종료한 뒤 진입할 수 있어요.
+                  ) : null}
+                  <FuturesLeverageSelect
+                    leverage={Number(leverage)}
+                    disabled={locked}
+                    sheet={locked ? null : leverageSheet}
+                    onSheetChange={setLeverageSheet}
+                    onChange={(value) => { setLeverageChoice(String(value)); clearFailure(); }}
+                  />
+                  {leverageChange && !marginLocked ? (
+                    <View testID="futures-leverage-change-notice" style={styles.leverageNotice}>
+                      <Text style={styles.leverageNoticeTitle}>
+                        포지션 레버리지 {leverageChange.fromLeverage}x → {leverageChange.toLeverage}x
                       </Text>
-                    ) : null}
-                  </View>
-                ) : (
-                  <>
-                    <View ref={questGuideTarget('futures-direction')} collapsable={false}>
-                      <OrderSideSegment
-                        testID="futures-direction"
-                        side={direction === 'long' ? 'buy' : 'sell'}
-                        labels={compactSides ? { buy: '롱', sell: '숏' } : { buy: directionLabel.long, sell: directionLabel.short }}
-                        accessibilityLabels={{ buy: directionLabel.long, sell: directionLabel.short }}
-                        testIDs={{ buy: 'futures-direction-long', sell: 'futures-direction-short' }}
-                        disabled={locked}
-                        onChange={(side) => { setDirection(side === 'buy' ? 'long' : 'short'); clearFailure(); }}
-                      />
+                      <Text style={styles.helper}>
+                        선택만으로는 바뀌지 않아요. 주문하거나 아래에서 변경할 때 확인 후 적용돼요.
+                      </Text>
+                      <ActionPressable testID="futures-leverage-only" accessibilityRole="button"
+                        accessibilityLabel={`레버리지만 ${leverageChange.toLeverage}배로 변경`}
+                        accessibilityState={{ disabled: locked || !data.capabilities.canIncrease }}
+                        aria-disabled={locked || !data.capabilities.canIncrease}
+                        disabled={locked || !data.capabilities.canIncrease} onPress={openLeverageOnly}
+                        style={[styles.leverageOnly, (locked || !data.capabilities.canIncrease) && styles.disabledAction]}>
+                        <Text style={styles.leverageOnlyText}>레버리지만 변경</Text>
+                      </ActionPressable>
                     </View>
-                    <View ref={questGuideTarget('futures-margin')} collapsable={false} style={styles.controls}>
-                      <FuturesMarginModeField value={marginMode} onChange={(value) => { setMarginMode(value); clearFailure(); }} disabled={locked} />
-                      <FuturesLeverageSelect
-                        leverage={Number(leverage)}
-                        disabled={locked}
-                        sheet={locked ? null : leverageSheet}
-                        onSheetChange={setLeverageSheet}
-                        onChange={(value) => { setLeverage(String(value)); clearFailure(); }}
-                      />
-                    </View>
-                  </>
-                )}
+                  ) : null}
+                </View>
                 <OrderTypeSelect
                   method={method}
                   options={methodOptions}
@@ -944,30 +1065,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                   <Text testID="futures-method-unavailable" style={styles.error}>{methodUnavailableReason}</Text>
                 ) : (
                   <>
-                    {position ? (
-                      stackedOperations ? (
-                        <View testID="futures-operation" accessibilityRole="radiogroup" accessibilityLabel="포지션 조작" style={styles.operations}>
-                          {(['increase', 'reduce', 'close'] as const).map((op) => {
-                            const selected = (selectedOperation === 'open' ? 'increase' : selectedOperation) === op;
-                            return (
-                              <ActionPressable key={op} feedback="selection" testID={`futures-operation-${op}`} accessibilityRole="radio"
-                                accessibilityLabel={operationLabel[op]} accessibilityState={{ selected, checked: selected, disabled: locked }}
-                                aria-selected={selected} disabled={locked} onPress={() => { if (!selected) changeOperation(op); }}
-                                style={[styles.operation, selected && styles.operationSelected]}>
-                                <Text style={[styles.operationText, selected && styles.operationTextSelected]}>{operationShortLabel[op]}</Text>
-                              </ActionPressable>
-                            );
-                          })}
-                        </View>
-                      ) : (
-                        <SegmentedControl testID="futures-operation" accessibilityLabel="포지션 조작" value={selectedOperation === 'open' ? 'increase' : selectedOperation}
-                          onChange={changeOperation}
-                          options={(['increase', 'reduce', 'close'] as const).map((op) => ({
-                            key: op, label: operationShortLabel[op], accessibilityLabel: operationLabel[op],
-                            testID: `futures-operation-${op}`, disabled: locked,
-                          }))} />
-                      )
-                    ) : null}
                     {method === 'conditional' ? (
                       <FuturesConditionalFields draft={conditionalDraft} onChange={setConditionalDraft} disabled={locked}
                         lastPrice={referenceFresh ? reference ?? null : null}
@@ -989,43 +1086,30 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         />
                       </View>
                     ) : null}
-                    {selectedOperation === 'close' && position ? (
-                      // 전량 종료 always sends the whole position; no amount can shrink it.
-                      <View style={styles.closeSummary} testID="futures-close-summary">
-                        <Text style={styles.label}>전량 종료</Text>
-                        <Text selectable style={styles.closeValue} testID="futures-close-quantity">
-                          보유 수량 {formatDisplayDecimal(position.quantity)} {baseSymbol} 전체
-                        </Text>
-                        {positionNotional ? (
-                          <Text style={styles.helper}>약 {formatUsd(positionNotional)} USD · 선물 Last 기준</Text>
-                        ) : null}
-                      </View>
-                    ) : (
-                      <FuturesAmountField
-                        label={amountLabel}
-                        amount={amount}
-                        onChange={changeAmount}
-                        editable={!locked}
-                        estimate={estimateLines}
-                        ratioLabel={selectedOperation === 'reduce' ? '감소 비율' : '주문 금액 비율'}
-                        ratio={displayedRatio}
-                        activeRatio={activeRatio}
-                        ratioDisabled={!!ratioReason}
-                        ratioReason={ratioReason}
-                        onRatio={applyRatio}
-                        available={availableText}
-                        availableTarget={questGuideTarget('futures-funding')}
-                        onInputFocus={inputScroll.onInputFocus}
-                        onInputBlur={inputScroll.onInputBlur}
-                      />
-                    )}
+                    <FuturesAmountField
+                      label={amountLabel}
+                      amount={amount}
+                      onChange={changeAmount}
+                      editable={!locked}
+                      estimate={estimateLines}
+                      ratioLabel="주문 금액 비율"
+                      ratio={displayedRatio}
+                      activeRatio={activeRatio}
+                      ratioDisabled={!!ratioReason}
+                      ratioReason={ratioReason}
+                      onRatio={applyRatio}
+                      available={availableText}
+                      availableTarget={questGuideTarget('futures-funding')}
+                      onInputFocus={inputScroll.onInputFocus}
+                      onInputBlur={inputScroll.onInputBlur}
+                    />
                     {amount.trim() && inputError ? (
                       <Text testID="futures-amount-error" accessibilityLiveRegion="polite" style={styles.error}>{inputError}</Text>
                     ) : null}
                     {fundingState ? (
                       <WalletFundingNotice testID="futures-wallet-funding" product="crypto_futures"
                         message={walletFundingMessage('crypto_futures', fundingState)} onAction={openFunding} disabled={locked} />
-                    ) : entering && (collateralShort || orderNotice === COLLATERAL_SHORT) ? (
+                    ) : collateralShort || orderNotice === COLLATERAL_SHORT ? (
                       <WalletFundingNotice testID="futures-funding-actions" product="crypto_futures" message={null}
                         onAction={openFunding} disabled={locked} />
                     ) : null}
@@ -1041,16 +1125,20 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                       <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id}
                         unit={instrument.underlying.symbol.replace(/USDT$/u, '')} direction={direction} marginMode={marginMode} leverage={leverage}
                         quantity={selectedQuantity} amount={amount} limitPrice={limitPrice}
-                        allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !riskBlocked && !pendingResult}
+                        allowed={bound && focused && covered && data.capabilities[position ? 'canIncrease' : 'canOpen'] && markFresh
+                          && !inputError && !riskBlocked && !pendingResult && !marginLocked && !leverageMutation.isPending}
                         collateralError={collateralShort ? COLLATERAL_SHORT : null}
+                        leverageChange={leverageChange ? { fromLeverage: leverageChange.fromLeverage, confirm: confirmEntryLeverage('limit') } : null}
                         onBusy={setLimitBusy} />
                     ) : method === 'conditional' ? (
                       <FuturesConditionalEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id}
                         direction={direction} marginMode={marginMode} leverage={leverage} quantity={selectedQuantity} draft={conditionalDraft}
                         onDraftChange={setConditionalDraft}
                         lastPrice={referenceFresh ? reference ?? null : null} displayDecimals={instrument.underlying.displayPriceDecimals}
-                        allowed={bound && focused && covered && data.capabilities.canOpen && referenceFresh && !inputError && !pendingResult
+                        allowed={bound && focused && covered && data.capabilities[position ? 'canIncrease' : 'canOpen'] && referenceFresh
+                          && !inputError && !pendingResult && !marginLocked && !leverageMutation.isPending
                           && conditionalGate.state === 'ready' && conditionalGate.enabled}
+                        leverageChange={leverageChange ? { fromLeverage: leverageChange.fromLeverage, confirm: confirmEntryLeverage('conditional') } : null}
                         onBusy={setConditionalBusy} />
                     ) : (
                       <View ref={inputScroll.submitRef}>
@@ -1059,7 +1147,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                           learningCaption={entryGate.locked ? entryGate.caption : null}
                           label={`${directionLabel[orderDirection]} ${operationVerb[effectiveOperation]}`}
                           testID="futures-submit"
-                          style={entering ? { backgroundColor: orderDirection === 'long' ? BUY_COLOR : SELL_COLOR } : undefined}
+                          style={{ backgroundColor: orderDirection === 'long' ? BUY_COLOR : SELL_COLOR }}
                           onPress={submit}
                           state={
                             mutation.isPending
@@ -1114,7 +1202,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               </View>
             ) : (
               <Text style={styles.warning}>
-                Mark 정보를 확인할 수 없어 위험 평가를 표시하지 않습니다.
+                평가 기준가를 확인할 수 없어 위험 평가를 표시하지 않습니다.
               </Text>
             )}
             <Text style={styles.muted}>
@@ -1143,11 +1231,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                 <FuturesPositionCard key={p.id} position={p} evaluatedAt={data.evaluatedAt} now={positionsNow}
                   disabled={locked} capabilities={data.capabilities}
                   tpSlSummary={tpSlRows ? tpSlCountSummary(tpSlRows.filter((row) => row.positionId === p.id)) : null}
-                  onTpSl={() => openTpSl(p.id)} onClose={() => openClose(p.id)} />
+                  onTrade={() => tradeFrom(p)} onTpSl={() => openTpSl(p.id)} onClose={() => openClose(p.id)} />
               ))}
             </>
           ) : (
-            <PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.account.mode === "season"} conditional />
+            // Futures orders and settings only (the other screens keep the whole list).
+            <PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.account.mode === "season"} scope="futures" />
           )}
         </View>
         {!final.isError && final.data?.settlement ? (
@@ -1193,6 +1282,15 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         onRetry={retryResult}
         onClose={() => setCloseTarget(null)}
       />
+      <FuturesLeverageChangeSheet
+        accountId={accountId}
+        request={focused && bound ? leverageConfirm : null}
+        active={focused && bound}
+        busy={leverageMutation.isPending}
+        error={leverageError}
+        onConfirm={confirmLeverage}
+        onClose={closeLeverage}
+      />
       {/* 이체 over this screen: closes on success; the next reads carry the new balance and margin. */}
       <WalletFundingSheet testID="futures" request={funding} visible={focused && bound} closeOnSuccess onClose={() => setFunding(null)} />
       <FuturesInstrumentSheet
@@ -1207,14 +1305,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   );
 }
 const directionLabel = { long: "롱(Long)", short: "숏(Short)" };
-const marginLabel = { isolated: "격리(Isolated)", cross: "교차(Cross)" };
 const operationLabel = {
   open: "신규 진입(Open)",
   increase: "수량 추가(Increase)",
   reduce: "수량 감소(Reduce)",
   close: "전량 종료(Close)",
 };
-const operationShortLabel = { increase: "수량 추가", reduce: "수량 감소", close: "전량 종료" };
 const operationVerb = { open: "진입", increase: "수량 추가", reduce: "수량 감소", close: "전량 종료" };
 const modeLabel = {
   ENABLED: "거래 가능",
@@ -1270,10 +1366,6 @@ const styles = StyleSheet.create({
   iconButton: { minWidth: 44, minHeight: 44, padding: 8, borderRadius: 8, backgroundColor: semantic.raised, alignItems: 'center', justifyContent: 'center' },
   // Rows wrap; on narrow widths and large fonts each item takes a full line.
   full: { flexBasis: '100%', width: '100%' },
-  prices: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 8, minWidth: 0 },
-  priceCell: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: 2 },
-  priceLabel: { fontSize: 11, lineHeight: 16, color: semantic.muted },
-  price: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: semantic.text, fontVariant: ['tabular-nums'] },
   // The spot order screen's row (OrderScreen tradingRow/orderColumn/priceColumn).
   tradingRow: {
     borderRadius: 12,
@@ -1291,20 +1383,18 @@ const styles = StyleSheet.create({
   priceColumn: { flex: 1, minWidth: 0, overflow: 'hidden' },
   pendingResult: { gap: 10, padding: 12, borderRadius: 10, backgroundColor: semantic.warningSurface, minWidth: 0 },
   group: { gap: 4, minWidth: 0 },
-  terms: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 2 },
-  termsDirection: { fontSize: 15, lineHeight: 22, fontWeight: '800' },
-  termsText: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.text, flexShrink: 1 },
   // Margin mode above leverage: the narrow form column stacks its controls.
   controls: { gap: 12, minWidth: 0 },
-  operations: { gap: 2, padding: 3, borderRadius: 11, backgroundColor: semantic.raised, minWidth: 0 },
-  operation: { minHeight: 44, paddingHorizontal: 8, paddingVertical: 8, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  operationSelected: { backgroundColor: semantic.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: semantic.border },
-  operationText: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: semantic.secondary, textAlign: 'center' },
-  operationTextSelected: { color: semantic.text, fontWeight: '700' },
-  closeSummary: { gap: 2, padding: 12, borderRadius: 10, backgroundColor: semantic.raised, minWidth: 0 },
-  closeValue: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: semantic.text, fontVariant: ['tabular-nums'] },
   label: { fontSize: 12, color: semantic.muted },
   helper: { fontSize: 12, color: semantic.secondary },
+  // The position's leverage would change: shown under the selector, with the
+  // explicit 레버리지만 변경 (choosing alone never changes the position).
+  leverageNotice: { gap: 6, padding: 10, borderRadius: 10, backgroundColor: semantic.raised, minWidth: 0 },
+  leverageNoticeTitle: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: semantic.text, flexShrink: 1 },
+  leverageOnly: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8,
+    borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.surface, maxWidth: '100%' },
+  leverageOnlyText: { fontSize: 13, lineHeight: 19, fontWeight: '700', color: semantic.text, textAlign: 'center', flexShrink: 1 },
+  disabledAction: { opacity: 0.5 },
   input: { ...orderInputStyle },
   error: { fontSize: 12, color: semantic.error },
   warning: { color: semantic.warning, fontSize: 13, lineHeight: 20 },

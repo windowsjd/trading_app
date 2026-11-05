@@ -5,7 +5,11 @@ Mark valuation and deterministic Season final exits without changing this risk
 engine. User trading stays DISABLED by default until a separate release decision.
 
 - Isolated is the backward-compatible default; explicit `marginMode: cross` opens
-  Cross. Mode, direction and integer leverage 1–100 are immutable per lifetime.
+  Cross. Margin mode and direction are immutable per lifetime; integer leverage
+  1–100 changes only by a confirmed leverage change (2026-11-06,
+  [futures-api-contract.md](futures-api-contract.md#two-way-positions-and-leverage-change-2026-11-06)),
+  checked like an increase. A long and a short of one contract are separate
+  lifetimes whose requirements are summed, never netted.
 - Only crypto_futures/USD cash is collateral. Reserved cash and all open Isolated
   allocations are protected from Cross. No collateral comes from other wallets.
 - Cross base = balance − reserved − Isolated allocations. Cross equity = base +
@@ -128,8 +132,8 @@ and execution, never Mark.
 [Limit Entry v1](futures-limit-entry-contract.md) uses the same collateral guard:
 pending reservations reduce available cash but contribute no Position, UPNL,
 maintenance or liquidation target. Fill rechecks fresh Mark and collateral under
-the existing wallet fence. Trailing stops, funding, hedge mode, brackets and risk
-tiers remain excluded.
+the existing wallet fence. Trailing stops, funding, hedge netting, brackets and
+risk tiers remain excluded.
 
 ## Diagnostic safety
 

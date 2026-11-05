@@ -16,6 +16,7 @@ export type FuturesExecuteBody = {
   leverage?: unknown;
   marginMode?: unknown;
   idempotencyKey?: unknown;
+  fromLeverage?: unknown;
 };
 export type FuturesCommand = {
   instrumentId: string;
@@ -26,6 +27,12 @@ export type FuturesCommand = {
   leverage: number;
   marginMode?: 'isolated' | 'cross';
   idempotencyKey: string;
+  /**
+   * An increase changing the position's leverage to `leverage`: the
+   * position's leverage the user saw and approved changing (2026-11-06).
+   * Absent otherwise; the plan refuses a change without it.
+   */
+  fromLeverage?: number;
 };
 
 export function assertFuturesLeverage(value: unknown): asserts value is number {
@@ -52,6 +59,7 @@ export function parseFuturesCommand(body: FuturesExecuteBody): FuturesCommand {
     'leverage',
     'marginMode',
     'idempotencyKey',
+    'fromLeverage',
   ];
   if (
     !body ||
@@ -61,6 +69,12 @@ export function parseFuturesCommand(body: FuturesExecuteBody): FuturesCommand {
   )
     invalid();
   assertFuturesLeverage(body.leverage);
+  // Only an increase can change the position's leverage, to another value.
+  if (body.fromLeverage !== undefined) {
+    if (body.operation !== 'increase') invalid();
+    assertFuturesLeverage(body.fromLeverage);
+    if (body.fromLeverage === body.leverage) invalid();
+  }
   if (
     body.marginMode !== undefined &&
     !['isolated', 'cross'].includes(body.marginMode as string)
@@ -97,6 +111,9 @@ export function parseFuturesCommand(body: FuturesExecuteBody): FuturesCommand {
     quantity: new Prisma.Decimal(quantity).toFixed(8),
     leverage: body.leverage,
     marginMode: (body.marginMode ?? 'isolated') as 'isolated' | 'cross',
+    ...(body.fromLeverage === undefined
+      ? {}
+      : { fromLeverage: body.fromLeverage }),
   };
 }
 
@@ -114,6 +131,10 @@ export function futuresCommandHash(accountId: string, command: FuturesCommand) {
         leverage: command.leverage,
         // Preserve the exact F1 isolated hash, including committed replay.
         ...(command.marginMode === 'cross' ? { marginMode: 'cross' } : {}),
+        // Present only on an approved leverage change: earlier hashes stay.
+        ...(command.fromLeverage === undefined
+          ? {}
+          : { fromLeverage: command.fromLeverage }),
       }),
     )
     .digest('hex');

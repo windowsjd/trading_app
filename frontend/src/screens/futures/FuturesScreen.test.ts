@@ -6,6 +6,8 @@ const { futuresHarness, deferred } = createRequire(import.meta.url)(
 );
 
 const words = (node: any) => [node?.props.children].flat(Infinity).filter((part: unknown) => typeof part === 'string').join('');
+// Every text inside a node (the book's current-price row is a View of Texts).
+const allText = (node: any) => node ? node.findAll((n: any) => n.type === 'Text').map(words).join(' ') : '';
 // Open = the sheet takes touches; this harness's motion never ends, so a closing sheet stays drawn without them.
 const sheetOpen = (h: any) => h.node('futures-close-sheet')?.props.pointerEvents === 'auto';
 
@@ -43,9 +45,10 @@ test('the card shows the side as an L box and the estimated closing fee where �
     assert.deepEqual([badge.props.accessibilityLabel, words(badge.findAll((n: any) => n.type === 'Text')[0])], [spoken, letter]);
     const text = JSON.stringify(card.findAll((n: any) => n.type === 'Text').map((n: any) => words(n)));
     assert.equal(/LONG|SHORT/.test(text), false, direction);
-    for (const label of ['포지션 규모', '기준 초기 증거금', '예상 종료 수수료', '평균 진입가', 'Mark Price', '예상 청산가'])
+    // 수익률 and 평가 기준가 (2026-11-06): the same ROI and Mark Price, in Korean.
+    for (const label of ['수익률', '포지션 규모', '기준 초기 증거금', '예상 종료 수수료', '평균 진입가', '평가 기준가', '예상 청산가'])
       assert.equal(text.includes(label), true, label);
-    for (const label of ['보유 수량', '격리 담보', '유지 증거금 + 종료 수수료', '누적 실현 손익'])
+    for (const label of ['보유 수량', '격리 담보', '유지 증거금 + 종료 수수료', '누적 실현 손익', 'ROI', 'Mark Price'])
       assert.equal(text.includes(label), false, label);
     // The server's estimate for closing the whole position on Mark (fixture: 0.2).
     assert.equal(words(h.node('futures-position-A:position-fee')), '$0.2');
@@ -124,7 +127,7 @@ test('a Short position watches the other sides: a take-profit above Futures Last
   assert.equal(h.node('tp-sl-stop-loss-trigger-price').props.placeholder, '현재가보다 높은 가격');
 });
 
-test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 조건주문; flat 조건주문 is a new-position entry, held 지정가/조건주문 explain why they wait', async t => {
+test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 조건주문, with or without a position held', async t => {
   const methods = (h: any) => ['market', 'limit', 'conditional', 'loc', 'protection'].filter(m => h.node(`order-method-${m}`) !== undefined);
   const flat = futuresHarness({ protectionEnabled: true });
   await flat.start(); t.after(flat.close);
@@ -138,23 +141,23 @@ test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 
   assert.equal(flat.node('futures-conditional-trigger-price').props.value, '');
   assert.equal(flat.node('futures-submit') === undefined, true, 'a conditional entry registers through its own form');
   const tradeCardPanels = flat.node('futures-trade').findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'protection-panel').length;
-  assert.equal(tradeCardPanels, 0, 'a new-position 조건주문 is not position TP/SL');
+  assert.equal(tradeCardPanels, 0, 'a 조건주문 is not position TP/SL');
   await flat.selectMethod('limit');
   assert.equal(flat.orderType(), '지정가');
   assert.equal(flat.node('futures-limit-price').props.value, '');
   assert.equal(flat.node('futures-submit') === undefined, true, 'the limit entry submits through its own form');
+  // Two-way (2026-11-06): a held position no longer limits the methods — an
+  // order of its direction adds to it.
   const held = futuresHarness({ position: true, protectionEnabled: true });
   await held.start(); t.after(held.close);
   assert.equal(held.orderType(), '시장가');
   await held.press('order-type-select');
   assert.deepEqual(methods(held), ['market', 'limit', 'conditional']);
-  assert.equal(held.node('order-method-limit').props.disabled, true);
-  assert.equal(held.node('order-method-conditional').props.disabled, true);
-  assert.equal(held.node('order-method-conditional-badge').props.children, '이용 불가');
-  await held.press('order-method-conditional');
-  assert.equal(held.orderType(), '시장가', 'a refused choice keeps the method');
+  assert.equal(held.node('order-method-limit').props.disabled, false);
+  assert.equal(held.node('order-method-conditional').props.disabled, false);
   await held.press('order-method-limit');
-  assert.equal(held.orderType(), '시장가');
+  assert.equal(held.orderType(), '지정가');
+  assert.equal(held.node('futures-method-unavailable') === undefined, true);
   assert.equal(held.requests.length + flat.requests.length, 0);
 });
 
@@ -196,10 +199,12 @@ test("Reduce/Close accepts a quiet market's re-confirmed older Futures Last trad
   const h = futuresHarness({ position: true, stale: true, oldReference: true });
   await h.start();
   t.after(h.close);
-  assert.equal(words(h.node("futures-last-price")), "$102");
-  await h.choose("전량 종료(Close)");
-  assert.equal(h.node("futures-submit").props.state, "enabled");
-  await h.press("futures-submit");
+  // The book beside the form keeps showing the contract's Last.
+  assert.equal(allText(h.node("futures-order-book-last")).includes("$102"), true);
+  // A close is the position card's 포지션 종료 (the trade form only enters).
+  await h.press("futures-position-A:position-close");
+  assert.equal(h.node("futures-close-submit").props.state, "enabled");
+  await h.press("futures-close-submit");
   assert.equal(h.requests[0].body.operation, "close");
 });
 test("a Futures Last trade older than 60 seconds is not shown or executable", async (t) => {
@@ -207,8 +212,8 @@ test("a Futures Last trade older than 60 seconds is not shown or executable", as
   await h.start();
   t.after(h.close);
   assert.match(h.text(), /시세 확인 불가/);
-  await h.choose("전량 종료(Close)");
-  assert.equal(h.node("futures-submit").props.state, "disabled");
+  await h.press("futures-position-A:position-close");
+  assert.equal(h.node("futures-close-submit").props.state, "disabled");
   assert.equal(h.requests.length, 0);
 });
 for (const accountId of ["A", "B"])
@@ -251,54 +256,59 @@ for (const accountId of ["A", "B"])
             ),
           );
         });
-for (const op of ["increase", "reduce", "close"])
-  for (const marginMode of ["isolated", "cross"])
-    test(`${op} keeps lifetime direction, leverage and ${marginMode}`, async (t) => {
-      const h = futuresHarness({
-        position: true,
-        direction: "short",
-        marginMode,
-        leverage: 37,
-      });
+for (const marginMode of ["isolated", "cross"]) {
+  test(`increase of a held short follows its direction, leverage and ${marginMode}`, async (t) => {
+    const h = futuresHarness({ position: true, direction: "short", marginMode, leverage: 37 });
+    await h.start();
+    t.after(h.close);
+    // The form keeps 롱/숏, margin mode and leverage; on the short side it
+    // shows the short's own terms (followed, never forced).
+    await h.choose("숏(Short)");
+    assert.equal(h.leverage(), "37x");
+    assert.match(words(h.node("futures-position-add-hint")), /보유 숏 포지션에 추가/);
+    await h.amount("51");
+    await h.press("futures-submit");
+    assert.deepEqual(
+      [h.requests[0].body.operation, h.requests[0].body.positionId, h.requests[0].body.direction, h.requests[0].body.leverage, h.requests[0].body.marginMode],
+      ["increase", "A:position", "short", 37, marginMode],
+    );
+    assert.equal(h.requests[0].body.fromLeverage, undefined, "the same leverage changes nothing");
+    assert.equal(h.requests[0].body.quantity, "0.5");
+  });
+  for (const op of ["reduce", "close"])
+    test(`${op} of a held short goes through 포지션 종료 with its lifetime terms (${marginMode})`, async (t) => {
+      const h = futuresHarness({ position: true, direction: "short", marginMode, leverage: 37 });
       await h.start();
       t.after(h.close);
-      const labels = {
-        increase: "수량 추가(Increase)",
-        reduce: "수량 감소(Reduce)",
-        close: "전량 종료(Close)",
-      };
-      await h.choose(labels[op]);
-      if (op !== "close") await h.amount("51");
-      assert.equal(h.node("futures-leverage-select") === undefined, true);
-      await h.press("futures-submit");
-      assert.equal(h.requests[0].body.direction, "short");
-      assert.equal(h.requests[0].body.leverage, 37);
-      assert.equal(h.requests[0].body.marginMode, marginMode);
+      assert.equal(h.node("futures-operation") === undefined, true, "no 수량 감소/전량 종료 in the trade form");
+      await h.press("futures-position-A:position-close");
+      if (op === "reduce") await h.press("futures-close-amount-ratio-25");
+      await h.press("futures-close-submit");
+      assert.deepEqual(
+        [h.requests[0].body.operation, h.requests[0].body.direction, h.requests[0].body.leverage, h.requests[0].body.marginMode],
+        [op, "short", 37, marginMode],
+      );
       assert.equal(h.requests[0].body.quantity, op === "close" ? "2" : "0.5");
-      if (marginMode === "cross") assert.doesNotMatch(h.text(), /예상 청산가/);
     });
+}
 for (const mode of ["ENABLED", "REDUCE_ONLY", "DISABLED"])
   test(`${mode} follows server capability and stale Mark still permits reduction`, async (t) => {
     const h = futuresHarness({ position: true, stale: true, mode });
     await h.start();
     t.after(h.close);
     await h.amount("51");
+    // No add without a fresh 평가 기준가 (the card says so too).
     assert.equal(h.node("futures-submit").props.state, "disabled");
-    assert.match(h.text(), /Mark 확인 불가/);
+    assert.match(h.text(), /평가 기준가 확인 불가/);
     assert.doesNotMatch(h.text(), /99\.5/);
-    await h.choose("수량 감소(Reduce)");
-    // A reduce amount is entered for the reduce itself (an add amount never carries over).
-    assert.equal(h.node("futures-amount").props.value, "");
-    await h.amount("51");
-    assert.equal(
-      h.node("futures-submit").props.state,
-      mode === "DISABLED" ? "disabled" : "enabled",
-    );
-    await h.choose("전량 종료(Close)");
-    assert.equal(
-      h.node("futures-submit").props.state,
-      mode === "DISABLED" ? "disabled" : "enabled",
-    );
+    if (mode === "DISABLED") {
+      assert.equal(h.node("futures-position-A:position-close").props.state, "disabled", "no close without the capability");
+      return;
+    }
+    await h.press("futures-position-A:position-close");
+    assert.equal(h.node("futures-close-submit").props.state, "enabled");
+    await h.press("futures-close-amount-ratio-25");
+    assert.equal(h.node("futures-close-submit").props.state, "enabled");
   });
 test("uncertain execution retries its committed idempotency key; duplicate clicks submit once", async (t) => {
   const h = futuresHarness();
@@ -399,20 +409,21 @@ test("opening with no free collateral is refused on press; reduce and unknown co
   const reducing = futuresHarness({ position: true, freeCollateral: "0.00000000" });
   await reducing.start();
   t.after(reducing.close);
-  await reducing.choose("수량 감소(Reduce)");
-  await reducing.amount("51");
-  assert.equal(reducing.node("futures-collateral-insufficient") === undefined, true, "risk reduction needs no new collateral");
+  await reducing.press("futures-position-A:position-close");
+  await reducing.press("futures-close-amount-ratio-25");
+  assert.equal(reducing.node("futures-close-submit").props.state, "enabled", "risk reduction needs no new collateral");
 });
 
-test("the header keeps the contract, its Last and Mark and the chart; no subtitle, wallet card or 기록 view", async (t) => {
+test("the header keeps the contract and the chart; no Last/Mark row (the book keeps the price), subtitle, wallet card or 기록 view", async (t) => {
   const h = futuresHarness({ position: true });
   await h.start();
   t.after(h.close);
   const text = h.text();
   assert.equal(/USD 가상 무기한 계약|선물 Last 거래 기준|평가\/청산 기준/.test(text), false);
-  assert.equal(/"Last"/.test(text) && /"Mark"/.test(text), true, "minimal Last / Mark names stay");
-  assert.equal(words(h.node("futures-last-price")), "$102");
-  assert.equal(words(h.node("futures-mark-price")), "$101");
+  // 2026-11-06: the duplicated Last / Mark cells above the form are gone.
+  assert.equal(h.node("futures-prices") === undefined && h.node("futures-last-price") === undefined && h.node("futures-mark-price") === undefined, true);
+  assert.equal(/"Last"/.test(text) || /"Mark"/.test(text), false);
+  assert.equal(allText(h.node("futures-order-book-last")).includes("$102"), true, "the book's current price stays");
   assert.equal(h.node("futures-open-chart") !== undefined, true);
   assert.equal(h.node("futures-wallet") === undefined, true, "the futures wallet card is gone");
   assert.match(words(h.node("futures-available-collateral")), /주문가능 9,995(\.00)? USD/);
@@ -444,12 +455,11 @@ for (const [label, offset] of [["2 s ahead of", -2000], ["1.5 s behind", 1500]] 
     const h = futuresHarness({ serverClockOffsetMs: offset, markPrice: "102" });
     await h.start();
     t.after(h.close);
-    assert.equal(words(h.node("futures-mark-price")), "$102");
     // 2.1 s without a new read: on the device clock a device 2 s ahead sees this
-    // Mark 5.1 s old ("Mark 확인 불가"); on the read's server clock it is 3.1 s.
+    // Mark 5.1 s old; on the read's server clock it is 3.1 s (still fresh).
     await deviceClockPlus(h, t, 2100);
-    assert.equal(words(h.node("futures-mark-price")), "$102");
     assert.equal(/Mark가 없거나 오래되었습니다/.test(h.text()), false);
+    assert.equal(h.node("futures-mark-notice") === undefined, true);
     await h.amount("51");
     assert.equal(h.node("futures-submit").props.state, "enabled");
   });
@@ -473,11 +483,12 @@ function deviceClock(t: any) {
 }
 const MARK_DIAGNOSIS = "Mark가 없거나 오래되었습니다. Open/Increase는 제한되며, 현재가가 유효하면 Reduce/Close를 요청할 수 있습니다.";
 const MEMBER_NOTICE = "가격 확인이 지연되어 신규 진입과 추가 주문이 잠시 제한될 수 있습니다.";
+// The screen no longer shows the Mark itself (2026-11-06); what it says about a missing one stays.
 const markSays = (h: any) => ({
-  price: words(h.node("futures-mark-price")),
   diagnosis: h.node("futures-mark-diagnostic") ? words(h.node("futures-mark-diagnostic")).replace(/\s+/g, " ") : null,
   notice: h.node("futures-mark-notice") ? words(h.node("futures-mark-notice")) : null,
 });
+const MARK_REASON = "평가 기준가를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다.";
 
 test("a member is not told about a short Mark gap, gets a short notice once it lasts, and Open stays blocked throughout", async (t) => {
   const h = futuresHarness({ serverClockOffsetMs: -2000, stale: true });
@@ -486,26 +497,26 @@ test("a member is not told about a short Mark gap, gets a short notice once it l
   const clock = deviceClock(t);
   await h.amount("51");
   // Just missing: being checked; no diagnosis or notice, but Open is blocked at once.
-  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null });
+  assert.deepEqual(markSays(h), { diagnosis: null, notice: null });
   assert.equal(h.node("futures-submit").props.state, "disabled");
   assert.equal(words(h.node("futures-ratio-reason")), "가격을 확인하는 중입니다.");
   await clock.watch(h, 8000);
-  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null }, "8 s is still a short gap");
+  assert.deepEqual(markSays(h), { diagnosis: null, notice: null }, "8 s is still a short gap");
   // 10 s watched without a Mark: a short, plain notice (no Mark/Open/Reduce jargon).
   await clock.watch(h, 2000);
-  assert.deepEqual(markSays(h), { price: "Mark 확인 불가", diagnosis: null, notice: MEMBER_NOTICE });
+  assert.deepEqual(markSays(h), { diagnosis: null, notice: MEMBER_NOTICE });
   assert.equal(h.node("futures-submit").props.state, "disabled", "the notice changes nothing about what may be ordered");
-  assert.equal(words(h.node("futures-ratio-reason")), "Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다.");
+  assert.equal(words(h.node("futures-ratio-reason")), MARK_REASON);
   // A fresh Mark ends it at once; a new gap starts quiet again (no flapping notice).
   h.options.stale = false;
   await h.client.refetchQueries();
   await h.flush();
-  assert.deepEqual(markSays(h), { price: "$101", diagnosis: null, notice: null });
+  assert.deepEqual(markSays(h), { diagnosis: null, notice: null });
   assert.equal(h.node("futures-submit").props.state, "enabled");
   h.options.stale = true;
   await h.client.refetchQueries();
   await h.flush();
-  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null });
+  assert.deepEqual(markSays(h), { diagnosis: null, notice: null });
   assert.equal(h.node("futures-submit").props.state, "disabled");
 });
 
@@ -514,15 +525,15 @@ test("an admin sees the existing Mark diagnosis at once, with its diagnostic fac
   await h.start();
   t.after(h.close);
   await h.amount("51");
-  assert.deepEqual(markSays(h), { price: "Mark 확인 불가", diagnosis: MARK_DIAGNOSIS, notice: null });
+  assert.deepEqual(markSays(h), { diagnosis: MARK_DIAGNOSIS, notice: null });
   assert.equal(h.node("admin-diagnostic-panel") === undefined, false, "the admin-only diagnostic facts");
-  assert.equal(words(h.node("futures-ratio-reason")), "Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다.");
+  assert.equal(words(h.node("futures-ratio-reason")), MARK_REASON);
   assert.equal(h.node("futures-submit").props.state, "disabled");
   // A member with the same data sees neither the diagnosis nor its facts.
   const member = futuresHarness({ serverClockOffsetMs: -2000, stale: true, diagnostics: true, role: "user" });
   await member.start();
   t.after(member.close);
-  assert.deepEqual(markSays(member), { price: "확인 중", diagnosis: null, notice: null });
+  assert.deepEqual(markSays(member), { diagnosis: null, notice: null });
   assert.equal(member.node("admin-diagnostic-panel") === undefined, true);
 });
 
@@ -539,12 +550,12 @@ test("reads that stop age the Mark out: Open is blocked at once, a member sees i
     await clock.watch(h, 4500);
     assert.equal(h.node("futures-submit").props.state, "disabled", role);
     assert.deepEqual(markSays(h), role === "admin"
-      ? { price: "Mark 확인 불가", diagnosis: MARK_DIAGNOSIS, notice: null }
-      : { price: "확인 중", diagnosis: null, notice: null }, role);
+      ? { diagnosis: MARK_DIAGNOSIS, notice: null }
+      : { diagnosis: null, notice: null }, role);
     // The next read recovers it.
     await h.client.refetchQueries();
     await h.flush();
-    assert.deepEqual(markSays(h), { price: "$102", diagnosis: null, notice: null }, role);
+    assert.deepEqual(markSays(h), { diagnosis: null, notice: null }, role);
     assert.equal(h.node("futures-submit").props.state, "enabled", role);
   }
 });
@@ -561,10 +572,10 @@ test("time the screen was not watching (the chart in front, the app in the backg
   h.readGate = deferred();
   h.focused = true;
   await h.update();
-  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null });
+  assert.deepEqual(markSays(h), { diagnosis: null, notice: null });
   // The app in the background for 20 s (one silent jump): still not watched.
   await clock.jump(h, 20_000);
-  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null });
+  assert.deepEqual(markSays(h), { diagnosis: null, notice: null });
   // Watched for 10 s with still no Mark: now it is a lasting gap.
   await clock.watch(h, 10_000);
   assert.equal(markSays(h).notice, MEMBER_NOTICE);
@@ -574,7 +585,7 @@ test("time the screen was not watching (the chart in front, the app in the backg
   h.readGate = null;
   await h.client.refetchQueries();
   await h.flush();
-  assert.deepEqual(markSays(h), { price: "$102", diagnosis: null, notice: null });
+  assert.deepEqual(markSays(h), { diagnosis: null, notice: null });
 });
 
 test("the 선물 지갑 준비 guide step points at 주문가능 now that the wallet card is gone", async (t) => {

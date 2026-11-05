@@ -346,18 +346,19 @@ describe('futures order screen opened from the detail', () => {
     assert.equal(h.node('futures-direction-long').props.accessibilityState.selected, false);
   });
 
-  it("with a long position held, a short request keeps the position's terms and says why: never a reduce or close", async (t) => {
+  it('with a long position held, a short request opens the short side as asked (two-way): never a reduce or close', async (t) => {
     const h = futuresHarness({ routeDirection: 'short', instrumentId: 'btc', position: true });
     await h.start(); t.after(h.close);
-    assert.equal(h.node('futures-position-terms') === undefined, false);
-    assert.match([h.node('futures-direction-held').props.children].flat().join(''),
-      /롱\(Long\) 포지션이 열려 있어 숏\(Short\)으로 새로 진입할 수 없습니다\. 이 포지션을 전량 종료한 뒤 진입할 수 있어요\./);
-    // The default stays the existing one (추가 금액 = increase of the held long), not a reduce/close.
-    assert.match(h.text(), /추가 금액 \(USD\)/);
-    // The same side as the held position: nothing to explain.
+    // 2026-11-06: no fixed terms, no "close it first": the 숏 side is selected for its own position.
+    assert.equal(h.node('futures-position-terms') === undefined && h.node('futures-direction-held') === undefined, true);
+    assert.equal(h.node('futures-direction-short').props.accessibilityState.selected, true);
+    assert.match(h.text(), /주문 금액 \(USD\)/, 'a new short (no short is held)');
+    assert.equal(h.node('futures-position-add-hint') === undefined, true);
+    // The same side as the held position: an add to it.
     const same = futuresHarness({ routeDirection: 'long', instrumentId: 'btc', position: true });
     await same.start(); t.after(same.close);
-    assert.equal(same.node('futures-direction-held') === undefined, true);
+    assert.match(same.text(), /추가 금액 \(USD\)/);
+    assert.equal(same.node('futures-position-add-hint') !== undefined, true);
   });
 });
 

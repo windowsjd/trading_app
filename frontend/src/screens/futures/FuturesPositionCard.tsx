@@ -9,10 +9,13 @@ import { futuresHolding, getFuturesPositionDisplay } from '../../features/future
 import { TP_SL_TITLE } from '../../features/conditional/tpSlModel';
 import { formatAssetPrice, formatMoneyDecimal } from '../../utils/format';
 import CTAButton from '../../components/common/CTAButton';
+import ActionPressable from '../../components/common/ActionPressable';
 import FuturesDirectionBadge from '../../components/tradingAccount/FuturesDirectionBadge';
 
 type Props = { position: FuturesPosition; evaluatedAt: string; now: number;
   disabled: boolean; capabilities: FuturesCapabilities;
+  /** The card's top (name and side, PnL, 수익률): trade this contract in this direction. Never orders. */
+  onTrade?: () => void;
   /** `익절 2건 · 손절 1건` of this lifetime's live settings; null when none/unknown. */
   tpSlSummary: string | null;
   /** Opens this position's 손절가/익절가 bottom sheet. */
@@ -25,11 +28,12 @@ type Props = { position: FuturesPosition; evaluatedAt: string; now: number;
  * leverage), how it performs on Mark, its size, prices and estimated closing
  * fee, and its two actions side by side — 손절가/익절가 설정 and 포지션 종료,
  * each in its own bottom sheet over this screen. A liquidation price is
- * individual to an isolated position only. Adding to a position (or reducing
- * it by an amount) stays in the trade form above, for the selected contract.
+ * individual to an isolated position only. Its top (name and side, PnL,
+ * 수익률) opens the trade form for this contract and direction, where an
+ * order adds to it; reducing it stays in 포지션 종료.
  */
 export default function FuturesPositionCard({ position: p, evaluatedAt, now,
-  disabled, capabilities, tpSlSummary, onTpSl, onClose }: Props) {
+  disabled, capabilities, onTrade, tpSlSummary, onTpSl, onClose }: Props) {
   const { width, fontScale } = useWindowDimensions();
   const guide = useQuestGuide();
   const stacked = width / fontScale < 300;
@@ -40,7 +44,11 @@ export default function FuturesPositionCard({ position: p, evaluatedAt, now,
     : formatAssetPrice(value, 'USD', p.instrument.underlying.displayPriceDecimals);
   const pnlColor = display.pnlDirection === 'neutral' ? semantic.secondary : financial[display.pnlDirection];
   const isolated = p.marginMode === 'isolated';
-  return <View ref={guide?.active?.positionId === p.id ? questGuideTarget('futures-position') : undefined} collapsable={false} style={styles.card} testID={`futures-position-${p.id}`}>
+  const directionName = p.direction === 'long' ? '롱' : '숏';
+  // The top: what the position is and how it does. Pressing it opens this
+  // contract's trade form in this direction (like a Spot holding's row); the
+  // two action buttons below stay separate touch targets.
+  const top = <>
     <View style={styles.header}>
       <FuturesDirectionBadge testID={`futures-position-${p.id}-direction`} direction={p.direction} />
       <Text style={styles.name}>{display.name}</Text>
@@ -50,13 +58,23 @@ export default function FuturesPositionCard({ position: p, evaluatedAt, now,
     <View style={[styles.performance, stacked && styles.stacked]}>
       <View style={styles.performanceMetric}>
         <Text style={styles.caption}>미실현 손익 · USD</Text>
-        <Text testID={`futures-position-${p.id}-pnl`} selectable style={[styles.pnl, { color: pnlColor }]}>{display.pnl}</Text>
+        <Text testID={`futures-position-${p.id}-pnl`} selectable={!onTrade} style={[styles.pnl, { color: pnlColor }]}>{display.pnl}</Text>
       </View>
       <View style={[styles.performanceMetric, !stacked && styles.end]}>
-        <Text style={[styles.caption, !stacked && styles.right]}>ROI</Text>
-        <Text testID={`futures-position-${p.id}-roi`} selectable style={[styles.pnl, !stacked && styles.right, { color: pnlColor }]}>{display.roi}</Text>
+        <Text style={[styles.caption, !stacked && styles.right]}>수익률</Text>
+        <Text testID={`futures-position-${p.id}-roi`} selectable={!onTrade} style={[styles.pnl, !stacked && styles.right, { color: pnlColor }]}>{display.roi}</Text>
       </View>
     </View>
+  </>;
+  return <View ref={guide?.active?.positionId === p.id ? questGuideTarget('futures-position') : undefined} collapsable={false} style={styles.card} testID={`futures-position-${p.id}`}>
+    {onTrade ? (
+      <ActionPressable testID={`futures-position-${p.id}-trade`} accessibilityRole="button"
+        accessibilityLabel={`${display.name} ${directionName} 포지션, 미실현 손익 ${display.pnl}, 수익률 ${display.roi}`}
+        accessibilityHint={`이 종목의 ${directionName} 주문으로 이동합니다`}
+        accessibilityState={{ disabled }} aria-disabled={disabled} disabled={disabled} onPress={onTrade} style={styles.top}>
+        {top}
+      </ActionPressable>
+    ) : <View style={styles.top}>{top}</View>}
     {display.notice ? <Text style={styles.notice}>{display.notice}</Text> : null}
     <View style={styles.metrics}>
       <Metric columns={columns} label="포지션 규모" value={display.notional} />
@@ -65,7 +83,7 @@ export default function FuturesPositionCard({ position: p, evaluatedAt, now,
       <Metric columns={columns} label="예상 종료 수수료" testID={`futures-position-${p.id}-fee`}
         value={display.fresh ? formatMoneyDecimal(p.risk?.estimatedCloseFee, 'USD') : '-'} />
       <Metric columns={columns} label="평균 진입가" value={price(p.averageEntryPrice)} />
-      <Metric columns={columns} label="Mark Price" value={display.fresh ? price(p.markPrice) : '-'} />
+      <Metric columns={columns} label="평가 기준가" value={display.fresh ? price(p.markPrice) : '-'} />
       {isolated ? (
         <Metric columns={columns} label="예상 청산가" value={display.fresh && p.risk
           ? p.risk.liquidationPrice === null ? '양수 가격 범위 내 없음' : price(p.risk.liquidationPrice) : '-'} />
@@ -92,13 +110,15 @@ function Metric({ label, value, columns, testID }: { label: string; value: strin
 }
 const styles = StyleSheet.create({
   card: { minWidth: 0, padding: 14, gap: 12, borderRadius: 12, borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.surface },
+  // The pressable top keeps the card's own spacing (the press ink reaches its edges).
+  top: { minWidth: 0, gap: 12, borderRadius: 8 },
   header: { minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 4 },
   name: { minWidth: 0, maxWidth: '100%', flexShrink: 1, fontSize: 17, lineHeight: 25, fontWeight: '700', color: semantic.text },
   badge: { fontSize: 11, lineHeight: 15, fontWeight: '600', color: semantic.secondary, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, backgroundColor: semantic.raised, overflow: 'hidden' },
   caption: { fontSize: 12, lineHeight: 18, color: semantic.secondary, flexShrink: 1 },
   performance: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
   performanceMetric: { flexShrink: 1, minWidth: 0, maxWidth: '100%', gap: 2 },
-  // ROI keeps the right edge, also on its own line under a long PnL.
+  // 수익률 keeps the right edge, also on its own line under a long PnL.
   end: { flexGrow: 1, alignItems: 'flex-end' },
   right: { textAlign: 'right' },
   pnl: { fontSize: 22, lineHeight: 31, fontWeight: '700', fontVariant: ['tabular-nums'] },

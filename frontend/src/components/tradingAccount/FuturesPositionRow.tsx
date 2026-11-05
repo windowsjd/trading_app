@@ -28,7 +28,7 @@ export default function FuturesPositionRow({ position, evaluatedAt, now, testID,
       </View>
       <View style={[styles.values, stacked && styles.stackedValues]}>
         <Text testID={`${testID}-notional`} accessibilityLabel={`포지션 규모 ${display.notional}`} style={styles.value}>{display.notional}</Text>
-        <Text testID={`${testID}-performance`} accessibilityLabel={`미실현 손익 ${display.pnl}, ROI ${display.roi}`}
+        <Text testID={`${testID}-performance`} accessibilityLabel={`미실현 손익 ${display.pnl}, 수익률 ${display.roi}`}
           style={[styles.performance, { color: display.pnlDirection === 'neutral' ? semantic.secondary : financial[display.pnlDirection] }]}>{display.performance}</Text>
       </View>
     </View>

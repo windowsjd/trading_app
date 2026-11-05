@@ -7,6 +7,16 @@ const { futuresFixture, futuresCandlesFixture, accounts } = require('./futuresFi
 const { deferred } = require('./walletTransferHarness.cjs');
 const { conditionalFixture } = require('./conditionalFixtures.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+/** The server's estimate of a 100x → `leverage` change of the fixture position (isolated). */
+function leveragePreviewFixture(positionId) {
+  const side = (leverage, margin, liquidation) => ({ leverage, quantity: '2.00000000', averageEntryPrice: '100.00000000',
+    isolatedMargin: margin, initialMargin: margin, initialRequirement: '2.02000000', liquidationPrice: liquidation, liquidationBuffer: '0.49000000' });
+  return { positionId, evaluatedAt: new Date().toISOString(), markState: 'fresh', basisPrice: null,
+    before: side(100, '2.00000000', '99.50000000'), after: side(50, '4.00000000', '98.50000000'),
+    collateral: { freeCollateralBefore: '9995.00000000', freeCollateralAfter: '9993.00000000', isolatedMarginDelta: '2.00000000',
+      initialRequirementDelta: '2.02000000', estimatedFee: '0.00000000', crossLiquidationBufferBefore: null, crossLiquidationBufferAfter: null },
+    refusal: null };
+}
 function futuresHarness(options = {}) {
   const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], readConfigs: [], invalidations: [], navigation: [], orderBookRequests: [], alerts: [], options, session: 1,
     // Screen focus (another screen in front when false) and the signed-in role (admin diagnostics).
@@ -70,6 +80,14 @@ function futuresHarness(options = {}) {
             capabilities: h.conditionalCapabilities ?? { enabled: true, canCreate: true, maxLivePerAccount: 20 }, entries,
             pagination: { limit: 100, offset: 0, total: entries.length, returned: entries.length, nextOffset: null } } } };
         }
+        // A leverage change estimate (positions/:id/leverage-preview): h.leveragePreview(positionId, params).
+        if (path.includes('/leverage-preview')) {
+          const positionId = decodeURIComponent(path.split('/')[5]);
+          h.previewReads ??= []; h.previewReads.push(path);
+          if (h.previewGate) await h.previewGate.promise;
+          return { data: { success: true, data: { tradingAccountId: h.wrongScope ?? id, positionId,
+            ...(h.leveragePreview?.(positionId, new URLSearchParams(path.split('?')[1] ?? '')) ?? leveragePreviewFixture(positionId)) } } };
+        }
         if (path.includes('limit-orders')) return { data: { data: { tradingAccountId: h.wrongScope ?? id, orders: h.pendingEntries ?? [], pagination: { limit: 100, offset: 0, total: h.pendingEntries?.length ?? 0, returned: h.pendingEntries?.length ?? 0, nextOffset: null } } } };
         const key = path.includes('instruments') ? 'catalog' : path.includes('positions') ? 'positions' : path.includes('executions') ? 'executions' : path.includes('liquidations') ? 'liquidations' : 'final';
         // Market list tests replace the catalog's contracts (24h statistics etc.).
@@ -98,7 +116,16 @@ function futuresHarness(options = {}) {
             : { tradingAccountId: path.split('/')[2], duplicate: false,
               settings: [...(body.stopLoss ? [row('stop_loss', body.stopLoss)] : []), ...(body.takeProfit ? [row('take_profit', body.takeProfit)] : [])] } } };
         }
-        return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'command', execution: { positionId: body.positionId ?? 'position', direction: body.direction ?? 'long', leverage: Number(body.leverage ?? 37), positionAfter: { quantity: body.operation === 'close' ? '0.00000000' : body.quantity ?? '1.00000000' }, operation: body.operation, feeAmount: '0.1' } } } };
+        // 레버리지만 변경 (positions/:id/leverage).
+        if (path.endsWith('/leverage')) {
+          const positionId = decodeURIComponent(path.split('/')[5]);
+          return { data: { success: true, data: { tradingAccountId: path.split('/')[2], changeId: 'change',
+            position: { id: positionId, leverage: body.leverage }, changedAt: new Date().toISOString(),
+            leverageChange: { fromLeverage: body.fromLeverage, toLeverage: body.leverage, isolatedMarginBefore: '2', isolatedMarginAfter: '1' },
+            collateral: { balanceAmount: '10000', totalMarginUsed: '1', freeCollateral: '9996' } } } };
+        }
+        return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'command',
+          ...(body.fromLeverage !== undefined ? { leverageChange: { fromLeverage: body.fromLeverage, toLeverage: body.leverage, isolatedMarginBefore: '2', isolatedMarginAfter: '1' } } : {}), execution: { positionId: body.positionId ?? 'position', direction: body.direction ?? 'long', leverage: Number(body.leverage ?? 37), positionAfter: { quantity: body.operation === 'close' ? '0.00000000' : body.quantity ?? '1.00000000' }, operation: body.operation, feeAmount: '0.1' } } } };
       },
     } };
   const api = load(resolve(__dirname, '../src/features/futures/api.ts'), { '../../services/api/client': transport });
@@ -232,4 +259,4 @@ function futuresHarness(options = {}) {
   h.close = async () => { await act(async () => h.renderer.unmount()); client.clear(); };
   return h;
 }
-module.exports = { futuresHarness, futuresCandlesFixture, deferred };
+module.exports = { futuresHarness, futuresCandlesFixture, deferred, leveragePreviewFixture };

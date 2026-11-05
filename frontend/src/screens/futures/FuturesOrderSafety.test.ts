@@ -75,7 +75,7 @@ for (const method of ['market', 'limit'])
     assert.notEqual(h.requests[0].body.idempotencyKey, h.requests[1].body.idempotencyKey, 'clear refusal permits a new intent even without edits');
   });
 
-for (const [code, reason] of [['FUTURES_MARK_STALE', /Mark 정보를/], ['FUTURES_MAINTENANCE_UNSAFE', /유지 증거금/], ['FUTURES_PRICE_UNAVAILABLE', /거래 기준 시세/]] as const)
+for (const [code, reason] of [['FUTURES_MARK_STALE', /평가 기준가를 확인할 수 없습니다/], ['FUTURES_MAINTENANCE_UNSAFE', /유지 증거금/], ['FUTURES_PRICE_UNAVAILABLE', /거래 기준 시세/]] as const)
   test(`limit: a ${code} refusal keeps its exact reason`, async t => {
     const h = futuresHarness(); await h.start(); t.after(h.close);
     await h.selectMethod('limit'); await h.change('futures-limit-price', '100'); await h.amount('51');
@@ -130,11 +130,10 @@ test('position and contract changes during Mark recovery use the selected positi
   const h = futuresHarness({ missingMark: true, futuresOnly: true }); await h.start(); t.after(h.close);
   await h.amount('51');
   h.options.position = true; h.options.leverage = 10; await refresh(h);
+  // The long position appeared: the long form now adds to it (and follows its 10x).
   assert.equal(h.node('futures-amount').props.accessibilityLabel, '추가 금액 (USD)');
-  assert.equal(slider(h).props.disabled, true);
-  await h.choose('수량 감소(Reduce)');
-  assert.equal(slider(h).props.disabled, false, 'reduce still uses the held quantity');
-  await h.press('futures-ratio-50'); assert.equal(h.node('futures-amount').props.value, '102');
+  assert.equal(h.leverage(), '10x');
+  assert.equal(slider(h).props.disabled, true, 'an add needs a fresh 평가 기준가');
   await h.selectInstrument('hype');
   assert.equal(h.node('futures-amount').props.value, '');
   assert.equal(slider(h).props.disabled, true);
@@ -150,12 +149,13 @@ for (const marginMode of ['isolated', 'cross']) for (const missing of [{ missing
   test(`${marginMode}: Reduce/Close remain available without fresh Mark (${JSON.stringify(missing)})`, async t => {
     const h = futuresHarness({ position: true, marginMode, freeCollateral: '0', ...missing }); await h.start(); t.after(h.close);
     assert.equal(slider(h).props.disabled, true, 'increase requires Mark');
-    await h.choose('수량 감소(Reduce)');
-    assert.equal(slider(h).props.disabled, false);
-    await h.press('futures-ratio-25'); await h.press('futures-submit');
+    // Reductions are the position card's 포지션 종료 (sized on Futures Last).
+    await h.press('futures-position-A:position-close');
+    await h.press('futures-close-amount-ratio-25'); await h.press('futures-close-submit');
     assert.equal(h.requests[0].body.quantity, '0.5');
     assert.equal(h.requests[0].body.operation, 'reduce');
-    await h.choose('전량 종료(Close)'); await h.press('futures-submit');
+    await h.press('futures-position-A:position-close');
+    await h.press('futures-close-submit');
     assert.equal(h.requests[1].body.quantity, '2');
     assert.equal(h.requests[1].body.operation, 'close');
   });
@@ -218,14 +218,17 @@ test('a beginner learning lock from the server reads as a learning step, not a r
   assert.match(futuresErrorMessage('BEGINNER_FEATURE_LOCKED', true), /체결을 확인하지 못했습니다/);
 });
 
-test('a one-way conflict from the server says what to do, never the generic refusal', () => {
+test('a position conflict from the server says what to do, never the generic refusal', () => {
   const { futuresErrorMessage } = require('../../features/futures/orderFeedback.ts');
   const generic = futuresErrorMessage('SOMETHING_ELSE', false);
+  // Two-way (2026-11-06): one position per contract and direction.
   for (const [code, pattern] of [
-    ['FUTURES_POSITION_ALREADY_OPEN', /이미 열려 있습니다.*전량 종료한 뒤 새로 진입/],
-    ['FUTURES_ONE_WAY_VIOLATION', /반대 방향으로는 진입할 수 없습니다/],
-    ['FUTURES_LEVERAGE_MISMATCH', /레버리지로만 수량을 추가/],
-    ['FUTURES_MARGIN_MODE_MISMATCH', /증거금 방식으로만 수량을 추가/],
+    ['FUTURES_POSITION_ALREADY_OPEN', /같은 방향의 포지션이 이미 열려 있습니다/],
+    ['FUTURES_ONE_WAY_VIOLATION', /선택한 포지션과 방향이 다릅니다/],
+    ['FUTURES_LEVERAGE_MISMATCH', /레버리지가 다릅니다.*레버리지 변경을 확인/],
+    ['FUTURES_POSITION_CHANGED', /포지션이 그사이 바뀌었습니다/],
+    ['FUTURES_MARGIN_MODE_MISMATCH', /증거금 방식이 다릅니다/],
+    ['FUTURES_ENTRY_PENDING', /같은 방향의 대기 중인 지정가 주문/],
   ] as const) {
     assert.match(futuresErrorMessage(code, false), pattern, code);
     assert.notEqual(futuresErrorMessage(code, false), generic, code);

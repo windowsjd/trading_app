@@ -17,6 +17,11 @@ import {
   lockTriggeredFuturesTpSl,
 } from './futures-tp-sl-state';
 import { presentFuturesPerformance } from './futures-position-display';
+import {
+  positionChanged,
+  refuseFuturesEntryFill,
+  resolveFuturesEntryFill,
+} from './futures-position-policy';
 import { activateFuturesEntryTpSlPlans } from '../conditional/entry-tp-sl-state';
 import { createApiError } from '../common/api-error';
 import { HttpStatus, Injectable, Optional } from '@nestjs/common';
@@ -194,9 +199,11 @@ export class FuturesService {
           ? null
           : await tx.futuresExecuteRequest.findUnique({ where });
         if (afterWait) return replay(afterWait);
+        // Both directions' open lifetimes of the instrument (two-way), by id.
         await tx.$queryRaw`
           SELECT "id" FROM "futures_positions" WHERE "trading_account_id" = ${accountId}
-            AND "instrument_id" = ${request.instrumentId} AND "status" = 'open' FOR UPDATE
+            AND "instrument_id" = ${request.instrumentId} AND "status" = 'open'
+          ORDER BY "id" FOR UPDATE
         `;
         const entry = limitEntryId
           ? await tx.futuresLimitOrder.findFirst({
@@ -223,21 +230,8 @@ export class FuturesService {
             'FUTURES_IDEMPOTENCY_CONFLICT',
             'This request conflicts with an earlier Futures command.',
           );
-        if (
-          !limitEntryId &&
-          request.operation === 'open' &&
-          (await tx.futuresLimitOrder.findFirst({
-            where: {
-              tradingAccountId: accountId,
-              instrumentId: request.instrumentId,
-              status: 'submitted',
-            },
-          }))
-        )
-          futuresError(
-            'FUTURES_ENTRY_PENDING',
-            'Cancel the pending entry before opening this instrument.',
-          );
+        // A pending entry no longer blocks a market trade (two-way, 2026-11-06):
+        // it resolves against the position it meets at its own fill.
         if (entry) await releaseFuturesEntryReservation(tx, entry);
         // A triggered Futures conditional entry (market execution) is locked
         // after every existing fence and linked below in this transaction.
@@ -318,22 +312,71 @@ export class FuturesService {
             'FUTURES_ENTRY_LIMIT_NOT_REACHED',
             'The entry limit is not executable.',
           );
+        // An open names the open lifetime of its direction (none, or the add
+        // an entry's fill becomes); every other command pins its lifetime.
         const current = await tx.futuresPosition.findFirst({
-          where: {
-            tradingAccountId: accountId,
-            instrumentId: request.instrumentId,
-            status: 'open',
-          },
+          where:
+            request.operation === 'open'
+              ? {
+                  tradingAccountId: accountId,
+                  instrumentId: request.instrumentId,
+                  direction: request.direction,
+                  status: 'open',
+                }
+              : {
+                  id: request.positionId!,
+                  tradingAccountId: accountId,
+                  instrumentId: request.instrumentId,
+                  status: 'open',
+                },
         });
+        // A pending entry (Limit, or a conditional entry's market execution)
+        // fills into the open lifetime of its direction: a new one, an add, or
+        // an add with the leverage change its user approved — never another
+        // margin mode or an unapproved change.
+        const entryTerms = entry ?? conditional;
+        let command = request;
+        if (entryTerms && current) {
+          const fill = resolveFuturesEntryFill(entryTerms, current);
+          if (fill.kind === 'refused') refuseFuturesEntryFill(fill.code);
+          if (
+            fill.kind === 'increase' &&
+            entry &&
+            (await tx.protectionGroup.count({
+              where: { parentFuturesOrderId: entry.id, status: 'holding' },
+            }))
+          )
+            // A legacy whole-lifetime OCO of the entry never extends to an
+            // existing lifetime.
+            positionChanged();
+          if (fill.kind === 'increase')
+            command = {
+              ...request,
+              operation: 'increase',
+              positionId: fill.positionId,
+              ...(fill.fromLeverage === undefined
+                ? {}
+                : { fromLeverage: fill.fromLeverage }),
+            };
+          // An add is gated like the user's own add (a Limit fill was gated
+          // when it was accepted).
+          if (command !== request && !limitEntryId)
+            await assertBeginnerLearningAccess(
+              tx,
+              lockedAccount,
+              beginnerFuturesAction(command),
+              { leverage: command.leverage },
+            );
+        }
         // A triggered independent stop-loss/take-profit (reduce or close of
         // its own lifetime) is locked after every existing fence and linked
         // to the execution below in this transaction.
         const tpSl = tpSlSettingId
           ? await lockTriggeredFuturesTpSl(tx, tpSlSettingId, accountId, {
               positionId: current?.id ?? null,
-              operation: request.operation,
-              direction: request.direction,
-              quantity: request.quantity,
+              operation: command.operation,
+              direction: command.direction,
+              quantity: command.quantity,
             })
           : null;
         const protection = current
@@ -372,7 +415,7 @@ export class FuturesService {
               409,
             );
         } else if (protection?.children.length) {
-          if (request.operation === 'increase')
+          if (command.operation === 'increase')
             throw createApiError(
               'PROTECTION_CHILD_PENDING',
               'Cancel the pending exit before increasing.',
@@ -393,7 +436,7 @@ export class FuturesService {
           ? readGeneralTradeFeeRate()
           : lockedAccount.seasonParticipant!.season.tradeFeeRate;
         const plan = planFuturesExecution(
-          request,
+          command,
           current,
           price.price,
           feeRate,
@@ -408,12 +451,15 @@ export class FuturesService {
         );
         let freeAfter = balanceAfter.sub(wallet.reservedAmount).sub(usedAfter);
         let reportedFreeAfter: Prisma.Decimal | null = freeAfter;
-        if (['open', 'increase'].includes(request.operation)) {
+        // The Mark an open/increase was checked on (leverage change evidence).
+        let riskMark: Awaited<ReturnType<typeof readFuturesMark>> = null;
+        if (['open', 'increase'].includes(command.operation)) {
           const mark = (await readFuturesMark(
             tx,
             lockedInstrument,
             executeNow,
           ))!;
+          riskMark = mark;
           const nextRisk = positionRisk(
             {
               ...plan,
@@ -624,7 +670,7 @@ export class FuturesService {
             tradingAccountId: accountId,
             instrumentId: lockedInstrument.id,
             positionId: position.id,
-            operation: plan.status === 'closed' ? 'close' : request.operation,
+            operation: plan.status === 'closed' ? 'close' : command.operation,
             direction: request.direction,
             marginMode: request.marginMode,
             quantity: request.quantity,
@@ -647,6 +693,27 @@ export class FuturesService {
             fxRateSnapshotId,
           },
         });
+        // An approved leverage change of the add, recorded with its execution
+        // in this transaction (the position guard checks it at commit).
+        const leverageChange =
+          current && current.leverage !== command.leverage
+            ? await tx.futuresLeverageChange.create({
+                data: {
+                  tradingAccountId: accountId,
+                  instrumentId: lockedInstrument.id,
+                  positionId: position.id,
+                  fromLeverage: current.leverage,
+                  toLeverage: command.leverage,
+                  isolatedMarginBefore: current.isolatedMargin,
+                  isolatedMarginAfter: position.isolatedMargin,
+                  markPrice: riskMark!.price,
+                  markEffectiveAt: riskMark!.effectiveAt,
+                  markCapturedAt: riskMark!.capturedAt,
+                  executionId: execution.id,
+                  createdAt: executeNow,
+                },
+              })
+            : null;
         stage('futures_ledger_write', accountId);
         if (conditionalChildId)
           await tx.protectionChild.update({
@@ -696,6 +763,16 @@ export class FuturesService {
             instrument: presentFuturesInstrument(lockedInstrument),
             execution: presentFuturesExecution(execution),
             position: presentFuturesPosition(position),
+            leverageChange: leverageChange
+              ? {
+                  fromLeverage: leverageChange.fromLeverage,
+                  toLeverage: leverageChange.toLeverage,
+                  isolatedMarginBefore:
+                    leverageChange.isolatedMarginBefore.toFixed(8),
+                  isolatedMarginAfter:
+                    leverageChange.isolatedMarginAfter.toFixed(8),
+                }
+              : null,
             collateral: {
               walletId: wallet.id,
               currencyCode: 'USD',

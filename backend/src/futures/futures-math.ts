@@ -87,10 +87,12 @@ export function planFuturesExecution(
     money(futuresDecimal(notional).mul(feeRate)),
   );
   if (command.operation === 'open') {
+    // `current` is the open lifetime of the SAME direction (two-way since
+    // 2026-11-06): an opposite-direction lifetime never blocks an open.
     if (current)
       futuresError(
         'FUTURES_POSITION_ALREADY_OPEN',
-        'Close the existing one-way position before opening another.',
+        'This direction already has an open position; add to it instead.',
       );
     return {
       quantity,
@@ -116,12 +118,25 @@ export function planFuturesExecution(
   if (current.direction !== command.direction)
     futuresError(
       'FUTURES_ONE_WAY_VIOLATION',
-      'Direction must match the existing one-way position.',
+      'Direction must match the position.',
     );
-  if (current.leverage !== command.leverage)
+  // A leverage change rides only an increase the user approved from the
+  // leverage the position still has; reduce and close name its leverage.
+  if (
+    command.fromLeverage !== undefined &&
+    command.fromLeverage !== current.leverage
+  )
+    futuresError(
+      'FUTURES_POSITION_CHANGED',
+      'The position changed; review it and try again.',
+    );
+  if (
+    current.leverage !== command.leverage &&
+    command.fromLeverage === undefined
+  )
     futuresError(
       'FUTURES_LEVERAGE_MISMATCH',
-      'Leverage is fixed for the open position lifetime.',
+      'Leverage differs from the open position.',
     );
   const oldQty = futuresDecimal(current.quantity);
   if ((current.marginMode ?? 'isolated') !== (command.marginMode ?? 'isolated'))
@@ -144,12 +159,18 @@ export function planFuturesExecution(
       isolatedMargin:
         command.marginMode === 'cross'
           ? futuresDecimal('0')
-          : assertFuturesMoney(
-              CalculationDecimal.max(
-                current.isolatedMargin.toString(),
+          : current.leverage !== command.leverage
+            ? // An approved change re-derives the whole allocation at the
+              // new leverage (it may add or release margin).
+              assertFuturesMoney(
                 marginCeil(entryNotional.div(command.leverage)),
+              )
+            : assertFuturesMoney(
+                CalculationDecimal.max(
+                  current.isolatedMargin.toString(),
+                  marginCeil(entryNotional.div(command.leverage)),
+                ),
               ),
-            ),
       realizedPnl: futuresDecimal('0'),
       cumulativeRealizedPnl: futuresDecimal(current.realizedPnl),
       notional,
@@ -193,5 +214,31 @@ export function planFuturesExecution(
     notional,
     feeAmount,
     status: remaining.eq(0) ? ('closed' as const) : ('open' as const),
+  };
+}
+
+/**
+ * A leverage change of an open lifetime alone (2026-11-06): quantity, average
+ * entry, entry basis and realized PnL stay; Isolated re-derives its whole
+ * allocation from the entry basis at the new leverage (more or less margin),
+ * Cross keeps zero allocation (its requirement follows Mark and leverage).
+ * No cash, fee or PnL is planned.
+ */
+export function planFuturesLeverageChange(
+  current: Pick<
+    FuturesPosition,
+    'entryNotional' | 'isolatedMargin' | 'leverage' | 'marginMode'
+  >,
+  leverage: number,
+) {
+  return {
+    leverage,
+    isolatedMarginBefore: futuresDecimal(current.isolatedMargin),
+    isolatedMargin:
+      current.marginMode === 'cross'
+        ? futuresDecimal('0')
+        : assertFuturesMoney(
+            marginCeil(futuresDecimal(current.entryNotional).div(leverage)),
+          ),
   };
 }

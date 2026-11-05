@@ -434,6 +434,9 @@ function conditionalSellItem(row: ConditionalSellOrderDto, limitAvailable: boole
 }
 
 const directionWord = (direction: string) => (direction === 'long' ? '롱' : '숏');
+/** An entry that changes its position's leverage when it fills (confirmed at registration). */
+const leverageChangeNote = (from: number, to: number, at: '체결' | '실행') =>
+  `${at} 시 보유 포지션 레버리지 ${from}x → ${to}x 함께 변경 (그사이 포지션이 바뀌면 ${at === '체결' ? '자동 취소' : '실행 안 됨'})`;
 const baseUnit = (symbol: string) => symbol.replace(/USDT$/u, '');
 
 function futuresLimitItem(order: FuturesLimitOrder): PendingItem {
@@ -454,7 +457,10 @@ function futuresLimitItem(order: FuturesLimitOrder): PendingItem {
       { key: 'execution', label: '진입 유형', value: '지정가' },
       { key: 'condition', label: '주문 조건', value: `지정가 ${formatPendingPrice(order.limitPrice, 'USD')}` },
     ],
-    notes: [`예약 증거금 ${formatMoney(order.reservedAmount, 'USD')} (수수료 포함)`],
+    notes: [
+      `예약 증거금 ${formatMoney(order.reservedAmount, 'USD')} (수수료 포함)`,
+      ...(order.leverageChange ? [leverageChangeNote(order.leverageChange.fromLeverage, order.leverage, '체결')] : []),
+    ],
     edit: {
       editable: true,
       target: { kind: 'futures_limit_order', id: order.id },
@@ -500,6 +506,8 @@ function futuresConditionalItem(row: FuturesConditionalEntry): PendingItem {
     notes: [
       ...(state ? [state] : []),
       ...(row.limitOrder?.status === 'submitted' ? [`예약 증거금 ${formatMoney(row.limitOrder.reservedAmount, 'USD')}`] : []),
+      ...(row.leverageChange && (row.state === 'watching' || row.state === 'triggered')
+        ? [leverageChangeNote(row.leverageChange.fromLeverage, row.leverage, '실행')] : []),
     ],
     edit: notModifiableWatch(row.state) ?? {
       editable: true,

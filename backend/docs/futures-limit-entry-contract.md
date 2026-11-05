@@ -1,12 +1,18 @@
 # Futures Limit Entry v1
 
-An account may have one submitted entry per instrument while flat. This is a
-full-fill entry into a new lifetime; increase, reduce and close remain on the
-existing execution/Conditional paths. API base remains `/api/v1`.
+An account may have one submitted entry per instrument and direction (two-way
+since 2026-11-06; flat-only and one per instrument before). It is a full fill
+that opens its direction's lifetime, or adds to the open one, with the merge
+rule and leverage approval of
+[futures-api-contract.md](futures-api-contract.md#two-way-positions-and-leverage-change-2026-11-06);
+reduce and close remain on the existing execution/Conditional paths. API base
+remains `/api/v1`.
 
 - `POST trading-accounts/:accountId/futures/limit-orders`: instrumentId,
   direction, marginMode, integer leverage 1–100, quantity, limitPrice,
-  idempotencyKey, optional `attachedProtection` legs in the existing format
+  idempotencyKey, optional `fromLeverage` (the open same-direction lifetime's
+  leverage the user confirmed changing at the fill; only when `leverage`
+  differs), optional `attachedProtection` legs in the existing format
   (retired 2026-10-16: refused `PROTECTION_REGISTRATION_RETIRED`), optional
   `entryTpSl` plans that become independent Futures stop-loss/take-profit
   settings at the actual fill
@@ -45,8 +51,11 @@ subsequent fresh evidence. Parent cancellation/lifecycle cleanup releases the
 reservation and cancels holding protection in the same transaction.
 
 Existing lifecycle/account/wallet fences serialize create, market open, fill,
-cancel, transfer and final settlement. A unique submitted account/instrument
-index and account/idempotency key preserve durable ownership. Existing migration
+cancel, transfer and final settlement. A unique submitted
+account/instrument/direction index (2026-11-06) and account/idempotency key
+preserve durable ownership. A reachable entry its direction's lifetime no longer
+accepts (another margin mode, or a leverage change outside its approval) ends
+`canceled` with `position_changed`, releasing its reservation and plans. Existing migration
 files are immutable; schema additions use one new migration. Feature flags are
 not enabled by this implementation.
 

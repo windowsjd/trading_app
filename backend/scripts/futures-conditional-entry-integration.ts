@@ -219,16 +219,24 @@ async function registration() {
     );
 
     await reject(
-      entries.create(s.userId, s.accountId, body(s, { direction: 'short' })),
+      entries.create(s.userId, s.accountId, body(s, { triggerPrice: '120' })),
       'FUTURES_CONDITIONAL_ENTRY_PENDING',
     );
+    // Two-way (2026-11-06): the other direction keeps its own live watch.
+    const shortWatch = await entries.create(
+      s.userId,
+      s.accountId,
+      body(s, { direction: 'short' }),
+    );
+    assert.equal(shortWatch.data.entry.direction, 'short');
+    await entries.cancel(s.userId, s.accountId, shortWatch.data.entry.id);
     await assert.rejects(
       db.$executeRaw`INSERT INTO futures_conditional_entries (id, trading_account_id, instrument_id, direction, margin_mode, leverage, quantity, trigger_condition, trigger_price, execution_type, registration_snapshot_id, idempotency_key, request_hash, updated_at)
         SELECT ${randomUUID()}, trading_account_id, instrument_id, direction, margin_mode, leverage, quantity, trigger_condition, trigger_price, execution_type, registration_snapshot_id, ${randomUUID()}, request_hash, now()
         FROM futures_conditional_entries WHERE id = ${entry.id}`,
     );
     pass(
-      'one live entry per instrument: service refusal and the partial unique index',
+      'one live entry per instrument and direction: service refusal and the partial unique index',
     );
 
     for (const [patch, expected] of [
@@ -288,10 +296,46 @@ async function registration() {
       leverage: 10,
       idempotencyKey: randomUUID(),
     });
+    // An open lifetime of the direction no longer blocks a watch: the same
+    // leverage adds to it; another needs the confirmed change of exactly it.
     await reject(
-      entries.create(other.userId, other.accountId, body(other)),
-      'FUTURES_POSITION_ALREADY_OPEN',
+      entries.create(
+        other.userId,
+        other.accountId,
+        body(other, { leverage: 20 }),
+      ),
+      'FUTURES_LEVERAGE_MISMATCH',
     );
+    await reject(
+      entries.create(
+        other.userId,
+        other.accountId,
+        body(other, { leverage: 20, fromLeverage: 5 }),
+      ),
+      'FUTURES_POSITION_CHANGED',
+    );
+    await reject(
+      entries.create(
+        other.userId,
+        other.accountId,
+        body(other, { marginMode: 'cross' }),
+      ),
+      'FUTURES_MARGIN_MODE_MISMATCH',
+    );
+    const addWatch = await entries.create(
+      other.userId,
+      other.accountId,
+      body(other, { leverage: 20, fromLeverage: 10 }),
+    );
+    assert.deepEqual(addWatch.data.entry.leverageChange, {
+      positionId: (
+        await db.futuresPosition.findFirstOrThrow({
+          where: { tradingAccountId: other.accountId, status: 'open' },
+        })
+      ).id,
+      fromLeverage: 10,
+    });
+    await entries.cancel(other.userId, other.accountId, addWatch.data.entry.id);
     await market(other, '100', 1);
     await limits.create(other.userId, other.accountId, {
       instrumentId: other.instruments[1].instrument.id,
@@ -311,7 +355,7 @@ async function registration() {
       'FUTURES_ENTRY_PENDING',
     );
     pass(
-      'existing position and pending limit entry conflicts follow the one-way policy',
+      'an open lifetime takes a watch only on its margin mode and confirmed leverage; a pending limit entry of the direction still conflicts',
     );
 
     await reject(
@@ -736,25 +780,72 @@ async function positionConflictAtTrigger() {
     const position = await db.futuresPosition.findFirstOrThrow({
       where: { tradingAccountId: s.accountId, status: 'open' },
     });
-    // ...and the trigger then never increases, reduces or flips it.
-    assert.equal(
-      await triggerWith(s, id, '110'),
-      'FUTURES_POSITION_ALREADY_OPEN',
-    );
-    assert.equal((await row(id)).status, 'failed');
+    // ...and the long trigger opens its own lifetime (two-way, 2026-11-06),
+    // never reducing, offsetting or flipping the short.
+    assert.equal(await triggerWith(s, id, '110'), 'ordered');
+    assert.equal((await row(id)).status, 'ordered');
     const unchanged = await db.futuresPosition.findUniqueOrThrow({
       where: { id: position.id },
     });
-    assert.equal(unchanged.quantity.toFixed(8), position.quantity.toFixed(8));
-    assert.equal(unchanged.direction, 'short');
+    assert.deepEqual(unchanged, position);
+    const long = await db.futuresPosition.findFirstOrThrow({
+      where: {
+        tradingAccountId: s.accountId,
+        status: 'open',
+        direction: 'long',
+      },
+    });
+    assert.equal(long.leverage, 10);
+    assert.equal(long.quantity.toFixed(8), '1.00000000');
     assert.equal(
       await db.futuresExecution.count({
         where: { tradingAccountId: s.accountId },
       }),
-      1,
+      2,
+    );
+    // A same-direction lifetime opened meanwhile at another leverage: the
+    // trigger never changes its leverage without the user's approval.
+    await reject(
+      entries.create(s.userId, s.accountId, body(s, { leverage: 20 })),
+      'FUTURES_LEVERAGE_MISMATCH',
+    );
+    const other = s.instruments[1].instrument.id;
+    await market(s, '100', 1);
+    const second = (
+      await entries.create(
+        s.userId,
+        s.accountId,
+        body(s, { instrumentId: other }),
+      )
+    ).data.entry.id;
+    await app.futures.execute(s.userId, s.accountId, {
+      instrumentId: other,
+      operation: 'open',
+      direction: 'long',
+      quantity: '1',
+      leverage: 5,
+      idempotencyKey: randomUUID(),
+    });
+    const meanwhile = await db.futuresPosition.findFirstOrThrow({
+      where: {
+        tradingAccountId: s.accountId,
+        instrumentId: other,
+        status: 'open',
+      },
+    });
+    assert.equal(
+      await triggerWith(s, second, '110', 1),
+      'FUTURES_LEVERAGE_MISMATCH',
+    );
+    assert.equal((await row(second)).status, 'failed');
+    assert.deepEqual(
+      await db.futuresPosition.findUniqueOrThrow({
+        where: { id: meanwhile.id },
+      }),
+      meanwhile,
     );
     pass(
-      'a position opened meanwhile makes the trigger fail clearly; the position is untouched',
+      'a position opened meanwhile: the other direction opens its own lifetime; an unapproved leverage change fails the trigger and leaves the lifetime untouched',
     );
   } finally {
     await clean(s);

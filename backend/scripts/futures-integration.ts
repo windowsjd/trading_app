@@ -398,11 +398,15 @@ const execute = async (
     const row = index >= 0 ? s.instruments[index] : undefined;
     const price = row && (await latestLast(s, index));
     if (row && price) {
+      // The command's own lifetime: an open's direction, or the pinned one.
       const current = await db.futuresPosition.findFirst({
         where: {
           tradingAccountId: s.accountId,
           instrumentId: row.instrument.id,
           status: 'open',
+          ...(body.operation === 'open'
+            ? { direction: body.direction as FuturesDirection }
+            : { id: body.positionId as string }),
         },
       });
       let mark = price.price;
@@ -438,14 +442,19 @@ async function positionBody(
   s: Scenario,
   operation: 'increase' | 'reduce' | 'close',
   patch: FuturesExecuteBody = {},
+  // Two-way: the lifetime of this direction (the only open one otherwise).
+  lifetime?: FuturesDirection,
 ) {
-  const p = await db.futuresPosition.findFirstOrThrow({
+  const open = await db.futuresPosition.findMany({
     where: {
       tradingAccountId: s.accountId,
       instrumentId: s.instruments[0].instrument.id,
       status: 'open',
+      ...(lifetime ? { direction: lifetime } : {}),
     },
   });
+  assert.equal(open.length, 1, 'positionBody needs exactly one lifetime');
+  const p = open[0];
   return {
     ...openBody(s),
     operation,
@@ -514,7 +523,11 @@ async function invariant(s: Scenario) {
   assert.ok(d(wallet.balanceAmount).sub(wallet.reservedAmount).gte(margin));
   assert.ok(wallet.balanceAmount.gte(0));
   assert.equal(wallet.reservedAmount.toFixed(8), '0.00000000');
-  assert.equal(new Set(open.map((p) => p.instrumentId)).size, open.length);
+  // Two-way: at most one open lifetime per instrument AND direction.
+  assert.equal(
+    new Set(open.map((p) => `${p.instrumentId}:${p.direction}`)).size,
+    open.length,
+  );
   const commands = await db.futuresExecuteRequest.findMany({
     where: { tradingAccountId: s.accountId },
   });
@@ -556,6 +569,7 @@ async function cleanup(s: Scenario) {
   const learning = await cleanupLearningPractice(db, s.accountId);
   const where = { tradingAccountId: s.accountId };
   await db.futuresLimitOrder.deleteMany({ where });
+  await db.futuresLeverageChange.deleteMany({ where });
   await db.futuresExecuteRequest.deleteMany({ where });
   await db.walletTransaction.deleteMany({ where });
   await db.futuresExecution.deleteMany({ where });
@@ -628,13 +642,34 @@ async function lifecycle(
       opened.data.collateral.balanceAmount,
       mode !== 'season' ? '9999.90000000' : '9999.80000000',
     );
+    // Two-way (2026-11-06): the same direction cannot open twice; the
+    // opposite direction opens its own lifetime and leaves this one as it was.
     await reject(
-      execute(
-        s,
-        openBody(s, { direction: direction === 'long' ? 'short' : 'long' }),
-      ),
+      execute(s, openBody(s, { direction })),
       'FUTURES_POSITION_ALREADY_OPEN',
     );
+    const opposite = direction === 'long' ? 'short' : 'long';
+    const before = await db.futuresPosition.findUniqueOrThrow({
+      where: { id: opened.data.position.id },
+    });
+    const hedge = await execute(
+      s,
+      openBody(s, { direction: opposite, leverage: 5 }),
+    );
+    assert.notEqual(hedge.data.position.id, opened.data.position.id);
+    assert.equal(hedge.data.position.direction, opposite);
+    assert.equal(hedge.data.execution.operation, 'open');
+    assert.deepEqual(
+      await db.futuresPosition.findUniqueOrThrow({
+        where: { id: opened.data.position.id },
+      }),
+      before,
+    );
+    await execute(
+      s,
+      await positionBody(s, 'close', { quantity: '1' }, opposite),
+    );
+    checks++;
     await reject(
       execute(s, await positionBody(s, 'increase', { leverage: 50 })),
       'FUTURES_LEVERAGE_MISMATCH',
@@ -732,7 +767,8 @@ async function lifecycle(
       limit: '2',
       offset: '0',
     });
-    assert.equal(history.data.pagination.total, priorExecutions + 5);
+    // + the opposite direction's open and close above.
+    assert.equal(history.data.pagination.total, priorExecutions + 7);
     assert.equal(history.data.executions.length, 2);
     assert.equal(history.data.pagination.nextOffset, 2);
     assert.equal(
@@ -747,7 +783,7 @@ async function lifecycle(
       await db.equitySnapshot.count({
         where: { tradingAccountId: s.accountId },
       }),
-      snapshots + 5,
+      snapshots + 7,
     );
     process.env.FUTURES_TRADING_ENABLED = 'false';
     await db.tradingAccount.update({
@@ -1739,9 +1775,16 @@ async function databaseConstraints() {
       db.$executeRaw`INSERT INTO futures_positions (id, trading_account_id, instrument_id, direction, quantity, average_entry_price, entry_notional, leverage, isolated_margin, updated_at) VALUES (${randomUUID()}, ${s.accountId}, ${base.instrumentId}, 'long', 1, 100, 100, ${'1.5'}::integer, 1, clock_timestamp())`,
     );
     const opened = await execute(s, openBody(s));
+    // Two-way (2026-11-06): one open lifetime per account, instrument AND
+    // direction — a second long is refused, a short beside it is not.
     await assert.rejects(
-      db.futuresPosition.create({ data: { ...base, direction: 'short' } }),
+      db.futuresPosition.create({ data: { ...base, direction: 'long' } }),
     );
+    const hedge = await db.futuresPosition.create({
+      data: { ...base, direction: 'short' },
+    });
+    await db.futuresPosition.delete({ where: { id: hedge.id } });
+    // Leverage never changes without same-transaction change evidence.
     await assert.rejects(
       db.futuresPosition.update({
         where: { id: opened.data.position.id },

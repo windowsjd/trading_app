@@ -76,6 +76,7 @@ export const ModelName = {
   FuturesPosition: 'FuturesPosition',
   FuturesExecution: 'FuturesExecution',
   FuturesExecuteRequest: 'FuturesExecuteRequest',
+  FuturesLeverageChange: 'FuturesLeverageChange',
   FuturesLimitOrder: 'FuturesLimitOrder',
   ProtectionGroup: 'ProtectionGroup',
   ProtectionLeg: 'ProtectionLeg',
@@ -636,6 +637,29 @@ export const FuturesExecuteRequestScalarFieldEnum = {
 export type FuturesExecuteRequestScalarFieldEnum = (typeof FuturesExecuteRequestScalarFieldEnum)[keyof typeof FuturesExecuteRequestScalarFieldEnum]
 
 
+export const FuturesLeverageChangeScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  positionId: 'positionId',
+  fromLeverage: 'fromLeverage',
+  toLeverage: 'toLeverage',
+  isolatedMarginBefore: 'isolatedMarginBefore',
+  isolatedMarginAfter: 'isolatedMarginAfter',
+  markPrice: 'markPrice',
+  markEffectiveAt: 'markEffectiveAt',
+  markCapturedAt: 'markCapturedAt',
+  executionId: 'executionId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  responsePayloadJson: 'responsePayloadJson',
+  transactionId: 'transactionId',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesLeverageChangeScalarFieldEnum = (typeof FuturesLeverageChangeScalarFieldEnum)[keyof typeof FuturesLeverageChangeScalarFieldEnum]
+
+
 export const FuturesLimitOrderScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -656,7 +680,9 @@ export const FuturesLimitOrderScalarFieldEnum = {
   endedAt: 'endedAt',
   revisedAt: 'revisedAt',
   revision: 'revision',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  leverageChangePositionId: 'leverageChangePositionId',
+  leverageChangeFrom: 'leverageChangeFrom'
 } as const
 
 export type FuturesLimitOrderScalarFieldEnum = (typeof FuturesLimitOrderScalarFieldEnum)[keyof typeof FuturesLimitOrderScalarFieldEnum]
@@ -858,7 +884,9 @@ export const FuturesConditionalEntryScalarFieldEnum = {
   endedAt: 'endedAt',
   revisedAt: 'revisedAt',
   revision: 'revision',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  leverageChangePositionId: 'leverageChangePositionId',
+  leverageChangeFrom: 'leverageChangeFrom'
 } as const
 
 export type FuturesConditionalEntryScalarFieldEnum = (typeof FuturesConditionalEntryScalarFieldEnum)[keyof typeof FuturesConditionalEntryScalarFieldEnum]

@@ -219,7 +219,7 @@ function CloseBody({ position, markFresh, referenceFresh, capabilities, busy, he
           <Text testID="futures-close-fee" selectable style={styles.value}>{fee === null ? '-' : formatMoneyDecimal(fee, 'USD')}</Text>
         </View>
       </View>
-      <Text style={styles.helper}>시장가로 바로 체결돼요. 예상 손익과 수수료는 Mark 기준이고, 실제 결과는 체결 시점의 선물 Last로 정해져요.</Text>
+      <Text style={styles.helper}>시장가로 바로 체결돼요. 예상 손익과 수수료는 평가 기준가로 계산하고, 실제 결과는 체결 시점의 선물 Last로 정해져요.</Text>
       {blocked ? <Text testID="futures-close-blocked" style={styles.error}>{blocked}</Text> : null}
       {uncertain ? (
         <Text testID="futures-close-uncertain" style={styles.warning}>

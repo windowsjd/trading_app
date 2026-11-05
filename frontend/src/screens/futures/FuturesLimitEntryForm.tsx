@@ -28,9 +28,13 @@ import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invali
  * the screen's inputs while a request or an uncertain result keeps this exact
  * intent.
  */
-export default function FuturesLimitEntryForm({ accountId, instrumentId, unit, direction, marginMode, leverage, quantity, amount, limitPrice, allowed, collateralError, onBusy }: {
+export default function FuturesLimitEntryForm({ accountId, instrumentId, unit, direction, marginMode, leverage, quantity, amount, limitPrice, allowed, collateralError, leverageChange, onBusy }: {
   accountId: string; instrumentId: string; unit: string; direction: Direction; marginMode: MarginMode;
-  leverage: string; quantity: string; amount: string; limitPrice: string; allowed: boolean; collateralError: string | null; onBusy: (busy: boolean) => void;
+  leverage: string; quantity: string; amount: string; limitPrice: string; allowed: boolean; collateralError: string | null;
+  /** The open position of the direction changes leverage with this entry: the screen's
+   * confirmation runs first, and the entry then carries the leverage it changes from. */
+  leverageChange: { fromLeverage: number; confirm: (proceed: () => void) => void } | null;
+  onBusy: (busy: boolean) => void;
 }) {
   const learning = useLearningAccess(accountId).gate('allTrading');
   const [collateralAttempted, setCollateralAttempted] = useState(false);
@@ -64,7 +68,7 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, unit, d
     }
   }, [amount, quantity, leverage, limitPrice, direction, marginMode, drafts]);
   const shownMessage = collateralAttempted ? collateralError : message;
-  const submit = async () => {
+  const submit = async (confirmed = false) => {
     if (locked.current || !current() || (!uncertain && (!permission.current.allowed || !validPrice))) return;
     if (!uncertain) {
       if (permission.current.collateralError) {
@@ -74,7 +78,10 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, unit, d
       const error = drafts.length ? getDraftTpSlError(drafts, direction, limitPrice) : null;
       if (error) { setFailure(null); setMessage(`손절가/익절가 설정을 확인해 주세요. ${error}`); return; }
       if (drafts.length && !permission.current.canAttach) { setMessage('현재 손절가/익절가를 함께 등록할 수 없어요. 설정을 지우고 주문해 주세요.'); return; }
-      request.current = { instrumentId, direction, marginMode, leverage: Number(leverage), quantity, limitPrice, idempotencyKey: createIdempotencyKey('futures-entry'), ...(drafts.length ? { entryTpSl: drafts } : {}) };
+      // Another leverage than the position's: asked first, applied only at the fill.
+      if (leverageChange && !confirmed) { leverageChange.confirm(() => void submit(true)); return; }
+      request.current = { instrumentId, direction, marginMode, leverage: Number(leverage), quantity, limitPrice, idempotencyKey: createIdempotencyKey('futures-entry'),
+        ...(drafts.length ? { entryTpSl: drafts } : {}), ...(leverageChange ? { fromLeverage: leverageChange.fromLeverage } : {}) };
     }
     if (!request.current) return;
     locked.current = true; setBusy(true); onBusy(true); setFailure(null);
@@ -82,8 +89,9 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, unit, d
       await createFuturesLimitOrder(accountId, request.current);
       if (!current()) return;
       const withPlans = !!request.current.entryTpSl?.length;
+      const changing = request.current.fromLeverage !== undefined;
       request.current = null; setUncertain(false); setDrafts([]);
-      setMessage(withPlans ? '지정가 진입 주문이 접수되었습니다. 체결 전까지 담보가 예약되고, 손절가/익절가는 체결 후 활성화됩니다.' : '지정가 진입 주문이 접수되었습니다. 체결 전까지 담보가 예약됩니다.');
+      setMessage(`${withPlans ? '지정가 진입 주문이 접수되었습니다. 체결 전까지 담보가 예약되고, 손절가/익절가는 체결 후 활성화됩니다.' : '지정가 진입 주문이 접수되었습니다. 체결 전까지 담보가 예약됩니다.'}${changing ? ' 포지션 레버리지는 체결될 때 함께 바뀌어요.' : ''}`);
       await Promise.all([client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.futures.all(accountId) }), client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.entryTpSl.all(accountId) }), invalidateAfterOrderCreate(client, accountId, { seasonUi: true })]);
     } catch (error) {
       if (!current()) return;

@@ -291,7 +291,7 @@ describe('F3 final settlement diagnostics at existing delivery boundaries', () =
   });
   it('assigns the new read route its observed Futures operation', async () => {
     const service = new FuturesService({} as never, {} as never, {} as never);
-    const controller = new FuturesController(service);
+    const controller = new FuturesController(service, {} as never);
     assertDiagnosticBaseline(
       await diagnostic(() => controller.finalSettlement({}, 'account')),
       'backend/src/futures/futures.controller.ts#finalSettlement',

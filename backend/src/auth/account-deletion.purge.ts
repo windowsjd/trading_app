@@ -339,8 +339,12 @@ export async function purgeDeletionScope(
       'limit_on_close_orders',
       Prisma.sql`DELETE FROM limit_on_close_orders WHERE trading_account_id = ANY(${accounts})`,
     ],
-    // Futures: requests and entries reference executions; executions,
-    // liquidation and season closes reference positions.
+    // Futures: requests, leverage changes and entries reference executions;
+    // executions, liquidation and season closes reference positions.
+    [
+      'futures_leverage_changes',
+      Prisma.sql`DELETE FROM futures_leverage_changes WHERE trading_account_id = ANY(${accounts})`,
+    ],
     [
       'futures_execute_requests',
       Prisma.sql`DELETE FROM futures_execute_requests WHERE trading_account_id = ANY(${accounts})`,

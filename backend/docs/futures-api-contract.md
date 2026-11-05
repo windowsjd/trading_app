@@ -1,7 +1,9 @@
 # Crypto Futures contract (F1 execution + F2 risk + F3 integration)
 
 USD-settled synthetic perpetuals support Market full fills,
-LONG/SHORT, One-way, Isolated and Cross, with integer leverage 1–100. The
+LONG/SHORT as independent per-direction lifetimes (two-way since 2026-11-06,
+[below](#two-way-positions-and-leverage-change-2026-11-06)), Isolated and
+Cross, with integer leverage 1–100. The
 [F2 risk contract](futures-risk-contract.md) defines fixed 0.5% maintenance,
 Mark pricing, automatic full liquidation and bankruptcy evidence.
 `FUTURES_TRADING_MODE` defaults DISABLED (legacy boolean supported); REDUCE_ONLY
@@ -39,6 +41,8 @@ All routes are authenticated and account scoped under
 | GET `/instruments` | Verified instruments, display precision, separate Futures Last/Mark evidence, 24h `marketStats` ([market data](futures-market-data-contract.md)), server capabilities and evaluatedAt |
 | POST `/execute` | A single idempotent Market command; no Spot quote/order lifecycle |
 | GET `/positions` | Open positions and collateral risk foundation |
+| POST `/positions/:positionId/leverage` | Leverage change of one open lifetime alone, confirmed by the user ([below](#two-way-positions-and-leverage-change-2026-11-06)) |
+| GET `/positions/:positionId/leverage-preview?leverage=&quantity=&price=` | Read-only estimate of that change, alone or with an add |
 | GET `/executions?limit=20&offset=0` | User Market execution history, newest first; limit 1–100 |
 | GET `/liquidations?limit=20&offset=0` | System liquidation events with all closes/Mark evidence; same bounds |
 | GET/POST `/conditional-entries`, POST `/conditional-entries/:entryId/cancel` | Futures Conditional Entry v1: reservation-free watch on Futures Last that opens one new position ([contract](futures-conditional-entry-contract.md)) |
@@ -46,7 +50,9 @@ All routes are authenticated and account scoped under
 
 Execute body: `instrumentId`, `operation` (`open`, `increase`, `reduce`, `close`),
 `direction` (`long`, `short`), `quantity` (positive decimal string, up to 8 places),
-`leverage` (JSON integer 1–100), `idempotencyKey` (nonempty, up to 200 characters).
+`leverage` (JSON integer 1–100), `idempotencyKey` (nonempty, up to 200 characters),
+optional `fromLeverage` (2026-11-06: only on an `increase` whose `leverage` differs;
+the position's current leverage the user confirmed changing).
 `positionId` is forbidden for open and required for all other operations to pin
 the intended position lifetime. Close quantity must equal the current quantity.
 Reduce of the entire current quantity records operation `close` in history.
@@ -56,13 +62,17 @@ means isolated). Mode cannot change before full close. Client price/rate/fee/mar
 order-type fields are not accepted.
 Money/quantity/price/PnL values are strings; timestamps are UTC ISO strings.
 
-Flat permits long or short open. An open position permits same-direction,
-same-leverage, same-margin-mode increase and explicit reduce/close. Another open, opposite direction,
-excess reduction, decimal leverage, or leverage change is rejected. No auto-flip.
-Leverage is every natural number from 1 through 100, never a preset enum. Full
+A direction without an open lifetime permits an open; an open lifetime permits
+a same-margin-mode increase (same leverage, or a confirmed leverage change) and
+explicit reduce/close of exactly that lifetime. A second open of the same
+direction, a reduce/close naming another direction, excess reduction, decimal
+leverage or an unconfirmed leverage change is rejected. The opposite direction is
+a separate lifetime (two-way, 2026-11-06): no auto-offset, auto-reduce or
+auto-flip. Leverage is every natural number from 1 through 100, never a preset enum. Full
 close retains a closed lifetime row and its cumulative realized PnL; reopening
-creates a new row and may choose any valid leverage/direction. A SQL partial unique
-index permits only one open position per account/instrument.
+creates a new row and may choose any valid leverage. A SQL partial unique index
+permits only one open position per account/instrument/direction (2026-11-06; one
+per account/instrument before).
 
 ### Contract list (market data, 2026-10-30)
 
@@ -201,9 +211,11 @@ cash, execution, ledger, and command either all commit or all roll back.
 
 Only additive migrations; no existing financial rows are rewritten. DB checks
 protect leverage integer/range, positive open quantity, closed-zero state,
-nonnegative margin, USD synthetic product, direction enum, and one-way uniqueness.
-Immutable instrument identity and position lifetime identity/leverage prevent
-historical reinterpretation; service transactions own financial formulas.
+nonnegative margin, USD synthetic product, direction enum, and per-direction
+uniqueness of open lifetimes. Immutable instrument identity and position lifetime
+identity (account, instrument, direction, margin mode) prevent historical
+reinterpretation; leverage changes only while open and only with same-transaction
+change evidence (2026-11-06); service transactions own financial formulas.
 
 Provision with `pnpm futures:provision-instruments --dry-run`. A dry-run requires
 `FUTURES_PROVISION_DRY_RUN_REDIS_URL` pointing to local Redis for the existing
@@ -277,7 +289,8 @@ full-fill Long/Short entries and attached TP/SL. A pending entry reserves cash
 availability; it is not an open Position or initial margin usage. On fill the
 reservation is released atomically and this contract's execution primitive runs.
 
-No dated/inverse/coin-margin/options, funding, Hedge Mode, ADL, insurance, partial
+No dated/inverse/coin-margin/options, funding, hedge netting or offset margin
+(two-way lifetimes are independent, never netted), ADL, insurance, partial
 liquidation, trailing stops, or Binance
 brackets/risk tiers. [Conditional v1](conditional-orders-contract.md) adds
 Position-bound SL/TP Market/Limit exits and OCO, triggered on Futures Last. F3 supplies account-pinned Futures UI and coherent
@@ -308,3 +321,99 @@ Isolated uses the stored allocated margin. Cross uses the stored remaining
 it never uses pooled collateral or current Mark initial requirement. The stored
 entry basis survives increases and proportional reductions. Missing/stale Mark
 leaves `markNotional` and `roi` null while position facts remain readable.
+
+## Two-way positions and leverage change (2026-11-06)
+
+Product policy: a long and a short of one contract are independent lifetimes of
+one account; trades of a direction merge into that direction's open lifetime
+(one row, its own id and lifetime), never into the other's. Leverage of an open
+lifetime may change, but only after the user explicitly confirms it.
+
+**Identity.** `futures_positions_one_open_per_direction` (partial unique on
+account, instrument, direction where open) replaces the per-instrument index;
+every user, limit, conditional and TP/SL path takes the Futures wallet `FOR
+UPDATE` first, so concurrent same-direction opens serialize and the second is
+`FUTURES_POSITION_ALREADY_OPEN` (the index is the durable backstop). Execute
+locks both directions' open lifetimes of the instrument in id order after the
+wallet; liquidation and Season settlement keep locking all of the account's in
+id order after the wallet (no new lock order).
+
+**One merge rule for every order method.** User market commands keep pinning:
+`open` requires no open lifetime of its direction; `increase` names its
+`positionId`. A pending entry resolves against its direction's open lifetime at
+its fill (`resolveFuturesEntryFill`, the same function for a Limit entry, a
+conditional entry's market execution and the Limit entry a conditional entry
+creates): none → a new lifetime at the entry's leverage; same margin mode and
+leverage → an `increase` (the execution records `increase`); another leverage →
+an increase changing it only when the entry carries an approval of exactly that
+lifetime at the leverage it still has; another margin mode or an unapproved
+change → no fill. A legacy whole-lifetime OCO attached to an entry never extends
+to an existing lifetime (no fill). Entry TP/SL plans activate on the lifetime
+the fill reached. The other direction is never read for a merge.
+
+**Pending entries.** One submitted Limit entry and one live conditional entry
+per account, instrument **and direction** (partial uniques per direction). A
+market trade no longer refuses because of a pending entry. Registration next to
+an open lifetime of the direction requires its margin mode
+(`FUTURES_MARGIN_MODE_MISMATCH`) and either its leverage or a confirmed change
+(body `fromLeverage` = the lifetime's leverage now; missing →
+`FUTURES_LEVERAGE_MISMATCH`, stale → `FUTURES_POSITION_CHANGED`). The approval is
+stored on the entry (`leverage_change_position_id`, `leverage_change_from`; a DB
+trigger checks it names that open lifetime at that leverage and keeps it
+immutable). Registering changes nothing on the position. A conditional entry's
+Limit entry carries its approval. When the fill is no longer allowed: a reachable
+Limit entry is canceled with terminal reason `position_changed` (reservation
+released, plans ended — the existing cancel core), a conditional entry fails with
+the refusal code (existing non-retryable `failed` policy). Reservation sizing is
+unchanged (the entry's own margin + fee); a change that needs more collateral
+than that is checked at the fill like any other fill shortage.
+
+**Leverage change.** Alone: `POST positions/:positionId/leverage` with
+`{ leverage, fromLeverage, idempotencyKey }` (ENABLED mode, beginner
+`allTrading`, verified instrument, fresh Mark). With a market add: execute
+`increase` with `fromLeverage`. At a pending entry's fill: the stored approval.
+All three are one transaction under the execution core's fences and checks:
+Isolated re-derives its whole allocation `ceil8(entryNotional / newLeverage)`
+(adding or releasing margin; the add's own allocation included), Cross keeps zero
+allocation and only its Mark initial requirement changes; then the open/increase
+exposure checks — the Isolated lifetime's own maintenance buffer
+(`FUTURES_MAINTENANCE_UNSAFE`), Cross base/free collateral never negative and
+Cross equity above maintenance while any Cross lifetime is open
+(`INSUFFICIENT_FUTURES_FREE_COLLATERAL`). Reservations stay protected; long and
+short requirements are summed, never netted. Quantity, average entry, entry
+basis, executions, realized PnL and TP/SL settings stay; no cash, fee, PnL,
+ledger row, fill count or performance snapshot is written by the change itself.
+`수익률`/`roi` keeps its basis (Isolated allocation, Cross entry basis ÷ leverage),
+so it follows the new leverage. A pending legacy OCO exit refuses the change
+(`PROTECTION_CHILD_PENDING`, as an increase). TP/SL treats a leverage race as
+retryable (`FUTURES_LEVERAGE_MISMATCH`), re-reading the lifetime.
+
+**Evidence and replay.** `futures_leverage_changes` (append-only; `UPDATE`
+refused by trigger) records account, instrument, lifetime, from/to leverage,
+Isolated allocation before/after, the Mark price and times the change was checked
+on, and either the add's `execution_id` or the leverage-only command's
+`idempotency_key`, `request_hash` and first response (CHECK: exactly one). A
+deferred constraint trigger on `futures_positions` requires such a row from the
+same transaction (`txid_current()`) for every leverage change, and the lifetime
+guard refuses leverage changes of closed rows. A leverage-only command replays
+its first response for the same key and body, conflicts
+(`FUTURES_IDEMPOTENCY_CONFLICT`) for another body, and refuses a stale
+`fromLeverage` (`FUTURES_POSITION_CHANGED`); concurrent duplicates write one row.
+Execute responses carry `leverageChange` (from/to and allocation before/after)
+when an add changed it, `null` otherwise (absent in earlier replays).
+
+**Preview.** `GET positions/:positionId/leverage-preview?leverage=&quantity=&price=`
+is read-only (RepeatableRead): the same plan and exposure checks on the current
+Mark (and current Futures Last for an add without `price`). It returns `before`/
+`after` (leverage, quantity, average entry, Isolated allocation, `initialMargin`,
+Mark initial requirement, Isolated liquidation price and buffer), `collateral`
+(free collateral before/after, allocation and requirement deltas, the add's fee,
+Cross buffer before/after) and `refusal` (the code the command would answer now).
+Without a fresh Mark or price `after`/`collateral` are `null` — never estimated.
+
+**Rollout.** Deploy the migration and server before the app (an older server
+refuses `fromLeverage` with 400 and has no leverage routes). The migration is
+expand-only and safe under the previous server. Rolling the server back after
+two-way lifetimes exist is not supported: the previous code assumes one open
+lifetime per instrument and would refuse reduce/close of the second one; close
+one direction first.

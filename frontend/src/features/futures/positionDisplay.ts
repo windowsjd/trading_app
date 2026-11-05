@@ -21,6 +21,6 @@ export function getFuturesPositionDisplay(position: FuturesHolding, evaluatedAt:
     notional: fresh ? formatMoneyDecimal(position.markNotional, 'USD') : '-',
     pnl, roi, performance: fresh ? `${pnl} (${roi})` : '-',
     pnlDirection: fresh ? getFinancialDirection(position.markUnrealizedPnl) : 'neutral',
-    fresh, notice: fresh ? null : 'Mark 확인 불가 · 평가 대기',
+    fresh, notice: fresh ? null : '평가 기준가 확인 불가 · 평가 대기',
   };
 }

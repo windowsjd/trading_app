@@ -57,6 +57,12 @@ import { readFuturesMark } from './futures-mark';
 import { readFuturesLastPrice } from './futures-last-price';
 import { cancelFuturesEntriesInTransaction } from './futures-limit-state';
 import {
+  futuresEntryLeverageApproval,
+  parseFuturesFromLeverage,
+  refuseFuturesEntryFill,
+  resolveFuturesEntryFill,
+} from './futures-position-policy';
+import {
   assertFuturesConditionalEntryWindow,
   linkFuturesConditionalEntry,
   lockTriggeredFuturesConditionalEntry,
@@ -83,14 +89,29 @@ export function parseFuturesEntry(body: unknown) {
           'idempotencyKey',
           'attachedProtection',
           'entryTpSl',
+          'fromLeverage',
         ].includes(k),
     )
   )
     futuresError('INVALID_FUTURES_REQUEST', 'Invalid Futures entry.', 400);
-  const { limitPrice, attachedProtection, entryTpSl, ...command } = row;
+  const {
+    limitPrice,
+    attachedProtection,
+    entryTpSl,
+    fromLeverage,
+    ...command
+  } = row;
   if (attachedProtection !== undefined && entryTpSl !== undefined)
     futuresError('INVALID_FUTURES_REQUEST', 'Invalid Futures entry.', 400);
   const request = parseFuturesCommand({ ...command, operation: 'open' });
+  // The leverage of the open same-direction lifetime the user confirmed
+  // changing at the fill (two-way positions, 2026-11-06).
+  const approvedFrom = parseFuturesFromLeverage(
+    fromLeverage,
+    request.leverage,
+    () =>
+      futuresError('INVALID_FUTURES_REQUEST', 'Invalid Futures entry.', 400),
+  );
   if (
     typeof limitPrice !== 'string' ||
     !/^\d{1,16}(\.\d{1,8})?$/.test(limitPrice) ||
@@ -112,6 +133,7 @@ export function parseFuturesEntry(body: unknown) {
     ...(entryTpSl === undefined
       ? {}
       : { entryTpSl: parseEntryTpSlDrafts(entryTpSl) }),
+    ...(approvedFrom === undefined ? {} : { fromLeverage: approvedFrom }),
   };
 }
 /**
@@ -153,6 +175,15 @@ export function presentFuturesEntry(row: FuturesLimitOrder) {
     quantity: row.quantity.toFixed(8),
     limitPrice: row.limitPrice.toFixed(8),
     reservedAmount: row.reservedAmount.toFixed(8),
+    // The approved change of the open same-direction lifetime's leverage
+    // (from → `leverage`) at the fill; null when none was needed.
+    leverageChange:
+      row.leverageChangePositionId && row.leverageChangeFrom !== null
+        ? {
+            positionId: row.leverageChangePositionId,
+            fromLeverage: row.leverageChangeFrom,
+          }
+        : null,
     status: row.status,
     executionId: row.executionId,
     terminalReason: row.terminalReason,
@@ -264,25 +295,57 @@ export class FuturesLimitService {
           'FUTURES_INSTRUMENT_UNVERIFIED',
           'This Futures instrument is not yet available for new trades.',
         );
+      // Two-way positions (2026-11-06): one submitted entry per direction;
+      // it opens that direction's lifetime or adds to the open one at its fill.
       if (
-        (await tx.futuresPosition.findFirst({
+        await tx.futuresLimitOrder.findFirst({
           where: {
             tradingAccountId: accountId,
             instrumentId: instrument.id,
-            status: 'open',
-          },
-        })) ||
-        (await tx.futuresLimitOrder.findFirst({
-          where: {
-            tradingAccountId: accountId,
-            instrumentId: instrument.id,
+            direction: request.direction,
             status: 'submitted',
           },
-        }))
+        })
       )
         futuresError(
           'FUTURES_ENTRY_PENDING',
-          'Entry requires a flat position and no pending entry.',
+          'This direction already has a pending entry.',
+        );
+      const current = await tx.futuresPosition.findFirst({
+        where: {
+          tradingAccountId: accountId,
+          instrumentId: instrument.id,
+          direction: request.direction,
+          status: 'open',
+        },
+      });
+      // A conditional entry's limit carries the approval its user gave at
+      // registration, valid only for the lifetime as it still is.
+      let approval: ReturnType<typeof futuresEntryLeverageApproval>;
+      if (conditional) {
+        const fill = resolveFuturesEntryFill(conditional, current);
+        if (fill.kind === 'refused') refuseFuturesEntryFill(fill.code);
+        approval =
+          fill.kind === 'increase' && fill.fromLeverage !== undefined
+            ? {
+                leverageChangePositionId: fill.positionId,
+                leverageChangeFrom: fill.fromLeverage,
+              }
+            : { leverageChangePositionId: null, leverageChangeFrom: null };
+      } else
+        approval = futuresEntryLeverageApproval(
+          {
+            marginMode: request.marginMode ?? 'isolated',
+            leverage: request.leverage,
+            fromLeverage: request.fromLeverage,
+          },
+          current,
+        );
+      // A whole-lifetime OCO attachment only protects a new lifetime.
+      if (request.legs.length && current)
+        futuresError(
+          'FUTURES_POSITION_ALREADY_OPEN',
+          'This direction already has an open position; add to it instead.',
         );
       setAdminDiagnosticContext({
         failureStage: 'futures_entry_mark_selection',
@@ -342,6 +405,7 @@ export class FuturesLimitService {
           idempotencyKey: request.idempotencyKey,
           requestHash,
           createdAt: now,
+          ...approval,
         },
       });
       if (request.legs.length)
@@ -530,19 +594,8 @@ export class FuturesLimitService {
           'FUTURES_INSTRUMENT_UNVERIFIED',
           'This Futures instrument is not yet available for new trades.',
         );
-      if (
-        await tx.futuresPosition.findFirst({
-          where: {
-            tradingAccountId: accountId,
-            instrumentId: instrument.id,
-            status: 'open',
-          },
-        })
-      )
-        futuresError(
-          'FUTURES_ENTRY_PENDING',
-          'Entry requires a flat position and no pending entry.',
-        );
+      // An open lifetime no longer blocks a change (two-way, 2026-11-06): the
+      // entry still resolves against the position it meets at its fill.
       await assertEntryPlansFitChangedEntry(
         tx,
         { futuresLimitOrderId: orderId },
@@ -688,7 +741,45 @@ export class FuturesLimitService {
         isSeasonSuspended(locked.seasonParticipant.season, now)
       )
         return 'paused' as const;
-      if (conditionalTradable(locked, now)) return false;
+      if (conditionalTradable(locked, now)) {
+        // The limit is reachable now. An entry the open lifetime of its
+        // direction no longer accepts (another margin mode, or a leverage
+        // change the user did not approve for this lifetime) never fills:
+        // it ends here, releasing its reservation, instead of retrying.
+        if (futuresTradingMode() !== 'ENABLED') return false;
+        const entry = await tx.futuresLimitOrder.findUnique({
+          where: { id: row.id },
+        });
+        if (entry?.status !== 'submitted') return false;
+        const fill = resolveFuturesEntryFill(
+          entry,
+          await tx.futuresPosition.findFirst({
+            where: {
+              tradingAccountId: entry.tradingAccountId,
+              instrumentId: entry.instrumentId,
+              direction: entry.direction,
+              status: 'open',
+            },
+          }),
+        );
+        if (
+          fill.kind === 'refused' ||
+          (fill.kind === 'increase' &&
+            (await tx.protectionGroup.count({
+              where: { parentFuturesOrderId: entry.id, status: 'holding' },
+            })))
+        ) {
+          await cancelFuturesEntriesInTransaction(
+            tx,
+            account.id,
+            'position_changed',
+            now,
+            row.id,
+          );
+          return 'position_changed' as const;
+        }
+        return false;
+      }
       const reason = isStandaloneAccountMode(locked.mode)
         ? 'account_not_tradable'
         : locked.seasonParticipant?.participantStatus === 'excluded'
@@ -704,6 +795,7 @@ export class FuturesLimitService {
       return true;
     });
     if (ended === 'paused') return { state: 'paused' };
+    if (ended === 'position_changed') return { state: 'position_changed' };
     if (ended) return { state: 'canceled' };
     if (futuresTradingMode() !== 'ENABLED') return { state: 'paused' };
     await this.futures.execute(

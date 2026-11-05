@@ -3,6 +3,15 @@
  * approve arbitrary exception/Provider/DB prose for users or operators.
  */
 const PUBLIC_MESSAGES = new Set<string>([
+  // Two-way Futures positions and leverage changes (2026-11-06).
+  'This direction already has an open position; add to it instead.',
+  'Direction must match the position.',
+  'The position changed; review it and try again.',
+  'Leverage differs from the open position.',
+  'This direction already has a pending entry.',
+  'This direction already has a live conditional entry.',
+  "Check the new leverage, the position's current leverage and the request key.",
+  'Check the leverage, quantity and price of the preview.',
   // Pending order/setting changes (2026-11-05, docs/pending-order-modification-contract.md).
   'expectedRevision must be the revision the change was made from.',
   'This order or setting can no longer be changed.',

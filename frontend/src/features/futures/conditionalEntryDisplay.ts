@@ -30,15 +30,20 @@ const END_REASON: Record<string, string> = {
 const FAILURE: Record<string, string> = {
   INSUFFICIENT_FUTURES_FREE_COLLATERAL: '사용 가능한 선물 담보가 부족했습니다.',
   FUTURES_MAINTENANCE_UNSAFE: '유지 증거금 기준을 충족하지 못했습니다.',
+  // Recorded before 2026-11-06 for any held position; since then for the same direction.
   FUTURES_POSITION_ALREADY_OPEN: '같은 상품에 보유 포지션이 있었습니다.',
   FUTURES_ENTRY_PENDING: '같은 상품에 대기 중인 지정가 진입이 있었습니다.',
+  // Two-way (2026-11-06): the same direction's position no longer matched what was confirmed.
+  FUTURES_LEVERAGE_MISMATCH: '보유 포지션의 레버리지가 등록 때 확인한 값과 달라 실행하지 않았습니다.',
+  FUTURES_POSITION_CHANGED: '보유 포지션이 그사이 바뀌어 실행하지 않았습니다.',
+  FUTURES_MARGIN_MODE_MISMATCH: '같은 방향 보유 포지션의 증거금 방식이 달라 실행하지 않았습니다.',
   FUTURES_REDUCE_ONLY: '선물 신규 진입이 제한된 상태였습니다.',
   FUTURES_TRADING_DISABLED: '선물 거래가 비활성 상태였습니다.',
   FUTURES_INSTRUMENT_UNVERIFIED: '상품이 신규 진입 가능한 상태가 아니었습니다.',
   FUTURES_PRICE_UNAVAILABLE: '선물 Last 시세를 확인할 수 없었습니다.',
   FUTURES_PRICE_STALE: '선물 Last 시세를 확인할 수 없었습니다.',
-  FUTURES_MARK_UNAVAILABLE: 'Mark 시세를 확인할 수 없었습니다.',
-  FUTURES_MARK_STALE: 'Mark 시세를 확인할 수 없었습니다.',
+  FUTURES_MARK_UNAVAILABLE: '평가 기준가를 확인할 수 없었습니다.',
+  FUTURES_MARK_STALE: '평가 기준가를 확인할 수 없었습니다.',
 };
 
 /** A Futures execution refusal in words (conditional entry or TP/SL); null if unknown. */
