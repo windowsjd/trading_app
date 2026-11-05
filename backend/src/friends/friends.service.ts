@@ -16,6 +16,23 @@ const publicUserSelect = {
   status: true,
 } as const;
 
+/** The viewer's side of one stored pair (none when no row exists). */
+function relationshipOf(
+  row: { id: string; status: string; requesterUserId: string } | null,
+  viewer: string,
+) {
+  return {
+    relationship: !row
+      ? ('none' as const)
+      : row.status === 'accepted'
+        ? ('friend' as const)
+        : row.requesterUserId === viewer
+          ? ('sent' as const)
+          : ('received' as const),
+    requestId: row?.id ?? null,
+  };
+}
+
 @Injectable()
 export class FriendsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -97,24 +114,42 @@ export class FriendsService {
     return {
       success: true,
       data: {
-        users: users.map((user) => {
-          const relation = byUser.get(user.id);
-          return {
-            userId: user.id,
-            nickname: user.nickname,
-            profileImageUrl: user.profileImageUrl,
-            relationship: !relation
-              ? 'none'
-              : relation.status === 'accepted'
-                ? 'friend'
-                : relation.requesterUserId === viewer
-                  ? 'sent'
-                  : 'received',
-            requestId: relation?.id ?? null,
-          };
-        }),
+        users: users.map((user) => ({
+          userId: user.id,
+          nickname: user.nickname,
+          profileImageUrl: user.profileImageUrl,
+          ...relationshipOf(byUser.get(user.id) ?? null, viewer),
+        })),
         pagination: buildPagination({ ...page, total, returned: users.length }),
       },
+    };
+  }
+
+  /**
+   * The viewer's relationship with one user, by id: the friend action on a
+   * user's season summary. Read only, the same derivation as search; self is
+   * named, an unknown or inactive user is 404 as for a request.
+   */
+  async relationship(userId: string | undefined, targetId: string) {
+    const viewer = this.viewer(userId);
+    if (targetId === viewer)
+      return {
+        success: true,
+        data: { userId: targetId, relationship: 'self', requestId: null },
+      };
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetId },
+      select: { status: true },
+    });
+    if (!target || target.status !== 'active')
+      this.fail(404, 'USER_NOT_FOUND', 'Active user not found.');
+    const row = await this.prisma.friendship.findUnique({
+      where: { lowUserId_highUserId: friendshipPair(viewer, targetId) },
+      select: { id: true, status: true, requesterUserId: true },
+    });
+    return {
+      success: true,
+      data: { userId: targetId, ...relationshipOf(row, viewer) },
     };
   }
 

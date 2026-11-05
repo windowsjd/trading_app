@@ -18,6 +18,8 @@ function secondaryDiagnosticsHarness(screen, role = 'admin') {
     '/rewards/me': { state: 'empty', items: [] }, '/badges/me': { state: 'empty', items: [] },
     '/ranking': { state: 'unavailable', season: h.season, myRanking: { state: 'unavailable' }, rankings: [], items: [], pagination: { nextOffset: null } },
     '/users/friend/season-summary': { user: { id: 'friend', nickname: '친구' }, season: null, state: 'not_joined', portfolioAccess: 'private', portfolio: null },
+    // The summary's friend action reads its relationship by user id.
+    '/friends/relationships/friend': { userId: 'friend', relationship: 'none', requestId: null },
   };
   h.client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: Infinity }, mutations: { retry: false } } });
   const call = async (method, url, body) => {

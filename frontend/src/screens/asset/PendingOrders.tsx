@@ -242,7 +242,8 @@ function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
         );
       })}
       {items.length ? (
-        <Text style={styles.count} testID="pending-count">대기 {items.length}건 · 먼저 등록한 순</Text>
+        // Still oldest registration first (buildPendingItems); the order goes without saying.
+        <Text style={styles.count} testID="pending-count">대기 {items.length}건</Text>
       ) : null}
       {items.map((item) => (
         <PendingCard key={item.key} item={item} busy={busy === item.key} locked={busy !== null}

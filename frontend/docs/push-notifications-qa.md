@@ -73,13 +73,17 @@ Negative cases (no push; row absent or `skipped`):
 | # | Steps | Expected |
 |---|---|---|
 | D1 | App open on another tab when a Spot fill arrives | No OS banner; in-app fill banner shows (existing) |
-| D2 | App open when a friend request arrives | No OS banner, no popup; 받은 요청 list refreshes |
+| D2 | App open when a friend request arrives | No OS banner; the in-app banner "친구 요청 / ○○님이 친구 요청을 보냈어요." (2026-11-06, D9–D12); 받은 요청 list and the 친구 dot refresh |
 | D3 | Tap a push while logged out | Login first; after login and mode selection the target opens |
 | D4 | Tap a push for user A while B is logged in | Nothing opens (B stays where they are) |
 | D5 | Beginner account mid-quest taps a push | Quest guide holds the move and explains why |
 | D6 | App open when a Futures liquidation of the user's account arrives | No OS banner; in-app banner "선물 강제청산" with the push text; 내역 보기 → 선물 > 강제청산 기록 |
 | D7 | Spot fill banner on screen when a liquidation arrives | Banners show one after the other, never stacked |
 | D8 | The same liquidation push delivered twice | Banner shown once |
+| D9 | Server push off (or device permission denied): app open on any screen, another member sends a request | Within ~30 s the in-app 친구 요청 banner shows (no push needed); 받은 요청 보기 → 전체 > 친구 > 받은 요청 |
+| D10 | Requests already pending at sign-in / app start, or sent while the app was in the background | No banner for them (the OS push and the 친구 dot cover them); a request arriving later while the app is open shows once |
+| D11 | 친구 요청 or 전체 알림 switched off in 설정 > 알림 | No in-app banner either; the 받은 요청 list and the dot still update |
+| D12 | A fill banner on screen when a friend request arrives (or the reverse) | One banner at a time at the top; the other shows after it leaves; several requests at once read "○○님 외 N명이…" |
 
 ## E. Settings
 

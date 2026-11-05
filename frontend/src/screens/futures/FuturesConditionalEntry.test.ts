@@ -55,6 +55,10 @@ test('이상/이하 follows the watch price against Futures Last; no manual choi
   const h = futuresHarness(); await h.start(); t.after(h.close);
   await h.selectMethod('conditional');
   assert.equal(h.renderer.root.findAll((n: any) => n.props?.testID === 'futures-conditional-trigger').length === 0, true, 'no 이상/이하 selector');
+  // The Spot condition forms' price ⓘ (2026-11-06) stays theirs: Futures keep their own title and 증거금 모드 ⓘ.
+  assert.equal(h.renderer.root.findAll((n: any) => /-trigger-price-info$/u.test(n.props?.testID ?? '')).length === 0, true, 'no price ⓘ');
+  assert.match(h.text(), /감시가격 \(USD\) · 선물 Last 기준/);
+  assert.equal(h.node('futures-margin-info') === undefined, false);
   await h.amount('100');
   assert.equal(h.node('futures-conditional-submit').props.state, 'disabled', 'a trigger price is required');
   assert.match(h.text(), /감시가격을 입력하면 계약 수량을 계산합니다/);

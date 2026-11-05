@@ -493,7 +493,8 @@ describe('pending limit orders in the real trading screen', () => {
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
     assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-early', 'pending-item-spot_limit-late']);
     assert.equal(h.renderer.root.findAll((n: any) => /^pending-(kind|group)-/.test(n.props?.testID ?? '')).length, 0);
-    assert.match(text(h.node('pending-count')), /대기 2건 · 먼저 등록한 순/);
+    // Oldest first as before, without saying so.
+    assert.equal(text(h.node('pending-count')), '대기 2건');
   });
 
   it('keeps holdings filters and shows a distinct empty pending state', async (t) => {
@@ -519,7 +520,8 @@ describe('pending limit orders in the real trading screen', () => {
     const h = inlineTradingHarness();
     h.dimensions.fontScale = 2;
     h.orders = { general: [
-      pendingOrder('buy', 'buy'), pendingOrder('sell', 'sell'),
+      // The server's BUY reservation: kept by the order, not printed on its card.
+      pendingOrder('buy', 'buy', { reservedAmount: '74.13000000' }), pendingOrder('sell', 'sell'),
       pendingOrder('conditional-child', 'sell', { conditionalChildId: 'child' }),
       pendingOrder('market', 'buy', { orderType: 'market' }),
       pendingOrder('done', 'buy', { status: 'executed' }),
@@ -533,7 +535,9 @@ describe('pending limit orders in the real trading screen', () => {
     assert.match(text(buy), /지정가.*매수.*매수 유형지정가/);
     assert.match(text(sell), /지정가.*매도.*매도 유형지정가/);
     assert.match(text(buy), /\(12,345,678,901,234,567,890\.12345678 BUY\)/);
-    assert.match(text(sell), /주문 조건지정가 \$12,345,678,901,234,567,890\.12345678/);
+    assert.match(text(buy), /주문 조건지정가 \$12,345,678,901,234,567,890\.12345678 이하 도달/);
+    assert.match(text(sell), /주문 조건지정가 \$12,345,678,901,234,567,890\.12345678 이상 도달/);
+    assert.doesNotMatch(text(buy), /예약 금액/);
     assert.ok(buy.findAllByType('Text').every((node: any) => node.props.numberOfLines === undefined));
     assert.equal(buy.findAllByType('View').find((node: any) => node.props.style?.flexWrap === 'wrap') !== undefined, true);
     assert.equal(h.dimensions.width, 320);

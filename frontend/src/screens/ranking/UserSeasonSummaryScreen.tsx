@@ -19,13 +19,11 @@ import {
   getRankingTier,
   getUserSeasonSummary,
 } from '../../features/ranking/api';
+import { getFriendRelationship } from '../../features/friends/api';
+import type { MeDto } from '../../features/me/api';
 import { formatKrw, formatKstDateTime, formatPercent } from '../../utils/format';
-import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
 import { getCompletedTradeDisplay } from '../../features/friends/completedTradeDisplay';
 import { financial } from '../../theme/financialColors';
-import { useAppearance } from '../../theme/appearance';
-import { getHomeTier } from '../home/tierPresentation';
-import TierEmblem from '../home/TierEmblem';
 import { getApiErrorCode } from '../../services/api/errorMapper';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -34,13 +32,20 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import FuturesPositionRow from '../../components/tradingAccount/FuturesPositionRow';
 import FuturesDirectionBadge from '../../components/tradingAccount/FuturesDirectionBadge';
+import StandingCard from './StandingCard';
+import UserFriendAction from './UserFriendAction';
+
+/** The summary card's own entrance memory: viewing someone else never decides 내 순위's (tierStage). */
+const SUMMARY_SPOTLIGHT_MEMORY = 'userSummary';
 
 type Props = { route: { params: { userId: string } } };
 export default function UserSeasonSummaryScreen({ route }: Props) {
   const { userId } = route.params;
   const focused = useIsFocused();
   const client = useQueryClient();
-  const { mode } = useAppearance();
+  // The member's own summary (a ranking row of mine) offers no friend action;
+  // the signed-in member is known before any summary opens.
+  const self = client.getQueryData<MeDto>(QUERY_KEYS.me)?.id === userId;
   // No polling: a friend's portfolio is read on entry, on return (screen or
   // app), on pull to refresh and on an invalidation. Each read re-checks the
   // server's friendship/privacy/season gates; the shown values are that read's.
@@ -52,7 +57,15 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
     enabled: focused,
     gcTime: 0,
   });
-  const refresh = usePullToRefresh([query]);
+  // The friend action's relationship with this user id, read alongside the summary.
+  const relationship = useQuery({
+    queryKey: QUERY_KEYS.friends.relationship(userId),
+    queryFn: ({ signal }) => getFriendRelationship(userId, signal),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    enabled: focused && !self,
+  });
+  const refresh = usePullToRefresh([query, { ...relationship, enabled: !self }]);
   useEffect(() => {
     if (!focused || query.isError) client.setQueryData<UserSeasonSummaryDto>(
       QUERY_KEYS.ranking.userSeasonSummary(userId),
@@ -61,6 +74,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   }, [client, focused, query.data, query.isError, userId]);
 
   const { refetch } = query;
+  const { refetch: refetchRelationship } = relationship;
   const clearFinancialCache = useCallback(() => client.setQueryData<UserSeasonSummaryDto>(
     QUERY_KEYS.ranking.userSeasonSummary(userId),
     data => data ? { ...data, portfolio: null } : data,
@@ -69,8 +83,9 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
     useCallback(() => {
       clearFinancialCache();
       void refetch();
+      if (!self) void refetchRelationship({ cancelRefetch: false });
       return () => { clearFinancialCache(); };
-    }, [clearFinancialCache, refetch]),
+    }, [clearFinancialCache, refetch, refetchRelationship, self]),
   );
   // Back from the background is a return too: the old answer is not shown
   // again before the server has re-checked the friend's permission.
@@ -81,11 +96,12 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
       if (previous !== 'active' && next === 'active') {
         clearFinancialCache();
         void refetch();
+        if (!self) void refetchRelationship({ cancelRefetch: false });
       }
       previous = next;
     });
     return () => subscription.remove();
-  }, [clearFinancialCache, focused, refetch]);
+  }, [clearFinancialCache, focused, refetch, refetchRelationship, self]);
   if (query.isLoading)
     return <FullPageLoading message="유저 정보를 불러오는 중입니다." />;
   const code = getApiErrorCode(query.error);
@@ -106,7 +122,6 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
       />
     );
   const { user, season, portfolioAccess, reason } = query.data;
-  const tier = getHomeTier(getRankingTier(season), mode);
   // Never paint cached sensitive sections while a fresh permission check runs.
   const portfolio =
     focused && !query.isFetching && !query.isError && portfolioAccess === 'available'
@@ -133,34 +148,22 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
       style={styles.screen}
       contentContainerStyle={styles.content}
     >
-      <View style={styles.card}>
-        {/* Same profile order as the ranking list: photo left, name right. */}
-        <View style={styles.profile}>
-          <ProfileAvatar profileImageUrl={user.profileImageUrl} size={56} />
-          <Text style={[styles.title, styles.profileName]}>{user.nickname}</Text>
-        </View>
-        <SeasonTitle style={styles.helper} name={season?.name ?? '현재 시즌 정보가 없습니다.'} displayBadge={season?.displayBadge} />
-        <Text style={styles.helper}>
-          현재 순위 {season?.rank ? `#${season.rank}` : '-'}
-        </Text>
-        {tier ? (
-          <View style={styles.tierRow} accessible accessibilityLabel={`${tier.name} 티어`}>
-            <TierEmblem tier={tier.id} size={36} />
-            <Text style={styles.tierName}>{tier.name}</Text>
-          </View>
-        ) : null}
+      <SeasonTitle style={styles.helper} name={season?.name ?? '현재 시즌 정보가 없습니다.'} displayBadge={season?.displayBadge} />
+      {/* 내 순위's tier card (StandingCard) for THIS user: every figure is this
+          read's — never the member's own; without a known tier, the plain card. */}
+      <View style={self ? styles.cardOnly : undefined}>
+        <StandingCard testIDPrefix="user-summary" tier={getRankingTier(season)} rankLabel="시즌 순위" rank={season?.rank}
+          settled={!!season?.finalTier} figures={season}
+          header={(foreground) => (
+            // Same profile order as the ranking list: photo left, name right.
+            <View style={styles.profile}>
+              <ProfileAvatar profileImageUrl={user.profileImageUrl} size={36} testID="user-summary-avatar" />
+              <Text testID="user-summary-nickname" style={[styles.nickname, foreground]}>{user.nickname}</Text>
+            </View>
+          )}
+          spotlight={{ context: `${season?.id}|${season?.finalTier ? 'final' : 'daily'}|${user.id}`, paused: !focused, memory: SUMMARY_SPOTLIGHT_MEMORY }} />
+        {self ? null : <UserFriendAction user={user} relationship={relationship} />}
       </View>
-      {season ? (
-        <View style={styles.card}>
-          <Text style={styles.label}>현재 시즌 요약</Text>
-          <Text style={styles.helper}>
-            수익률 <Text style={{ color: getRecordFinancialDisplay(season.returnRate, 'rate').color }}>{getRecordFinancialDisplay(season.returnRate, 'rate').text}</Text>
-          </Text>
-          <Text style={styles.helper}>
-            총 자산 {formatKrw(season.totalAssetKrw)}원
-          </Text>
-        </View>
-      ) : null}
       {portfolio ? (
         <>
           <View style={styles.card}>
@@ -274,10 +277,11 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   );
 }
 const styles = StyleSheet.create({
-  profile: { flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
-  profileName: { flex: 1, minWidth: 0 },
-  tierRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tierName: { fontSize: 15, lineHeight: 22, fontWeight: '700' },
+  // The ranking tab's 내 순위 profile: 36 photo, 18/26 bold name.
+  profile: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, flexShrink: 1 },
+  nickname: { flex: 1, minWidth: 0, fontSize: 18, lineHeight: 26, fontWeight: '700' },
+  // StandingCard keeps 12 below itself; without the friend action the screen's gap already does.
+  cardOnly: { marginBottom: -12 },
   screen: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 32, gap: 12 },
   card: {
@@ -288,7 +292,6 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.surface,
     gap: 10,
   },
-  title: { fontSize: 22, fontWeight: '700', flexShrink: 1 },
   label: { fontSize: 17, fontWeight: '700' },
   helper: { fontSize: 14, color: semantic.secondary, flexShrink: 1 },
   row: {

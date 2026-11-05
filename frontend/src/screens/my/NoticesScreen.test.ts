@@ -59,15 +59,15 @@ it('a link with noticeId opens that notice and scrolls to it, also when the scre
 const published = {
   id: '0190a2b4-0000-7000-8000-000000000001',
   title: '서버 점검 안내',
-  // 2026-11-06 00:30 KST: newer than every app notice (the newest is 2026-11-05).
-  publishedAt: '2026-11-05T15:30:00.000Z',
+  // 2026-11-07 00:30 KST: newer than every app notice (the newest is 2026-11-06).
+  publishedAt: '2026-11-06T15:30:00.000Z',
   sections: [{ heading: '점검 시간', paragraphs: ['10월 21일 02:00–03:00'] }],
 };
 
 it('lists an important notice published by an operator, newest first and marked', (t) => {
   const h = setup(t, undefined, { notices: [published] });
   const toggle = h.find(`notice-${published.id}-toggle`);
-  assert.equal(toggle.props.accessibilityLabel, '중요 공지, 서버 점검 안내, 2026.11.06');
+  assert.equal(toggle.props.accessibilityLabel, '중요 공지, 서버 점검 안내, 2026.11.07');
   const ids = h.renderer.root
     .findAll((node: any) => typeof node.type === 'string' && /^notice-[^]+-toggle$/.test(node.props.testID ?? ''))
     .map((node: any) => node.props.testID);

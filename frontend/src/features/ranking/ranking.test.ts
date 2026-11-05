@@ -69,6 +69,8 @@ function createHarness(scope?: string) {
       queryOptions.push(options);
       return ranking;
     },
+    // The summary's friend action (its own tests drive the commands).
+    useMutation: () => ({ isPending: false, variables: undefined, mutate: () => {}, reset: () => {} }),
     useQueryClient: () => queryClient,
   });
   mockLocal('app/navigation/navigationHooks', { useRootNavigation: () => navigation });
@@ -434,7 +436,7 @@ describe('existing user season summary', () => {
     assert.match(html, />Silver</);
     assert.doesNotMatch(html, /퍼센타일|등급 silver/);
     assert.match(html, /999,998/);
-    await h.queryOptions[0].queryFn({});
+    await h.queryOptions.find((q) => q.queryKey[0] === 'ranking').queryFn({});
     assert.equal(h.requests[0], '/users/user-2/season-summary');
   });
 
@@ -545,8 +547,9 @@ describe('friend portfolio reads (no polling)', () => {
     assert.deepEqual([options.refetchInterval, options.enabled, options.gcTime, options.staleTime, options.refetchOnMount],
       [undefined, true, 0, 0, 'always']);
     assert.doesNotMatch(html, /최대 낙폭/);
-    assert.match(html, /수익률/);
-    assert.match(html, /총 자산 999,998원/);
+    // The figures sit on the tier card (StandingCard), as on 내 순위.
+    assert.match(html, /data-testid="user-summary-return"[^>]*>\+9%</);
+    assert.match(html, /data-testid="user-summary-total"[^>]*>999,998원</);
   });
 
   it('shows futures values as of the server\'s evaluation, labelled, however long ago that read was', () => {

@@ -36,6 +36,13 @@ export class FriendsController {
   ) {
     return this.friends.list(request.user?.userId, query);
   }
+  @Get('relationships/:userId')
+  relationship(
+    @Req() request: AuthenticatedRequest,
+    @Param('userId') userId: string,
+  ) {
+    return this.friends.relationship(request.user?.userId, userId);
+  }
   @Get('requests')
   requests(
     @Req() request: AuthenticatedRequest,

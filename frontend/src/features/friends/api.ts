@@ -27,6 +27,28 @@ export async function getFriends(
   );
   return response.data.data;
 }
+/** The signed-in member's side of one pair; `self` for the member's own id. */
+export type FriendRelationship = {
+  userId: string;
+  relationship: FriendUser['relationship'] | 'self';
+  requestId: string | null;
+};
+const RELATIONSHIPS: ReadonlySet<string> = new Set(['none', 'sent', 'received', 'friend', 'self']);
+/**
+ * One user's relationship by user id (GET /friends/relationships/:userId,
+ * read only). An answer for another user or of an unknown kind is an error,
+ * never "none".
+ */
+export async function getFriendRelationship(userId: string, signal?: AbortSignal) {
+  const response = await apiClient.get<ApiSuccessResponse<FriendRelationship>>(
+    `/friends/relationships/${encodeURIComponent(userId)}`,
+    { signal },
+  );
+  const data = response.data.data;
+  if (data?.userId !== userId || !RELATIONSHIPS.has(data.relationship))
+    throw new Error('친구 관계를 확인할 수 없습니다.');
+  return data;
+}
 export type FriendAction = {
   action: 'request' | 'accept' | 'reject' | 'remove';
   user: FriendUser;

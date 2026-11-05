@@ -7,7 +7,7 @@ import { tierEmblemVisibleBox, tierEmblemWidth } from './TierEmblem';
 import type { HomeTier } from './tierPresentation';
 import {
   EASE_OUT, LINEAR, PARTICLES, PARTICLE_OPACITY, STAGE_TIMING, STILL_FLOOR_OPACITY, SWAY_CURVE,
-  beamPoints, beamStops, dropEasing, emblemSlot, entranceDecision, flashTint, floorAlpha, loopPosition, rememberPresented, rgba, stageAnchor,
+  STANDING_SPOTLIGHT_MEMORY, beamPoints, beamStops, dropEasing, emblemSlot, entranceDecision, flashTint, floorAlpha, loopPosition, rememberPresented, rgba, stageAnchor,
   stageGeometry, stageMotion, stageLook, swing, type Curve, type Size, type StageCard, type StageGeometry, type StageLook,
 } from './tierStage';
 
@@ -20,6 +20,8 @@ export type TierSpotlight = {
   context: string;
   /** Off screen (the tab lost focus): the loops stop and an owed entrance waits. */
   paused: boolean;
+  /** Whose entrance memory (tierStage): 내 순위 by default; another card keeps its own. */
+  memory?: string;
 };
 
 type Values = {
@@ -108,6 +110,7 @@ export function useTierStage(input: {
   const tier = look?.tier ?? null;
   const context = input?.spotlight.context ?? '';
   const paused = input?.spotlight.paused ?? true;
+  const memory = input?.spotlight.memory ?? STANDING_SPOTLIGHT_MEMORY;
   const emblemSize = input?.emblemSize ?? 0;
   const stacked = input?.stacked ?? false;
   const bobPeriod = look?.bobPeriod ?? null;
@@ -117,7 +120,7 @@ export function useTierStage(input: {
   // Drop values known to hold the rest pose: made at rest, or a drop that ran to its end.
   const [resting] = useState(() => new WeakSet<Animated.Value>());
   // Until the OS says reduced motion, a tier that owes its entrance is hidden at the drop's start.
-  const owes = () => tier !== null && entranceDecision(tier, context) === 'play' && !(settled && reduced);
+  const owes = () => tier !== null && entranceDecision(tier, context, memory) === 'play' && !(settled && reduced);
   const [emblem, setEmblem] = useState(() => emblemDrop(resting, tier, owes()));
   if (emblem.tier !== tier) setEmblem(emblemDrop(resting, tier, owes()));
   const drop = emblem.drop;
@@ -137,19 +140,19 @@ export function useTierStage(input: {
   const [entrance, setEntrance] = useState<HomeTier | null>(null);
   useEffect(() => {
     if (!tier) return;
-    const decision = entranceDecision(tier, context);
+    const decision = entranceDecision(tier, context, memory);
     if (decision === 'play' && !(settled && reduced)) {
       // Owed: it plays once the OS answer is known and the card is on screen.
       if (!settled || paused) return;
-      rememberPresented(tier, context);
+      rememberPresented(tier, context, memory);
       setEntrance(tier);
       return;
     }
-    if (decision === 'silent') rememberPresented(tier, context);
+    if (decision === 'silent') rememberPresented(tier, context, memory);
     // Nothing owed (already presented, another selection, reduced motion): the emblem rests unless
     // this card's own entrance is still to run — it is never left at the drop's hidden start.
     if (entrance !== tier || !motion) settle();
-  }, [context, entrance, motion, paused, reduced, settle, settled, tier]);
+  }, [context, entrance, memory, motion, paused, reduced, settle, settled, tier]);
 
   const entering = entrance !== null && entrance === tier && motion && !paused;
   useEffect(() => {

@@ -96,11 +96,13 @@ describe('통합 대기목록', () => {
     const buy = byKey(items, 'spot_limit:o-1');
     assert.deepEqual([buy.assetName, buy.typeLabel, buy.sideLabel, buy.tone], ['삼성전자', '지정가', '매수', 'buy']);
     assert.deepEqual(buy.rows.map((entry) => [entry.label, entry.value]), [
-      ['금액', '700,000원 (10주)'], ['매수 유형', '지정가'], ['주문 조건', '지정가 70,000원'],
+      ['금액', '700,000원 (10주)'], ['매수 유형', '지정가'], ['주문 조건', '지정가 70,000원 이하 도달'],
     ]);
-    assert.deepEqual(buy.notes, ['예약 금액 700,105원 (수수료 포함)']);
+    // The reservation is the server's (700,105원 here), never a card line.
+    assert.deepEqual(buy.notes, []);
     assert.equal(registeredLabel(buy), '등록 2026-11-05 10:05');
     assert.equal(row(byKey(items, 'spot_limit:s'), 'execution')?.label, '매도 유형');
+    assert.equal(row(byKey(items, 'spot_limit:s'), 'condition')?.value, '지정가 70,000원 이상 도달');
     // A crypto BUY watch by amount: the quantity is decided when it fills, never invented.
     const amountWatch = byKey(items, 'conditional_buy:cb-1');
     assert.deepEqual(amountWatch.rows.map((entry) => [entry.label, entry.value]), [
@@ -264,6 +266,32 @@ describe('통합 대기목록', () => {
       assert.equal(/예약|감시 중에는|다시 (사용|매도)할 수/u.test(cancel?.confirm ?? ''), false, key);
       assert.equal((cancel?.confirm ?? '').split('?').length, 2, key);
     }
+  });
+
+  it('a plain Spot limit reads 이하/이상 도달 by side; LOC, Futures limits and conditions keep their own condition and notes', () => {
+    const loc = { limitOnClose: { status: 'pending', sessionDate: '2026-11-05', decisionReason: null } };
+    const usd = { market: 'NAS', symbol: 'AAPL', name: 'Apple Inc.', currencyCode: 'USD', quantity: '1.00000000', limitPrice: '70000.00000000', reservedAmount: '74.13000000' };
+    const items = buildPendingItems({
+      spotOrders: [
+        spotLimit({ ...usd, orderId: 'b', id: 'b' }), spotLimit({ ...usd, orderId: 's', id: 's', side: 'sell', reservedAmount: null }),
+        spotLimit({ orderId: 'loc-b', id: 'loc-b', ...loc }), spotLimit({ orderId: 'loc-s', id: 'loc-s', side: 'sell', reservedAmount: null, ...loc }),
+      ],
+      futuresLimits: [futuresLimit()],
+      conditionalBuys: [watch({ executionType: 'limit', limitPrice: '94.00000000' })],
+    });
+    const condition = (key: string) => row(byKey(items, key), 'condition')?.value;
+    assert.deepEqual([condition('spot_limit:b'), condition('spot_limit:s')], ['지정가 $70,000 이하 도달', '지정가 $70,000 이상 도달']);
+    assert.deepEqual([byKey(items, 'spot_limit:b').notes, byKey(items, 'spot_limit:s').notes], [[], []]);
+    // The plain BUY card drops only its line: the change still starts from the order's own terms.
+    const edit = byKey(items, 'spot_limit:b').edit as Extract<PendingItem['edit'], { editable: true }>;
+    assert.deepEqual([edit.target, edit.initial], [{ kind: 'spot_order', id: 'b' }, { limitPrice: '70000', quantity: '1' }]);
+    // LOC is decided by the close: its condition and its reservation line stay.
+    assert.deepEqual([condition('spot_limit:loc-b'), byKey(items, 'spot_limit:loc-b').notes], ['지정가 70,000원 · 종가 기준', ['예약 금액 700,105원 (수수료 포함)']]);
+    assert.deepEqual([condition('spot_limit:loc-s'), byKey(items, 'spot_limit:loc-s').notes], ['지정가 70,000원 · 종가 기준', []]);
+    // Futures keep their wording and their separate 예약 증거금; a watch keeps its trigger.
+    assert.deepEqual([condition('futures_limit:fl-1'), byKey(items, 'futures_limit:fl-1').notes], ['지정가 $100', ['예약 증거금 $40.1 (수수료 포함)']]);
+    assert.equal(condition('conditional_buy:cb-1'), '감시가격 $95 이하 · 지정가 $94');
+    for (const item of items) assert.equal(/도달/u.test(condition(item.key) ?? '') === (item.typeLabel === '지정가'), true, item.key);
   });
 
   it('prices keep every given decimal with separators; nothing is rounded for display', () => {

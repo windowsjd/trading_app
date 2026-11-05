@@ -506,6 +506,40 @@ async function run() {
   await get('/friends/search?nickname[x]=bad').expect(400);
   await get('/friends?limit=0').expect(400);
   await post('/friends/requests', 0, { userId: userIds[0] }).expect(400);
+  // One pair by user id (a user's season summary): the viewer's side, read only.
+  type Relation = {
+    userId: string;
+    relationship: string;
+    requestId: string | null;
+  };
+  const relation = async (target: number, viewer: number) => {
+    const response = await get(
+      `/friends/relationships/${userIds[target]}`,
+      viewer,
+    ).expect(200);
+    return (response.body as { data: Relation }).data;
+  };
+  const sameRelation = (
+    data: Relation,
+    target: number,
+    relationship: string,
+    requestId: string | null,
+  ) =>
+    data.userId === userIds[target] &&
+    data.relationship === relationship &&
+    data.requestId === requestId;
+  check(
+    sameRelation(await relation(7, 0), 7, 'none', null),
+    'relationship none',
+  );
+  check(
+    sameRelation(await relation(0, 0), 0, 'self', null),
+    'relationship self',
+  );
+  await get(`/friends/relationships/${randomUUID()}`).expect(404);
+  await request(server)
+    .get(`/api/v1/friends/relationships/${userIds[7]}`)
+    .expect(401);
   let r = await summary();
   check(
     r.body.data.portfolioAccess === 'not_friend' &&
@@ -514,6 +548,15 @@ async function run() {
   );
   r = await post('/friends/requests', 0, { userId: userIds[7] }).expect(201);
   const id = r.body.data.requestId;
+  const requestId = id as string;
+  check(
+    sameRelation(await relation(7, 0), 7, 'sent', requestId),
+    'requester sees sent',
+  );
+  check(
+    sameRelation(await relation(0, 7), 0, 'received', requestId),
+    'recipient sees received',
+  );
   await post('/friends/requests', 7, { userId: userIds[0] }).expect(409);
   await post(`/friends/requests/${id}/accept`, 0).expect(404);
   await post(`/friends/requests/${id}/reject`, 41).expect(404);
@@ -525,6 +568,11 @@ async function run() {
     'incoming request visible to recipient',
   );
   await post(`/friends/requests/${id}/accept`, 7).expect(201);
+  check(
+    sameRelation(await relation(7, 0), 7, 'friend', requestId) &&
+      sameRelation(await relation(0, 7), 0, 'friend', requestId),
+    'both members see friend',
+  );
   const markAt = new Date(Date.now() - 1000);
   await db.futuresMarkSnapshot.create({
     data: {
@@ -740,10 +788,23 @@ async function run() {
     ).expect(409);
   }
   await get('/ranking?scope=near_me').expect(400);
+  check(
+    sameRelation(
+      await relation(0, 39),
+      0,
+      'received',
+      (pending.body as { data: Relation }).data.requestId,
+    ),
+    'pending incoming before reject',
+  );
   await post(
     `/friends/requests/${pending.body.data.requestId}/reject`,
     39,
   ).expect(201);
+  check(
+    sameRelation(await relation(39, 0), 39, 'none', null),
+    'rejected is none again',
+  );
   r = await get(`/users/${userIds[40]}/season-summary`);
   check(
     r.body.data.state === 'not_joined' && r.body.data.portfolio === null,
@@ -782,6 +843,8 @@ async function run() {
     'inactive target denied',
   );
   await get('/friends', 7).expect(403);
+  await get(`/friends/relationships/${userIds[7]}`, 41).expect(404);
+  await get(`/friends/relationships/${userIds[7]}`, 0).expect(404);
   r = await get(`/friends/search?nickname=friends-${tag}-renamed`);
   check(r.body.data.users.length === 0, 'inactive target excluded');
   await post('/friends/requests', 41, { userId: userIds[7] }).expect(404);

@@ -47,6 +47,7 @@ import ActionPressable from '../../components/common/ActionPressable';
 import OrderNumberInput, { orderInputStyle } from './OrderNumberInput';
 import OrderRatioControls from './OrderRatioControls';
 import TriggerDirectionChoice from './TriggerDirectionChoice';
+import TriggerPriceLabel from './TriggerPriceLabel';
 
 type LearningGate = { allowed: boolean; locked: boolean; message: string | null; guard: (work: () => void) => void };
 
@@ -261,7 +262,7 @@ export default function ConditionalBuyForm({
   return (
     <View style={styles.form} testID="conditional-buy-form">
       <View style={styles.group}>
-        <Text style={styles.label}>감시가격 ({currency})</Text>
+        <TriggerPriceLabel side="buy" currency={currency} testID="conditional-trigger-price" />
         <OrderNumberInput
           testID="conditional-trigger-price"
           accessibilityLabel={`감시가격 ${currency}`}

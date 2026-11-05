@@ -43,7 +43,8 @@ export default function PushNotificationsHost() {
   return nativePush.supported ? <NativePushHost /> : null;
 }
 
-function useSessionUserId(queryClient: QueryClient): string | null {
+/** The signed-in user's id from the /me cache (null signed out / restoring). */
+export function useSessionUserId(queryClient: QueryClient): string | null {
   const subscribe = useCallback(
     (notify: () => void) =>
       queryClient.getQueryCache().subscribe((event) => {
@@ -65,7 +66,7 @@ function currentRootRoute(): string | null {
   return state?.routes[state.index]?.name ?? null;
 }
 
-function useRootRouteName(): string | null {
+export function useRootRouteName(): string | null {
   const [name, setName] = useState<string | null>(currentRootRoute);
   useEffect(() => {
     const update = () => setName(currentRootRoute());
@@ -76,8 +77,9 @@ function useRootRouteName(): string | null {
 }
 
 /** `pushAt` differs per tap, so an already open screen selects the pushed
- * view again even when the rest of the params are the same. */
-function navigateTo(intent: PushIntent, pushAt: number) {
+ * view again even when the rest of the params are the same. The in-app
+ * friend-request banner opens 받은 요청 the same way. */
+export function navigateTo(intent: PushIntent, pushAt: number) {
   switch (intent.kind) {
     case 'trade_history':
       rootNavigationRef.navigate('TradeHistory', {

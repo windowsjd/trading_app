@@ -125,6 +125,29 @@ async function run() {
         await page.getByTestId(`order-method-${methods[0]}`).scrollIntoViewIfNeeded();
       };
       const row = (method) => page.getByTestId(`order-method-${method}`);
+      // The ⓘ beside a Spot condition's price (2026-11-06): its sheet reads the agreed copy, sits
+      // inside the viewport, and closes with the typed price kept.
+      const priceInfo = async (field, label, title, body, value, name) => {
+        const info = page.getByTestId(`${field}-info`);
+        // Right beside its field title, on the title's line.
+        const labelBox = await page.getByText(label, { exact: true }).first().boundingBox();
+        const infoBox = await info.boundingBox();
+        assert.ok(infoBox.x >= labelBox.x + labelBox.width - 1 && infoBox.x - (labelBox.x + labelBox.width) <= 12
+          && Math.abs(infoBox.y + infoBox.height / 2 - (labelBox.y + labelBox.height / 2)) <= 8, `${field} ⓘ beside ${label} (${tag})`);
+        await info.click();
+        await page.getByTestId(`${field}-info-body`).waitFor();
+        await page.waitForTimeout(450);
+        const sheet = await page.getByTestId(`${field}-info-sheet`).innerText();
+        assert.ok(sheet.includes(title), `${field} title (${tag})`);
+        assert.equal(await page.getByTestId(`${field}-info-body`).innerText(), body.join('\n'), `${field} body (${tag})`);
+        assert.equal(/보장|체결되지 않을 수/u.test(sheet), false, `${field} no fill caveat (${tag})`);
+        const box = await page.getByTestId(`${field}-info-body`).boundingBox();
+        assert.ok(box.y >= 0 && box.y + box.height <= page.viewportSize().height + 1 && box.x >= 0 && box.x + box.width <= page.viewportSize().width + 1, `${field} sheet on screen (${tag})`);
+        await shot(name);
+        await page.getByTestId(`${field}-info-sheet-close`).click();
+        await page.getByTestId(`${field}-info-body`).waitFor({ state: 'detached' });
+        assert.equal(await page.getByTestId(field).inputValue(), value, `${field} kept (${tag})`);
+      };
 
       // 1. Crypto BUY: 시장가 by default with the ▼ on the field's right, then
       // the sheet with a server-gated 조건주문.
@@ -148,6 +171,10 @@ async function run() {
       await page.getByTestId('conditional-limit-price').fill('0.80123456');
       await page.getByTestId('conditional-size').fill('1234567.12345678');
       await shot('crypto-conditional');
+      await priceInfo('conditional-trigger-price', '감시가격 (USD)', '감시가격이란?', [
+        '감시가격은 자동으로 매수·매도 주문을 시작하는 기준가격입니다.',
+        '시세가 설정한 방향에 따라 감시가격 이상 또는 이하에 도달하면 선택한 방식(시장가·지정가)으로 주문을 접수합니다.',
+      ], '0.81234567', 'crypto-conditional-price-info');
       await page.getByTestId('conditional-submit').click();
       await page.getByTestId('conditional-registered').waitFor();
       await page.getByTestId('conditional-registered').scrollIntoViewIfNeeded();
@@ -265,6 +292,11 @@ async function run() {
       assert.equal(await page.getByTestId('sell-condition-quantity').inputValue(), '5', `50% of 10 held (${tag})`);
       await page.getByTestId('sell-condition-ratio').scrollIntoViewIfNeeded();
       await shot('krx-closed-sell-condition');
+      await page.getByTestId('sell-condition-trigger-price-info').scrollIntoViewIfNeeded();
+      await priceInfo('sell-condition-trigger-price', '매도 기준가 (KRW)', '매도 기준가란?', [
+        '매도 기준가는 자동으로 매도 주문을 시작하는 기준가격입니다.',
+        '시세가 설정한 방향에 따라 매도 기준가 이상 또는 이하에 도달하면 선택한 방식(시장가·지정가)으로 주문을 접수합니다.',
+      ], '65000', 'krx-sell-price-info');
 
       // 4d. KRX open: the direction follows the price; ratio picks size the watch.
       await go('krx=1&asset=SAMSUNG&conditional=enabled&longName=1&stock=1');
@@ -327,7 +359,12 @@ async function run() {
         ['spot_stop_loss-mix-sl', '익절가/손절가', '매도 · 손절가', '손절가 매도 설정을 취소할까요?'],
       ];
       assert.deepEqual(await cards(), mix.map(([key]) => `pending-item-${key}`), `registration order (${tag})`);
-      assert.equal(await page.getByTestId('pending-count').innerText(), `대기 ${mix.length}건 · 먼저 등록한 순`, `count (${tag})`);
+      // Still registration order (above), without saying so (2026-11-06).
+      assert.equal(await page.getByTestId('pending-count').innerText(), `대기 ${mix.length}건`, `count (${tag})`);
+      // Plain Spot limits: their direction of reach, and no reservation line on the card.
+      assert.equal(await page.getByTestId('pending-item-spot_limit-mix-buy-limit-condition').innerText().then((text) => /지정가 .+ 이하 도달/u.test(text)), true, `buy limit condition (${tag})`);
+      assert.equal(await page.getByTestId('pending-item-spot_limit-mix-sell-limit-condition').innerText().then((text) => /지정가 .+ 이상 도달/u.test(text)), true, `sell limit condition (${tag})`);
+      assert.equal(await page.getByTestId('pending-item-spot_limit-mix-buy-limit').innerText().then((text) => text.includes('예약 금액')), false, `no 예약 금액 (${tag})`);
       for (const [index, [key, badge, side]] of mix.entries()) {
         assert.equal((await page.getByTestId(`pending-item-${key}-type`).innerText()).trim(), badge, `${key} badge (${tag})`);
         assert.equal(await page.getByTestId(`pending-item-${key}-registered`).innerText(), `등록 2026-11-05 09:0${index}`, `${key} time (${tag})`);
@@ -429,7 +466,7 @@ async function run() {
       await go('asset=SUI&conditional=enabled&conditionalRows=many&longName=1&conditionalCancel=fail');
       await page.getByTestId('holdings-filter-pending').click();
       for (const s of ['order_pending', 'triggered', 'watching']) await page.getByTestId(`pending-item-conditional_buy-old-${s}`).waitFor();
-      assert.equal(await page.getByTestId('pending-count').innerText(), '대기 3건 · 먼저 등록한 순', `old open rows listed (${tag})`);
+      assert.equal(await page.getByTestId('pending-count').innerText(), '대기 3건', `old open rows listed (${tag})`);
       await page.getByTestId('pending-history-toggle').scrollIntoViewIfNeeded();
       await page.getByTestId('pending-history-toggle').click();
       await page.getByTestId('pending-history').waitFor();

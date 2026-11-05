@@ -288,10 +288,13 @@ export function loopPosition(elapsed: number, period: number, delay = 0) {
 
 /*
  * When the entrance plays. The memory lives for the app process: remounts,
- * refocus, Light/Dark and font changes find the tier already presented.
+ * refocus, Light/Dark and font changes find the tier already presented. Each
+ * card that shows the spotlight keeps its own (`memory`): 내 순위 is the
+ * default, and another user's season summary (2026-11-06) never decides it.
  */
 type Presented = { tier: HomeTier; context: string };
-let presented: Presented | null = null;
+export const STANDING_SPOTLIGHT_MEMORY = 'standing';
+const presented = new Map<string, Presented>();
 
 /**
  * `play`: the first presentation in this process, or the tier changed within
@@ -299,18 +302,19 @@ let presented: Presented | null = null;
  * daily → final, another participant), so only remember the new tier.
  * `none`: this tier is already presented.
  */
-export function entranceDecision(tier: HomeTier, context: string): 'play' | 'silent' | 'none' {
-  if (!presented) return 'play';
-  if (presented.context !== context) return 'silent';
-  return presented.tier === tier ? 'none' : 'play';
+export function entranceDecision(tier: HomeTier, context: string, memory = STANDING_SPOTLIGHT_MEMORY): 'play' | 'silent' | 'none' {
+  const last = presented.get(memory);
+  if (!last) return 'play';
+  if (last.context !== context) return 'silent';
+  return last.tier === tier ? 'none' : 'play';
 }
 
 /** Record the presented tier: when its entrance actually starts, or silently. */
-export function rememberPresented(tier: HomeTier, context: string) {
-  presented = { tier, context };
+export function rememberPresented(tier: HomeTier, context: string, memory = STANDING_SPOTLIGHT_MEMORY) {
+  presented.set(memory, { tier, context });
 }
 
 /** Tests only: a fresh app process. */
 export function resetPresentedTier() {
-  presented = null;
+  presented.clear();
 }

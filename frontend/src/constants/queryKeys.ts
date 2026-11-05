@@ -27,6 +27,8 @@ export const QUERY_KEYS = {
     list: ['friends', 'list', 'infinite'] as const,
     requests: ['friends', 'requests', 'infinite'] as const,
     search: (nickname: string) => ['friends', 'search', nickname, 'infinite'] as const,
+    /** The signed-in member's relationship with one user, by id (under `all`: every friend change refreshes it). */
+    relationship: (userId: string) => ['friends', 'relationship', userId] as const,
   },
 
   season: {

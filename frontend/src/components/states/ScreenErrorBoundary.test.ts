@@ -54,6 +54,7 @@ function harness() {
   // The app-wide fill banner has its own tests; this boundary test renders the navigator only.
   rootMocks['../../features/order/OrderFillNotifier'] = { default: () => null, __esModule: true };
   rootMocks['../../features/notifications/PushNotificationsHost'] = { default: () => null, __esModule: true };
+  rootMocks['../../features/friends/FriendRequestNotifier'] = { default: () => null, __esModule: true };
   for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
     '../../screens/history/TradeHistoryScreen', '../../screens/history/OrderFailureScreen', '../../screens/asset/AssetChartScreen', '../../screens/futures/FuturesChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen', '../../screens/season/SeasonFinalResultScreen']) {
     rootMocks[name] = { default: name, __esModule: true };

@@ -12,6 +12,14 @@ not depend on JWT claims or a server cache.
 - `GET /friends`: paginated accepted relationships; inactive friends remain
   removable and are labelled `active: false`.
 - `GET /friends/requests`: paginated incoming pending requests from active users.
+- `GET /friends/relationships/:userId` (2026-11-06, read only): the caller's
+  relationship with that one user, looked up by user id (never by nickname)
+  for the friend action on a user's season summary. Returns `userId`,
+  `relationship` (none/sent/received/friend, derived exactly as in search, or
+  `self` for the caller's own id) and `requestId` (the friendship row id when
+  related, else null; the id accept/reject/delete take). An unknown or inactive
+  user is 404 `USER_NOT_FOUND`, as for a request. No schema change; nothing is
+  written.
 - `POST /friends/requests` with `{ userId }`: create pending request; self and
   either-direction duplicates fail with 400/409. Concurrent insert uniqueness
   is enforced in PostgreSQL.

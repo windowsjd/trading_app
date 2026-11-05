@@ -124,6 +124,20 @@ describe('friend API and targeted cache updates', () => {
     assert.ok(calls[0][1].includes('offset=30'));
     assert.doesNotMatch(JSON.stringify(calls), /email|tradingAccount|api\/v2/);
   });
+  it('reads one relationship by user id; an answer for another id, of an unknown kind or empty is an error, never "none"', async () => {
+    const calls: string[] = [];
+    const answers: unknown[] = [];
+    const api = load(resolve('src/features/friends/api.ts'), { '../../services/api/client': { apiClient: {
+      get: async (path: string) => { calls.push(path); return { data: { data: answers.shift() } }; },
+    } } });
+    answers.push({ userId: 'user/1', relationship: 'sent', requestId: 'request-1' });
+    assert.deepEqual(await api.getFriendRelationship('user/1'), { userId: 'user/1', relationship: 'sent', requestId: 'request-1' });
+    assert.deepEqual(calls, ['/friends/relationships/user%2F1']);
+    for (const answer of [{ userId: 'other', relationship: 'friend', requestId: 'x' }, { userId: 'user/1', relationship: 'blocked', requestId: null }, null]) {
+      answers.push(answer);
+      await assert.rejects(api.getFriendRelationship('user/1'), /친구 관계를 확인할 수 없습니다/);
+    }
+  });
   it('revokes cached portfolio and friend ranking without clearing other accounts/rankings', async () => {
     const client = new QueryClient();
     const cache = load(resolve('src/features/friends/cache.ts'), {});

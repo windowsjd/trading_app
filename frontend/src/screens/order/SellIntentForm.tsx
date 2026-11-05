@@ -52,6 +52,7 @@ import { formatDisplayDecimal } from '../../utils/format';
 import OrderNumberInput, { orderInputStyle } from './OrderNumberInput';
 import OrderRatioControls from './OrderRatioControls';
 import TriggerDirectionChoice from './TriggerDirectionChoice';
+import TriggerPriceLabel from './TriggerPriceLabel';
 
 type LearningGate = { allowed: boolean; locked: boolean; message: string | null; guard: (work: () => void) => void };
 type Request = { accountId: string; epoch: number; body: ConditionalSellCreateDto };
@@ -267,7 +268,7 @@ export default function SellIntentForm({
     return (
       <View style={styles.legFields}>
         <View style={styles.group}>
-          <Text style={styles.label}>{SELL_REFERENCE_LABEL} ({currency})</Text>
+          <TriggerPriceLabel side="sell" currency={currency} testID={`${id}-trigger-price`} />
           <OrderNumberInput
             testID={`${id}-trigger-price`}
             accessibilityLabel={`${SELL_REFERENCE_LABEL} ${currency}`}

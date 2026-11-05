@@ -312,6 +312,21 @@ describe('스포트라이트: 입장 재생 판정', () => {
     resetPresentedTier();
     assert.equal(entranceDecision('diamond', 'season-1|final|sp-1'), 'play', 'a fresh process');
   });
+
+  it("another card's memory (a user's season summary) never decides 내 순위's entrance, nor the reverse", () => {
+    const summary = 'userSummary';
+    // Another user's card first: its own first presentation plays and is remembered apart.
+    assert.equal(entranceDecision('bronze', 'season-1|user-2', summary), 'play');
+    rememberPresented('bronze', 'season-1|user-2', summary);
+    assert.equal(entranceDecision('gold', 'season-1|daily|sp-1'), 'play', '내 순위 still owes its first entrance');
+    rememberPresented('gold', 'season-1|daily|sp-1');
+    // Back and forth: each keeps what it presented.
+    assert.equal(entranceDecision('bronze', 'season-1|user-2', summary), 'none');
+    assert.equal(entranceDecision('silver', 'season-1|user-3', summary), 'silent', 'another user: no replay');
+    assert.equal(entranceDecision('gold', 'season-1|daily|sp-1'), 'none');
+    resetPresentedTier();
+    assert.deepEqual([entranceDecision('bronze', 'season-1|user-2', summary), entranceDecision('gold', 'season-1|daily|sp-1')], ['play', 'play']);
+  });
 });
 
 describe('스포트라이트: OS 저모션 설정 확정 여부', () => {

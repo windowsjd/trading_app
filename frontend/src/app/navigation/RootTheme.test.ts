@@ -24,6 +24,7 @@ for (const mode of ['light', 'dark'] as const) {
       '../../components/states/ScreenErrorBoundary': { default: 'ScreenErrorBoundary', __esModule: true },
       '../../features/order/OrderFillNotifier': { default: 'OrderFillNotifier', __esModule: true },
       '../../features/notifications/PushNotificationsHost': { default: 'PushNotificationsHost', __esModule: true },
+      '../../features/friends/FriendRequestNotifier': { default: 'FriendRequestNotifier', __esModule: true },
     };
     for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
       '../../screens/history/TradeHistoryScreen', '../../screens/history/OrderFailureScreen', '../../screens/asset/AssetChartScreen', '../../screens/futures/FuturesChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen', '../../screens/season/SeasonFinalResultScreen']) {
@@ -45,6 +46,8 @@ for (const mode of ['light', 'dark'] as const) {
     // The fill banner sits beside the root stack, inside navigation, so it
     // overlays every tab and pushed screen and can open TradeHistory.
     assert.equal(elements(tree, 'OrderFillNotifier').length, 1);
+    // The friend-request banner too (2026-11-06): any screen, one mount.
+    assert.equal(elements(tree, 'FriendRequestNotifier').length, 1);
     // Push permission/registration/tap routing also lives inside navigation,
     // mounted once for every route (sign-in included).
     assert.equal(elements(tree, 'PushNotificationsHost').length, 1);

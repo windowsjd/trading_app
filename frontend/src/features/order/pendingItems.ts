@@ -28,6 +28,10 @@ import type { FuturesTpSlSetting } from '../futures/tpSlApi';
  *   the group (익절가/손절가) while its side line and `kindLabel` keep the
  *   kind; its trigger reads 매도 기준가 — the price that decides the
  *   automatic sale, never a promised fill price.
+ * - A plain Spot limit (2026-11-06) reads 지정가 X 이하 도달 (BUY) or 이상
+ *   도달 (SELL): it fills at or better than its price, not only at it. Its
+ *   card names no reservation (the reservation itself is unchanged); LOC
+ *   keeps 종가 기준 and its 예약 금액 line, Futures their own wording.
  */
 
 export type PendingKind =
@@ -253,9 +257,13 @@ function spotLimitItem(order: RecordOrderItemDto): PendingItem | null {
     rows: [
       { key: 'amount', label: '금액', value: `${amount ? formatMoney(amount, currency) : '-'} (${formatPendingQuantity(order.quantity, unit)})` },
       { key: 'execution', label: buy ? '매수 유형' : '매도 유형', value: loc ? 'LOC(장 마감 지정가)' : '지정가' },
-      { key: 'condition', label: '주문 조건', value: `지정가 ${formatPendingPrice(order.limitPrice, currency)}${loc ? ' · 종가 기준' : ''}` },
+      {
+        key: 'condition',
+        label: '주문 조건',
+        value: `지정가 ${formatPendingPrice(order.limitPrice, currency)} ${loc ? '· 종가 기준' : `${conditionWord(buy ? 'at_or_below' : 'at_or_above')} 도달`}`,
+      },
     ],
-    notes: buy && order.reservedAmount ? [`예약 금액 ${formatMoney(order.reservedAmount, currency)} (수수료 포함)`] : [],
+    notes: loc && buy && order.reservedAmount ? [`예약 금액 ${formatMoney(order.reservedAmount, currency)} (수수료 포함)`] : [],
     edit: loc
       ? { editable: false, reason: '장 마감 지정가(LOC) 주문은 변경할 수 없어요. 취소한 뒤 다시 주문해 주세요.' }
       : {

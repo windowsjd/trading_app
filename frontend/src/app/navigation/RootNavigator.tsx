@@ -22,6 +22,7 @@ import SeasonJoinScreen from '../../screens/season/SeasonJoinScreen';
 import SeasonFinalResultScreen from '../../screens/season/SeasonFinalResultScreen';
 import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
 import OrderFillNotifier from '../../features/order/OrderFillNotifier';
+import FriendRequestNotifier from '../../features/friends/FriendRequestNotifier';
 import PushNotificationsHost from '../../features/notifications/PushNotificationsHost';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -92,6 +93,9 @@ export default function RootNavigator() {
       {/* Real-fill banner over every tab and pushed screen; it watches the
           signed-in user's accounts only and draws nothing otherwise. */}
       <OrderFillNotifier />
+      {/* New friend requests while the app is in use (no push needed); the
+          same top place as the fill banner, one at a time. */}
+      <FriendRequestNotifier />
       {/* Push permission (first launch, before sign-in), device registration
           after sign-in, and tap routing. Draws nothing; no-op on web. */}
       <PushNotificationsHost />
