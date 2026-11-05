@@ -289,6 +289,11 @@ export async function purgeDeletionScope(
   const participants = input.scope.participants.map((p) => p.id);
   const friendSourcePrefix = `friend:${user}:`;
   const steps: Array<[string, Prisma.Sql]> = [
+    // Change records reference only the account (their targets by id).
+    [
+      'pending_order_modifications',
+      Prisma.sql`DELETE FROM pending_order_modifications WHERE trading_account_id = ANY(${accounts})`,
+    ],
     // Intents and plans reference orders, positions and executions.
     [
       'beginner_quest_acknowledgements',

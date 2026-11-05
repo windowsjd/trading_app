@@ -1,3 +1,4 @@
+import { evidenceFloor } from '../common/pending-order-modification';
 import {
   assertBeginnerLearningAccess,
   beginnerFuturesAction,
@@ -306,8 +307,9 @@ export class FuturesService {
         ))!;
         if (
           entry &&
-          (price.effectiveAt < entry.createdAt ||
-            price.capturedAt < entry.createdAt ||
+          // A trade after registration (or the entry's latest 설정 변경).
+          (price.effectiveAt < evidenceFloor(entry, entry.createdAt) ||
+            price.capturedAt < evidenceFloor(entry, entry.createdAt) ||
             (entry.direction === 'long'
               ? price.price.gt(entry.limitPrice)
               : price.price.lt(entry.limitPrice)))

@@ -3,6 +3,7 @@ import {
   Prisma,
   type ConditionalBuyTrigger,
   type FuturesDirection,
+  type FuturesMarginMode,
 } from '../generated/prisma/client';
 import {
   conditionalHash,
@@ -162,6 +163,59 @@ export function parseFuturesConditionalEntryBody(
     executionType: row.executionType,
     limitPrice: row.executionType === 'limit' ? decimal(row.limitPrice) : null,
     idempotencyKey,
+  };
+}
+
+/**
+ * The new terms of a change, read exactly as a registration of the row's own
+ * instrument, direction, margin mode and leverage. Only the quantity, the
+ * condition and the execution may differ.
+ */
+export function parseFuturesConditionalEntryModify(
+  body: unknown,
+  row: {
+    instrumentId: string;
+    direction: FuturesDirection;
+    marginMode: FuturesMarginMode;
+    leverage: number;
+  },
+  idempotencyKey: string,
+): FuturesConditionalEntryInput {
+  const terms =
+    body && typeof body === 'object' && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : {};
+  return parseFuturesConditionalEntryBody({
+    instrumentId: row.instrumentId,
+    direction: row.direction,
+    marginMode: row.marginMode,
+    leverage: row.leverage,
+    quantity: terms.quantity,
+    triggerCondition: terms.triggerCondition,
+    triggerPrice: terms.triggerPrice,
+    executionType: terms.executionType,
+    ...(terms.limitPrice !== undefined ? { limitPrice: terms.limitPrice } : {}),
+    idempotencyKey,
+  });
+}
+
+/** An entry's canonical terms (decimal text): compared, hashed and recorded on a change. */
+export function futuresConditionalEntryTerms(
+  input: Pick<
+    FuturesConditionalEntryInput,
+    | 'quantity'
+    | 'triggerCondition'
+    | 'triggerPrice'
+    | 'executionType'
+    | 'limitPrice'
+  >,
+) {
+  return {
+    quantity: new Prisma.Decimal(input.quantity).toFixed(8),
+    triggerCondition: input.triggerCondition,
+    triggerPrice: input.triggerPrice.toFixed(8),
+    executionType: input.executionType,
+    limitPrice: input.limitPrice?.toFixed(8) ?? null,
   };
 }
 

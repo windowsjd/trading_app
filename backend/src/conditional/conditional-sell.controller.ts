@@ -11,7 +11,10 @@ import {
 import type { Request } from 'express';
 import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { ConditionalSellService } from './conditional-sell.service';
-import type { ConditionalSellBody } from './conditional-sell-policy';
+import type {
+  ConditionalSellBody,
+  ConditionalSellModifyBody,
+} from './conditional-sell-policy';
 type AuthRequest = Request & { user?: { userId?: string } };
 @Controller('api/v1/trading-accounts/:accountId/conditional-sell-orders')
 export class ConditionalSellController {
@@ -57,6 +60,16 @@ export class ConditionalSellController {
     @Body() body: ConditionalSellBody,
   ) {
     return this.service.create(req.user?.userId, id, body);
+  }
+  @Post(':conditionalOrderId/modify')
+  @HttpCode(200)
+  modify(
+    @Req() req: AuthRequest,
+    @Param('accountId') id: string,
+    @Param('conditionalOrderId') conditionalOrderId: string,
+    @Body() body: ConditionalSellModifyBody,
+  ) {
+    return this.service.modify(req.user?.userId, id, conditionalOrderId, body);
   }
   @Post(':conditionalOrderId/cancel')
   @HttpCode(200)

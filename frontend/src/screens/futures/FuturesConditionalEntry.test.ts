@@ -184,18 +184,24 @@ test('대기 주문 › 조건주문 lists entries with their state and cancels 
     ],
   };
   await h.view('pending');
-  await h.press('pending-kind-conditional');
-  const state = (id: string) => [h.node(`futures-conditional-${id}-state`)?.props.children].flat().join('');
-  assert.equal(state('w'), '감시 중');
-  assert.equal(state('p'), '발동 · 지정가 주문 대기');
+  // One list: the live watch and the one whose limit entry waits, each once.
+  assert.equal(h.node('pending-item-futures_conditional-w') !== undefined, true);
+  assert.equal(h.node('pending-item-futures_conditional-p') !== undefined, true);
+  assert.match(h.text(), /조건 충족 · 지정가 주문 체결 대기/);
+  assert.equal(h.node('pending-item-futures_limit-limit-1') === undefined, true, 'the created entry is shown on its watch');
+  assert.equal(h.node('pending-item-futures_conditional-f') === undefined, true, 'ended rows are not pending');
+  // Ended rows keep their real end and reason under the one 종료 이력.
+  await h.press('pending-history-toggle');
+  const state = (id: string) => [h.node(`pending-history-futures_conditional-${id}-state`)?.props.children].flat().join('');
   assert.equal(state('f'), '발동 후 주문 실패');
   assert.equal(state('s'), '정책에 따라 종료');
   assert.match(h.text(), /사용 가능한 선물 담보가 부족했습니다/);
   assert.match(h.text(), /시즌이 종료되어 감시를 끝냈습니다/);
-  assert.equal(h.node('futures-conditional-f-cancel') === undefined, true, 'ended rows cannot be canceled');
-  await h.press('futures-conditional-w-cancel');
+  await h.press('pending-item-futures_conditional-w-cancel');
+  await h.press('pending-item-futures_conditional-w-confirm-cancel');
   assert.equal(h.requests.at(-1).path, '/trading-accounts/A/futures/conditional-entries/w/cancel');
-  await h.press('futures-conditional-p-cancel');
+  await h.press('pending-item-futures_conditional-p-cancel');
+  await h.press('pending-item-futures_conditional-p-confirm-cancel');
   assert.equal(h.requests.at(-1).path, '/trading-accounts/A/futures/limit-orders/limit-1/cancel');
 });
 
@@ -204,6 +210,5 @@ test('rows of another account are never shown', async t => {
   h.conditionalEntries = { open: [entry('w', {})], ended: [] };
   h.wrongScope = 'B';
   await h.view('pending');
-  await h.press('pending-kind-conditional');
-  assert.equal(h.node('futures-conditional-w') === undefined, true);
+  assert.equal(h.node('pending-item-futures_conditional-w') === undefined, true);
 });

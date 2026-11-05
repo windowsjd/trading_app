@@ -94,6 +94,9 @@ describe('routes reachable without an access token', () => {
     // account-scoped futures, FX quote/execute, record, ranking and operator
     // route keeps requiring a token: adding one here is a review.
     expect(tokenlessRoutes()).toEqual([
+      // 앱 업데이트 안내 (2026-11-05): the store-published version per
+      // platform from operator config; no account or user data.
+      { access: 'public', route: 'GET /api/v1/app-release' },
       { access: 'optional', route: 'GET /api/v1/assets' },
       { access: 'optional', route: 'GET /api/v1/assets/:assetId' },
       { access: 'optional', route: 'GET /api/v1/assets/:assetId/candles' },

@@ -23,7 +23,7 @@ function harness() {
     'react-native': native, './AdminDiagnosticPanel': diagnostics,
   });
   const Boundary = load(resolve('src/components/states/ScreenErrorBoundary.tsx'), {
-    './ErrorState': errorState,
+    'react-native': native, './ErrorState': errorState,
   }).default;
   const h: any = { client: null, account: null, providerMounts: 0, navigationMounts: 0, operations: [] };
   function AccountProvider({ children }: any) {
@@ -92,8 +92,45 @@ function harness() {
   };
   h.text = () => JSON.stringify(h.renderer.toJSON());
   h.ErrorState = errorState.default;
+  h.Boundary = Boundary;
   return h;
 }
+
+describe('tab stack screen render boundary', () => {
+  it('keeps the failure inside its screen and offers the screen before it; a stack root offers only the retry', async (t) => {
+    t.mock.method(console, 'error', () => {});
+    const h = harness();
+    const { stackScreenLayout } = load(resolve('src/app/navigation/stackScreenLayout.tsx'), {
+      'react-native': { Platform: { OS: 'ios' }, Animated: {}, useWindowDimensions: () => ({ width: 390 }) },
+      '@react-navigation/native': { useNavigationState: () => true },
+      '../../components/states/ScreenErrorBoundary': { default: h.Boundary, __esModule: true },
+    });
+    function Detail(): never { throw new Error('intentional detail failure'); }
+    for (const canGoBack of [true, false]) {
+      const calls: string[] = [];
+      const navigation = { canGoBack: () => canGoBack, goBack: () => calls.push('back') };
+      let renderer: any;
+      const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      await act(async () => {
+        renderer = create(React.createElement(QueryClientProvider, { client }, React.createElement('Tabs', null, stackScreenLayout({
+          children: React.createElement(Detail), route: { key: 'detail', name: 'AssetDetail' }, navigation,
+        }), React.createElement('Text', null, 'tab bar'))));
+      });
+      const text = JSON.stringify(renderer.toJSON());
+      assert.match(text, /화면을 표시하지 못했습니다/);
+      assert.match(text, /tab bar/, 'the tabs around the screen stay');
+      const back = renderer.root.findAll((node: any) => typeof node.type === 'string' && node.props.testID === 'screen-error-back');
+      assert.equal(back.length, canGoBack ? 1 : 0);
+      if (canGoBack) {
+        await act(async () => back[0].props.onPress());
+        assert.deepEqual(calls, ['back']);
+      }
+      await act(async () => renderer.unmount());
+      client.clear();
+    }
+  });
+});
 
 describe('root screen render boundary', () => {
   it('shows the existing ErrorState, reports the stack and retries without resetting providers/cache', async (t) => {

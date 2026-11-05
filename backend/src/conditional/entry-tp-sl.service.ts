@@ -15,7 +15,10 @@ import {
   futuresTpSlCondition,
   futuresTpSlEnabled,
 } from '../futures/futures-tp-sl-policy';
-import { conditionalMarkets } from './conditional-markets';
+import {
+  conditionalMarkets,
+  usConditionalOrdersSupported,
+} from './conditional-markets';
 import { conditionalTradable } from './conditional-policy';
 import {
   assertConditionalSellKindEnabled,
@@ -24,12 +27,25 @@ import {
 import {
   ENTRY_TP_SL_MAX_PENDING_PER_ACCOUNT,
   ENTRY_TP_SL_MAX_PER_ENTRY,
+  assertEntryTriggerSides,
   entryTpSlHash,
+  entryTpSlTerms,
+  findEntryPlanConflict,
   parseEntryId,
   parseEntryTpSlBody,
+  parseEntryTpSlModify,
   parseEntryType,
   type EntryType,
 } from './entry-tp-sl-policy';
+import {
+  assertExpectedRevision,
+  assertTermsChanged,
+  isReplayedModification,
+  modificationHash,
+  notModifiable,
+  parseModificationEnvelope,
+  recordModification,
+} from '../common/pending-order-modification';
 import {
   createEntryTpSlPlansInTransaction,
   entryPlanWhere,
@@ -39,6 +55,16 @@ import {
 } from './entry-tp-sl-state';
 
 const PLAN_INCLUDE = {
+  asset: {
+    select: {
+      id: true,
+      symbol: true,
+      name: true,
+      market: true,
+      currencyCode: true,
+      settlementCurrency: true,
+    },
+  },
   conditionalBuyOrder: { select: { orderId: true } },
   futuresLimitOrder: { select: { direction: true } },
   futuresConditionalEntry: { select: { direction: true, limitOrderId: true } },
@@ -162,6 +188,172 @@ export class EntryTpSlService {
         orderBy: { kind: 'asc' },
       });
       return this.response(accountId, created, root, false);
+    });
+  }
+
+  /**
+   * 설정 변경 (docs/pending-order-modification-contract.md) of one pending
+   * plan: its trigger price and share of the fill. Locks follow the entry's
+   * fill (account fence → the entry → the plan), so a fill that activates the
+   * plan either committed first (the change is refused) or activates the new
+   * terms. The plan stays on its entry and kind and still activates as a
+   * market setting; every registration rule applies against the entry's OTHER
+   * pending plans.
+   */
+  async modify(
+    userId: string | undefined,
+    accountId: string,
+    id: string,
+    body: unknown,
+  ) {
+    this.user(userId);
+    const envelope = parseModificationEnvelope(body);
+    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockAccount(tx, accountId, userId);
+      const located = await tx.entryTpSlPlan.findFirst({
+        where: { id, tradingAccountId: accountId },
+        select: {
+          orderId: true,
+          conditionalBuyOrderId: true,
+          futuresLimitOrderId: true,
+          futuresConditionalEntryId: true,
+        },
+      });
+      if (!located)
+        throw createApiError(
+          'ENTRY_TP_SL_NOT_FOUND',
+          'Stop-loss or take-profit plan not found.',
+          404,
+        );
+      const entry = planEntry(located);
+      const root = await resolveEntryRoot(
+        tx,
+        accountId,
+        entry.type,
+        entry.id,
+        true,
+      );
+      await tx.$queryRaw`SELECT "id" FROM "entry_tp_sl_plans" WHERE "id" = ${id} AND "trading_account_id" = ${accountId} FOR UPDATE`;
+      const row = await tx.entryTpSlPlan.findFirst({
+        where: { id, tradingAccountId: accountId },
+        include: PLAN_INCLUDE,
+      });
+      if (!row || !root)
+        throw createApiError(
+          'ENTRY_TP_SL_NOT_FOUND',
+          'Stop-loss or take-profit plan not found.',
+          404,
+        );
+      const intent = parseEntryTpSlModify(
+        body,
+        row,
+        entry,
+        envelope.idempotencyKey,
+      );
+      const terms = entryTpSlTerms(intent);
+      const requestHash = modificationHash(
+        'entry_tp_sl_plan',
+        id,
+        envelope.expectedRevision,
+        terms,
+      );
+      if (
+        await isReplayedModification(tx, {
+          accountId,
+          target: 'entry_tp_sl_plan',
+          targetId: id,
+          idempotencyKey: envelope.idempotencyKey,
+          requestHash,
+        })
+      )
+        return this.single(accountId, row, true);
+      if (row.status !== 'pending' || root.state !== 'open' || !root.supported)
+        notModifiable();
+      assertExpectedRevision(row.revision, envelope.expectedRevision);
+      const before = entryTpSlTerms(row);
+      assertTermsChanged(before, terms);
+      if (
+        root.domain === 'spot' &&
+        root.asset.assetType === 'us_stock' &&
+        !usConditionalOrdersSupported()
+      )
+        throw createApiError(
+          'ENTRY_TP_SL_MARKET_NOT_SUPPORTED',
+          'Stop-loss and take-profit settings are not available for this market.',
+          409,
+        );
+      if (root.domain === 'spot') assertConditionalSellKindEnabled('stop_loss');
+      else {
+        assertFuturesTpSlEnabled();
+        assertFuturesOperation('reduce');
+      }
+      const now = await this.now(tx);
+      const account = await this.access.getOwnedAccountOrThrow(
+        userId,
+        accountId,
+        tx,
+      );
+      if (!conditionalTradable(account, now))
+        throw createApiError(
+          'CONDITIONAL_ACCOUNT_NOT_TRADABLE',
+          'The account trading window ended.',
+          409,
+        );
+      await assertBeginnerLearningAccess(
+        tx,
+        account,
+        root.domain === 'spot' && root.asset.assetType === 'crypto'
+          ? 'spotProtection'
+          : 'allTrading',
+      );
+      const others = await tx.entryTpSlPlan.findMany({
+        where: {
+          ...entryPlanWhere(root),
+          ...pendingEntryTpSl,
+          id: { not: id },
+        },
+        select: { kind: true, triggerPrice: true, ratioPercent: true },
+      });
+      const conflict = findEntryPlanConflict({
+        intents: [intent],
+        pending: others,
+      });
+      if (conflict === 'duplicate_price')
+        throw createApiError(
+          'ENTRY_TP_SL_DUPLICATE_PRICE',
+          'A pending plan of the same kind already uses this price.',
+          409,
+        );
+      if (conflict === 'total_exceeds_entry')
+        throw createApiError(
+          'ENTRY_TP_SL_TOTAL_EXCEEDS_ENTRY',
+          'Plans of the same kind would exceed the entry quantity.',
+          409,
+        );
+      assertEntryTriggerSides([intent], root.direction, root.entryPrice);
+      const updated = await tx.entryTpSlPlan.update({
+        where: { id },
+        data: {
+          triggerPrice: intent.triggerPrice,
+          ratioPercent: intent.ratioPercent,
+          revisedAt: now,
+          revision: { increment: 1 },
+        },
+        include: PLAN_INCLUDE,
+      });
+      await recordModification(tx, {
+        accountId,
+        target: 'entry_tp_sl_plan',
+        targetId: id,
+        idempotencyKey: envelope.idempotencyKey,
+        requestHash,
+        revision: updated.revision,
+        before,
+        after: terms,
+        at: now,
+      });
+      return this.single(accountId, updated, false);
     });
   }
 
@@ -407,6 +599,18 @@ export function presentEntryTpSlPlan(row: PlanRecord) {
       null,
     domain: row.domain,
     assetId: row.assetId,
+    // Additive (2026-11-05): the plan's own asset and price currency, so a
+    // list of plans reads without its entry beside it.
+    asset: {
+      id: row.asset.id,
+      symbol: row.asset.symbol,
+      name: row.asset.name,
+      market: row.asset.market,
+    },
+    currencyCode:
+      row.domain === 'futures'
+        ? 'USD'
+        : (row.asset.settlementCurrency ?? row.asset.currencyCode),
     direction,
     kind: row.kind,
     triggerCondition: futuresTpSlCondition(direction, row.kind),
@@ -421,7 +625,28 @@ export function presentEntryTpSlPlan(row: PlanRecord) {
     failureCode: row.failureCode,
     terminalReason: row.terminalReason,
     createdAt: row.createdAt.toISOString(),
+    // 설정 변경: the revision a change names, and when the terms last changed.
+    revision: row.revision,
+    revisedAt: row.revisedAt?.toISOString() ?? null,
     endedAt: row.endedAt?.toISOString() ?? null,
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** The entry a plan belongs to (exactly one link is set). */
+function planEntry(row: {
+  orderId: string | null;
+  conditionalBuyOrderId: string | null;
+  futuresLimitOrderId: string | null;
+  futuresConditionalEntryId: string | null;
+}): { type: EntryType; id: string } {
+  if (row.orderId) return { type: 'spot_limit_order', id: row.orderId };
+  if (row.conditionalBuyOrderId)
+    return { type: 'spot_conditional_buy', id: row.conditionalBuyOrderId };
+  if (row.futuresLimitOrderId)
+    return { type: 'futures_limit_order', id: row.futuresLimitOrderId };
+  return {
+    type: 'futures_conditional_entry',
+    id: row.futuresConditionalEntryId!,
   };
 }

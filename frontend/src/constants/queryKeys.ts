@@ -20,6 +20,8 @@ export const QUERY_KEYS = {
   },
   /** Operator-published important notices (공지사항, alongside the app's own). */
   notices: { important: ['notices', 'important'] as const },
+  /** 앱 업데이트 안내: the store-published latest version per platform (public). */
+  appRelease: ['appRelease'] as const,
   friends: {
     all: ['friends'] as const,
     list: ['friends', 'list', 'infinite'] as const,
@@ -361,6 +363,10 @@ export const QUERY_KEYS = {
       history: (id: string) => ['tradingAccount', 'protections', id, 'history'] as const,
       list: (id: string, domain: 'spot' | 'futures', assetId: string, history = false) => ['tradingAccount', 'protections', id, domain, assetId, history] as const,
     },
+    /** 통합 대기목록의 종료 이력: every ended kind's newest page, read on request. */
+    pendingHistory: (id: string) => ['tradingAccount', 'pendingHistory', id] as const,
+    /** 발동·체결 알림 feed reads (the cursor lives in device storage, not here). */
+    pendingOrderEvents: (id: string) => ['tradingAccount', 'pendingOrderEvents', id] as const,
     conditionalBuy: {
       all: (id: string) => ['tradingAccount', 'conditionalBuyOrders', id] as const,
       list: (id: string, filters: { history: boolean; limit: number; assetId?: string }) =>

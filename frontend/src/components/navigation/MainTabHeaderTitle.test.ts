@@ -23,6 +23,8 @@ for (const [stack, root, label, icon] of [
       'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
       '../../theme/useReducedMotion': { useReducedMotion: () => true },
       './RecordStack': { default: 'RecordStack', __esModule: true },
+      // Each stack screen renders inside its own error boundary (stackScreenLayout); headers are the subject here.
+      '../../components/states/ScreenErrorBoundary': { default: ({ children }: { children: unknown }) => children, __esModule: true },
       ...Object.fromEntries([...readFileSync(file, 'utf8').matchAll(/import (\w+) from '(\.\.\/\.\.\/screens\/[^']+)'/g)]
         .map(match => [match[2], { default: match[1], __esModule: true }])),
     };
@@ -81,6 +83,7 @@ test('Quest: the beginner root reuses the shared tab title with its own quest ic
     '@react-navigation/native': navigationTheme,
     'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
     '../../theme/useReducedMotion': { useReducedMotion: () => true },
+    '../../components/states/ScreenErrorBoundary': { default: ({ children }: { children: unknown }) => children, __esModule: true },
     ...Object.fromEntries([...readFileSync(file, 'utf8').matchAll(/import (\w+) from '(\.\.\/\.\.\/screens\/[^']+)'/g)]
       .map(match => [match[2], { default: match[1], __esModule: true }])),
   };

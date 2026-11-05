@@ -382,6 +382,8 @@ export type FuturesLimitOrder = {
   executionId: string | null; terminalReason: string | null;
   createdAt: string; endedAt: string | null;
   instrument: FuturesInstrument;
+  /** 설정 변경 (2026-11-05): absent on an older server (0). */
+  revision?: number; revisedAt?: string | null;
 };
 export type FuturesLimitResult = { tradingAccountId: string; order: Omit<FuturesLimitOrder, 'instrument'> };
 export async function getFuturesLimitOrders(id: string, signal?: AbortSignal) {
@@ -431,6 +433,8 @@ export type FuturesConditionalEntry = {
     executionId: string | null; terminalReason: string | null; createdAt: string; endedAt: string | null } | null;
   attemptCount: number; lastAttemptAt: string | null; failureCode: string | null; terminalReason: string | null;
   createdAt: string; endedAt: string | null; updatedAt: string;
+  /** 설정 변경 (2026-11-05): absent on an older server (0). */
+  revision?: number; revisedAt?: string | null;
 };
 export type FuturesConditionalEntries = {
   tradingAccountId: string;

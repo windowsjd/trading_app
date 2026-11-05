@@ -109,7 +109,8 @@ function BannerFrame({ notice, reduced, onDone, onOpenHistory }: {
     leaveAfter(FILL_BANNER_HELD_MS);
   };
 
-  const overflow = notice.overflow ? `외 ${notice.overflow}건 체결` : null;
+  // A folded condition-met notice is not a fill: the count then names none.
+  const overflow = notice.overflow ? `외 ${notice.overflow}건${notice.overflowMixed ? '' : ' 체결'}` : null;
   const detail = [notice.detail, overflow].filter(Boolean).join(' · ') || null;
   return (
     <View pointerEvents="box-none" style={[styles.layer, { top: (insets?.top ?? 0) + 8 }]}>

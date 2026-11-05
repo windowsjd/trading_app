@@ -26,17 +26,19 @@ const icons = readFileSync(
 type AccountMode = 'general' | 'season' | 'beginner';
 
 function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`, guest = false) {
-  // Tab screens' bottom sheets render in ScreenSheetHost; the navigator contract is inside it.
-  const unwrap = (node: any) => node?.type === 'ScreenSheetHost' ? node.props.children : node;
+  // Tab screens' bottom sheets render in ScreenSheetHost; the navigator contract is inside it
+  // (beside the 앱 업데이트 안내, which opens in the same sheet layer).
+  const unwrap = (node: any) => node?.type === 'ScreenSheetHost'
+    ? [node.props.children].flat().find((child: any) => child?.type !== 'AppUpdateNotice') : node;
   const tree: any = renderHostedTabs(mode, isLoading, appearance, reduced, accountId, guest);
   // Guest tabs: the exit provider wraps the hosted navigator.
   const hosted = guest && tree?.props?.value ? tree.props.children : tree;
   return hosted?.type === 'QuestGuideProvider' ? { ...hosted, props: { ...hosted.props, children: unwrap(hosted.props.children) } } : unwrap(hosted);
 }
 
-function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`, guest = false, navigation: unknown = undefined) {
+function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`, guest = false, navigation: unknown = undefined, read: { isEmpty?: boolean; accountReadError?: unknown; retryAccountRead?: () => void } = {}) {
   const MainTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
-    'react-native': { useWindowDimensions: () => ({ fontScale: 1 }) },
+    'react-native': { Text: 'Text', useWindowDimensions: () => ({ fontScale: 1 }) },
     'react-native-safe-area-context': {
       useSafeAreaInsets: () => ({ bottom: 0 }),
     },
@@ -63,14 +65,19 @@ function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearanc
       default: 'FullPageLoading',
       __esModule: true,
     },
+    '../../components/states/ErrorState': { default: 'ErrorState', __esModule: true },
     '../../features/tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({
         selectedAccount: mode ? { id: accountId, mode } : null,
         isLoading,
+        isEmpty: read.isEmpty ?? false,
+        accountReadError: read.accountReadError ?? null,
+        retryAccountRead: read.retryAccountRead ?? (() => undefined),
       }),
     },
     '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
     '../../components/common/ScreenSheetHost': { ScreenSheetHost: 'ScreenSheetHost' },
+    '../../features/appRelease/AppUpdateNotice': { default: 'AppUpdateNotice', __esModule: true },
     '../../features/auth/guestBrowsing': { isGuestBrowsing: () => guest },
     ...Object.fromEntries(
       ['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My', 'Modes'].map((name) => [
@@ -168,12 +175,34 @@ describe('mode-aware bottom tabs', () => {
     for (const tree of [
       renderTabs('season', true),
       renderTabs(null, true),
-      renderTabs(null, false),
     ]) {
       assert.equal(tree.type, 'FullPageLoading');
       assert.equal(tree.props.message, '계정 정보를 불러오는 중입니다.');
       assert.equal(elements(tree, 'Screen').length, 0);
     }
+  });
+
+  it('a finished read without an account is never an endless loader: why, retry and a way back to the start', () => {
+    const calls: string[] = [];
+    const navigation = { reset: (state: unknown) => calls.push(JSON.stringify(state)) };
+    const failure = new Error('timeout of 10000ms exceeded');
+    const failed: any = renderHostedTabs(null, false, 'light', false, 'x', false, navigation, { accountReadError: failure, retryAccountRead: () => calls.push('retry') });
+    assert.equal(failed.type, 'ErrorState');
+    assert.equal(elements(failed, 'Screen').length, 0, 'no tabs of a mode that is not known');
+    assert.deepEqual([failed.props.title, failed.props.message, failed.props.error === failure],
+      ['계정 정보를 불러오지 못했습니다.', '네트워크 연결을 확인한 뒤 다시 시도해주세요.', true]);
+    failed.props.onRetry();
+    // 처음 화면으로: the error screen's second way out (never an endless loader with no exit).
+    const restart = failed.props.secondaryAction;
+    assert.deepEqual([restart?.label, restart?.testID], ['처음 화면으로', 'main-tabs-restart']);
+    restart.onPress();
+    assert.deepEqual(calls, ['retry', JSON.stringify({ index: 0, routes: [{ name: 'Splash' }] })]);
+
+    const empty: any = renderHostedTabs(null, false, 'light', false, 'x', false, navigation, { isEmpty: true });
+    assert.deepEqual([empty.type, empty.props.title, empty.props.message],
+      ['ErrorState', '사용할 계정이 없습니다.', '처음 화면에서 투자 모드를 다시 선택해주세요.']);
+    const unresolved: any = renderHostedTabs(null, false);
+    assert.deepEqual([unresolved.type, unresolved.props.title], ['ErrorState', '계정 정보를 불러오지 못했습니다.']);
   });
 
   it('extends the existing Guide stack with MarketBasics and leaves Ranking intact', () => {
@@ -313,6 +342,11 @@ it('beginner tabs run inside one quest guide keyed by the account, unlike other 
   // Sheets cover the tabs (headers, tab bar) but the quest overlay stays above them.
   assert.equal((renderHostedTabs('beginner') as any).props.children.type, 'ScreenSheetHost');
   for (const mode of ['general', 'season'] as const) assert.equal((renderHostedTabs(mode) as any).type, 'ScreenSheetHost');
+  // 앱 업데이트 안내: once, in that sheet layer (so below the quest overlay), for every mode and guests.
+  const notices = (host: any) => [host.props.children].flat().filter((child: any) => child?.type === 'AppUpdateNotice').length;
+  assert.equal(notices((renderHostedTabs('beginner') as any).props.children), 1);
+  for (const mode of ['general', 'season'] as const) assert.equal(notices(renderHostedTabs(mode)), 1);
+  assert.equal(notices((renderHostedTabs(null, false, 'light', false, 'guest', true) as any).props.children), 1);
 });
 it('even switching two season accounts resets nested navigation by account id', () => {
   assert.notEqual(renderTabs('season', false, 'light', false, 'season-one').key, renderTabs('season', false, 'light', false, 'season-two').key);

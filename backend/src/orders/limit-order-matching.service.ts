@@ -1,3 +1,4 @@
+import { evidenceFloor } from '../common/pending-order-modification';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   AssetPriceSourceType,
@@ -360,9 +361,11 @@ export class LimitOrderMatchingService {
   ): FillPlanDecision {
     const pathASnapshot = snapshotEvaluation.snapshot;
     const side = candidate.side ?? OrderSide.buy;
+    // Evidence must follow the submission, or the order's latest 설정 변경.
+    const evidenceFrom = evidenceFloor(candidate, candidate.submittedAt);
     if (
       pathASnapshot &&
-      pathASnapshot.effectiveAt >= candidate.submittedAt &&
+      pathASnapshot.effectiveAt >= evidenceFrom &&
       ((side === OrderSide.buy &&
         pathASnapshot.price.lte(candidate.limitPrice)) ||
         (side === OrderSide.sell &&
@@ -381,14 +384,14 @@ export class LimitOrderMatchingService {
     }
     const pathA: PathAReason = !pathASnapshot
       ? 'snapshot_selection_failed'
-      : pathASnapshot.effectiveAt < candidate.submittedAt
+      : pathASnapshot.effectiveAt < evidenceFrom
         ? 'before_submission'
         : 'limit_not_crossed';
 
     const trigger = this.candleEvidence.evaluateTriggerCandleForOrder(
       candleEvaluation.candles,
       {
-        submittedAt: candidate.submittedAt,
+        submittedAt: evidenceFrom,
         limitPrice: candidate.limitPrice,
         side,
         seasonEndAt: candidate.seasonEndAt,

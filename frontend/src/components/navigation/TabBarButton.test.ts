@@ -45,6 +45,8 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
     '../../components/navigation/TabBarButton': { default: Button, __esModule: true },
     '../../components/navigation/TabBarIcon': { default: 'TabBarIcon', __esModule: true },
     '../../components/states/FullPageLoading': { default: 'FullPageLoading', __esModule: true },
+    '../../components/states/ErrorState': { default: 'ErrorState', __esModule: true },
+    '../../features/appRelease/AppUpdateNotice': { default: 'AppUpdateNotice', __esModule: true },
     '../../features/tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({ selectedAccount: { id: 'account-1', mode }, isLoading: false }),
     },
@@ -54,8 +56,8 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
       `./${name}Stack`, { default: `${name}Stack`, __esModule: true },
     ])),
   }).default;
-  // The navigator renders inside the tab screens' bottom-sheet host.
-  const MainTabs = () => HostedTabs().props.children;
+  // The navigator renders inside the tab screens' bottom-sheet host (beside the 앱 업데이트 안내).
+  const MainTabs = () => [HostedTabs().props.children].flat().find((child: any) => child?.type !== 'AppUpdateNotice');
   return { MainTabs, dimensions, insets, animations };
 }
 

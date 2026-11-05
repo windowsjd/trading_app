@@ -39,9 +39,19 @@ import {
 } from '../conditional/conditional-sell-policy';
 import {
   activateSpotEntryTpSlPlans,
+  assertEntryPlansFitChangedEntry,
   createEntryTpSlPlansInTransaction,
   resolveEntryRoot,
 } from '../conditional/entry-tp-sl-state';
+import {
+  assertExpectedRevision,
+  assertTermsChanged,
+  isReplayedModification,
+  modificationHash,
+  notModifiable,
+  parseModificationEnvelope,
+  recordModification,
+} from '../common/pending-order-modification';
 import {
   entryTpSlDraftsCanonical,
   parseEntryTpSlDrafts,
@@ -2378,6 +2388,305 @@ export class OrdersService {
     });
   }
 
+  /**
+   * 설정 변경 (docs/pending-order-modification-contract.md) of a submitted
+   * limit order, in place, in the fill's lock order: lifecycle authorization,
+   * the order row, then cash or holding. A concurrent fill or cancel either
+   * committed first (the change is refused and the order answers with its
+   * state) or sees the new terms. The new price and size meet every
+   * registration rule of a limit order; the reservation moves by the
+   * difference only. LOC orders (session-bound close settlement), orders a
+   * condition or an OCO placed, and orders under a live OCO keep their own
+   * path: cancel.
+   */
+  async modifyOrderForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+    orderId: string | undefined,
+    body: Record<string, unknown> | undefined,
+  ) {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+    const parsedOrderId = this.parseOrderId(orderId);
+    const envelope = parseModificationEnvelope(body);
+    const account =
+      await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
+        userId,
+        tradingAccountId.trim(),
+      );
+    // The new terms, read as a limit registration of this order's asset and
+    // side (crypto BUY by amount, everything else by quantity).
+    const readTerms = (order: {
+      side: OrderSide;
+      asset: { assetType: AssetType };
+    }) => {
+      const limitPrice = this.parsePositiveDecimalField(
+        body?.limitPrice,
+        'limitPrice',
+        monetaryScale,
+      );
+      const amountBuy =
+        order.asset.assetType === AssetType.crypto &&
+        order.side === OrderSide.buy;
+      const amount = amountBuy
+        ? this.parsePositiveDecimalField(body?.amount, 'amount')
+        : null;
+      const requested = amountBuy
+        ? null
+        : this.parsePositiveQuantityField(body?.quantity);
+      const requestHash = modificationHash(
+        'spot_order',
+        parsedOrderId,
+        envelope.expectedRevision,
+        {
+          limitPrice: limitPrice.toFixed(8),
+          quantity: requested?.toFixed(8) ?? null,
+          amount: amount?.toFixed(8) ?? null,
+        },
+      );
+      return { limitPrice, amount, requested, requestHash };
+    };
+    const replay = {
+      accountId: account.id,
+      target: 'spot_order' as const,
+      targetId: parsedOrderId,
+      idempotencyKey: envelope.idempotencyKey,
+    };
+    // A retry after a lost response finds its own commit before any state
+    // check: the Season may have ended or the account changed since.
+    const committed = await this.prisma.order.findFirst({
+      where: { id: parsedOrderId, tradingAccountId: account.id },
+      select: { side: true, asset: { select: { assetType: true } } },
+    });
+    if (
+      committed &&
+      (await isReplayedModification(this.prisma, {
+        ...replay,
+        requestHash: readTerms(committed).requestHash,
+      }))
+    )
+      return this.modifiedOrderResponse(
+        userId,
+        account.id,
+        parsedOrderId,
+        true,
+      );
+    const context = await this.resolveAccountTradingContextForAccount(
+      account,
+      new Date(),
+    );
+    const limitOrderCreate = this.requireLimitOrderCreateService();
+    const duplicate = await this.prisma.$transaction(async (tx) => {
+      const { participant } = context;
+      const lockedContext = participant
+        ? await limitOrderCreate.lockTradableContextInTransaction(tx, {
+            userId,
+            seasonParticipantId: participant.id,
+          })
+        : null;
+      if (participant && lockedContext?.tradingAccountId !== account.id)
+        this.throwTradingScopeIntegrityError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'Participant trading-account link changed while changing the order.',
+        );
+      if (!participant)
+        await this.lockGeneralTradingAccountInTransaction(tx, context);
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "orders"
+        WHERE "id" = ${parsedOrderId} AND "trading_account_id" = ${account.id}
+        FOR UPDATE
+      `;
+      const order =
+        locked.length === 1
+          ? await tx.order.findUnique({
+              where: { id: parsedOrderId },
+              select: {
+                id: true,
+                tradingAccountId: true,
+                assetId: true,
+                side: true,
+                orderType: true,
+                status: true,
+                quantity: true,
+                limitPrice: true,
+                currencyCode: true,
+                cashWalletScope: true,
+                reservedAmount: true,
+                reservedQuantity: true,
+                reservationFeeRate: true,
+                revision: true,
+                limitOnClose: { select: { orderId: true } },
+                protectionChild: { select: { id: true } },
+                conditionalBuy: { select: { id: true } },
+                conditionalSell: { select: { id: true } },
+                attachedProtection: { select: { status: true } },
+                asset: {
+                  select: {
+                    id: true,
+                    assetType: true,
+                    market: true,
+                    isActive: true,
+                  },
+                },
+              },
+            })
+          : null;
+      if (!order)
+        this.throwApiError(
+          HttpStatus.NOT_FOUND,
+          'ORDER_NOT_FOUND',
+          'Order not found.',
+        );
+      const { limitPrice, amount, requested, requestHash } = readTerms(order);
+      assertOrderInputPolicy({
+        assetType: order.asset.assetType,
+        side: order.side,
+        orderType: OrderType.limit,
+        quantity: requested,
+        amount,
+      });
+      const quantity = amount
+        ? quantityFromBuyAmount(amount, limitPrice)
+        : requested!;
+      // Again under the locks: a retry racing its own first attempt.
+      if (await isReplayedModification(tx, { ...replay, requestHash }))
+        return true;
+      if (
+        order.orderType !== OrderType.limit ||
+        order.status !== OrderStatus.submitted
+      )
+        notModifiable();
+      if (order.limitOnClose)
+        throw createApiError(
+          'PENDING_ORDER_LOC_NOT_MODIFIABLE',
+          'Limit-on-Close orders cannot be changed; cancel and place a new one.',
+          409,
+        );
+      if (
+        order.protectionChild ||
+        order.conditionalBuy ||
+        order.conditionalSell
+      )
+        throw createApiError(
+          'PENDING_ORDER_CHILD_NOT_MODIFIABLE',
+          'An order placed by a condition or another setting cannot be changed; cancel it instead.',
+          409,
+        );
+      if (
+        order.attachedProtection &&
+        (order.attachedProtection.status === 'holding' ||
+          order.attachedProtection.status === 'active')
+      )
+        throw createApiError(
+          'PENDING_ORDER_PROTECTION_NOT_MODIFIABLE',
+          'Orders protected by an existing TP/SL (OCO) cannot be changed; cancel the protection first.',
+          409,
+        );
+      assertExpectedRevision(order.revision, envelope.expectedRevision);
+      const before = {
+        limitPrice: order.limitPrice?.toFixed(8) ?? null,
+        quantity: order.quantity.toFixed(8),
+      };
+      const after = {
+        limitPrice: limitPrice.toFixed(8),
+        quantity: quantity.toFixed(8),
+      };
+      assertTermsChanged(before, after);
+      // A retired asset takes no new terms (its fills are skipped; a larger
+      // reservation would only stay locked), as a registration is refused.
+      if (!order.asset.isActive)
+        this.throwApiError(
+          HttpStatus.BAD_REQUEST,
+          'ASSET_NOT_TRADABLE',
+          'Asset is inactive.',
+        );
+      this.assertLimitOrderFeatureEnabled();
+      const now = await this.readTransactionWallClock(tx);
+      if (lockedContext)
+        limitOrderCreate.assertLockedTradableContext(lockedContext, now);
+      await assertBeginnerLearningAccess(
+        tx,
+        context,
+        beginnerOrderAction(
+          { side: order.side, orderType: OrderType.limit },
+          order.asset.assetType,
+        ),
+      );
+      this.assertOrderAssetTradable(order.asset, now, OrderType.limit);
+      // The asset's legacy OCO state, as at registration (a pending
+      // protection child holds BUYs; a live protection holds Limit SELLs).
+      await this.prepareProtection(
+        tx,
+        account.id,
+        {
+          assetId: order.assetId,
+          side: order.side,
+          orderType: OrderType.limit,
+        },
+        now,
+      );
+      if (order.side === OrderSide.buy)
+        await assertEntryPlansFitChangedEntry(
+          tx,
+          { orderId: order.id },
+          'long',
+          limitPrice,
+        );
+      const reserved =
+        await limitOrderCreate.reviseSubmittedLimitOrderInTransaction(tx, {
+          order,
+          quantity,
+          limitPrice,
+          now,
+        });
+      await recordModification(tx, {
+        accountId: account.id,
+        target: 'spot_order',
+        targetId: order.id,
+        idempotencyKey: envelope.idempotencyKey,
+        requestHash,
+        revision: order.revision + 1,
+        before: {
+          ...before,
+          reservedAmount: order.reservedAmount?.toFixed(8) ?? null,
+          reservedQuantity: order.reservedQuantity?.toFixed(8) ?? null,
+        },
+        after: { ...after, ...reserved },
+        at: now,
+      });
+      return false;
+    });
+    return this.modifiedOrderResponse(
+      userId,
+      account.id,
+      parsedOrderId,
+      duplicate,
+    );
+  }
+
+  /** The order as its detail route returns it, after a change or its replay. */
+  private async modifiedOrderResponse(
+    userId: string,
+    accountId: string,
+    orderId: string,
+    duplicate: boolean,
+  ) {
+    const detail = await this.getOrderForTradingAccount(
+      userId,
+      accountId,
+      orderId,
+    );
+    return {
+      success: true as const,
+      data: { tradingAccountId: accountId, ...detail.data, duplicate },
+    };
+  }
+
   async executeOrder(
     userId: string | undefined,
     orderId: string | undefined,
@@ -2787,7 +3096,10 @@ export class OrdersService {
           quoteId: true,
           protectionChild: { select: { id: true } },
           conditionalSell: { select: { id: true, kind: true } },
+          conditionalBuy: { select: { id: true } },
           limitOnClose: { select: LIMIT_ON_CLOSE_SELECT },
+          revision: true,
+          revisedAt: true,
           side: true,
           orderType: true,
           status: true,
@@ -2840,6 +3152,8 @@ export class OrdersService {
           conditionalSell: order.conditionalSell
             ? { id: order.conditionalSell.id, kind: order.conditionalSell.kind }
             : null,
+          // The Conditional BUY watch that submitted this order, if any.
+          conditionalBuyId: order.conditionalBuy?.id ?? null,
         })),
       },
     };
@@ -2892,6 +3206,8 @@ export class OrdersService {
           },
         },
         limitOnClose: { select: LIMIT_ON_CLOSE_SELECT },
+        revision: true,
+        revisedAt: true,
       },
     });
 

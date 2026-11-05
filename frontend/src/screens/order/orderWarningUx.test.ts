@@ -106,8 +106,10 @@ describe('order screen warning meaning', () => {
       await h.mount(); t.after(h.close); await h.flush();
       assert.doesNotMatch(panelText(h), /운영 중|Season 1|일반 투자/);
       assert.doesNotMatch(text(h.node('account-holdings')), /운영 중|Season 1|일반 투자/);
-      await h.press('holdings-filter-pending'); await h.flush();
-      assert.ok(h.node(`pending-order-pending-${mode}`));
+      await h.press('holdings-filter-pending');
+      // 통합 대기목록: the order's card (its Spot read is real; wait for it to land).
+      for (let i = 0; i < 20 && !h.node(`pending-item-spot_limit-pending-${mode}`); i += 1) await h.flush();
+      assert.ok(h.node(`pending-item-spot_limit-pending-${mode}`));
       assert.doesNotMatch(text(h.node('account-holdings')), /운영 중|Season 1|일반 투자/);
       assert.equal(h.orderReads.at(-1).id, mode);
     });

@@ -45,6 +45,16 @@ export class FuturesConditionalEntryController {
   ) {
     return this.entries.create(req.user?.userId, id, body);
   }
+  @Post(':entryId/modify')
+  @HttpCode(200)
+  modify(
+    @Req() req: AuthenticatedRequest,
+    @Param('accountId') id: string,
+    @Param('entryId') entryId: string,
+    @Body() body: unknown,
+  ) {
+    return this.entries.modify(req.user?.userId, id, entryId, body);
+  }
   @Post(':entryId/cancel')
   @HttpCode(200)
   cancel(

@@ -548,6 +548,7 @@ model TradingAccount {
   futuresConditionalEntries     FuturesConditionalEntry[]
   futuresTpSlSettings           FuturesTpSlSetting[]
   entryTpSlPlans                EntryTpSlPlan[]
+  pendingOrderModifications     PendingOrderModification[]
   futuresLiquidations           FuturesLiquidation[]
   futuresSeasonSettlement       FuturesSeasonSettlement?
   protectionGroups              ProtectionGroup[]
@@ -1220,6 +1221,8 @@ model FuturesLimitOrder {
   terminalReason      String?           @map("terminal_reason")
   createdAt           DateTime          @default(now()) @map("created_at")
   endedAt             DateTime?         @map("ended_at")
+  revisedAt           DateTime?         @map("revised_at")
+  revision            Int               @default(0)
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
   tradingAccount   TradingAccount           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
@@ -1431,6 +1434,8 @@ model Order {
   rejectedAt                 DateTime?    @map("rejected_at")
   rejectReason               String?      @map("reject_reason")
   createdAt                  DateTime     @default(now()) @map("created_at")
+  revisedAt                  DateTime?    @map("revised_at")
+  revision                   Int          @default(0)
   updatedAt                  DateTime     @updatedAt @map("updated_at")
 
   tradingAccount       TradingAccount             @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
@@ -1513,6 +1518,8 @@ model ConditionalBuyOrder {
   requestHash            String                @map("request_hash")
   createdAt              DateTime              @default(now()) @map("created_at")
   endedAt                DateTime?             @map("ended_at")
+  revisedAt              DateTime?             @map("revised_at")
+  revision               Int                   @default(0)
   updatedAt              DateTime              @updatedAt @map("updated_at")
 
   tradingAccount       TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
@@ -1565,6 +1572,8 @@ model FuturesConditionalEntry {
   requestHash            String                @map("request_hash")
   createdAt              DateTime              @default(now()) @map("created_at")
   endedAt                DateTime?             @map("ended_at")
+  revisedAt              DateTime?             @map("revised_at")
+  revision               Int                   @default(0)
   updatedAt              DateTime              @updatedAt @map("updated_at")
 
   tradingAccount       TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
@@ -1645,6 +1654,8 @@ model ConditionalSellOrder {
   requestHash                String                 @map("request_hash")
   createdAt                  DateTime               @default(now()) @map("created_at")
   endedAt                    DateTime?              @map("ended_at")
+  revisedAt                  DateTime?              @map("revised_at")
+  revision                   Int                    @default(0)
   updatedAt                  DateTime               @updatedAt @map("updated_at")
 
   tradingAccount       TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
@@ -1704,6 +1715,8 @@ model FuturesTpSlSetting {
   requestHash            String               @map("request_hash")
   createdAt              DateTime             @default(now()) @map("created_at")
   endedAt                DateTime?            @map("ended_at")
+  revisedAt              DateTime?            @map("revised_at")
+  revision               Int                  @default(0)
   updatedAt              DateTime             @updatedAt @map("updated_at")
 
   tradingAccount       TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
@@ -1771,6 +1784,8 @@ model EntryTpSlPlan {
   requestHash               String              @map("request_hash")
   createdAt                 DateTime            @default(now()) @map("created_at")
   endedAt                   DateTime?           @map("ended_at")
+  revisedAt                 DateTime?           @map("revised_at")
+  revision                  Int                 @default(0)
   updatedAt                 DateTime            @updatedAt @map("updated_at")
 
   tradingAccount          TradingAccount           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
@@ -1796,6 +1811,27 @@ model EntryTpSlPlan {
   @@index([fillExecutionId])
   @@map("entry_tp_sl_plans")
 }
+/// 대기주문·설정 변경의 append-only 기록 (docs/pending-order-modification-contract.md):
+/// the change's idempotency key and the terms before and after it.
+model PendingOrderModification {
+  id               String   @id @default(uuid(7))
+  tradingAccountId String   @map("trading_account_id")
+  targetType       String   @map("target_type")
+  targetId         String   @map("target_id")
+  idempotencyKey   String   @map("idempotency_key")
+  requestHash      String   @map("request_hash")
+  revision         Int
+  beforeJson       Json     @map("before_json")
+  afterJson        Json     @map("after_json")
+  createdAt        DateTime @map("created_at")
+
+  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([tradingAccountId, idempotencyKey])
+  @@index([targetType, targetId, revision])
+  @@map("pending_order_modifications")
+}
+
 
 enum LimitOnCloseStatus {
   pending

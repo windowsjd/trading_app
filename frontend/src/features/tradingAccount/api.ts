@@ -752,6 +752,51 @@ export async function createTradingAccountOrder(
  * suspended and closed accounts too — blocking it client-side would strand a
  * user's own money behind a screen they can still read.
  */
+/**
+ * 설정 변경 (docs/pending-order-modification-contract.md): one in-place change
+ * of a pending order or setting. The server applies it atomically under the
+ * same locks as its fill or trigger; `expectedRevision` is the revision the
+ * user changed from, and a retry with the same key replays the committed
+ * change instead of applying it twice.
+ */
+const PENDING_MODIFY_ROUTE: Record<import('../order/pendingItems').PendingModifyKind, string> = {
+  spot_order: 'orders',
+  conditional_buy: 'conditional-buy-orders',
+  conditional_sell: 'conditional-sell-orders',
+  futures_limit_order: 'futures/limit-orders',
+  futures_conditional_entry: 'futures/conditional-entries',
+  futures_tp_sl: 'futures/tp-sl-settings',
+  entry_tp_sl_plan: 'entry-tp-sl-plans',
+};
+
+export type PendingModifyBody = { idempotencyKey: string; expectedRevision: number } & Record<string, string | number>;
+
+export async function modifyPendingOrder(
+  accountId: string,
+  target: { kind: import('../order/pendingItems').PendingModifyKind; id: string },
+  body: PendingModifyBody,
+) {
+  const route = PENDING_MODIFY_ROUTE[target.kind];
+  const response = await apiClient.post<ApiSuccessResponse<{ tradingAccountId: string; duplicate?: boolean }>>(
+    accountPath(accountId, `/${route}/${encodeURIComponent(target.id)}/modify`),
+    body,
+  );
+  return assertAccountScope(`POST /trading-accounts/:accountId/${route}/:id/modify`, accountId, response.data.data);
+}
+
+/**
+ * 대기주문 발동·체결 알림: the account's confirmed fills and met conditions
+ * since `after` (the server's own `serverTime` from the last read). Without
+ * `after` only the cursor comes back, so a first read never replays history.
+ */
+export async function getPendingOrderEvents(accountId: string, after: string | null, signal?: AbortSignal) {
+  const response = await apiClient.get<ApiSuccessResponse<import('../order/pendingEvents').PendingOrderEventsDto>>(
+    accountPath(accountId, '/pending-order-events'),
+    { params: after ? { after } : undefined, signal },
+  );
+  return assertAccountScope('GET /trading-accounts/:accountId/pending-order-events', accountId, response.data.data);
+}
+
 export async function cancelTradingAccountOrder(
   accountId: string,
   orderId: string,

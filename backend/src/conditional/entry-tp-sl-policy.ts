@@ -116,6 +116,36 @@ export function parseEntryTpSlDrafts(value: unknown): EntryTpSlIntent[] {
   });
 }
 
+/** The new price and share of a change, read as a registration of the plan's own entry and kind. */
+export function parseEntryTpSlModify(
+  body: unknown,
+  row: { kind: ProtectionKind },
+  entry: { type: EntryType; id: string },
+  idempotencyKey: string,
+): EntryTpSlIntent {
+  const terms =
+    body && typeof body === 'object' && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : {};
+  const leg = { triggerPrice: terms.triggerPrice, ratio: terms.ratio };
+  return parseEntryTpSlBody({
+    entryType: entry.type,
+    entryId: entry.id,
+    idempotencyKey,
+    ...(row.kind === 'stop_loss' ? { stopLoss: leg } : { takeProfit: leg }),
+  }).intents[0];
+}
+
+/** A plan's canonical terms: compared, hashed and recorded on a change. */
+export function entryTpSlTerms(
+  intent: Pick<EntryTpSlIntent, 'triggerPrice' | 'ratioPercent'>,
+) {
+  return {
+    triggerPrice: intent.triggerPrice.toFixed(8),
+    ratioPercent: intent.ratioPercent,
+  };
+}
+
 /** Canonical text of drafts for a create request hash. */
 export function entryTpSlDraftsCanonical(intents: EntryTpSlIntent[]) {
   return intents.map((intent) => ({

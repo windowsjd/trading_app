@@ -29,6 +29,8 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/conditional-buy-and-loc-contract.md` — Conditional BUY watches (KRX/crypto Spot) and KRX Limit-on-Close with final close evidence; US extension contract; default OFF
    - `docs/conditional-sell-and-loc-sell-contract.md` — SELL conditions, independent stop-loss/take-profit (market only, per-family totals since 2026-10-15) and KRX LOC SELL; default OFF
    - `docs/sell-automation-activation-2026-10-15.md` — activation of Conditional BUY/SELL, TP/SL and LOC BUY/SELL: flags, dependencies, observed production state and the production checks NOT yet performed
+   - `docs/pending-order-modification-contract.md` — 2026-11-05: 설정 변경 of every pending order/setting in place (one command, revision + idempotency, reservation re-derivation, evidence floor `revised_at`, append-only `pending_order_modifications`); LOC/child/OCO-protected not modifiable
+   - `docs/pending-order-events-contract.md` — 2026-11-05: read-only feed of confirmed fills and met conditions per account (cursor, look-back, trigger-vs-fill rule) for the app's banners; no push coupling
    - `docs/independent-tp-sl-entry-plans-contract.md` — 2026-10-16: independent partial stop-loss/take-profit on holdings, Futures positions and pending entries (plans activated by the actual fill), retirement of new OCO registration, automatic 이상/이하 of conditional orders; default OFF
    - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`
@@ -39,6 +41,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/trading-account-orders-api-contract.md`
    - `docs/general-account-and-ad-rewards-api-contract.md`
    - `docs/operator-api-contract.md`
+   - `docs/app-release-contract.md` — 2026-11-05: public store-release manifest (operator-set env per platform) for the app's update notice; nothing set = no notice
    - `docs/push-notifications-contract.md` — 2026-10-17: Expo push for 7 types derived from committed rows (outbox, Ops lease, receipts), device/preference APIs, operator-published important notices, app permission/registration/tap rules; default OFF
    - `docs/tiingo-us-equity-official.md` — Tiingo as the official US provider (2026-10-17): collector lease, stored reference prices, `US_STOCK_PRICE_PROVIDER` switch, stored Tiingo candles, US LOC, activation runbook and rollback; default OFF
    - `docs/tiingo-us-equity-trial.md` — Tiingo US-equity trial: display-only, memory-only prices/candles/estimated quote; default OFF

@@ -126,8 +126,9 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     {
       testID: 'wallet-transfer',
       label: '이체하기',
-      // A wallet with money leaving it for another wallet.
-      iconPath: 'M18 9.5V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-1.5 M11 12.5h10 M18 9.5l3 3-3 3',
+      // A wallet with money leaving it for another wallet. The arrowhead stands clear of the
+      // wallet's open side (tips 4 units right of it: a 2-unit gap at stroke 2), never touching it.
+      iconPath: 'M14.5 9.5v-1a2 2 0 0 0-2-2h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-1 M8.5 12.5h13 M18.5 9.5l3 3-3 3',
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
       questTarget: questGuideTarget('wallet-transfer'),

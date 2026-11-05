@@ -223,6 +223,67 @@ function leg(
   };
 }
 
+/** A change of one watching SELL intent: new terms only (its asset and kind stay). */
+export type ConditionalSellModifyBody = LegBody & {
+  triggerCondition?: unknown;
+  idempotencyKey?: unknown;
+  expectedRevision?: unknown;
+};
+
+/**
+ * The new terms of a change, read exactly as a registration of the row's own
+ * asset and kind: a condition takes its direction; a stop-loss/take-profit
+ * keeps its fixed direction and still executes at market.
+ */
+export function parseConditionalSellModify(
+  body: ConditionalSellModifyBody | undefined,
+  row: {
+    assetId: string;
+    currencyCode: CurrencyCode;
+    kind: ConditionalSellKind;
+  },
+  idempotencyKey: string,
+): ConditionalSellInput {
+  const terms: ConditionalSellModifyBody =
+    body && typeof body === 'object' ? body : {};
+  const leg: LegBody = {
+    triggerPrice: terms.triggerPrice,
+    executionType: terms.executionType,
+    limitPrice: terms.limitPrice,
+    quantity: terms.quantity,
+  };
+  return parseConditionalSellBody({
+    assetId: row.assetId,
+    currencyCode: row.currencyCode,
+    idempotencyKey,
+    ...(row.kind === 'condition'
+      ? { kind: 'condition', triggerCondition: terms.triggerCondition, ...leg }
+      : row.kind === 'stop_loss'
+        ? { kind: 'protection', stopLoss: leg }
+        : { kind: 'protection', takeProfit: leg }),
+  });
+}
+
+/** An intent's canonical terms (decimal text): compared, hashed and recorded on a change. */
+export function conditionalSellTerms(
+  intent: Pick<
+    ConditionalSellIntentInput,
+    | 'triggerCondition'
+    | 'triggerPrice'
+    | 'executionType'
+    | 'limitPrice'
+    | 'quantity'
+  >,
+) {
+  return {
+    triggerCondition: intent.triggerCondition,
+    triggerPrice: intent.triggerPrice.toFixed(8),
+    executionType: intent.executionType,
+    limitPrice: intent.limitPrice?.toFixed(8) ?? null,
+    quantity: intent.quantity.toFixed(8),
+  };
+}
+
 /** Request identity for create idempotency (normalized decimal text). */
 export function conditionalSellHash(input: ConditionalSellInput) {
   return conditionalHash({

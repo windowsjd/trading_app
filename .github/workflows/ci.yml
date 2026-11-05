@@ -204,6 +204,10 @@ jobs:
       # settings, plans on pending entries activated only by their own fill,
       # retired OCO registration; races, lifecycle and modes.
       INDEPENDENT_TP_SL_DB_INTEGRATION: "1"
+      # 설정 변경 of pending orders/settings: in-place change under the
+      # trigger/fill fences, reservation deltas, moved evidence floor,
+      # idempotent replay, and change-vs-cancel/fill races.
+      PENDING_ORDER_MODIFY_DB_INTEGRATION: "1"
       # TC-D05: one committed account state per valuation while real Spot,
       # FX, transfer and Futures commands commit between its SELECTs.
       VALUATION_CONSISTENCY_DB_INTEGRATION: "1"
@@ -260,6 +264,7 @@ jobs:
           src/conditional/conditional-buy.integration.spec.ts
           src/conditional/conditional-sell.integration.spec.ts
           src/conditional/independent-tp-sl.integration.spec.ts
+          src/orders/pending-order-modification.integration.spec.ts
           src/orders/limit-on-close.integration.spec.ts
           src/orders/limit-on-close-us.integration.spec.ts
           src/orders/stock-expansion-orders.integration.spec.ts

@@ -32,6 +32,13 @@ function notifierHarness() {
     navigation: [] as unknown[],
     announcements: [] as string[],
     generation: 1,
+    // 발동·체결 알림 feed: what the server lists after a cursor, per account.
+    events: { general: [], season: [] } as Record<string, Row[]>,
+    eventTotal: {} as Record<string, number>,
+    eventReads: [] as Array<[string, string | null]>,
+    eventErrors: { general: [], season: [] } as Record<string, unknown[]>,
+    serverTime: '2026-11-05T01:00:00.000Z',
+    cursors: new Map<string, unknown>(),
     ui,
   };
   ui.native.AppState = { currentState: 'active', addEventListener: (_: string, fn: (s: string) => void) => { h.appState = fn; return { remove() {} }; } };
@@ -42,6 +49,13 @@ function notifierHarness() {
     '../tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts: h.accounts }) },
     '../tradingAccount/accountDisplay': { getAccountDisplay: (account: Row) => ({ title: account.id === 'season' ? '시즌 계정' : '일반모드' }) },
     '../tradingAccount/api': {
+      getPendingOrderEvents: async (id: string, after: string | null) => {
+        h.eventReads.push([id, after]);
+        const failure = h.eventErrors[id]?.shift();
+        if (failure) throw failure;
+        const events = after ? h.events[id] ?? [] : [];
+        return { tradingAccountId: id, serverTime: h.serverTime, events, total: h.eventTotal[id] ?? events.length };
+      },
       getTradingAccountOrders: async (id: string) => { h.reads.push(`orders:${id}`); return page(h.pending[id], id); },
       getTradingAccountOrder: async (id: string, orderId: string) => {
         h.reads.push(`detail:${id}:${orderId}`);
@@ -77,6 +91,10 @@ function notifierHarness() {
       },
     },
     '../../services/api/sessionOwnership': { getSessionGeneration: () => h.generation, isCurrentSession: (owner: number) => owner === h.generation },
+    './pendingEventStorage': {
+      readPendingEventCursor: async (id: string) => h.cursors.get(id) ?? null,
+      writePendingEventCursor: async (id: string, cursor: unknown) => { h.cursors.set(id, cursor); },
+    },
     '../../app/navigation/navigationRef': { rootNavigationRef: { isReady: () => h.navReady !== false, navigate: (...args: unknown[]) => h.navigation.push(args) } },
     'react-native-safe-area-context': { SafeAreaInsetsContext: React.createContext(null), initialWindowMetrics: { insets: { top: 30, bottom: 0, left: 0, right: 0 } } },
   }).default;
@@ -269,6 +287,130 @@ describe('real-fill banner', () => {
     await act(async () => h.appState('active'));
     await h.settle();
     assert.deepEqual(h.banner(), ['삼성전자 매수 체결 완료']);
+  });
+});
+
+describe('발동·체결 알림 (the server event feed)', () => {
+  const at = '2026-11-05T00:59:00.000Z';
+  const spotFill = (orderId: string, extra: Row = {}) => ({ key: `fill:spot_order:${orderId}`, type: 'fill', market: 'spot', origin: 'limit', side: 'buy',
+    direction: null, asset: { ...asset, market: 'KRX' }, quantity: '3.00000000', price: '70000.00000000', currencyCode: 'KRW', executionType: null, at, visibleAt: at, ...extra });
+  const trigger = (id: string, extra: Row = {}) => ({ key: `trigger:conditional_buy:${id}`, type: 'trigger', market: 'spot', origin: 'condition', side: 'buy',
+    direction: null, asset: { ...asset, market: 'KRX' }, quantity: null, price: '70000.00000000', currencyCode: 'KRW', executionType: 'limit', at, visibleAt: at, ...extra });
+  const btc = { id: 'btc', symbol: 'BTCUSDT', name: 'Bitcoin', market: 'BINANCE' };
+  const futuresFill = (id: string) => ({ key: `fill:futures_execution:${id}`, type: 'fill', market: 'futures', origin: 'futures_condition', side: null,
+    direction: 'short', asset: btc, quantity: '0.01000000', price: '68000.00000000', currencyCode: 'USD', executionType: null, at, visibleAt: at });
+  const stored = (cursor = '2026-11-05T00:50:00.000Z', seen: string[] = []) => ({ cursor, seen });
+
+  it('a first read on this device only sets the cursor; what happens next is announced, a met condition never as 체결', async (t) => {
+    const h = notifierHarness();
+    h.events.general = [spotFill('old')];
+    await h.mount(); t.after(h.close);
+    assert.deepEqual(h.eventReads.filter(([id]: [string]) => id === 'general'), [['general', null]], 'no cursor: nothing is asked for');
+    assert.deepEqual(h.banner(), [], 'no history replay on a fresh start');
+    assert.deepEqual(h.cursors.get('general'), stored(h.serverTime));
+    h.events.general = [trigger('c1')];
+    h.serverTime = '2026-11-05T01:00:30.000Z';
+    await h.refresh();
+    assert.deepEqual(h.eventReads.at(-2), ['general', '2026-11-05T01:00:00.000Z']);
+    assert.deepEqual(h.banner(), ['삼성전자 조건주문 매수 조건 충족']);
+    assert.deepEqual(h.detail(), ['일반모드 · 감시가격 70000 도달 · 처리 결과는 거래 내역에서 확인할 수 있어요']);
+    assert.doesNotMatch(`${h.banner()}${h.detail()}`, /체결/);
+    // Its order later fills: that is the second, distinct notice.
+    h.events.general = [trigger('c1'), spotFill('c1-order', { origin: 'condition' })];
+    await h.refresh();
+    await h.pressHistory();
+    assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: 'general' }]);
+    await h.finishAnimations();
+    assert.deepEqual(h.banner(), ['삼성전자 매수 체결 완료']);
+    assert.deepEqual(h.detail(), ['일반모드 · 조건주문 · 체결 수량 3']);
+    await h.pressHistory(); await h.finishAnimations();
+    await h.refresh();
+    assert.deepEqual(h.banner(), [], 'the look-back sends both again: neither is shown twice');
+  });
+
+  it('reopening shows what happened while the app was closed, once, and a fill the order reads found is not repeated', async (t) => {
+    const h = notifierHarness();
+    h.cursors.set('general', stored('2026-11-05T00:50:00.000Z', ['trigger:conditional_buy:seen']));
+    h.pending.general = [submitted('o1')];
+    h.events.general = [trigger('seen'), spotFill('closed-fill')];
+    await h.mount(); t.after(h.close);
+    assert.deepEqual(h.eventReads.filter(([id]: [string]) => id === 'general'), [['general', '2026-11-05T00:50:00.000Z']]);
+    assert.deepEqual(h.banner(), ['삼성전자 매수 체결 완료']);
+    assert.deepEqual((h.cursors.get('general') as { seen: string[] }).seen, ['trigger:conditional_buy:seen', 'fill:spot_order:closed-fill']);
+    await h.pressHistory(); await h.finishAnimations();
+    // o1 fills now: the order reads announce it first, the feed then lists the same order.
+    h.pending.general = [];
+    h.details['general:o1'] = executed('o1');
+    await h.refresh();
+    assert.deepEqual(h.banner(), ['삼성전자 매수 체결 완료']);
+    h.events.general = [spotFill('o1')];
+    await h.pressHistory(); await h.finishAnimations();
+    await h.refresh();
+    assert.deepEqual(h.banner(), [], 'one notice per order between the feed and the order reads');
+  });
+
+  it("a Futures fill names the account it belongs to and opens that account's Futures executions", async (t) => {
+    const h = notifierHarness();
+    h.cursors.set('season', stored());
+    h.events.season = [futuresFill('e1')];
+    await h.mount(); t.after(h.close);
+    assert.deepEqual(h.banner(), ['Bitcoin 숏 진입 체결 완료']);
+    assert.deepEqual(h.detail(), ['시즌 계정 · 선물 조건주문 · 체결 수량 0.01']);
+    assert.deepEqual(h.eventReads.filter(([id]: [string]) => id === 'general'), [['general', null]], "the other account's feed is its own");
+    await h.pressHistory();
+    const [name, params] = h.navigation.at(-1);
+    assert.equal(name, 'TradeHistory');
+    assert.deepEqual({ ...params, pushAt: undefined }, { accountId: 'season', market: 'futures', futuresView: 'executions', pushAt: undefined });
+  });
+
+  it('a cursor the server refuses is dropped without replaying; a failed read keeps the cursor for the next one', async (t) => {
+    const h = notifierHarness();
+    h.cursors.set('general', stored());
+    h.eventErrors.general = [{ response: { status: 400, data: { error: { code: 'INVALID_EVENT_CURSOR', message: 'bad cursor' } } } }];
+    h.events.general = [spotFill('would-replay')];
+    await h.mount(); t.after(h.close);
+    assert.deepEqual(h.eventReads.filter(([id]: [string]) => id === 'general'), [['general', '2026-11-05T00:50:00.000Z'], ['general', null]]);
+    assert.deepEqual(h.banner(), []);
+    assert.deepEqual(h.cursors.get('general'), stored(h.serverTime));
+    // An unknown failure (no response, retried once) changes nothing: the next read uses the same cursor.
+    h.events.general = [];
+    h.eventErrors.general = [new Error('Network Error'), new Error('Network Error')];
+    const cursor = h.serverTime;
+    h.serverTime = '2026-11-05T01:01:00.000Z';
+    await h.refresh();
+    assert.deepEqual(h.cursors.get('general'), stored(cursor));
+    assert.deepEqual(h.banner(), []);
+    await h.refresh();
+    assert.deepEqual(h.eventReads.filter(([id]: [string]) => id === 'general').at(-1), ['general', cursor]);
+    assert.deepEqual(h.cursors.get('general'), stored(h.serverTime));
+  });
+
+  it('reads nothing in the background; back in the foreground it catches up at once', async (t) => {
+    const h = notifierHarness();
+    h.cursors.set('general', stored());
+    await h.mount(); t.after(h.close);
+    await act(async () => h.appState('background'));
+    await h.settle();
+    const before = h.eventReads.length;
+    h.events.general = [spotFill('while-away', { origin: 'loc', side: 'sell' })];
+    await h.settle();
+    assert.equal(h.eventReads.length, before);
+    await act(async () => h.appState('active'));
+    await h.settle();
+    assert.equal(h.eventReads.length > before, true);
+    assert.deepEqual(h.banner(), ['삼성전자 LOC 매도 체결 완료']);
+  });
+
+  it('many at once are one banner at a time; the count of the rest never calls a condition 체결', async (t) => {
+    const h = notifierHarness();
+    h.cursors.set('general', stored());
+    h.events.general = [spotFill('a'), spotFill('b'), spotFill('c'), trigger('t1')];
+    h.eventTotal.general = 54;
+    await h.mount(); t.after(h.close);
+    assert.equal(h.banner().length, 1);
+    for (let i = 0; i < 2; i += 1) { await h.pressHistory(); await h.finishAnimations(); }
+    assert.deepEqual(h.banner(), ['삼성전자 매수 체결 완료']);
+    assert.match(h.detail()[0], /외 51건$/);
   });
 });
 

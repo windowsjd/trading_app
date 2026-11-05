@@ -1,17 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigationState, type ParamListBase, type RouteProp } from '@react-navigation/native';
+import ScreenErrorBoundary, { type ErrorBack } from '../../components/states/ScreenErrorBoundary';
 import { Animated, Platform, useWindowDimensions } from '../../theme/native';
 import { webPushMotion } from './transitionPolicy';
 
-type LayoutProps = { children: React.ReactElement; route: RouteProp<ParamListBase> };
+type LayoutProps = { children: React.ReactElement; route: RouteProp<ParamListBase>; navigation: ErrorBack };
 
 /**
  * Native stacks animate push/pop themselves. The web native-stack swaps screens
  * without motion, so on web the screen that becomes the top of its stack eases
  * in with the same direction cue: from the right on push, from the left on back.
  */
-export function stackScreenLayout({ children, route }: LayoutProps): React.ReactElement {
-  return Platform.OS === 'web' ? <WebPushLayout routeKey={route.key}>{children}</WebPushLayout> : children;
+export function stackScreenLayout({ children, route, navigation }: LayoutProps): React.ReactElement {
+  // A render failure stays inside its own screen: the tabs and the stack around it remain, and
+  // the error offers the screen before it — retrying a failure the screen's state keeps
+  // reproducing would otherwise be the only way out (the root boundary replaces every tab).
+  const guarded = <ScreenErrorBoundary back={navigation}>{children}</ScreenErrorBoundary>;
+  return Platform.OS === 'web' ? <WebPushLayout routeKey={route.key}>{guarded}</WebPushLayout> : guarded;
 }
 
 // Read at the moment of the transition: the shared hook starts as "reduced"

@@ -46,6 +46,9 @@ export type FuturesTpSlSetting = {
   createdAt: string;
   endedAt: string | null;
   updatedAt: string;
+  /** 설정 변경 (2026-11-05): the revision a change names; absent on an older server (0). */
+  revision?: number;
+  revisedAt?: string | null;
 };
 export type FuturesTpSlList = {
   tradingAccountId: string;

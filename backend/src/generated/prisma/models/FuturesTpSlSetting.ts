@@ -30,12 +30,14 @@ export type FuturesTpSlSettingAvgAggregateOutputType = {
   triggerPrice: runtime.Decimal | null
   quantity: runtime.Decimal | null
   attemptCount: number | null
+  revision: number | null
 }
 
 export type FuturesTpSlSettingSumAggregateOutputType = {
   triggerPrice: runtime.Decimal | null
   quantity: runtime.Decimal | null
   attemptCount: number | null
+  revision: number | null
 }
 
 export type FuturesTpSlSettingMinAggregateOutputType = {
@@ -60,6 +62,8 @@ export type FuturesTpSlSettingMinAggregateOutputType = {
   requestHash: string | null
   createdAt: Date | null
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number | null
   updatedAt: Date | null
 }
 
@@ -85,6 +89,8 @@ export type FuturesTpSlSettingMaxAggregateOutputType = {
   requestHash: string | null
   createdAt: Date | null
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number | null
   updatedAt: Date | null
 }
 
@@ -111,6 +117,8 @@ export type FuturesTpSlSettingCountAggregateOutputType = {
   requestHash: number
   createdAt: number
   endedAt: number
+  revisedAt: number
+  revision: number
   updatedAt: number
   _all: number
 }
@@ -120,12 +128,14 @@ export type FuturesTpSlSettingAvgAggregateInputType = {
   triggerPrice?: true
   quantity?: true
   attemptCount?: true
+  revision?: true
 }
 
 export type FuturesTpSlSettingSumAggregateInputType = {
   triggerPrice?: true
   quantity?: true
   attemptCount?: true
+  revision?: true
 }
 
 export type FuturesTpSlSettingMinAggregateInputType = {
@@ -150,6 +160,8 @@ export type FuturesTpSlSettingMinAggregateInputType = {
   requestHash?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
 }
 
@@ -175,6 +187,8 @@ export type FuturesTpSlSettingMaxAggregateInputType = {
   requestHash?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
 }
 
@@ -201,6 +215,8 @@ export type FuturesTpSlSettingCountAggregateInputType = {
   requestHash?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
   _all?: true
 }
@@ -314,6 +330,8 @@ export type FuturesTpSlSettingGroupByOutputType = {
   requestHash: string
   createdAt: Date
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number
   updatedAt: Date
   _count: FuturesTpSlSettingCountAggregateOutputType | null
   _avg: FuturesTpSlSettingAvgAggregateOutputType | null
@@ -363,6 +381,8 @@ export type FuturesTpSlSettingWhereInput = {
   requestHash?: Prisma.StringFilter<"FuturesTpSlSetting"> | string
   createdAt?: Prisma.DateTimeFilter<"FuturesTpSlSetting"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"FuturesTpSlSetting"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"FuturesTpSlSetting"> | Date | string | null
+  revision?: Prisma.IntFilter<"FuturesTpSlSetting"> | number
   updatedAt?: Prisma.DateTimeFilter<"FuturesTpSlSetting"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   instrument?: Prisma.XOR<Prisma.FuturesInstrumentScalarRelationFilter, Prisma.FuturesInstrumentWhereInput>
@@ -396,6 +416,8 @@ export type FuturesTpSlSettingOrderByWithRelationInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   instrument?: Prisma.FuturesInstrumentOrderByWithRelationInput
@@ -434,6 +456,8 @@ export type FuturesTpSlSettingWhereUniqueInput = Prisma.AtLeast<{
   requestHash?: Prisma.StringFilter<"FuturesTpSlSetting"> | string
   createdAt?: Prisma.DateTimeFilter<"FuturesTpSlSetting"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"FuturesTpSlSetting"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"FuturesTpSlSetting"> | Date | string | null
+  revision?: Prisma.IntFilter<"FuturesTpSlSetting"> | number
   updatedAt?: Prisma.DateTimeFilter<"FuturesTpSlSetting"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   instrument?: Prisma.XOR<Prisma.FuturesInstrumentScalarRelationFilter, Prisma.FuturesInstrumentWhereInput>
@@ -467,6 +491,8 @@ export type FuturesTpSlSettingOrderByWithAggregationInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.FuturesTpSlSettingCountOrderByAggregateInput
   _avg?: Prisma.FuturesTpSlSettingAvgOrderByAggregateInput
@@ -501,6 +527,8 @@ export type FuturesTpSlSettingScalarWhereWithAggregatesInput = {
   requestHash?: Prisma.StringWithAggregatesFilter<"FuturesTpSlSetting"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"FuturesTpSlSetting"> | Date | string
   endedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"FuturesTpSlSetting"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"FuturesTpSlSetting"> | Date | string | null
+  revision?: Prisma.IntWithAggregatesFilter<"FuturesTpSlSetting"> | number
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"FuturesTpSlSetting"> | Date | string
 }
 
@@ -521,6 +549,8 @@ export type FuturesTpSlSettingCreateInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesTpSlSettingsInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutTpSlSettingsInput
@@ -554,6 +584,8 @@ export type FuturesTpSlSettingUncheckedCreateInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutFuturesTpSlSettingInput
 }
@@ -575,6 +607,8 @@ export type FuturesTpSlSettingUpdateInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesTpSlSettingsNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutTpSlSettingsNestedInput
@@ -608,6 +642,8 @@ export type FuturesTpSlSettingUncheckedUpdateInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutFuturesTpSlSettingNestedInput
 }
@@ -635,6 +671,8 @@ export type FuturesTpSlSettingCreateManyInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -655,6 +693,8 @@ export type FuturesTpSlSettingUpdateManyMutationInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -681,6 +721,8 @@ export type FuturesTpSlSettingUncheckedUpdateManyInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -733,6 +775,8 @@ export type FuturesTpSlSettingCountOrderByAggregateInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -740,6 +784,7 @@ export type FuturesTpSlSettingAvgOrderByAggregateInput = {
   triggerPrice?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
 }
 
 export type FuturesTpSlSettingMaxOrderByAggregateInput = {
@@ -764,6 +809,8 @@ export type FuturesTpSlSettingMaxOrderByAggregateInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -789,6 +836,8 @@ export type FuturesTpSlSettingMinOrderByAggregateInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -796,6 +845,7 @@ export type FuturesTpSlSettingSumOrderByAggregateInput = {
   triggerPrice?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
 }
 
 export type FuturesTpSlSettingCreateNestedManyWithoutTradingAccountInput = {
@@ -1073,6 +1123,8 @@ export type FuturesTpSlSettingCreateWithoutTradingAccountInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutTpSlSettingsInput
   position: Prisma.FuturesPositionCreateNestedOneWithoutTpSlSettingsInput
@@ -1104,6 +1156,8 @@ export type FuturesTpSlSettingUncheckedCreateWithoutTradingAccountInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutFuturesTpSlSettingInput
 }
@@ -1160,6 +1214,8 @@ export type FuturesTpSlSettingScalarWhereInput = {
   requestHash?: Prisma.StringFilter<"FuturesTpSlSetting"> | string
   createdAt?: Prisma.DateTimeFilter<"FuturesTpSlSetting"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"FuturesTpSlSetting"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"FuturesTpSlSetting"> | Date | string | null
+  revision?: Prisma.IntFilter<"FuturesTpSlSetting"> | number
   updatedAt?: Prisma.DateTimeFilter<"FuturesTpSlSetting"> | Date | string
 }
 
@@ -1180,6 +1236,8 @@ export type FuturesTpSlSettingCreateWithoutInstrumentInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesTpSlSettingsInput
   position: Prisma.FuturesPositionCreateNestedOneWithoutTpSlSettingsInput
@@ -1211,6 +1269,8 @@ export type FuturesTpSlSettingUncheckedCreateWithoutInstrumentInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutFuturesTpSlSettingInput
 }
@@ -1258,6 +1318,8 @@ export type FuturesTpSlSettingCreateWithoutPositionInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesTpSlSettingsInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutTpSlSettingsInput
@@ -1287,6 +1349,8 @@ export type FuturesTpSlSettingUncheckedCreateWithoutPositionInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutFuturesTpSlSettingInput
 }
@@ -1334,6 +1398,8 @@ export type FuturesTpSlSettingCreateWithoutExecutionInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesTpSlSettingsInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutTpSlSettingsInput
@@ -1364,6 +1430,8 @@ export type FuturesTpSlSettingUncheckedCreateWithoutExecutionInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutFuturesTpSlSettingInput
 }
@@ -1401,6 +1469,8 @@ export type FuturesTpSlSettingUpdateWithoutExecutionInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesTpSlSettingsNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutTpSlSettingsNestedInput
@@ -1431,6 +1501,8 @@ export type FuturesTpSlSettingUncheckedUpdateWithoutExecutionInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutFuturesTpSlSettingNestedInput
 }
@@ -1452,6 +1524,8 @@ export type FuturesTpSlSettingCreateWithoutEntryPlanInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesTpSlSettingsInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutTpSlSettingsInput
@@ -1484,6 +1558,8 @@ export type FuturesTpSlSettingUncheckedCreateWithoutEntryPlanInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1520,6 +1596,8 @@ export type FuturesTpSlSettingUpdateWithoutEntryPlanInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesTpSlSettingsNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutTpSlSettingsNestedInput
@@ -1552,6 +1630,8 @@ export type FuturesTpSlSettingUncheckedUpdateWithoutEntryPlanInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1572,6 +1652,8 @@ export type FuturesTpSlSettingCreateWithoutRegistrationSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesTpSlSettingsInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutTpSlSettingsInput
@@ -1603,6 +1685,8 @@ export type FuturesTpSlSettingUncheckedCreateWithoutRegistrationSnapshotInput = 
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutFuturesTpSlSettingInput
 }
@@ -1634,6 +1718,8 @@ export type FuturesTpSlSettingCreateWithoutTriggerSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesTpSlSettingsInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutTpSlSettingsInput
@@ -1665,6 +1751,8 @@ export type FuturesTpSlSettingUncheckedCreateWithoutTriggerSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutFuturesTpSlSettingInput
 }
@@ -1733,6 +1821,8 @@ export type FuturesTpSlSettingCreateManyTradingAccountInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1753,6 +1843,8 @@ export type FuturesTpSlSettingUpdateWithoutTradingAccountInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutTpSlSettingsNestedInput
   position?: Prisma.FuturesPositionUpdateOneRequiredWithoutTpSlSettingsNestedInput
@@ -1784,6 +1876,8 @@ export type FuturesTpSlSettingUncheckedUpdateWithoutTradingAccountInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutFuturesTpSlSettingNestedInput
 }
@@ -1810,6 +1904,8 @@ export type FuturesTpSlSettingUncheckedUpdateManyWithoutTradingAccountInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1835,6 +1931,8 @@ export type FuturesTpSlSettingCreateManyInstrumentInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1855,6 +1953,8 @@ export type FuturesTpSlSettingUpdateWithoutInstrumentInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesTpSlSettingsNestedInput
   position?: Prisma.FuturesPositionUpdateOneRequiredWithoutTpSlSettingsNestedInput
@@ -1886,6 +1986,8 @@ export type FuturesTpSlSettingUncheckedUpdateWithoutInstrumentInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutFuturesTpSlSettingNestedInput
 }
@@ -1912,6 +2014,8 @@ export type FuturesTpSlSettingUncheckedUpdateManyWithoutInstrumentInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1935,6 +2039,8 @@ export type FuturesTpSlSettingCreateManyPositionInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1955,6 +2061,8 @@ export type FuturesTpSlSettingUpdateWithoutPositionInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesTpSlSettingsNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutTpSlSettingsNestedInput
@@ -1984,6 +2092,8 @@ export type FuturesTpSlSettingUncheckedUpdateWithoutPositionInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutFuturesTpSlSettingNestedInput
 }
@@ -2008,6 +2118,8 @@ export type FuturesTpSlSettingUncheckedUpdateManyWithoutPositionInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -2033,6 +2145,8 @@ export type FuturesTpSlSettingCreateManyRegistrationSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -2058,6 +2172,8 @@ export type FuturesTpSlSettingCreateManyTriggerSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -2078,6 +2194,8 @@ export type FuturesTpSlSettingUpdateWithoutRegistrationSnapshotInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesTpSlSettingsNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutTpSlSettingsNestedInput
@@ -2109,6 +2227,8 @@ export type FuturesTpSlSettingUncheckedUpdateWithoutRegistrationSnapshotInput = 
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutFuturesTpSlSettingNestedInput
 }
@@ -2135,6 +2255,8 @@ export type FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotInpu
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -2155,6 +2277,8 @@ export type FuturesTpSlSettingUpdateWithoutTriggerSnapshotInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesTpSlSettingsNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutTpSlSettingsNestedInput
@@ -2186,6 +2310,8 @@ export type FuturesTpSlSettingUncheckedUpdateWithoutTriggerSnapshotInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutFuturesTpSlSettingNestedInput
 }
@@ -2212,6 +2338,8 @@ export type FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -2240,6 +2368,8 @@ export type FuturesTpSlSettingSelect<ExtArgs extends runtime.Types.Extensions.In
   requestHash?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
@@ -2273,6 +2403,8 @@ export type FuturesTpSlSettingSelectCreateManyAndReturn<ExtArgs extends runtime.
   requestHash?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
@@ -2305,6 +2437,8 @@ export type FuturesTpSlSettingSelectUpdateManyAndReturn<ExtArgs extends runtime.
   requestHash?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
@@ -2337,10 +2471,12 @@ export type FuturesTpSlSettingSelectScalar = {
   requestHash?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
 }
 
-export type FuturesTpSlSettingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "instrumentId" | "positionId" | "direction" | "kind" | "triggerPrice" | "quantity" | "status" | "executionId" | "registrationSnapshotId" | "triggerSnapshotId" | "triggerEvidenceJson" | "triggeredAt" | "attemptCount" | "lastAttemptAt" | "failureCode" | "terminalReason" | "idempotencyKey" | "requestHash" | "createdAt" | "endedAt" | "updatedAt", ExtArgs["result"]["futuresTpSlSetting"]>
+export type FuturesTpSlSettingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "instrumentId" | "positionId" | "direction" | "kind" | "triggerPrice" | "quantity" | "status" | "executionId" | "registrationSnapshotId" | "triggerSnapshotId" | "triggerEvidenceJson" | "triggeredAt" | "attemptCount" | "lastAttemptAt" | "failureCode" | "terminalReason" | "idempotencyKey" | "requestHash" | "createdAt" | "endedAt" | "revisedAt" | "revision" | "updatedAt", ExtArgs["result"]["futuresTpSlSetting"]>
 export type FuturesTpSlSettingInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
@@ -2401,6 +2537,8 @@ export type $FuturesTpSlSettingPayload<ExtArgs extends runtime.Types.Extensions.
     requestHash: string
     createdAt: Date
     endedAt: Date | null
+    revisedAt: Date | null
+    revision: number
     updatedAt: Date
   }, ExtArgs["result"]["futuresTpSlSetting"]>
   composites: {}
@@ -2854,6 +2992,8 @@ export interface FuturesTpSlSettingFieldRefs {
   readonly requestHash: Prisma.FieldRef<"FuturesTpSlSetting", 'String'>
   readonly createdAt: Prisma.FieldRef<"FuturesTpSlSetting", 'DateTime'>
   readonly endedAt: Prisma.FieldRef<"FuturesTpSlSetting", 'DateTime'>
+  readonly revisedAt: Prisma.FieldRef<"FuturesTpSlSetting", 'DateTime'>
+  readonly revision: Prisma.FieldRef<"FuturesTpSlSetting", 'Int'>
   readonly updatedAt: Prisma.FieldRef<"FuturesTpSlSetting", 'DateTime'>
 }
     

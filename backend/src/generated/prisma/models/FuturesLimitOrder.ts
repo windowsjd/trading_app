@@ -31,6 +31,7 @@ export type FuturesLimitOrderAvgAggregateOutputType = {
   quantity: runtime.Decimal | null
   limitPrice: runtime.Decimal | null
   reservedAmount: runtime.Decimal | null
+  revision: number | null
 }
 
 export type FuturesLimitOrderSumAggregateOutputType = {
@@ -38,6 +39,7 @@ export type FuturesLimitOrderSumAggregateOutputType = {
   quantity: runtime.Decimal | null
   limitPrice: runtime.Decimal | null
   reservedAmount: runtime.Decimal | null
+  revision: number | null
 }
 
 export type FuturesLimitOrderMinAggregateOutputType = {
@@ -57,6 +59,8 @@ export type FuturesLimitOrderMinAggregateOutputType = {
   terminalReason: string | null
   createdAt: Date | null
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number | null
   updatedAt: Date | null
 }
 
@@ -77,6 +81,8 @@ export type FuturesLimitOrderMaxAggregateOutputType = {
   terminalReason: string | null
   createdAt: Date | null
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number | null
   updatedAt: Date | null
 }
 
@@ -98,6 +104,8 @@ export type FuturesLimitOrderCountAggregateOutputType = {
   terminalReason: number
   createdAt: number
   endedAt: number
+  revisedAt: number
+  revision: number
   updatedAt: number
   _all: number
 }
@@ -108,6 +116,7 @@ export type FuturesLimitOrderAvgAggregateInputType = {
   quantity?: true
   limitPrice?: true
   reservedAmount?: true
+  revision?: true
 }
 
 export type FuturesLimitOrderSumAggregateInputType = {
@@ -115,6 +124,7 @@ export type FuturesLimitOrderSumAggregateInputType = {
   quantity?: true
   limitPrice?: true
   reservedAmount?: true
+  revision?: true
 }
 
 export type FuturesLimitOrderMinAggregateInputType = {
@@ -134,6 +144,8 @@ export type FuturesLimitOrderMinAggregateInputType = {
   terminalReason?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
 }
 
@@ -154,6 +166,8 @@ export type FuturesLimitOrderMaxAggregateInputType = {
   terminalReason?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
 }
 
@@ -175,6 +189,8 @@ export type FuturesLimitOrderCountAggregateInputType = {
   terminalReason?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
   _all?: true
 }
@@ -283,6 +299,8 @@ export type FuturesLimitOrderGroupByOutputType = {
   terminalReason: string | null
   createdAt: Date
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number
   updatedAt: Date
   _count: FuturesLimitOrderCountAggregateOutputType | null
   _avg: FuturesLimitOrderAvgAggregateOutputType | null
@@ -327,6 +345,8 @@ export type FuturesLimitOrderWhereInput = {
   terminalReason?: Prisma.StringNullableFilter<"FuturesLimitOrder"> | string | null
   createdAt?: Prisma.DateTimeFilter<"FuturesLimitOrder"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"FuturesLimitOrder"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"FuturesLimitOrder"> | Date | string | null
+  revision?: Prisma.IntFilter<"FuturesLimitOrder"> | number
   updatedAt?: Prisma.DateTimeFilter<"FuturesLimitOrder"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   instrument?: Prisma.XOR<Prisma.FuturesInstrumentScalarRelationFilter, Prisma.FuturesInstrumentWhereInput>
@@ -354,6 +374,8 @@ export type FuturesLimitOrderOrderByWithRelationInput = {
   terminalReason?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   instrument?: Prisma.FuturesInstrumentOrderByWithRelationInput
@@ -386,6 +408,8 @@ export type FuturesLimitOrderWhereUniqueInput = Prisma.AtLeast<{
   terminalReason?: Prisma.StringNullableFilter<"FuturesLimitOrder"> | string | null
   createdAt?: Prisma.DateTimeFilter<"FuturesLimitOrder"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"FuturesLimitOrder"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"FuturesLimitOrder"> | Date | string | null
+  revision?: Prisma.IntFilter<"FuturesLimitOrder"> | number
   updatedAt?: Prisma.DateTimeFilter<"FuturesLimitOrder"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   instrument?: Prisma.XOR<Prisma.FuturesInstrumentScalarRelationFilter, Prisma.FuturesInstrumentWhereInput>
@@ -413,6 +437,8 @@ export type FuturesLimitOrderOrderByWithAggregationInput = {
   terminalReason?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.FuturesLimitOrderCountOrderByAggregateInput
   _avg?: Prisma.FuturesLimitOrderAvgOrderByAggregateInput
@@ -442,6 +468,8 @@ export type FuturesLimitOrderScalarWhereWithAggregatesInput = {
   terminalReason?: Prisma.StringNullableWithAggregatesFilter<"FuturesLimitOrder"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"FuturesLimitOrder"> | Date | string
   endedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"FuturesLimitOrder"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"FuturesLimitOrder"> | Date | string | null
+  revision?: Prisma.IntWithAggregatesFilter<"FuturesLimitOrder"> | number
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"FuturesLimitOrder"> | Date | string
 }
 
@@ -460,6 +488,8 @@ export type FuturesLimitOrderCreateInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesLimitOrdersInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
@@ -487,6 +517,8 @@ export type FuturesLimitOrderUncheckedCreateInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
@@ -508,6 +540,8 @@ export type FuturesLimitOrderUpdateInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesLimitOrdersNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
@@ -535,6 +569,8 @@ export type FuturesLimitOrderUncheckedUpdateInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
@@ -559,6 +595,8 @@ export type FuturesLimitOrderCreateManyInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -577,6 +615,8 @@ export type FuturesLimitOrderUpdateManyMutationInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -598,6 +638,8 @@ export type FuturesLimitOrderUncheckedUpdateManyInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -644,6 +686,8 @@ export type FuturesLimitOrderCountOrderByAggregateInput = {
   terminalReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -652,6 +696,7 @@ export type FuturesLimitOrderAvgOrderByAggregateInput = {
   quantity?: Prisma.SortOrder
   limitPrice?: Prisma.SortOrder
   reservedAmount?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
 }
 
 export type FuturesLimitOrderMaxOrderByAggregateInput = {
@@ -671,6 +716,8 @@ export type FuturesLimitOrderMaxOrderByAggregateInput = {
   terminalReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -691,6 +738,8 @@ export type FuturesLimitOrderMinOrderByAggregateInput = {
   terminalReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -699,6 +748,7 @@ export type FuturesLimitOrderSumOrderByAggregateInput = {
   quantity?: Prisma.SortOrder
   limitPrice?: Prisma.SortOrder
   reservedAmount?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
 }
 
 export type FuturesLimitOrderCreateNestedManyWithoutTradingAccountInput = {
@@ -884,6 +934,8 @@ export type FuturesLimitOrderCreateWithoutTradingAccountInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutLimitOrderInput
@@ -909,6 +961,8 @@ export type FuturesLimitOrderUncheckedCreateWithoutTradingAccountInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
@@ -962,6 +1016,8 @@ export type FuturesLimitOrderScalarWhereInput = {
   terminalReason?: Prisma.StringNullableFilter<"FuturesLimitOrder"> | string | null
   createdAt?: Prisma.DateTimeFilter<"FuturesLimitOrder"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"FuturesLimitOrder"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"FuturesLimitOrder"> | Date | string | null
+  revision?: Prisma.IntFilter<"FuturesLimitOrder"> | number
   updatedAt?: Prisma.DateTimeFilter<"FuturesLimitOrder"> | Date | string
 }
 
@@ -980,6 +1036,8 @@ export type FuturesLimitOrderCreateWithoutInstrumentInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesLimitOrdersInput
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutLimitOrderInput
@@ -1005,6 +1063,8 @@ export type FuturesLimitOrderUncheckedCreateWithoutInstrumentInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
@@ -1052,6 +1112,8 @@ export type FuturesLimitOrderCreateWithoutExecutionInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesLimitOrdersInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
@@ -1076,6 +1138,8 @@ export type FuturesLimitOrderUncheckedCreateWithoutExecutionInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
@@ -1113,6 +1177,8 @@ export type FuturesLimitOrderUpdateWithoutExecutionInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesLimitOrdersNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
@@ -1137,6 +1203,8 @@ export type FuturesLimitOrderUncheckedUpdateWithoutExecutionInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
@@ -1158,6 +1226,8 @@ export type FuturesLimitOrderCreateWithoutProtectionInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesLimitOrdersInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
@@ -1184,6 +1254,8 @@ export type FuturesLimitOrderUncheckedCreateWithoutProtectionInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesLimitOrderInput
@@ -1220,6 +1292,8 @@ export type FuturesLimitOrderUpdateWithoutProtectionInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesLimitOrdersNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
@@ -1246,6 +1320,8 @@ export type FuturesLimitOrderUncheckedUpdateWithoutProtectionInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesLimitOrderNestedInput
@@ -1266,6 +1342,8 @@ export type FuturesLimitOrderCreateWithoutConditionalEntryInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesLimitOrdersInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
@@ -1292,6 +1370,8 @@ export type FuturesLimitOrderUncheckedCreateWithoutConditionalEntryInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesLimitOrderInput
@@ -1328,6 +1408,8 @@ export type FuturesLimitOrderUpdateWithoutConditionalEntryInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesLimitOrdersNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
@@ -1354,6 +1436,8 @@ export type FuturesLimitOrderUncheckedUpdateWithoutConditionalEntryInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesLimitOrderNestedInput
@@ -1374,6 +1458,8 @@ export type FuturesLimitOrderCreateWithoutEntryTpSlPlansInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesLimitOrdersInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
@@ -1400,6 +1486,8 @@ export type FuturesLimitOrderUncheckedCreateWithoutEntryTpSlPlansInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
@@ -1436,6 +1524,8 @@ export type FuturesLimitOrderUpdateWithoutEntryTpSlPlansInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesLimitOrdersNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
@@ -1462,6 +1552,8 @@ export type FuturesLimitOrderUncheckedUpdateWithoutEntryTpSlPlansInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
@@ -1484,6 +1576,8 @@ export type FuturesLimitOrderCreateManyTradingAccountInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1502,6 +1596,8 @@ export type FuturesLimitOrderUpdateWithoutTradingAccountInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
   execution?: Prisma.FuturesExecutionUpdateOneWithoutLimitOrderNestedInput
@@ -1527,6 +1623,8 @@ export type FuturesLimitOrderUncheckedUpdateWithoutTradingAccountInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
@@ -1550,6 +1648,8 @@ export type FuturesLimitOrderUncheckedUpdateManyWithoutTradingAccountInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1570,6 +1670,8 @@ export type FuturesLimitOrderCreateManyInstrumentInput = {
   terminalReason?: string | null
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1588,6 +1690,8 @@ export type FuturesLimitOrderUpdateWithoutInstrumentInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesLimitOrdersNestedInput
   execution?: Prisma.FuturesExecutionUpdateOneWithoutLimitOrderNestedInput
@@ -1613,6 +1717,8 @@ export type FuturesLimitOrderUncheckedUpdateWithoutInstrumentInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
@@ -1636,6 +1742,8 @@ export type FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentInput = {
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1688,6 +1796,8 @@ export type FuturesLimitOrderSelect<ExtArgs extends runtime.Types.Extensions.Int
   terminalReason?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
@@ -1716,6 +1826,8 @@ export type FuturesLimitOrderSelectCreateManyAndReturn<ExtArgs extends runtime.T
   terminalReason?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
@@ -1740,6 +1852,8 @@ export type FuturesLimitOrderSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   terminalReason?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
@@ -1764,10 +1878,12 @@ export type FuturesLimitOrderSelectScalar = {
   terminalReason?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
 }
 
-export type FuturesLimitOrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "instrumentId" | "direction" | "marginMode" | "leverage" | "quantity" | "limitPrice" | "reservedAmount" | "status" | "idempotencyKey" | "requestHash" | "executionId" | "responsePayloadJson" | "terminalReason" | "createdAt" | "endedAt" | "updatedAt", ExtArgs["result"]["futuresLimitOrder"]>
+export type FuturesLimitOrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "instrumentId" | "direction" | "marginMode" | "leverage" | "quantity" | "limitPrice" | "reservedAmount" | "status" | "idempotencyKey" | "requestHash" | "executionId" | "responsePayloadJson" | "terminalReason" | "createdAt" | "endedAt" | "revisedAt" | "revision" | "updatedAt", ExtArgs["result"]["futuresLimitOrder"]>
 export type FuturesLimitOrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
@@ -1816,6 +1932,8 @@ export type $FuturesLimitOrderPayload<ExtArgs extends runtime.Types.Extensions.I
     terminalReason: string | null
     createdAt: Date
     endedAt: Date | null
+    revisedAt: Date | null
+    revision: number
     updatedAt: Date
   }, ExtArgs["result"]["futuresLimitOrder"]>
   composites: {}
@@ -2263,6 +2381,8 @@ export interface FuturesLimitOrderFieldRefs {
   readonly terminalReason: Prisma.FieldRef<"FuturesLimitOrder", 'String'>
   readonly createdAt: Prisma.FieldRef<"FuturesLimitOrder", 'DateTime'>
   readonly endedAt: Prisma.FieldRef<"FuturesLimitOrder", 'DateTime'>
+  readonly revisedAt: Prisma.FieldRef<"FuturesLimitOrder", 'DateTime'>
+  readonly revision: Prisma.FieldRef<"FuturesLimitOrder", 'Int'>
   readonly updatedAt: Prisma.FieldRef<"FuturesLimitOrder", 'DateTime'>
 }
     

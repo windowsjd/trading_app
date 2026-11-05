@@ -144,6 +144,60 @@ export function conditionalBuyHash(input: ConditionalBuyInput) {
   });
 }
 
+/** A change of a watching Conditional BUY: new terms only (the asset stays). */
+export type ConditionalBuyModifyBody = Pick<
+  ConditionalBuyBody,
+  | 'triggerCondition'
+  | 'triggerPrice'
+  | 'executionType'
+  | 'limitPrice'
+  | 'quantity'
+  | 'amount'
+> & { idempotencyKey?: unknown; expectedRevision?: unknown };
+
+/** The new terms of a change, read exactly as a registration of the row's own asset. */
+export function parseConditionalBuyModify(
+  body: ConditionalBuyModifyBody | undefined,
+  row: { assetId: string; currencyCode: CurrencyCode },
+  idempotencyKey: string,
+): ConditionalBuyInput {
+  const terms: ConditionalBuyModifyBody =
+    body && typeof body === 'object' ? body : {};
+  return parseConditionalBuyBody({
+    assetId: row.assetId,
+    currencyCode: row.currencyCode,
+    triggerCondition: terms.triggerCondition,
+    triggerPrice: terms.triggerPrice,
+    executionType: terms.executionType,
+    limitPrice: terms.limitPrice,
+    quantity: terms.quantity,
+    amount: terms.amount,
+    idempotencyKey,
+  });
+}
+
+/** A watch's canonical terms (decimal text): compared, hashed and recorded on a change. */
+export function conditionalBuyTerms(
+  input: Pick<
+    ConditionalBuyInput,
+    | 'triggerCondition'
+    | 'triggerPrice'
+    | 'executionType'
+    | 'limitPrice'
+    | 'quantity'
+    | 'amount'
+  >,
+) {
+  return {
+    triggerCondition: input.triggerCondition,
+    triggerPrice: input.triggerPrice.toFixed(8),
+    executionType: input.executionType,
+    limitPrice: input.limitPrice?.toFixed(8) ?? null,
+    quantity: input.quantity?.toFixed(8) ?? null,
+    amount: input.amount?.toFixed(8) ?? null,
+  };
+}
+
 /** Watch price vs trigger: at_or_above → price ≥ trigger, at_or_below → price ≤ trigger. */
 export function isConditionalBuyMet(
   condition: ConditionalBuyTrigger,

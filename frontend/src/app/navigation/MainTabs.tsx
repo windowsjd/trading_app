@@ -11,9 +11,11 @@ import { tabTransition } from './transitionPolicy';
 import TabBarIcon from '../../components/navigation/TabBarIcon';
 import TabBarButton from '../../components/navigation/TabBarButton';
 import FullPageLoading from '../../components/states/FullPageLoading';
+import ErrorState from '../../components/states/ErrorState';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { ScreenSheetHost } from '../../components/common/ScreenSheetHost';
 import { QuestGuideProvider } from '../../features/quest/QuestGuideProvider';
+import AppUpdateNotice from '../../features/appRelease/AppUpdateNotice';
 import { questNavigationRouter } from '../../features/quest/questNavigationGuard';
 import { isGuestBrowsing } from '../../features/auth/guestBrowsing';
 import { GuestExitContext } from '../../components/guest/guestExit';
@@ -34,7 +36,7 @@ export default function MainTabs(props: MainTabsScreenProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useAppearance();
   const reducedMotion = useReducedMotion();
-  const { selectedAccount, isLoading } = useTradingAccount();
+  const { selectedAccount, isLoading, isEmpty, accountReadError, retryAccountRead } = useTradingAccount();
   // 「로그인 없이 둘러보기」: no account at all, so nothing to wait for. A
   // signed-in user never reaches here as a guest (a session ends browsing).
   const guest = isGuestBrowsing();
@@ -43,8 +45,21 @@ export default function MainTabs(props: MainTabsScreenProps) {
   // The entry flow normally resolves the account before MainTabs mounts. Keep
   // tabs hidden during provider refreshes as well, so neither mode briefly
   // exposes the other mode's third tab.
-  if (!guest && (isLoading || !account)) {
+  if (!guest && isLoading) {
     return <FullPageLoading message="계정 정보를 불러오는 중입니다." />;
+  }
+  // Loaded and still no account: the read failed, or came back without one. Never an
+  // endless loader with no tab bar and no way out — say why, retry, or start over.
+  if (!guest && !account) {
+    return (
+      <ErrorState
+        error={accountReadError ?? undefined}
+        title={accountReadError || !isEmpty ? '계정 정보를 불러오지 못했습니다.' : '사용할 계정이 없습니다.'}
+        message={accountReadError || !isEmpty ? '네트워크 연결을 확인한 뒤 다시 시도해주세요.' : '처음 화면에서 투자 모드를 다시 선택해주세요.'}
+        onRetry={retryAccountRead}
+        secondaryAction={{ label: '처음 화면으로', testID: 'main-tabs-restart', onPress: () => props.navigation.reset({ index: 0, routes: [{ name: 'Splash' }] }) }}
+      />
+    );
   }
 
   const mode = account?.mode ?? 'guest';
@@ -167,7 +182,8 @@ export default function MainTabs(props: MainTabsScreenProps) {
   // keyed like the navigator, a switch or logout discards it with the tabs.
   // Bottom sheets of tab screens cover headers and the tab bar but stay below
   // the quest overlay, which the provider draws after its children.
-  const hosted = <ScreenSheetHost>{tabs}</ScreenSheetHost>;
+  // 앱 업데이트 안내 opens in the same sheet layer once the app is entered normally.
+  const hosted = <ScreenSheetHost>{tabs}<AppUpdateNotice /></ScreenSheetHost>;
   if (mode === 'guest') {
     // A guest's 로그인 / 회원가입, from any tab or sheet: this root route's
     // own navigation resets to the auth stack.

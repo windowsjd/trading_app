@@ -57,18 +57,19 @@ it('a holding card opens its 손절가/익절가 sheet (no inline editor); an ex
   assert.equal(h.node('protection-panel') === undefined,true,'no inline TP/SL editor');
   assert.doesNotMatch(text(h.node('account-holdings')),/TP\/SL 설정·관리|남은 보유 수량 전체를 보호/);
   await h.press('holdings-filter-pending');await h.flush();
-  await h.press('pending-kind-protection');await h.flush();
+  // A live whole-position OCO keeps its own section under the one pending list.
   assert.match(text(h.node('pending-protections')),/현물 · 포지션 보호 중/);
   const cancel=h.renderer.root.findAll((n:any)=>n.type==='CTAButton'&&n.props.label==='보호 조건 취소')[0];
   await act(async()=>cancel.props.onPress());
   assert.equal(h.protectionRequests.length,1);
   assert.deepEqual([h.protectionRequests[0].accountId,h.protectionRequests[0].groupId],['general','group']);
-  // Ended protections stay reviewable, read only on request.
+  // Ended protections stay reviewable, read only on request, in the one 종료 이력.
   h.protections=conditionalFixture('general',{domain:'spot',complete:true});await h.update();
-  assert.equal(h.node('protection-history') === undefined,true);
-  await h.press('protection-history-toggle');await h.flush();
-  assert.match(text(h.node('protection-history')),/현물 · 보호 완료/);
-  assert.match(text(h.node('protection-history')),/조건 충족 .* · 실행됨/);
+  assert.equal(h.node('pending-history') === undefined,true);
+  await h.press('pending-history-toggle');await h.flush();
+  assert.match(text(h.node('pending-history')),/보호 완료/);
+  assert.match(text(h.node('pending-history')),/기존 손절가\/익절가\(OCO\)/);
+  assert.match(text(h.node('pending-history')),/조건 충족 .* · 실행됨/);
 });
 
 it('pending separates Spot/Futures entries from active or holding Protection and honors cancellation capability', async t => {
@@ -80,10 +81,7 @@ it('pending separates Spot/Futures entries from active or holding Protection and
   h.protections.groups.push({...h.protections.groups[0],id:'finished',status:'completed',asset:{name:'SHOULD NOT DISPLAY'}});
   await h.mount();t.after(h.close);await h.flush();
   await h.press('holdings-filter-pending');await h.flush();
-  assert.equal(h.node('pending-futures') !== undefined,true);
-  assert.match(JSON.stringify(h.node('pending-futures').children.map(text)),/Short.*Cross.*37/);
-  await h.press('pending-kind-protection');await h.flush();
-  assert.equal(h.node('pending-futures') === undefined,true);
+  assert.match(text(h.node('pending-item-futures_limit-entry')),/숏 진입 · 교차 37x/);
   assert.match(text(h.node('pending-protections')),/진입 체결 대기/);
   assert.doesNotMatch(text(h.node('pending-protections')),/SHOULD NOT DISPLAY/);
   const cancel=h.renderer.root.findAll((n:any)=>n.type==='CTAButton'&&n.props.label==='보호 조건 취소')[0].props.onPress;
@@ -101,7 +99,6 @@ it('pending keeps Futures protection visible but paused when only Futures mode i
   h.protections = conditionalFixture('general', { domain: 'futures', active: true, mode: 'DISABLED' });
   await h.mount(); t.after(h.close); await h.flush();
   await h.press('holdings-filter-pending'); await h.flush();
-  await h.press('pending-kind-protection'); await h.flush();
   const content = text(h.node('pending-protections'));
   assert.match(content, /보호 감시 중지/);
   assert.equal(content.match(/조건 감시 중지/g)?.length, 2);
@@ -397,8 +394,10 @@ const pendingOrder = (id: string, side: 'buy' | 'sell', overrides: Record<string
   submittedAt: '2026-09-29T00:00:00.000Z',
   ...overrides,
 });
+/** The unified list's cards (a card root is the node that carries its own -registered line). */
 const pendingIds = (h: any) => h.renderer.root.findAll((node: any) =>
-  typeof node.type === 'string' && /^pending-order-/.test(node.props.testID ?? ''),
+  typeof node.type === 'string' && /^pending-item-/.test(node.props.testID ?? '')
+  && node.findAll((inner: any) => inner.props?.testID === `${node.props.testID}-registered`).length > 0,
 ).map((node: any) => node.props.testID);
 
 describe('pending limit orders in the real trading screen', () => {
@@ -419,8 +418,8 @@ describe('pending limit orders in the real trading screen', () => {
       for (let i = 0; i < 5; i += 1) await h.flush();
       const find = (pattern: RegExp) => h.renderer.root.findAll((n: any) => typeof n.type === 'string' && pattern.test(n.props.testID ?? ''));
       return {
-        buttons: find(/^pending-order-.*-tp-sl$/).length,
-        summary: [find(/^pending-order-.*-tp-sl-summary$/)[0]?.props.children].flat().join(''),
+        buttons: find(/^pending-item-.*-tp-sl$/).length,
+        summary: [find(/^pending-item-.*-tp-sl-summary$/)[0]?.props.children].flat().join(''),
       };
     };
     // Tiingo prices: the server lists US.
@@ -448,11 +447,12 @@ describe('pending limit orders in the real trading screen', () => {
       executionType: 'limit', entryPrice: '700', triggerPrice: null, limitPrice: '700', expectedQuantity: '100', amount: null, currencyCode: 'USD',
       leverage: null, legacyProtection: false, childOrderId: null });
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending');
-    for (let i = 0; i < 20 && pendingIds(h).length === 0; i += 1) await h.flush();
-    const button = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^pending-order-.*-tp-sl$/.test(n.props.testID ?? ''));
+    // The plan's own card (a fixture read) shows before the real Spot read lands: wait for the order.
+    for (let i = 0; i < 20 && !h.node('pending-item-spot_limit-buy-1'); i += 1) await h.flush();
+    const button = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^pending-item-.*-tp-sl$/.test(n.props.testID ?? ''));
     assert.equal(button.length, 1, 'only the ordinary BUY limit');
     assert.equal(button[0].props.label, '손절가/익절가 설정');
-    const summary = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^pending-order-.*-tp-sl-summary$/.test(n.props.testID ?? ''));
+    const summary = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^pending-item-.*-tp-sl-summary$/.test(n.props.testID ?? ''));
     assert.equal([summary[0]?.props.children].flat().join(''), '손절 1건');
     await act(async () => button[0].props.onPress()); await h.flush();
     assert.equal([h.node('tp-sl-entry-summary')?.props.children].flat().join(''), '지정가 매수 · 700 USD');
@@ -470,65 +470,30 @@ describe('pending limit orders in the real trading screen', () => {
   });
 
   for (const [spot, futures] of [[0, 1], [1, 0], [0, 0]])
-    it(`aggregates pending emptiness for Spot ${spot}/Futures ${futures} and keeps TP/SL independent`, async t => {
+    it(`one list for Spot ${spot}/Futures ${futures}; a live OCO keeps its section and is never "nothing pending"`, async t => {
       const h = inlineTradingHarness();
       const { futuresFixture } = require('../../../test/futuresFixtures.cjs');
       const { conditionalFixture } = require('../../../test/conditionalFixtures.cjs');
       h.orders = { general: spot ? [pendingOrder('spot-only', 'buy')] : [] };
-      h.pendingEntries = { general: futures ? [{ id: 'futures-only', instrument: futuresFixture('general').catalog.instruments[0], direction: 'long', marginMode: 'isolated', leverage: 10, limitPrice: '100', quantity: '1', reservedAmount: '10' }] : [] };
+      h.pendingEntries = { general: futures ? [{ id: 'futures-only', instrument: futuresFixture('general').catalog.instruments[0], direction: 'long', marginMode: 'isolated', leverage: 10, limitPrice: '100', quantity: '1', reservedAmount: '10', createdAt: '2026-09-28T00:00:00.000Z' }] : [] };
       h.protections = conditionalFixture('general', { domain: 'futures', holding: true });
       await h.mount(); t.after(h.close); await h.press('holdings-filter-pending');
-      const waitForPending = async () => {
-        const deadline = Date.now() + 1000;
-        while (Date.now() < deadline && (!h.node('pending-futures') || pendingIds(h).length !== spot || /대기 중인 지정가 주문이 없습니다/.test(empty(h)) !== (spot === 0 && futures === 0))) await h.flush();
-      };
-      await waitForPending();
-      assert.equal(/대기 중인 지정가 주문이 없습니다/.test(empty(h)), spot === 0 && futures === 0);
-      assert.equal(pendingIds(h).length, spot);
-      assert.equal(/Futures|Long/.test(text(h.node('pending-futures'))), futures > 0);
-      await h.press('pending-kind-protection'); await h.flush();
-      assert.equal(h.node('pending-futures') === undefined, true);
+      const deadline = Date.now() + 1000;
+      while (Date.now() < deadline && (pendingIds(h).length !== spot + futures || !h.node('pending-protections'))) await h.flush();
+      assert.deepEqual(pendingIds(h), [...(futures ? ['pending-item-futures_limit-futures-only'] : []), ...(spot ? ['pending-item-spot_limit-spot-only'] : [])]);
       assert.match(text(h.node('pending-protections')), /진입 체결 대기/);
-      assert.doesNotMatch(empty(h), /대기 중인 지정가 주문이 없습니다/);
-      await h.press('pending-kind-limit'); await waitForPending();
-      assert.equal(/대기 중인 지정가 주문이 없습니다/.test(empty(h)), spot === 0 && futures === 0);
+      assert.doesNotMatch(empty(h), /대기 중인 주문이 없습니다/);
+      // No kind groups or filters remain.
+      assert.equal(h.renderer.root.findAll((n: any) => /^pending-(kind|group)-/.test(n.props?.testID ?? '')).length, 0);
     });
-  it('대기 목록 opens on every kind with no filter selected; a filter narrows it and pressing it again shows all', async (t) => {
+  it('대기 목록 is one list without kind filters: every kind once, oldest registration first', async (t) => {
     const h = inlineTradingHarness();
-    h.orders = { general: [pendingOrder('spot-1', 'buy')] };
+    h.orders = { general: [pendingOrder('late', 'buy', { submittedAt: '2026-09-29T02:00:00.000Z', createdAt: '2026-09-29T02:00:00.000Z' }),
+      pendingOrder('early', 'sell', { submittedAt: '2026-09-29T01:00:00.000Z', createdAt: '2026-09-29T01:00:00.000Z' })] };
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
-    const kinds = ['limit', 'protection', 'conditional'];
-    const selected = () => kinds.filter(kind => h.node(`pending-kind-${kind}`).props.accessibilityState.selected);
-    const groups = () => kinds.filter(kind => h.node(`pending-group-${kind}`) !== undefined);
-    const headings = () => h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'header'
-      && /^pending-group-/.test(n.parent?.props.testID ?? '')).map((n: any) => text(n));
-    assert.deepEqual(selected(), []);
-    assert.deepEqual(groups(), kinds);
-    assert.deepEqual(headings(), ['지정가', '손절가/익절가', '조건주문']);
-    assert.deepEqual(pendingIds(h), ['pending-order-spot-1'], 'the 지정가 list is part of the all view');
-    // The renamed filter reads 손절가/익절가; its invisible glue only moves where it may wrap.
-    const label = h.node('pending-kind-protection');
-    assert.equal(label.props.accessibilityLabel, '손절가/익절가');
-    assert.equal(text(label).replace(/[\u2060\u200B]/gu, ''), '손절가/익절가');
-
-    await h.press('pending-kind-protection');
-    assert.deepEqual([selected(), groups(), headings()], [['protection'], ['protection'], []]);
-    await h.press('pending-kind-protection');
-    assert.deepEqual([selected(), groups()], [[], kinds], 'pressing the selected filter again shows all');
-    await h.press('pending-kind-limit');
-    await h.press('pending-kind-conditional');
-    assert.deepEqual([selected(), groups()], [['conditional'], ['conditional']], 'another filter replaces the previous one');
-  });
-
-  it('a list shown in the all view and in its own filter is not read again on switching', async (t) => {
-    const h = inlineTradingHarness();
-    h.orders = { general: [pendingOrder('spot-1', 'buy')] };
-    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
-    const reads = h.orderReads.length;
-    await h.press('pending-kind-limit'); await h.flush();
-    await h.press('pending-kind-limit'); await h.flush();
-    assert.equal(h.orderReads.length, reads);
-    assert.deepEqual(pendingIds(h), ['pending-order-spot-1']);
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-early', 'pending-item-spot_limit-late']);
+    assert.equal(h.renderer.root.findAll((n: any) => /^pending-(kind|group)-/.test(n.props?.testID ?? '')).length, 0);
+    assert.match(text(h.node('pending-count')), /대기 2건 · 먼저 등록한 순/);
   });
 
   it('keeps holdings filters and shows a distinct empty pending state', async (t) => {
@@ -544,7 +509,7 @@ describe('pending limit orders in the real trading screen', () => {
     await h.press('holdings-filter-pending'); await h.flush();
     assert.equal(h.node('holdings-filter-pending').props.accessibilityState.selected, true);
     assert.deepEqual(pendingIds(h), []);
-    assert.match(empty(h), /대기 중인 지정가 주문이 없습니다/);
+    assert.match(empty(h), /대기 중인 주문이 없습니다/);
     assert.deepEqual(h.orderReads.map((read: any) => [read.id, read.status, read.offset]), [['general', 'submitted', 0]]);
     await h.press('holdings-filter-all');
     assert.deepEqual(ids(h), ['holding-btc']);
@@ -562,13 +527,13 @@ describe('pending limit orders in the real trading screen', () => {
       pendingOrder('reject', 'buy', { status: 'rejected' }),
     ] };
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
-    assert.deepEqual(pendingIds(h), ['pending-order-buy', 'pending-order-sell']);
-    const buy = h.node('pending-order-buy');
-    const sell = h.node('pending-order-sell');
-    assert.match(text(buy), /지정가 매수 · 미체결/);
-    assert.match(text(sell), /지정가 매도 · 미체결/);
-    assert.match(text(buy), /주문 수량12,345,678,901,234,567,890.12345678/);
-    assert.match(text(sell), /지정가12,345,678,901,234,567,890.12345678/);
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-buy', 'pending-item-spot_limit-sell']);
+    const buy = h.node('pending-item-spot_limit-buy');
+    const sell = h.node('pending-item-spot_limit-sell');
+    assert.match(text(buy), /지정가.*매수.*매수 유형지정가/);
+    assert.match(text(sell), /지정가.*매도.*매도 유형지정가/);
+    assert.match(text(buy), /\(12,345,678,901,234,567,890\.12345678 BUY\)/);
+    assert.match(text(sell), /주문 조건지정가 \$12,345,678,901,234,567,890\.12345678/);
     assert.ok(buy.findAllByType('Text').every((node: any) => node.props.numberOfLines === undefined));
     assert.equal(buy.findAllByType('View').find((node: any) => node.props.style?.flexWrap === 'wrap') !== undefined, true);
     assert.equal(h.dimensions.width, 320);
@@ -584,14 +549,14 @@ describe('pending limit orders in the real trading screen', () => {
       assert.equal(h.node(`holdings-filter-${value}`).props.accessibilityState.selected, true);
     }
     await h.flush();
-    assert.deepEqual(pendingIds(h), ['pending-order-buy']);
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-buy']);
   });
 
   it('switches General to Season without ever showing the old account row', async (t) => {
     const h = inlineTradingHarness();
     h.orders = { general: [pendingOrder('a', 'buy')], season: [pendingOrder('b', 'sell')] };
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
-    assert.deepEqual(pendingIds(h), ['pending-order-a']);
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-a']);
     h.orderGate = { season: deferred() };
     h.accountId = 'season';
     h.routeAccountId = 'season'; await h.update();
@@ -599,7 +564,7 @@ describe('pending limit orders in the real trading screen', () => {
     await h.press('holdings-filter-pending');
     assert.deepEqual(pendingIds(h), []);
     await act(async () => h.orderGate.season.resolve()); await h.flush();
-    assert.deepEqual(pendingIds(h), ['pending-order-b']);
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-b']);
     assert.deepEqual(h.orderReads.map((read: any) => read.id), ['general', 'season']);
   });
 
@@ -607,21 +572,24 @@ describe('pending limit orders in the real trading screen', () => {
     const h = inlineTradingHarness();
     h.orders = { general: [pendingOrder('buy', 'buy')] };
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
-    assert.deepEqual(pendingIds(h), ['pending-order-buy']);
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-buy']);
     h.orders.general.push(pendingOrder('sell', 'sell'));
     await act(async () => invalidateAfterOrderCreate(h.client, 'general')); await h.flush();
-    assert.deepEqual(pendingIds(h), ['pending-order-buy', 'pending-order-sell']);
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-buy', 'pending-item-spot_limit-sell']);
     h.invalidations = [];
     h.orders.general[0].status = 'executed';
     await act(async () => h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.ordersAll('general') })); await h.flush();
-    assert.deepEqual(pendingIds(h), ['pending-order-sell']);
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-sell']);
     assert.ok(h.invalidations.some((key: any[]) => key[1] === 'positions' && key[2] === 'general'));
     assert.ok(h.invalidations.every((key: any[]) => key[2] !== 'season'));
     h.orders.general[1].status = 'canceled';
     await act(async () => h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.ordersAll('general') })); await h.flush();
     assert.deepEqual(pendingIds(h), []);
-    assert.match(empty(h), /대기 중인 지정가 주문이 없습니다/);
-    assert.ok(h.queries.some((q: any) => q.queryKey[1] === 'orders' && q.refetchInterval === 4000));
+    assert.match(empty(h), /대기 중인 주문이 없습니다/);
+    // Polled while focused: every 4 s while something is pending, every 15 s while the list is empty.
+    const orders = h.queries.filter((q: any) => q.queryKey[1] === 'orders' && typeof q.refetchInterval === 'function').at(-1);
+    assert.equal(orders !== undefined, true);
+    assert.deepEqual([orders.refetchInterval({ state: { data: { items: [{}] } } }), orders.refetchInterval({ state: { data: { items: [] } } })], [4000, 15000]);
   });
 
   it('reads every submitted page before displaying the list', async (t) => {
@@ -630,7 +598,7 @@ describe('pending limit orders in the real trading screen', () => {
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
     assert.equal(pendingIds(h).length, 205);
     assert.deepEqual(h.orderReads.map((read: any) => read.offset), [0, 100, 200]);
-    assert.match(text(h.node('pending-orders-list')), /대기 주문 205건/);
+    assert.match(text(h.node('pending-count')), /대기 205건/);
   });
 
   for (const integrity of [false, true]) it(`distinguishes ${integrity ? 'integrity' : 'network'} failure from empty`, async (t) => {
@@ -638,13 +606,116 @@ describe('pending limit orders in the real trading screen', () => {
     h.orders = { general: [] };
     h.orderError = integrity ? { response: { status: 409, data: { error: { code: 'TRADING_ACCOUNT_INTEGRITY' } } } } : new Error('offline');
     await h.mount(); t.after(h.close); await h.press('holdings-filter-pending'); await h.flush();
-    assert.match(empty(h), integrity ? /대기 주문을 안전하게 표시할 수 없습니다/ : /대기 주문을 불러오지 못했습니다/);
-    assert.doesNotMatch(empty(h), /대기 중인 지정가 주문이 없습니다/);
-    h.orderError = null; await h.press('pending-orders-retry'); await h.flush();
-    assert.match(empty(h), /대기 중인 지정가 주문이 없습니다/);
+    assert.match(text(h.node('pending-source-error-spot')), integrity ? /현물 지정가 주문을 안전하게 표시할 수 없어요/ : /현물 지정가 주문을 불러오지 못했어요/);
+    assert.doesNotMatch(empty(h), /대기 중인 주문이 없습니다/);
+    h.orderError = null; await h.press('pending-source-retry-spot'); await h.flush();
+    assert.match(empty(h), /대기 중인 주문이 없습니다/);
   });
 });
 
+
+describe('설정 변경 / 설정 취소 on the one pending list', () => {
+  const values = (h: any, id: string) => [h.node(id)?.props.value].flat().join('');
+  // The sheet's frame takes touches only while it is open (a closing sheet animates out).
+  const sheetOpen = (h: any) => h.node('pending-edit-sheet')?.props.pointerEvents === 'auto';
+  const open = async (h: any, rows: unknown[]) => {
+    h.orders = { general: rows };
+    await h.mount(); await h.press('holdings-filter-pending');
+    for (let i = 0; i < 20 && pendingIds(h).length === 0; i += 1) await h.flush();
+  };
+  const bnb = () => pendingOrder('buy-1', 'buy', { quantity: '100', limitPrice: '700', revision: 2,
+    asset: { id: 'bnb', symbol: 'BNBUSDT', name: 'BNB', market: 'BINANCE' } });
+
+  it('prefills the current terms, reviews before → after, and sends ONE modify with the row revision', async (t) => {
+    const h = inlineTradingHarness();
+    t.after(h.close);
+    await open(h, [bnb()]);
+    await h.press('pending-item-spot_limit-buy-1-edit');
+    assert.equal(sheetOpen(h), true);
+    assert.equal(values(h, 'pending-edit-limit-price'), '700');
+    assert.equal(values(h, 'pending-edit-amount'), '70000');
+    // A plain limit stays limit: no execution choice is offered.
+    assert.equal(h.node('pending-edit-execution') === undefined, true);
+    assert.match(text(h.node('pending-edit-execution-fixed')), /지정가 · 이 지정가의 실행 유형은 바꿀 수 없어요/);
+    // Nothing changed: no request.
+    await h.press('pending-edit-review');
+    assert.match(text(h.node('pending-edit-message')), /변경된 내용이 없어요/);
+    await h.input('pending-edit-limit-price', '650');
+    await h.press('pending-edit-review');
+    assert.match(text(h.node('pending-edit-changes')), /지정가.*700.*→.*650/);
+    assert.equal(h.requests.some((r: any) => r.url.endsWith('/modify')), false, 'reviewing sends nothing');
+    h.orders.general[0] = { ...h.orders.general[0], limitPrice: '650', quantity: '107.692307', revision: 3 };
+    await h.press('pending-edit-save'); await h.flush();
+    const sent = h.requests.filter((r: any) => r.url.endsWith('/modify'));
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].url, '/trading-accounts/general/orders/buy-1/modify');
+    assert.deepEqual({ ...sent[0].body, idempotencyKey: typeof sent[0].body.idempotencyKey },
+      { limitPrice: '650', amount: '70000', expectedRevision: 2, idempotencyKey: 'string' });
+    // Never a cancel plus a new order.
+    assert.equal(h.requests.some((r: any) => r.url.endsWith('/cancel') || r.url.endsWith('/orders')), false);
+    for (let i = 0; i < 10 && !h.node('pending-notice'); i += 1) await h.flush();
+    assert.match(text(h.node('pending-notice')), /BNB 지정가 설정을 변경했어요/);
+    assert.equal(sheetOpen(h), false);
+    assert.match(text(h.node('pending-item-spot_limit-buy-1-condition')), /지정가 \$650/);
+  });
+
+  it('an unconfirmed result retries with the SAME key; a refused one keeps the order and offers only 닫기 when it moved on', async (t) => {
+    const h = inlineTradingHarness();
+    t.after(h.close);
+    await open(h, [bnb()]);
+    await h.press('pending-item-spot_limit-buy-1-edit');
+    await h.input('pending-edit-amount', '35000');
+    await h.press('pending-edit-review');
+    h.modifyFailures = [
+      Object.assign(new Error('Network Error'), { isAxiosError: true, request: {} }),
+      { response: { status: 409, data: { error: { code: 'PENDING_ORDER_CHANGED', message: 'changed' } } } },
+    ];
+    await h.press('pending-edit-save'); await h.flush();
+    assert.match(text(h.node('pending-edit-error')), /변경 결과를 확인하지 못했어요/);
+    assert.equal(h.node('pending-edit-save')?.props.label, '같은 요청으로 다시 확인');
+    // The draft cannot be edited into another request while the first is unconfirmed.
+    assert.equal(h.node('pending-edit-back')?.props.state, 'disabled');
+    await h.press('pending-edit-save'); await h.flush();
+    const sent = h.requests.filter((r: any) => r.url.endsWith('/modify'));
+    assert.equal(sent.length, 2);
+    assert.equal(sent[1].body.idempotencyKey, sent[0].body.idempotencyKey);
+    assert.deepEqual(sent[1].body, sent[0].body);
+    // The order changed elsewhere: no save, the list shows the server's state.
+    assert.equal(h.node('pending-edit-save') === undefined, true);
+    assert.equal(h.node('pending-edit-close') !== undefined, true);
+    assert.match(text(h.node('pending-edit-error')), /다른 곳에서 바뀌었|최신 상태|변경되었/);
+    await h.press('pending-edit-close'); await h.flush();
+    assert.equal(sheetOpen(h), false);
+    assert.match(text(h.node('pending-item-spot_limit-buy-1-condition')), /지정가 \$700/);
+  });
+
+  it('LOC shows why it cannot change; 설정 취소 asks first, 유지 keeps it, 취소하기 sends one cancel', async (t) => {
+    const h = inlineTradingHarness();
+    t.after(h.close);
+    await open(h, [
+      pendingOrder('loc-1', 'buy', { currencyCode: 'KRW', quantity: '3', limitPrice: '70000', limitOnClose: { status: 'pending' },
+        asset: { id: 'samsung', symbol: '005930', name: '삼성전자', market: 'KRX' }, submittedAt: '2026-09-29T00:00:00.000Z' }),
+      pendingOrder('sell-1', 'sell', { quantity: '2', limitPrice: '900', submittedAt: '2026-09-29T01:00:00.000Z',
+        asset: { id: 'eth', symbol: 'ETHUSDT', name: 'ETH', market: 'BINANCE' } }),
+    ]);
+    assert.equal(h.node('pending-item-spot_limit-loc-1-edit')?.props.disabled, true);
+    assert.match(text(h.node('pending-item-spot_limit-loc-1-edit-reason')), /LOC.*변경할 수 없어요/);
+    assert.equal(h.node('pending-item-spot_limit-sell-1-edit')?.props.disabled, false);
+    await h.press('pending-item-spot_limit-sell-1-cancel');
+    assert.match(text(h.node('pending-item-spot_limit-sell-1-confirm')), /지정가 매도 주문을 취소할까요/);
+    await h.press('pending-item-spot_limit-sell-1-keep');
+    assert.equal(h.node('pending-item-spot_limit-sell-1-confirm') === undefined, true);
+    assert.equal(h.requests.some((r: any) => r.url.endsWith('/cancel')), false);
+    await h.press('pending-item-spot_limit-sell-1-cancel');
+    h.orders.general = h.orders.general.filter((row: any) => row.id !== 'sell-1');
+    await h.press('pending-item-spot_limit-sell-1-confirm-cancel'); await h.flush();
+    assert.deepEqual(h.requests.filter((r: any) => r.url.endsWith('/cancel')).map((r: any) => r.url),
+      ['/trading-accounts/general/orders/sell-1/cancel']);
+    for (let i = 0; i < 10 && pendingIds(h).length !== 1; i += 1) await h.flush();
+    assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-loc-1']);
+    assert.match(text(h.node('pending-notice')), /ETH 지정가 설정을 취소했어요/);
+  });
+});
 
 describe('order panel side colors in the trading screen', () => {
   it('keeps BUY green and SELL red on selected tabs and final CTA', async (t) => {

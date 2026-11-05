@@ -13,6 +13,16 @@ import { conditionalTradable } from '../conditional/conditional-policy';
 import { findProtectionSettingConflict } from '../conditional/conditional-sell-policy';
 import { liveProtection } from '../conditional/conditional-state';
 import { futuresError } from './futures-error';
+import {
+  assertExpectedRevision,
+  assertTermsChanged,
+  evidenceFloor,
+  isReplayedModification,
+  modificationHash,
+  notModifiable,
+  parseModificationEnvelope,
+  recordModification,
+} from '../common/pending-order-modification';
 import { assertFuturesOperation, futuresTradingMode } from './futures.config';
 import { readFuturesLastPrice } from './futures-last-price';
 import { FuturesService } from './futures.service';
@@ -31,7 +41,9 @@ import {
   futuresTpSlWindowExpired,
   isFuturesTpSlMet,
   isRetryableFuturesTpSlFailure,
+  futuresTpSlTerms,
   parseFuturesTpSlBody,
+  parseFuturesTpSlModify,
   resolveFuturesTpSlExecution,
 } from './futures-tp-sl-policy';
 import {
@@ -255,6 +267,172 @@ export class FuturesTpSlService {
     });
   }
 
+  /**
+   * 설정 변경 (docs/pending-order-modification-contract.md) of one watching
+   * setting, in place: account fence → the row → the Futures wallet and the
+   * position (an execution's order after the fence). Its kind and position
+   * stay and it still executes at market; the new price and quantity meet the
+   * registration rules against the OTHER live settings of the lifetime, and
+   * the evidence floor moves to the change.
+   */
+  async modify(
+    userId: string | undefined,
+    accountId: string,
+    id: string,
+    body: unknown,
+  ) {
+    this.user(userId);
+    const envelope = parseModificationEnvelope(body);
+    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockAccount(tx, accountId, userId);
+      await tx.$queryRaw`SELECT "id" FROM "futures_tp_sl_settings" WHERE "id" = ${id} AND "trading_account_id" = ${accountId} FOR UPDATE`;
+      const row = await tx.futuresTpSlSetting.findFirst({
+        where: { id, tradingAccountId: accountId },
+        include: TP_SL_INCLUDE,
+      });
+      if (!row)
+        futuresError(
+          'FUTURES_TP_SL_NOT_FOUND',
+          'Stop-loss or take-profit setting not found.',
+          HttpStatus.NOT_FOUND,
+        );
+      const intent = parseFuturesTpSlModify(body, row, envelope.idempotencyKey);
+      const terms = futuresTpSlTerms(intent);
+      const requestHash = modificationHash(
+        'futures_tp_sl',
+        id,
+        envelope.expectedRevision,
+        terms,
+      );
+      if (
+        await isReplayedModification(tx, {
+          accountId,
+          target: 'futures_tp_sl',
+          targetId: id,
+          idempotencyKey: envelope.idempotencyKey,
+          requestHash,
+        })
+      )
+        return this.single(accountId, row, true);
+      if (row.status !== 'watching') notModifiable();
+      assertExpectedRevision(row.revision, envelope.expectedRevision);
+      const before = futuresTpSlTerms(row);
+      assertTermsChanged(before, terms);
+      assertFuturesTpSlEnabled();
+      assertFuturesOperation('reduce');
+      const now = await this.futures.dbNow(tx);
+      const account = await this.access.getOwnedAccountOrThrow(
+        userId,
+        accountId,
+        tx,
+      );
+      if (!conditionalTradable(account, now))
+        futuresError(
+          'CONDITIONAL_ACCOUNT_NOT_TRADABLE',
+          'The account trading window ended.',
+        );
+      await assertBeginnerLearningAccess(tx, account, 'allTrading');
+      await tx.$queryRaw`SELECT id FROM cash_wallets WHERE trading_account_id = ${accountId} AND wallet_scope = 'crypto_futures' AND currency_code = 'USD' FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM futures_positions WHERE id = ${row.positionId} AND trading_account_id = ${accountId} FOR UPDATE`;
+      const position = await tx.futuresPosition.findFirst({
+        where: {
+          id: row.positionId,
+          tradingAccountId: accountId,
+          status: 'open',
+        },
+      });
+      if (!position)
+        futuresError(
+          'FUTURES_TP_SL_POSITION_UNAVAILABLE',
+          'An open Futures position is required.',
+        );
+      const instrument = await this.futures.instrument(
+        tx,
+        position.instrumentId,
+      );
+      if (
+        await tx.protectionGroup.count({
+          where: { futuresPositionId: position.id, ...liveProtection },
+        })
+      )
+        futuresError(
+          'PROTECTION_CONFLICT',
+          'Cancel the existing TP/SL protection before adding stop-loss or take-profit settings.',
+        );
+      if (intent.quantity.gt(position.quantity))
+        futuresError(
+          'FUTURES_TP_SL_QUANTITY_EXCEEDS_POSITION',
+          'The quantity exceeds the open position.',
+        );
+      const conflict = findProtectionSettingConflict({
+        intents: [intent],
+        live: await tx.futuresTpSlSetting.findMany({
+          where: {
+            positionId: position.id,
+            kind: intent.kind,
+            id: { not: id },
+            ...liveFuturesTpSl,
+          },
+          select: { kind: true, triggerPrice: true, quantity: true },
+        }),
+        holding: position.quantity,
+      });
+      if (conflict === 'duplicate_price')
+        futuresError(
+          'FUTURES_TP_SL_DUPLICATE_PRICE',
+          'An active setting of the same kind already uses this price.',
+        );
+      if (conflict === 'total_exceeds_holding')
+        futuresError(
+          'FUTURES_TP_SL_TOTAL_EXCEEDS_POSITION',
+          'Active settings of the same kind would exceed the open position.',
+        );
+      setAdminDiagnosticContext({
+        domain: 'futures',
+        operation: 'FUTURES_TP_SL_MODIFY',
+        failureStage: 'futures_tp_sl_price_selection',
+        entities: { tradingAccountId: accountId, instrumentId: instrument.id },
+      });
+      const price = (await readFuturesLastPrice(tx, instrument, now))!;
+      if (
+        isFuturesTpSlMet(
+          position.direction,
+          intent.kind,
+          price.price,
+          intent.triggerPrice,
+        )
+      )
+        futuresError(
+          'FUTURES_TP_SL_ALREADY_MET',
+          'The current Futures Last already meets this setting.',
+        );
+      const updated = await tx.futuresTpSlSetting.update({
+        where: { id },
+        data: {
+          triggerPrice: intent.triggerPrice,
+          quantity: intent.quantity,
+          registrationSnapshotId: price.id,
+          revisedAt: now,
+          revision: { increment: 1 },
+        },
+        include: TP_SL_INCLUDE,
+      });
+      await recordModification(tx, {
+        accountId,
+        target: 'futures_tp_sl',
+        targetId: id,
+        idempotencyKey: envelope.idempotencyKey,
+        requestHash,
+        revision: updated.revision,
+        before,
+        after: terms,
+        at: now,
+      });
+      return this.single(accountId, updated, false);
+    });
+  }
+
   async cancel(userId: string | undefined, accountId: string, id: string) {
     this.user(userId);
     await this.access.getOwnedAccountOrThrow(userId, accountId);
@@ -438,7 +616,8 @@ export class FuturesTpSlService {
       const price = await readFuturesLastPrice(tx, row.instrument, now, false);
       if (!price) return { state: 'price_unavailable' };
       // Only evidence of a trade received after registration may trigger.
-      if (price.effectiveAt < row.createdAt || price.capturedAt < row.createdAt)
+      const floor = evidenceFloor(row, row.createdAt);
+      if (price.effectiveAt < floor || price.capturedAt < floor)
         return { state: 'awaiting_price' };
       if (
         !isFuturesTpSlMet(
@@ -728,6 +907,9 @@ export function presentFuturesTpSl(
     failureCode: row.failureCode,
     terminalReason: row.terminalReason,
     createdAt: row.createdAt.toISOString(),
+    // 설정 변경: the revision a change names, and when the terms last changed.
+    revision: row.revision,
+    revisedAt: row.revisedAt?.toISOString() ?? null,
     endedAt: row.endedAt?.toISOString() ?? null,
     updatedAt: row.updatedAt.toISOString(),
   };

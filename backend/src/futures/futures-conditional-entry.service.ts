@@ -10,7 +10,20 @@ import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy
 import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learning-policy';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { conditionalTradable } from '../conditional/conditional-policy';
-import { endEntryTpSlPlansOfEndedEntries } from '../conditional/entry-tp-sl-state';
+import {
+  assertEntryPlansFitChangedEntry,
+  endEntryTpSlPlansOfEndedEntries,
+} from '../conditional/entry-tp-sl-state';
+import {
+  assertExpectedRevision,
+  assertTermsChanged,
+  evidenceFloor,
+  isReplayedModification,
+  modificationHash,
+  notModifiable,
+  parseModificationEnvelope,
+  recordModification,
+} from '../common/pending-order-modification';
 import { futuresError } from './futures-error';
 import {
   assertFuturesOperation,
@@ -35,7 +48,9 @@ import {
   futuresConditionalEntryWindowExpired,
   isFuturesConditionalEntryMet,
   isRetryableFuturesConditionalEntryFailure,
+  futuresConditionalEntryTerms,
   parseFuturesConditionalEntryBody,
+  parseFuturesConditionalEntryModify,
 } from './futures-conditional-entry-policy';
 import {
   liveFuturesConditionalEntry,
@@ -221,6 +236,156 @@ export class FuturesConditionalEntryService {
           'The account trading window ended.',
         );
       return this.response(accountId, row, false);
+    });
+  }
+
+  /**
+   * 설정 변경 (docs/pending-order-modification-contract.md) of a watching
+   * entry, in place under the trigger's fence (account, then the row). The
+   * instrument, direction, margin mode and leverage stay; the new quantity,
+   * condition and execution meet every registration rule (the row itself is
+   * the instrument's one live watch), and the evidence floor moves to the
+   * change. Nothing is reserved while watching.
+   */
+  async modify(
+    userId: string | undefined,
+    accountId: string,
+    id: string,
+    body: unknown,
+  ) {
+    this.user(userId);
+    const envelope = parseModificationEnvelope(body);
+    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockAccount(tx, accountId, userId);
+      await tx.$queryRaw`SELECT "id" FROM "futures_conditional_entries" WHERE "id" = ${id} AND "trading_account_id" = ${accountId} FOR UPDATE`;
+      const row = await tx.futuresConditionalEntry.findFirst({
+        where: { id, tradingAccountId: accountId },
+        include: ENTRY_INCLUDE,
+      });
+      if (!row)
+        futuresError(
+          'FUTURES_CONDITIONAL_ENTRY_NOT_FOUND',
+          'Conditional entry not found.',
+          HttpStatus.NOT_FOUND,
+        );
+      const input = parseFuturesConditionalEntryModify(
+        body,
+        row,
+        envelope.idempotencyKey,
+      );
+      const terms = futuresConditionalEntryTerms(input);
+      const requestHash = modificationHash(
+        'futures_conditional_entry',
+        id,
+        envelope.expectedRevision,
+        terms,
+      );
+      if (
+        await isReplayedModification(tx, {
+          accountId,
+          target: 'futures_conditional_entry',
+          targetId: id,
+          idempotencyKey: envelope.idempotencyKey,
+          requestHash,
+        })
+      )
+        return this.response(accountId, row, true);
+      if (row.status !== 'watching') notModifiable();
+      assertExpectedRevision(row.revision, envelope.expectedRevision);
+      const before = futuresConditionalEntryTerms({
+        ...row,
+        quantity: row.quantity.toFixed(8),
+      });
+      assertTermsChanged(before, terms);
+      assertFuturesConditionalEntryEnabled();
+      assertFuturesOperation('open');
+      const now = await this.futures.dbNow(tx);
+      const account = await this.access.getOwnedAccountOrThrow(
+        userId,
+        accountId,
+        tx,
+      );
+      await this.futures.assertTradable(account, now, tx);
+      await assertBeginnerLearningAccess(tx, account, 'allTrading');
+      const instrument = await this.futures.instrument(tx, row.instrumentId);
+      if (!verifiedFuturesInstrument(instrument, now))
+        futuresError(
+          'FUTURES_INSTRUMENT_UNVERIFIED',
+          'This Futures instrument is not yet available for new trades.',
+        );
+      const scope = {
+        tradingAccountId: accountId,
+        instrumentId: instrument.id,
+      };
+      if (
+        await tx.futuresPosition.findFirst({
+          where: { ...scope, status: 'open' },
+        })
+      )
+        futuresError(
+          'FUTURES_POSITION_ALREADY_OPEN',
+          'Close the existing one-way position before registering a new entry.',
+        );
+      if (
+        await tx.futuresLimitOrder.findFirst({
+          where: { ...scope, status: 'submitted' },
+        })
+      )
+        futuresError(
+          'FUTURES_ENTRY_PENDING',
+          'Cancel the pending entry before registering a conditional entry.',
+        );
+      setAdminDiagnosticContext({
+        domain: 'futures',
+        operation: 'FUTURES_CONDITIONAL_ENTRY_MODIFY',
+        failureStage: 'futures_conditional_entry_price_selection',
+        entities: { tradingAccountId: accountId, instrumentId: instrument.id },
+      });
+      const price = (await readFuturesLastPrice(tx, instrument, now))!;
+      if (
+        isFuturesConditionalEntryMet(
+          input.triggerCondition,
+          price.price,
+          input.triggerPrice,
+        )
+      )
+        futuresError(
+          'FUTURES_CONDITIONAL_ENTRY_ALREADY_MET',
+          'The current Futures Last already meets this condition.',
+        );
+      await assertEntryPlansFitChangedEntry(
+        tx,
+        { futuresConditionalEntryId: id },
+        row.direction,
+        input.limitPrice ?? input.triggerPrice,
+      );
+      const updated = await tx.futuresConditionalEntry.update({
+        where: { id },
+        data: {
+          quantity: input.quantity,
+          triggerCondition: input.triggerCondition,
+          triggerPrice: input.triggerPrice,
+          executionType: input.executionType,
+          limitPrice: input.limitPrice,
+          registrationSnapshotId: price.id,
+          revisedAt: now,
+          revision: { increment: 1 },
+        },
+        include: ENTRY_INCLUDE,
+      });
+      await recordModification(tx, {
+        accountId,
+        target: 'futures_conditional_entry',
+        targetId: id,
+        idempotencyKey: envelope.idempotencyKey,
+        requestHash,
+        revision: updated.revision,
+        before,
+        after: terms,
+        at: now,
+      });
+      return this.response(accountId, updated, false);
     });
   }
 
@@ -414,8 +579,9 @@ export class FuturesConditionalEntryService {
       if (futuresTradingMode() !== 'ENABLED') return { state: 'paused' };
       const price = await readFuturesLastPrice(tx, instrument, now, false);
       if (!price) return { state: 'price_unavailable' };
-      // Only evidence of a trade received after registration may trigger.
-      if (price.effectiveAt < row.createdAt || price.capturedAt < row.createdAt)
+      // Only evidence of a trade received after registration (or its latest change) may trigger.
+      const floor = evidenceFloor(row, row.createdAt);
+      if (price.effectiveAt < floor || price.capturedAt < floor)
         return { state: 'awaiting_price' };
       if (
         !isFuturesConditionalEntryMet(
@@ -666,6 +832,9 @@ export function presentFuturesConditionalEntry(row: EntryRecord) {
     failureCode: row.failureCode,
     terminalReason: row.terminalReason,
     createdAt: row.createdAt.toISOString(),
+    // 설정 변경: the revision a change names, and when the terms last changed.
+    revision: row.revision,
+    revisedAt: row.revisedAt?.toISOString() ?? null,
     endedAt: row.endedAt?.toISOString() ?? null,
     updatedAt: row.updatedAt.toISOString(),
   };

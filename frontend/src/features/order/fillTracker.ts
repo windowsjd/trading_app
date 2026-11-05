@@ -227,8 +227,12 @@ export type FillNotice = {
   detail: string | null;
   /** Further notices folded into this one when the queue is full. */
   overflow?: number;
+  /** Some folded notice was not a fill (a condition met, or of unknown kind): the count never says 체결. */
+  overflowMixed?: boolean;
+  /** A condition met, not a fill (pendingEvents.ts). */
+  trigger?: boolean;
   /** 내역 보기 target inside 거래 내역; the Spot list when absent. */
-  history?: { market: 'futures'; futuresView: 'liquidations' };
+  history?: { market: 'futures'; futuresView: 'executions' | 'liquidations' };
 };
 
 /** A foreground liquidation push as a banner (its own copy, its own key). */
@@ -301,7 +305,11 @@ export function enqueueFillNotice(queue: readonly FillNotice[], notice: FillNoti
   if (queue.some((item) => item.id === notice.id)) return [...queue];
   if (queue.length < max) return [...queue, notice];
   const last = queue[queue.length - 1];
-  return [...queue.slice(0, -1), { ...last, overflow: (last.overflow ?? 0) + 1 + (notice.overflow ?? 0) }];
+  return [...queue.slice(0, -1), {
+    ...last,
+    overflow: (last.overflow ?? 0) + 1 + (notice.overflow ?? 0),
+    ...(last.overflowMixed || notice.trigger || notice.overflowMixed ? { overflowMixed: true } : {}),
+  }];
 }
 
 /**

@@ -76,6 +76,13 @@ function runLoop(value: Animated.Value, period: number, delay: number, elapsed: 
   return () => { stopped = true; animation.stop(); };
 }
 
+/** The emblem's drop value for `tier`: at the drop's start while its entrance is owed, else at rest (and known to be). */
+function emblemDrop(resting: WeakSet<Animated.Value>, tier: HomeTier | null, owed: boolean) {
+  const drop = new Animated.Value(owed ? 0 : 3);
+  if (!owed) resting.add(drop);
+  return { tier, drop };
+}
+
 /** A size from onLayout, kept only when it changed. */
 function useSize() {
   const [size, setSize] = useState<Size | null>(null);
@@ -107,11 +114,19 @@ export function useTierStage(input: {
   const motion = settled && !reduced;
   const native = Platform.OS !== 'web';
 
+  // Drop values known to hold the rest pose: made at rest, or a drop that ran to its end.
+  const [resting] = useState(() => new WeakSet<Animated.Value>());
   // Until the OS says reduced motion, a tier that owes its entrance is hidden at the drop's start.
   const owes = () => tier !== null && entranceDecision(tier, context) === 'play' && !(settled && reduced);
-  const [emblem, setEmblem] = useState(() => ({ tier, drop: new Animated.Value(owes() ? 0 : 3) }));
-  if (emblem.tier !== tier) setEmblem({ tier, drop: new Animated.Value(owes() ? 0 : 3) });
+  const [emblem, setEmblem] = useState(() => emblemDrop(resting, tier, owes()));
+  if (emblem.tier !== tier) setEmblem(emblemDrop(resting, tier, owes()));
   const drop = emblem.drop;
+  // The rest pose never trusts a value the native driver ran: stopping a native drive reports its
+  // last frame back to JS after any setValue made meanwhile, and Fabric then commits that frame — a
+  // drop stopped near its start kept the emblem transparent for good. A new value at rest replaces it.
+  // `only`: an interrupted entrance settles its own drop, never a newer tier's that still owes its entrance.
+  const settle = useCallback((only?: Animated.Value) => setEmblem((current) =>
+    (only && current.drop !== only) || resting.has(current.drop) ? current : emblemDrop(resting, current.tier, false)), [resting]);
   const [values] = useState<Values>(() => ({
     ring: new Animated.Value(1), flash: new Animated.Value(1),
     sway: new Animated.Value(0), pulse: new Animated.Value(0), bob: new Animated.Value(0),
@@ -123,35 +138,42 @@ export function useTierStage(input: {
   useEffect(() => {
     if (!tier) return;
     const decision = entranceDecision(tier, context);
-    if (decision === 'silent') { rememberPresented(tier, context); return; }
-    if (decision !== 'play' || !settled) return;
-    if (reduced) { drop.setValue(3); return; }
-    if (paused) return;
-    rememberPresented(tier, context);
-    setEntrance(tier);
-  }, [context, drop, paused, reduced, settled, tier]);
+    if (decision === 'play' && !(settled && reduced)) {
+      // Owed: it plays once the OS answer is known and the card is on screen.
+      if (!settled || paused) return;
+      rememberPresented(tier, context);
+      setEntrance(tier);
+      return;
+    }
+    if (decision === 'silent') rememberPresented(tier, context);
+    // Nothing owed (already presented, another selection, reduced motion): the emblem rests unless
+    // this card's own entrance is still to run — it is never left at the drop's hidden start.
+    if (entrance !== tier || !motion) settle();
+  }, [context, entrance, motion, paused, reduced, settle, settled, tier]);
 
   const entering = entrance !== null && entrance === tier && motion && !paused;
   useEffect(() => {
     if (!entering) return;
     const timing = (value: Animated.Value, config: Omit<Animated.TimingAnimationConfig, 'useNativeDriver'>) =>
       Animated.timing(value, { ...config, useNativeDriver: native, isInteraction: false });
+    resting.delete(drop);
     drop.setValue(0); values.ring.setValue(0); values.flash.setValue(0);
+    const fall = timing(drop, { toValue: 3, duration: STAGE_TIMING.drop, easing: dropEasing });
     const ring = timing(values.ring, { toValue: 1, duration: STAGE_TIMING.ring, delay: STAGE_TIMING.ringDelay, easing: EASE_OUT });
-    const animations = [
-      timing(drop, { toValue: 3, duration: STAGE_TIMING.drop, easing: dropEasing }),
-      timing(values.flash, { toValue: 1, duration: STAGE_TIMING.flash, easing: EASE_OUT }),
-      ring,
-    ];
-    animations.forEach((animation) => animation.start(animation === ring
-      ? ({ finished }) => { if (finished) setEntrance(null); } : undefined));
-    // Interrupted (paused, reduced, another tier): settle at once; it is not replayed.
+    const animations = [fall, timing(values.flash, { toValue: 1, duration: STAGE_TIMING.flash, easing: EASE_OUT }), ring];
+    animations.forEach((animation) => animation.start(
+      animation === ring ? ({ finished }) => { if (finished) setEntrance(null); }
+      : animation === fall ? ({ finished }) => { if (finished) resting.add(drop); }
+      : undefined));
+    // Interrupted (paused, reduced, another tier): settle at once; it is not replayed. The ring and
+    // the flash are drawn only while entering and restart from 0, so their last frames do not matter.
     return () => {
       animations.forEach((animation) => animation.stop());
-      drop.setValue(3); values.ring.setValue(1); values.flash.setValue(1);
+      values.ring.setValue(1); values.flash.setValue(1);
+      settle(drop);
       setEntrance(null);
     };
-  }, [drop, entering, native, values]);
+  }, [drop, entering, native, resting, settle, values]);
 
   // Loop time survives pauses; another tier starts its loops from the beginning.
   const clock = useRef<{ tier: HomeTier | null; elapsed: number }>({ tier: null, elapsed: 0 });

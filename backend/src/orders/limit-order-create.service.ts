@@ -36,7 +36,10 @@ import {
   validateQuotedLimitReservationBasis,
   type QuotedLimitReservationBasis,
 } from './limit-order-policy';
-import { reserveAvailablePositionQuantity } from './position-reservation-atomic';
+import {
+  releaseReservedPositionQuantity,
+  reserveAvailablePositionQuantity,
+} from './position-reservation-atomic';
 import { requireOrderCashWalletScope } from './order-cash-wallet-policy';
 import { OrderReservationService } from './order-reservation.service';
 import {
@@ -1185,6 +1188,166 @@ export class LimitOrderCreateService {
       select: { id: true },
     });
     return response;
+  }
+
+  /**
+   * 설정 변경 of a submitted, non-LOC limit order, in place
+   * (docs/pending-order-modification-contract.md). The caller holds the
+   * lifecycle fence and the order row lock (the fill's order) and has applied
+   * every registration rule to the new terms. The reservation moves by exactly
+   * the difference — BUY cash at the order's own pinned fee rate (never the
+   * season's current one), SELL holding quantity — and a shortage refuses the
+   * whole change with nothing moved. The order keeps its id, quote, submission
+   * time and links; `revisedAt` becomes its evidence floor.
+   */
+  async reviseSubmittedLimitOrderInTransaction(
+    tx: LimitCreateTransactionClient,
+    input: {
+      order: {
+        id: string;
+        tradingAccountId: string;
+        assetId: string;
+        side: OrderSide;
+        currencyCode: CurrencyCode;
+        cashWalletScope: WalletScope;
+        reservedAmount: Prisma.Decimal | null;
+        reservedQuantity: Prisma.Decimal | null;
+        reservationFeeRate: Prisma.Decimal | null;
+        revision: number;
+      };
+      quantity: Prisma.Decimal;
+      limitPrice: Prisma.Decimal;
+      now: Date;
+    },
+  ): Promise<{
+    reservedAmount: string | null;
+    reservedQuantity: string | null;
+  }> {
+    const { order } = input;
+    const quantityText = formatDecimalScale(input.quantity, orderQuantityScale);
+    let reserved: {
+      reservedAmount: string | null;
+      reservedQuantity: string | null;
+    };
+    if (order.side === OrderSide.buy) {
+      if (!order.reservedAmount || !order.reservationFeeRate)
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+          'The order has no reservation basis to revise.',
+        );
+      const next = calculateLimitBuyReservation({
+        limitPrice: input.limitPrice,
+        quantity: input.quantity,
+        tradeFeeRate: order.reservationFeeRate,
+      }).reservedAmount;
+      const delta = next.sub(order.reservedAmount);
+      const wallet = {
+        tradingAccountId: order.tradingAccountId,
+        currencyCode: order.currencyCode,
+        walletScope: order.cashWalletScope,
+      };
+      if (delta.gt(0))
+        await this.reservation.reserveForLimitBuy(tx, {
+          ...wallet,
+          amount: formatDecimalScale(delta, monetaryScale),
+        });
+      else if (delta.lt(0)) {
+        const row = await tx.cashWallet.findUnique({
+          where: {
+            tradingAccountId_walletScope_currencyCode: {
+              tradingAccountId: order.tradingAccountId,
+              walletScope: order.cashWalletScope,
+              currencyCode: order.currencyCode,
+            },
+          },
+          select: { id: true },
+        });
+        if (!row)
+          this.throwLimitOrderError(
+            limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+            'Wallet reservation does not cover the order reservation.',
+          );
+        await this.reservation.releaseLimitBuyReservation(tx, {
+          ...wallet,
+          walletId: row.id,
+          amount: formatDecimalScale(delta.neg(), monetaryScale),
+        });
+      }
+      reserved = {
+        reservedAmount: formatDecimalScale(next, monetaryScale),
+        reservedQuantity: null,
+      };
+    } else {
+      if (!order.reservedQuantity)
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+          'The order has no reserved quantity to revise.',
+        );
+      const position = await tx.position.findUnique({
+        where: {
+          tradingAccountId_assetId: {
+            tradingAccountId: order.tradingAccountId,
+            assetId: order.assetId,
+          },
+        },
+        select: { id: true },
+      });
+      if (!position)
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+          'The holding of the order was not found.',
+        );
+      const delta = input.quantity.sub(order.reservedQuantity);
+      const target = {
+        positionId: position.id,
+        tradingAccountId: order.tradingAccountId,
+        assetId: order.assetId,
+        quantity: formatDecimalScale(delta.abs(), orderQuantityScale),
+      };
+      if (
+        delta.gt(0) &&
+        (await reserveAvailablePositionQuantity(tx, target)) !== 1
+      )
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'INSUFFICIENT_QUANTITY',
+          'Available position quantity is insufficient.',
+        );
+      if (
+        delta.lt(0) &&
+        (await releaseReservedPositionQuantity(tx, target)) !== 1
+      )
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+          'The holding does not cover the order reservation.',
+        );
+      reserved = { reservedAmount: null, reservedQuantity: quantityText };
+    }
+    // Guarded on the state and revision read under the lock: never a second
+    // writer's terms, never a filled or canceled order.
+    const updated = await tx.order.updateMany({
+      where: {
+        id: order.id,
+        status: OrderStatus.submitted,
+        revision: order.revision,
+      },
+      data: {
+        quantity: quantityText,
+        limitPrice: formatDecimalScale(input.limitPrice, monetaryScale),
+        ...(order.side === OrderSide.buy
+          ? { reservedAmount: reserved.reservedAmount }
+          : { reservedQuantity: reserved.reservedQuantity }),
+        revisedAt: input.now,
+        revision: { increment: 1 },
+        updatedAt: input.now,
+      },
+    });
+    if (updated.count !== 1)
+      this.throwLimitOrderError(
+        limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT,
+        'The order changed while it was being revised.',
+      );
+    return reserved;
   }
 
   /**

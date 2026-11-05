@@ -63,7 +63,7 @@ function walletTransferHarness({ platform = 'web', diagnostics = false, role = '
   h.flushFrames = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); };
   h.keyboard = (event, screenY = 400) => { for (const listener of listeners.get(event) ?? []) listener({ endCoordinates: { screenY } }); h.flushFrames(); };
   const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView'].map(name => [name, name]));
-  Object.assign(native, { Platform: { OS: platform }, StyleSheet: { create: value => value }, Keyboard: {
+  Object.assign(native, { Platform: { OS: platform }, StyleSheet: { create: value => value }, useWindowDimensions: () => ({ width: 360, height: 760, fontScale: 1 }), Keyboard: {
     dismiss() { h.events.push('dismiss'); },
     addListener(event, callback) { const set = listeners.get(event) ?? new Set(); set.add(callback); listeners.set(event, set); return { remove: () => set.delete(callback) }; },
   } });

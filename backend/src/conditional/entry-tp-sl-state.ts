@@ -11,7 +11,7 @@ import {
 import { orderInputQuantityScale } from '../orders/order-input-policy';
 import { FUTURES_TP_SL_MAX_LIVE_PER_ACCOUNT } from '../futures/futures-tp-sl-policy';
 import { liveFuturesTpSl } from '../futures/futures-tp-sl-state';
-import { conditionalHash } from './conditional-policy';
+import { conditionalHash, isTriggered } from './conditional-policy';
 import {
   CONDITIONAL_SELL_MAX_LIVE_PER_ACCOUNT,
   findProtectionSettingConflict,
@@ -336,6 +336,34 @@ export async function resolveEntryRoot(
     legacyProtection: false,
     childOrderId: limitOrder?.id ?? null,
   };
+}
+
+/**
+ * 설정 변경 of an entry (docs/pending-order-modification-contract.md): its
+ * pending plans were placed against the old entry price and must stay on the
+ * protective side of the new one. The change is refused rather than ending
+ * plans the user set (they keep their own 변경/취소).
+ */
+export async function assertEntryPlansFitChangedEntry(
+  tx: Pick<Client, 'entryTpSlPlan'>,
+  link: EntryLink,
+  direction: FuturesDirection,
+  entryPrice: Prisma.Decimal,
+) {
+  const plans = await tx.entryTpSlPlan.findMany({
+    where: { ...link, ...pendingEntryTpSl },
+    select: { kind: true, triggerPrice: true },
+  });
+  if (
+    plans.some((plan) =>
+      isTriggered(direction, plan.kind, entryPrice, plan.triggerPrice),
+    )
+  )
+    throw createApiError(
+      'PENDING_ORDER_ENTRY_PLAN_CONFLICT',
+      'Pending stop-loss/take-profit plans of this entry would no longer protect it at the new price.',
+      409,
+    );
 }
 
 /** The plans of one entry (any status), oldest first. */

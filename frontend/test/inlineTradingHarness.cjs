@@ -144,6 +144,15 @@ function inlineTradingHarness() {
         },
         post: async (url, body) => {
           h.requests.push({ url, body });
+          // 설정 변경 / 설정 취소: `h.modifyFailures` / `h.cancelFailures` fail calls in turn, then the server commits.
+          if (url.endsWith('/modify') || url.endsWith('/cancel')) {
+            const modify = url.endsWith('/modify');
+            if (modify && h.modifyGate) await h.modifyGate.promise;
+            const failure = (modify ? h.modifyFailures : h.cancelFailures)?.shift();
+            if (failure) throw failure;
+            h.onCommand?.(url, body);
+            return { data: { success: true, data: { tradingAccountId: url.split('/')[2], ...(modify ? { duplicate: false } : { status: 'canceled' }) } } };
+          }
           const isQuote = url.endsWith('/quote');
           if (isQuote && h.quoteGate) await h.quoteGate.promise;
           if (!isQuote && h.createGate) await h.createGate.promise;
@@ -295,8 +304,19 @@ function inlineTradingHarness() {
     '../../features/futures/api': {
       getFuturesLimitOrders: async id => ({ tradingAccountId: id, orders: h.pendingEntries?.[id] ?? [] }),
       cancelFuturesLimitOrder: async (id, orderId) => { h.protectionRequests ??= []; h.protectionRequests.push({accountId:id,orderId}); },
+      // The one pending list (2026-11-05) also reads Futures conditional entries: none unless a test sets them.
+      getFuturesConditionalEntries: async (id, state) => ({ tradingAccountId: id, capabilities: { enabled: false, canCreate: false, maxLivePerAccount: 20 },
+        entries: h.futuresConditionalEntries?.[id]?.[state] ?? [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } }),
+      cancelFuturesConditionalEntry: async (id, entryId) => { h.requests.push({ url: `/trading-accounts/${id}/futures/conditional-entries/${entryId}/cancel` }); },
+    },
+    '../../features/futures/tpSlApi': {
+      getFuturesTpSlSettings: async (id, state) => ({ tradingAccountId: id, capabilities: { enabled: false, canCreate: false, canCancel: true, maxLivePerAccount: 30 },
+        settings: h.futuresTpSl?.[id]?.[state] ?? [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } }),
+      cancelFuturesTpSlSetting: async (id, settingId) => { h.requests.push({ url: `/trading-accounts/${id}/futures/tp-sl-settings/${settingId}/cancel` }); },
     },
     '../../features/conditional/api': {
+      // Ended protections for the one 종료 이력: the fixture as it is now.
+      getProtectionHistory: async (accountId) => h.protections ?? { tradingAccountId: accountId, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { total: 0, limit: 30, offset: 0, hasNext: false } },
       createProtection: async (accountId, body) => { h.protectionRequests ??= []; h.protectionRequests.push({accountId,body}); },
       cancelProtection: async (accountId, groupId, key) => { h.protectionRequests ??= []; h.protectionRequests.push({accountId,groupId,key}); if(h.protectionGate) await h.protectionGate.promise; },
     },
@@ -367,6 +387,8 @@ function inlineTradingHarness() {
         const [scope, resource, id] = options.queryKey;
         if (options.queryKey[3] === 'holdings' || resource === 'orders') return query.useQuery(options);
         if (resource === 'futures') return query.useQuery(options);
+        // The one pending list's 종료 이력 reads every ended kind through the API mocks.
+        if (resource === 'pendingHistory') return query.useQuery(options);
         const base = {
           isLoading: false,
           isPending: false,
@@ -543,7 +565,12 @@ function inlineTradingHarness() {
     // 손절가/익절가 plans: reads go through the query mock; writes are recorded.
     '../../features/conditional/entryTpSlApi': {
       getEntryTpSlPlans: async () => { throw new Error('read through the query mock'); },
-      getAccountEntryTpSlPlans: async () => { throw new Error('read through the query mock'); },
+      // Open plans are read through the query mock; the 종료 이력 reads ended ones here.
+      getAccountEntryTpSlPlans: async (accountId, state) => {
+        if (state !== 'ended') throw new Error('read through the query mock');
+        return { tradingAccountId: accountId, capabilities: { spot: { enabled: false, canCreate: false }, futures: { enabled: false, canCreate: false }, canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 },
+          entry: null, plans: h.entryTpSlEnded ?? [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } };
+      },
       createEntryTpSlPlans: async (accountId, body) => {
         h.requests.push({ url: `/trading-accounts/${accountId}/entry-tp-sl-plans`, body });
         if (h.entryTpSlFailure) throw h.entryTpSlFailure;

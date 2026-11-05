@@ -13,7 +13,7 @@ import { ACCOUNT_INTEGRITY_TITLE, findAccountIntegrityFailure } from '../../feat
 import { invalidateAfterWalletTransfer } from '../../features/tradingAccount/invalidation';
 import { getWalletByIdentity } from '../../features/wallet/mapper';
 import { TRANSFER_WALLETS, WALLET_SCOPE_LABELS, type TransferWalletIdentity } from '../../features/wallet/walletIdentity';
-import { parseTransferAmount, transferAmountFits, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, WalletTransferContractError, WalletBalanceCheckError, walletBalanceCheckMessage } from '../../features/wallet/walletTransfer';
+import { parseTransferAmount, transferAmountAtRatio, transferAmountFits, transferAmountShare, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, WalletTransferContractError, WalletBalanceCheckError, walletBalanceCheckMessage } from '../../features/wallet/walletTransfer';
 import { isFxResponseInScope as isTransferResponseInScope, type FxRequestScope as TransferScope } from '../../features/wallet/fxAccountScope';
 import { isZeroAmount, type UsdWalletScope } from '../../features/wallet/walletFunding';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -25,6 +25,7 @@ import CTAButton from '../../components/common/CTAButton';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import ErrorNotice from '../../components/states/ErrorNotice';
+import OrderRatioControls from '../order/OrderRatioControls';
 import { isTradingAccountScopeMismatchError } from '../../features/tradingAccount/accountScope';
 import {
   captureQuestGuideCommand,
@@ -108,6 +109,10 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
   const sourceIdentity = USD_TRANSFER_WALLETS.find(wallet => wallet.key === sourceKey);
   const destinationIdentity = USD_TRANSFER_WALLETS.find(wallet => wallet.key === destinationKey);
   const [amount, setAmount] = useState(initial?.amount ?? '');
+  // The ratio pick that sized the amount and the sending wallet it was taken from: another sending
+  // wallet re-sizes the amount at that ratio of its own transferable amount, once that is known.
+  const [ratioPick, setRatioPick] = useState<{ ratio: number; source: UsdWalletIdentity['key'] } | null>(null);
+  const [ratioNotice, setRatioNotice] = useState<string | null>(null);
   const [result, setResult] = useState<WalletTransferDto | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const attempt = useRef<TransferCommand | null>(null);
@@ -192,6 +197,13 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
     ? futures.isError ? null : futuresTransferAvailableAmount(futures.data, account.id, source)
     : transferAvailableAmount(source);
   const canonicalAmount = parseTransferAmount(amount);
+  // The ratio controls size the amount from what can be sent now (balance − reserved, or the
+  // Futures wallet's free collateral); a typed amount moves the thumb back, never the text.
+  const ratioDisabledReason = available === null ? '보내는 지갑의 이체 가능 금액을 확인할 수 없습니다.'
+    : !(Number(available) > 0) ? '보내는 지갑에 이체 가능한 금액이 없습니다.' : null;
+  const activeRatio = !ratioDisabledReason && ratioPick?.source === sourceKey
+    && (ratioPick.ratio === 0 ? !amount : transferAmountAtRatio(available, ratioPick.ratio) === amount) ? ratioPick.ratio : null;
+  const displayedRatio = activeRatio ?? transferAmountShare(canonicalAmount, available);
   const block = capabilities?.canExchange ? null : getCapabilityBlockMessage(capabilities, capabilities?.exchangeBlockReason) ?? '현재 계정에서는 이체할 수 없습니다.';
   const locked = mutation.isPending || !!attempt.current?.running;
   useEffect(() => { onBusyChange?.(locked); }, [locked, onBusyChange]);
@@ -213,6 +225,22 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
   const canExecute = !block && !wallets.isError && hasAllWallets && !!source?.id && !!destination?.id &&
     source.id !== destination.id && !!canonicalAmount && available !== null &&
     ((balanceReady && transferAmountFits(canonicalAmount, available)) || uncertainRetry);
+  const applyRatio = (value: number) => {
+    if (locked || attempt.current?.running || ratioDisabledReason || !Number.isFinite(value)) return;
+    const ratio = Math.max(0, Math.min(1, value));
+    const text = ratio === 0 ? '' : transferAmountAtRatio(available, ratio);
+    if (text === null) { setRatioNotice('계산된 이체 금액이 너무 작습니다.'); return; }
+    if (parseTransferAmount(text) !== canonicalAmount) attempt.current = null;
+    setAmount(text); setRatioPick({ ratio, source: sourceKey }); setRatioNotice(null); setFailure(null);
+  };
+  // 출금 지갑 change: a picked ratio is taken again from the new wallet's transferable amount.
+  useEffect(() => {
+    if (!ratioPick || ratioPick.source === sourceKey || available === null || locked) return;
+    const text = ratioPick.ratio === 0 ? '' : transferAmountAtRatio(available, ratioPick.ratio);
+    setAmount(text ?? '');
+    setRatioPick(text === null ? null : { ratio: ratioPick.ratio, source: sourceKey });
+    setRatioNotice(text === null ? '보내는 지갑에 이체 가능한 금액이 없어 금액을 비웠습니다.' : null);
+  }, [available, locked, ratioPick, sourceKey]);
   const dismissAmount = () => {
     amountInputRef.current?.blur();
     inputScroll.onInputBlur();
@@ -322,7 +350,7 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
                       onChangeText={value => {
                         if (locked || attempt.current?.running) return;
                         if (parseTransferAmount(value) !== canonicalAmount) attempt.current = null;
-                        setAmount(value); setFailure(null);
+                        setAmount(value); setRatioPick(null); setRatioNotice(null); setFailure(null);
                       }}
                       editable={!locked} keyboardType="decimal-pad" placeholder="0" style={styles.input} />
                   </View>
@@ -332,6 +360,18 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
                     {available !== null ? '이체 가능 금액: USD ' + formatDisplayDecimal(available)
                       : futures.isFetching ? '이체 가능 금액을 확인하고 있습니다.' : '현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다.'}
                   </Text>}
+                  <OrderRatioControls
+                    testID="wallet-transfer-ratio"
+                    label="이체 비율"
+                    accessibilityLabel="보내는 지갑의 이체 가능 금액 중 보낼 비율"
+                    pickLabel="이체 가능 금액"
+                    value={displayedRatio}
+                    active={activeRatio}
+                    disabled={locked || !!ratioDisabledReason}
+                    reason={ratioDisabledReason}
+                    notice={ratioNotice}
+                    onChange={applyRatio}
+                  />
                   {sourceIsFutures && available === null && !futures.isFetching ? <CTAButton label="이체 가능 금액 다시 확인" variant="neutral" state={locked ? 'disabled' : 'enabled'} onPress={() => void futures.refetch()} /> : null}
                   {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
                     : balanceReady && canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>잔액이 부족합니다.</Text> : null}

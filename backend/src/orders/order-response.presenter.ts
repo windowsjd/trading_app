@@ -52,6 +52,9 @@ export type OrderResponseRecord = {
   rejectReason: string | null;
   createdAt: Date;
   updatedAt: Date;
+  /** 설정 변경 (pending order lists and detail only): the revision a change names. */
+  revision?: number;
+  revisedAt?: Date | null;
   asset: {
     id: string;
     symbol: string;
@@ -96,6 +99,12 @@ export function formatOrderResponse(order: OrderResponseRecord) {
     updatedAt: order.updatedAt.toISOString(),
     ...(order.limitOnClose
       ? { limitOnClose: presentLimitOnClose(order.limitOnClose) }
+      : {}),
+    ...(order.revision !== undefined
+      ? {
+          revision: order.revision,
+          revisedAt: formatNullableDate(order.revisedAt ?? null),
+        }
       : {}),
   };
 }

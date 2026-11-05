@@ -27,6 +27,16 @@ import {
   conditionalRegistrationReference,
 } from './conditional-price';
 import {
+  assertExpectedRevision,
+  assertTermsChanged,
+  evidenceFloor,
+  isReplayedModification,
+  modificationHash,
+  notModifiable,
+  parseModificationEnvelope,
+  recordModification,
+} from '../common/pending-order-modification';
+import {
   assertConditionalBuyEnabled,
   CONDITIONAL_BUY_MAX_ATTEMPTS,
   CONDITIONAL_BUY_MAX_LIVE_PER_ACCOUNT,
@@ -35,14 +45,21 @@ import {
   conditionalBuyWindowExpired,
   isConditionalBuyMet,
   isRetryableConditionalBuyFailure,
+  conditionalBuyTerms,
   parseConditionalBuyBody,
+  parseConditionalBuyModify,
   type ConditionalBuyBody,
+  type ConditionalBuyInput,
+  type ConditionalBuyModifyBody,
 } from './conditional-buy-policy';
 import {
   liveConditionalBuy,
   openConditionalBuy,
 } from './conditional-buy-state';
-import { endEntryTpSlPlansOfEndedEntries } from './entry-tp-sl-state';
+import {
+  assertEntryPlansFitChangedEntry,
+  endEntryTpSlPlansOfEndedEntries,
+} from './entry-tp-sl-state';
 
 const CONDITIONAL_BUY_INCLUDE = {
   asset: {
@@ -158,37 +175,7 @@ export class ConditionalBuyService {
           'The account trading window ended.',
           409,
         );
-      const asset = await tx.asset.findUnique({
-        where: { id: input.assetId },
-      });
-      if (!asset)
-        throw createApiError('ASSET_NOT_FOUND', 'Asset not found.', 404);
-      if (!asset.isActive || isFuturesOnlyAsset(asset))
-        throw createApiError(
-          'ASSET_NOT_TRADABLE',
-          'Asset is not a Spot product.',
-          400,
-        );
-      // US stocks need the approved US price source (Tiingo, 2026-10-17).
-      if (asset.assetType === 'us_stock' && !usConditionalOrdersSupported())
-        throw createApiError(
-          'CONDITIONAL_BUY_MARKET_NOT_SUPPORTED',
-          'Conditional buy orders are not available for this market.',
-          409,
-        );
-      if (input.currencyCode && input.currencyCode !== asset.settlementCurrency)
-        throw createApiError(
-          'ASSET_CURRENCY_MISMATCH',
-          'currencyCode must match asset settlementCurrency.',
-          400,
-        );
-      assertOrderInputPolicy({
-        assetType: asset.assetType,
-        side: 'buy',
-        orderType: input.executionType,
-        quantity: input.quantity,
-        amount: input.amount,
-      });
+      const asset = await this.watchAsset(tx, input);
       await assertBeginnerLearningAccess(tx, account, 'allTrading');
       const live = await tx.conditionalBuyOrder.count({
         where: { tradingAccountId: accountId, ...liveConditionalBuy },
@@ -199,40 +186,14 @@ export class ConditionalBuyService {
           'Too many active conditional buy orders.',
           409,
         );
-      // A confirmed-closed stock market registers without a price (the
-      // user's direction as sent, watched from the next regular session);
-      // in session and for crypto the fresh price must not already meet it.
-      const price = await conditionalRegistrationReference(tx, asset, now);
-      if (!price) {
-        setAdminDiagnosticContext({
-          domain: 'CONDITIONAL',
-          operation: 'CONDITIONAL_BUY_CREATE',
-          failureStage: 'conditional_registration_price_selection',
-          entities: { tradingAccountId: accountId, assetId: asset.id },
-          evidence: {
-            evaluationState: 'reference_unavailable',
-            priceEvidenceAvailable: false,
-          },
-        });
-        throw createApiError(
-          'CONDITIONAL_PRICE_UNAVAILABLE',
-          'A fresh eligible reference price is required.',
-          409,
-        );
-      }
-      if (
-        price !== 'off_session' &&
-        isConditionalBuyMet(
-          input.triggerCondition,
-          price.price,
-          input.triggerPrice,
-        )
-      )
-        throw createApiError(
-          'CONDITIONAL_BUY_ALREADY_MET',
-          'The current price already meets this condition.',
-          409,
-        );
+      const price = await this.watchReference(
+        tx,
+        accountId,
+        asset,
+        input,
+        now,
+        'CONDITIONAL_BUY_CREATE',
+      );
       const row = await tx.conditionalBuyOrder.create({
         data: {
           tradingAccountId: accountId,
@@ -259,6 +220,131 @@ export class ConditionalBuyService {
           409,
         );
       return this.response(accountId, row, false);
+    });
+  }
+
+  /**
+   * 설정 변경 (docs/pending-order-modification-contract.md): a watching row
+   * changes in place under the trigger's own fence (account, then the row), so
+   * a concurrent trigger either committed first (the change is refused) or
+   * sees the new terms. Every registration rule applies to the new terms, and
+   * the evidence floor moves to the change: only a price after it can fire.
+   * A triggered row is mid-execution and an `ordered` one is an ordinary order.
+   */
+  async modify(
+    userId: string | undefined,
+    accountId: string,
+    id: string,
+    body: ConditionalBuyModifyBody,
+  ) {
+    this.user(userId);
+    const envelope = parseModificationEnvelope(body);
+    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockAccount(tx, accountId, userId);
+      await tx.$queryRaw`SELECT "id" FROM "conditional_buy_orders" WHERE "id" = ${id} AND "trading_account_id" = ${accountId} FOR UPDATE`;
+      const row = await tx.conditionalBuyOrder.findFirst({
+        where: { id, tradingAccountId: accountId },
+        include: CONDITIONAL_BUY_INCLUDE,
+      });
+      if (!row)
+        throw createApiError(
+          'CONDITIONAL_BUY_NOT_FOUND',
+          'Conditional order not found.',
+          404,
+        );
+      const input = parseConditionalBuyModify(
+        body,
+        row,
+        envelope.idempotencyKey,
+      );
+      const terms = conditionalBuyTerms(input);
+      const requestHash = modificationHash(
+        'conditional_buy',
+        id,
+        envelope.expectedRevision,
+        terms,
+      );
+      if (
+        await isReplayedModification(tx, {
+          accountId,
+          target: 'conditional_buy',
+          targetId: id,
+          idempotencyKey: envelope.idempotencyKey,
+          requestHash,
+        })
+      )
+        return this.response(accountId, row, true);
+      if (row.status !== 'watching') notModifiable();
+      assertExpectedRevision(row.revision, envelope.expectedRevision);
+      const before = conditionalBuyTerms(row);
+      assertTermsChanged(before, terms);
+      assertConditionalBuyEnabled();
+      if (
+        input.executionType === 'limit' &&
+        (!isLimitOrderEnabled() ||
+          !readLimitOrderMatchingConfig().matchingEnabled)
+      )
+        throw createApiError(
+          'CONDITIONAL_LIMIT_UNAVAILABLE',
+          'Spot Limit registration and matching must be available.',
+          409,
+        );
+      const now = await this.now(tx);
+      const account = await this.access.getOwnedAccountOrThrow(
+        userId,
+        accountId,
+        tx,
+      );
+      if (!conditionalTradable(account, now))
+        throw createApiError(
+          'CONDITIONAL_ACCOUNT_NOT_TRADABLE',
+          'The account trading window ended.',
+          409,
+        );
+      const asset = await this.watchAsset(tx, input);
+      await assertBeginnerLearningAccess(tx, account, 'allTrading');
+      const price = await this.watchReference(
+        tx,
+        accountId,
+        asset,
+        input,
+        now,
+        'CONDITIONAL_BUY_MODIFY',
+      );
+      await assertEntryPlansFitChangedEntry(
+        tx,
+        { conditionalBuyOrderId: id },
+        'long',
+        input.limitPrice ?? input.triggerPrice,
+      );
+      const updated = await tx.conditionalBuyOrder.update({
+        where: { id },
+        data: {
+          triggerCondition: input.triggerCondition,
+          triggerPrice: input.triggerPrice,
+          executionType: input.executionType,
+          limitPrice: input.limitPrice,
+          quantity: input.quantity,
+          amount: input.amount,
+          registrationSnapshotId: price === 'off_session' ? null : price.id,
+          revisedAt: now,
+          revision: { increment: 1 },
+        },
+        include: CONDITIONAL_BUY_INCLUDE,
+      });
+      await recordModification(tx, {
+        accountId,
+        target: 'conditional_buy',
+        targetId: id,
+        idempotencyKey: envelope.idempotencyKey,
+        requestHash,
+        revision: updated.revision,
+        before,
+        after: terms,
+        at: now,
+      });
+      return this.response(accountId, updated, false);
     });
   }
 
@@ -471,8 +557,9 @@ export class ConditionalBuyService {
       if (!conditionalBuyEnabled()) return { state: 'disabled' };
       const price = await conditionalPrice(tx, row.asset, 'spot', now);
       if (!price) return { state: 'price_unavailable' };
-      // Only evidence of a trade after registration may trigger the watch.
-      if (price.effectiveAt < row.createdAt) return { state: 'awaiting_price' };
+      // Only evidence of a trade after registration (or its latest change) may trigger the watch.
+      if (price.effectiveAt < evidenceFloor(row, row.createdAt))
+        return { state: 'awaiting_price' };
       if (
         !isConditionalBuyMet(
           row.triggerCondition,
@@ -604,6 +691,96 @@ export class ConditionalBuyService {
     };
   }
 
+  /** A watch's asset rules, for a registration and a change alike. */
+  private async watchAsset(
+    tx: Prisma.TransactionClient,
+    input: Pick<
+      ConditionalBuyInput,
+      'assetId' | 'currencyCode' | 'executionType' | 'quantity' | 'amount'
+    >,
+  ) {
+    const asset = await tx.asset.findUnique({
+      where: { id: input.assetId },
+    });
+    if (!asset)
+      throw createApiError('ASSET_NOT_FOUND', 'Asset not found.', 404);
+    if (!asset.isActive || isFuturesOnlyAsset(asset))
+      throw createApiError(
+        'ASSET_NOT_TRADABLE',
+        'Asset is not a Spot product.',
+        400,
+      );
+    // US stocks need the approved US price source (Tiingo, 2026-10-17).
+    if (asset.assetType === 'us_stock' && !usConditionalOrdersSupported())
+      throw createApiError(
+        'CONDITIONAL_BUY_MARKET_NOT_SUPPORTED',
+        'Conditional buy orders are not available for this market.',
+        409,
+      );
+    if (input.currencyCode && input.currencyCode !== asset.settlementCurrency)
+      throw createApiError(
+        'ASSET_CURRENCY_MISMATCH',
+        'currencyCode must match asset settlementCurrency.',
+        400,
+      );
+    assertOrderInputPolicy({
+      assetType: asset.assetType,
+      side: 'buy',
+      orderType: input.executionType,
+      quantity: input.quantity,
+      amount: input.amount,
+    });
+    return asset;
+  }
+
+  /**
+   * The price a watch's terms are registered against. A confirmed-closed
+   * stock market registers without a price (the user's direction as sent,
+   * watched from the next regular session); in session and for crypto the
+   * fresh price must not already meet it.
+   */
+  private async watchReference(
+    tx: Prisma.TransactionClient,
+    accountId: string,
+    asset: Awaited<ReturnType<ConditionalBuyService['watchAsset']>>,
+    input: Pick<ConditionalBuyInput, 'triggerCondition' | 'triggerPrice'>,
+    now: Date,
+    operation: 'CONDITIONAL_BUY_CREATE' | 'CONDITIONAL_BUY_MODIFY',
+  ) {
+    const price = await conditionalRegistrationReference(tx, asset, now);
+    if (!price) {
+      setAdminDiagnosticContext({
+        domain: 'CONDITIONAL',
+        operation,
+        failureStage: 'conditional_registration_price_selection',
+        entities: { tradingAccountId: accountId, assetId: asset.id },
+        evidence: {
+          evaluationState: 'reference_unavailable',
+          priceEvidenceAvailable: false,
+        },
+      });
+      throw createApiError(
+        'CONDITIONAL_PRICE_UNAVAILABLE',
+        'A fresh eligible reference price is required.',
+        409,
+      );
+    }
+    if (
+      price !== 'off_session' &&
+      isConditionalBuyMet(
+        input.triggerCondition,
+        price.price,
+        input.triggerPrice,
+      )
+    )
+      throw createApiError(
+        'CONDITIONAL_BUY_ALREADY_MET',
+        'The current price already meets this condition.',
+        409,
+      );
+    return price;
+  }
+
   private user(userId: string | undefined): asserts userId is string {
     if (!userId) throw createApiError('UNAUTHORIZED', 'Unauthorized', 401);
   }
@@ -701,6 +878,9 @@ export function presentConditionalBuy(row: ConditionalBuyRecord) {
     failureCode: row.failureCode,
     terminalReason: row.terminalReason,
     createdAt: row.createdAt.toISOString(),
+    // 설정 변경: the revision a change names, and when the terms last changed.
+    revision: row.revision,
+    revisedAt: row.revisedAt?.toISOString() ?? null,
     endedAt: row.endedAt?.toISOString() ?? null,
     updatedAt: row.updatedAt.toISOString(),
   };

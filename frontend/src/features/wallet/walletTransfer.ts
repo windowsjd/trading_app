@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js';
 import { getErrorMessageFromCode } from '../../services/api/errorMapper.ts';
 import type { WalletBalanceDto } from './api';
+import { fxSourceAtRatio, fxSourceShare } from './fxAmountEntry.ts';
 import type { TradingAccountFuturesCollateralDto } from '../tradingAccount/api';
 
 export function parseTransferAmount(text: string): string | null {
@@ -22,6 +23,21 @@ export function transferAvailableAmount(wallet: WalletBalanceDto | null): string
 
 export function transferAmountFits(amount: string | null, available: string | null): boolean {
   return amount !== null && available !== null && new Decimal(amount).lte(available);
+}
+/**
+ * 이체 금액 at `ratio` (0..1) of what can be sent now — the USD wallet's
+ * balance − reserved, or the Futures wallet's free collateral — as input text
+ * rounded DOWN to the 8 decimals a transfer takes, so even 100% never asks
+ * for more than can be sent (the same math as 환전's ratio). Null when the
+ * share is not a valid amount (unknown, nothing to send, or below 1e-8).
+ */
+export function transferAmountAtRatio(available: string | null, ratio: number): string | null {
+  const text = ratio > 0 ? fxSourceAtRatio(available, ratio) : null;
+  return text !== null && parseTransferAmount(text) !== null ? text : null;
+}
+/** The share (0..1) of the transferable amount that a typed amount uses: the slider's place. */
+export function transferAmountShare(amount: string | null, available: string | null): number {
+  return fxSourceShare(amount, available);
 }
 
 /** A local preflight rejection means no financial command was sent. */

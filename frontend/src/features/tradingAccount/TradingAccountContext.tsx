@@ -68,6 +68,13 @@ export type TradingAccountContextValue = {
   isError: boolean;
   error: unknown;
   isEmpty: boolean;
+  /**
+   * Why no account could be resolved after loading: the user (`me`) or the
+   * account list read failed with nothing cached. Null while either is known.
+   */
+  accountReadError: unknown;
+  /** Reads `me` again when it is missing, then the account list. */
+  retryAccountRead: () => void;
   selectAccount: (accountId: string) => void;
   /**
    * Refetches the owned-account list and RESOLVES WITH IT, so a flow that just
@@ -225,6 +232,12 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
     }
   }, [accounts, accountsQuery.data, userId, explicitAccountId, storedAccountId, queryClient]);
 
+  const retryAccountRead = useCallback(() => {
+    // Without `me` the account list is disabled: it follows once the user is known.
+    if (!meQuery.data) void meQuery.refetch();
+    else void accountsQuery.refetch();
+  }, [accountsQuery, meQuery]);
+
   const handleSelectedAccountMissing = useCallback(async () => {
     if (userId) {
       await clearSelectedAccountId(userId);
@@ -274,6 +287,9 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
         !accountsQuery.isLoading &&
         !selectionIsLoading &&
         accounts.length === 0,
+      accountReadError: accountsQuery.isError ? accountsQuery.error
+        : meQuery.isError && !meQuery.data ? meQuery.error : null,
+      retryAccountRead,
       selectAccount,
       refetchAccounts: accountsQuery.refetch,
       handleSelectedAccountMissing,
@@ -290,6 +306,10 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
       accountsQuery.isError,
       accountsQuery.error,
       accountsQuery.refetch,
+      meQuery.isError,
+      meQuery.data,
+      meQuery.error,
+      retryAccountRead,
       selectAccount,
       handleSelectedAccountMissing,
     ],

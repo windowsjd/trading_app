@@ -41,6 +41,8 @@ export type LimitMatchCandidate = {
   reservedQuantity?: Prisma.Decimal | null;
   reservationFeeRate: Prisma.Decimal;
   submittedAt: Date;
+  /** The latest 설정 변경 (absent or null: never changed); see evidenceFloor. */
+  revisedAt?: Date | null;
   seasonId: string | null;
   seasonEndAt: Date | null;
   asset: {
@@ -67,6 +69,7 @@ const CANDIDATE_SELECT = {
   reservedQuantity: true,
   reservationFeeRate: true,
   submittedAt: true,
+  revisedAt: true,
   tradingAccount: {
     select: {
       seasonParticipant: {
@@ -223,6 +226,7 @@ export class LimitOrderCandidateRepository {
           reservedQuantity: row.reservedQuantity,
           reservationFeeRate: row.reservationFeeRate,
           submittedAt: row.submittedAt,
+          revisedAt: row.revisedAt,
           seasonId: season?.id ?? null,
           seasonEndAt: season?.endAt ?? null,
           asset: row.asset,

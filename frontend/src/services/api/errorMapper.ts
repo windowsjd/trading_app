@@ -516,6 +516,22 @@ export function getErrorMessageFromCode(
       return '감시에 사용할 최신 시세가 없어 등록할 수 없습니다. 주식은 정규장 중에 등록해주세요.';
     case ERROR_CODE.CONDITIONAL_BUY_ALREADY_MET:
       return '현재 가격이 이미 감시가격에 도달해 등록하지 않았습니다. 다시 정해진 감시 조건을 확인한 뒤 등록해주세요.';
+    case ERROR_CODE.PENDING_ORDER_NOT_MODIFIABLE:
+      return '이미 체결·발동·취소되어 변경할 수 없어요. 대기목록의 최신 상태를 확인해주세요.';
+    case ERROR_CODE.PENDING_ORDER_CHANGED:
+      return '다른 곳에서 먼저 변경되었어요. 최신 내용을 확인한 뒤 다시 변경해주세요.';
+    case ERROR_CODE.PENDING_ORDER_UNCHANGED:
+      return '변경된 내용이 없어요.';
+    case ERROR_CODE.PENDING_ORDER_MODIFY_IDEMPOTENCY_CONFLICT:
+      return '같은 변경 요청이 다른 내용으로 처리되었어요. 최신 내용을 확인해주세요.';
+    case ERROR_CODE.PENDING_ORDER_ENTRY_PLAN_CONFLICT:
+      return '이 주문의 체결 후 손절가/익절가가 새 가격과 맞지 않아요. 손절가/익절가를 먼저 조정해주세요.';
+    case ERROR_CODE.PENDING_ORDER_LOC_NOT_MODIFIABLE:
+      return '장 마감 지정가(LOC) 주문은 변경할 수 없어요. 취소한 뒤 다시 주문해주세요.';
+    case ERROR_CODE.PENDING_ORDER_CHILD_NOT_MODIFIABLE:
+      return '조건이나 다른 설정으로 접수된 주문은 변경할 수 없어요. 취소한 뒤 다시 등록해주세요.';
+    case ERROR_CODE.PENDING_ORDER_PROTECTION_NOT_MODIFIABLE:
+      return '기존 손절가/익절가(OCO)가 연결된 주문은 변경할 수 없어요. 연결된 보호 설정을 먼저 취소해주세요.';
     case ERROR_CODE.CONDITIONAL_IDEMPOTENCY_CONFLICT:
       return '같은 요청이 다른 내용으로 처리 중입니다. 대기 목록의 조건주문을 확인해주세요.';
     case ERROR_CODE.INVALID_CONDITIONAL_BUY:

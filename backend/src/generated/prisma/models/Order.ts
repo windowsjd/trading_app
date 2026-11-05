@@ -40,6 +40,7 @@ export type OrderAvgAggregateOutputType = {
   reservedAmount: runtime.Decimal | null
   reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
+  revision: number | null
 }
 
 export type OrderSumAggregateOutputType = {
@@ -56,6 +57,7 @@ export type OrderSumAggregateOutputType = {
   reservedAmount: runtime.Decimal | null
   reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
+  revision: number | null
 }
 
 export type OrderMinAggregateOutputType = {
@@ -95,6 +97,8 @@ export type OrderMinAggregateOutputType = {
   rejectedAt: Date | null
   rejectReason: string | null
   createdAt: Date | null
+  revisedAt: Date | null
+  revision: number | null
   updatedAt: Date | null
 }
 
@@ -135,6 +139,8 @@ export type OrderMaxAggregateOutputType = {
   rejectedAt: Date | null
   rejectReason: string | null
   createdAt: Date | null
+  revisedAt: Date | null
+  revision: number | null
   updatedAt: Date | null
 }
 
@@ -177,6 +183,8 @@ export type OrderCountAggregateOutputType = {
   rejectedAt: number
   rejectReason: number
   createdAt: number
+  revisedAt: number
+  revision: number
   updatedAt: number
   _all: number
 }
@@ -196,6 +204,7 @@ export type OrderAvgAggregateInputType = {
   reservedAmount?: true
   reservedQuantity?: true
   reservationFeeRate?: true
+  revision?: true
 }
 
 export type OrderSumAggregateInputType = {
@@ -212,6 +221,7 @@ export type OrderSumAggregateInputType = {
   reservedAmount?: true
   reservedQuantity?: true
   reservationFeeRate?: true
+  revision?: true
 }
 
 export type OrderMinAggregateInputType = {
@@ -251,6 +261,8 @@ export type OrderMinAggregateInputType = {
   rejectedAt?: true
   rejectReason?: true
   createdAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
 }
 
@@ -291,6 +303,8 @@ export type OrderMaxAggregateInputType = {
   rejectedAt?: true
   rejectReason?: true
   createdAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
 }
 
@@ -333,6 +347,8 @@ export type OrderCountAggregateInputType = {
   rejectedAt?: true
   rejectReason?: true
   createdAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
   _all?: true
 }
@@ -462,6 +478,8 @@ export type OrderGroupByOutputType = {
   rejectedAt: Date | null
   rejectReason: string | null
   createdAt: Date
+  revisedAt: Date | null
+  revision: number
   updatedAt: Date
   _count: OrderCountAggregateOutputType | null
   _avg: OrderAvgAggregateOutputType | null
@@ -527,6 +545,8 @@ export type OrderWhereInput = {
   rejectedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   rejectReason?: Prisma.StringNullableFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
+  revisedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  revision?: Prisma.IntFilter<"Order"> | number
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
@@ -584,6 +604,8 @@ export type OrderOrderByWithRelationInput = {
   rejectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   rejectReason?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   asset?: Prisma.AssetOrderByWithRelationInput
@@ -646,6 +668,8 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   rejectedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   rejectReason?: Prisma.StringNullableFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
+  revisedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  revision?: Prisma.IntFilter<"Order"> | number
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
@@ -703,6 +727,8 @@ export type OrderOrderByWithAggregationInput = {
   rejectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   rejectReason?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.OrderCountOrderByAggregateInput
   _avg?: Prisma.OrderAvgOrderByAggregateInput
@@ -753,6 +779,8 @@ export type OrderScalarWhereWithAggregatesInput = {
   rejectedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   rejectReason?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
+  revisedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  revision?: Prisma.IntWithAggregatesFilter<"Order"> | number
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
 }
 
@@ -788,6 +816,8 @@ export type OrderCreateInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -845,6 +875,8 @@ export type OrderUncheckedCreateInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -888,6 +920,8 @@ export type OrderUpdateInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -945,6 +979,8 @@ export type OrderUncheckedUpdateInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -995,6 +1031,8 @@ export type OrderCreateManyInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1030,6 +1068,8 @@ export type OrderUpdateManyMutationInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1072,6 +1112,8 @@ export type OrderUncheckedUpdateManyInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1139,6 +1181,8 @@ export type OrderCountOrderByAggregateInput = {
   rejectedAt?: Prisma.SortOrder
   rejectReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -1156,6 +1200,7 @@ export type OrderAvgOrderByAggregateInput = {
   reservedAmount?: Prisma.SortOrder
   reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
 }
 
 export type OrderMaxOrderByAggregateInput = {
@@ -1195,6 +1240,8 @@ export type OrderMaxOrderByAggregateInput = {
   rejectedAt?: Prisma.SortOrder
   rejectReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -1235,6 +1282,8 @@ export type OrderMinOrderByAggregateInput = {
   rejectedAt?: Prisma.SortOrder
   rejectReason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -1252,6 +1301,7 @@ export type OrderSumOrderByAggregateInput = {
   reservedAmount?: Prisma.SortOrder
   reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
 }
 
 export type OrderScalarRelationFilter = {
@@ -1717,6 +1767,8 @@ export type OrderCreateWithoutTradingAccountInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -1772,6 +1824,8 @@ export type OrderUncheckedCreateWithoutTradingAccountInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -1851,6 +1905,8 @@ export type OrderScalarWhereInput = {
   rejectedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   rejectReason?: Prisma.StringNullableFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
+  revisedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  revision?: Prisma.IntFilter<"Order"> | number
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
 }
 
@@ -1886,6 +1942,8 @@ export type OrderCreateWithoutAssetInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -1941,6 +1999,8 @@ export type OrderUncheckedCreateWithoutAssetInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -2010,6 +2070,8 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -2065,6 +2127,8 @@ export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -2134,6 +2198,8 @@ export type OrderCreateWithoutAttachedProtectionInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -2190,6 +2256,8 @@ export type OrderUncheckedCreateWithoutAttachedProtectionInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2248,6 +2316,8 @@ export type OrderUpdateWithoutAttachedProtectionInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -2304,6 +2374,8 @@ export type OrderUncheckedUpdateWithoutAttachedProtectionInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2346,6 +2418,8 @@ export type OrderCreateWithoutProtectionChildInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -2402,6 +2476,8 @@ export type OrderUncheckedCreateWithoutProtectionChildInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2460,6 +2536,8 @@ export type OrderUpdateWithoutProtectionChildInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -2516,6 +2594,8 @@ export type OrderUncheckedUpdateWithoutProtectionChildInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2558,6 +2638,8 @@ export type OrderCreateWithoutConditionalBuyInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -2614,6 +2696,8 @@ export type OrderUncheckedCreateWithoutConditionalBuyInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -2672,6 +2756,8 @@ export type OrderUpdateWithoutConditionalBuyInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -2728,6 +2814,8 @@ export type OrderUncheckedUpdateWithoutConditionalBuyInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -2770,6 +2858,8 @@ export type OrderCreateWithoutConditionalSellInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -2826,6 +2916,8 @@ export type OrderUncheckedCreateWithoutConditionalSellInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -2884,6 +2976,8 @@ export type OrderUpdateWithoutConditionalSellInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -2940,6 +3034,8 @@ export type OrderUncheckedUpdateWithoutConditionalSellInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -2982,6 +3078,8 @@ export type OrderCreateWithoutEntryTpSlPlansInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -3038,6 +3136,8 @@ export type OrderUncheckedCreateWithoutEntryTpSlPlansInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -3085,6 +3185,8 @@ export type OrderCreateWithoutEntryTpSlPlanFillsInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -3141,6 +3243,8 @@ export type OrderUncheckedCreateWithoutEntryTpSlPlanFillsInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -3199,6 +3303,8 @@ export type OrderUpdateWithoutEntryTpSlPlansInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -3255,6 +3361,8 @@ export type OrderUncheckedUpdateWithoutEntryTpSlPlansInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -3308,6 +3416,8 @@ export type OrderUpdateWithoutEntryTpSlPlanFillsInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -3364,6 +3474,8 @@ export type OrderUncheckedUpdateWithoutEntryTpSlPlanFillsInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -3406,6 +3518,8 @@ export type OrderCreateWithoutLimitOnCloseInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -3462,6 +3576,8 @@ export type OrderUncheckedCreateWithoutLimitOnCloseInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -3520,6 +3636,8 @@ export type OrderUpdateWithoutLimitOnCloseInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -3576,6 +3694,8 @@ export type OrderUncheckedUpdateWithoutLimitOnCloseInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -3618,6 +3738,8 @@ export type OrderCreateWithoutSessionCloseEvidenceInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -3673,6 +3795,8 @@ export type OrderUncheckedCreateWithoutSessionCloseEvidenceInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -3742,6 +3866,8 @@ export type OrderCreateWithoutBeginnerQuestAcknowledgementsInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -3798,6 +3924,8 @@ export type OrderUncheckedCreateWithoutBeginnerQuestAcknowledgementsInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -3856,6 +3984,8 @@ export type OrderUpdateWithoutBeginnerQuestAcknowledgementsInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -3912,6 +4042,8 @@ export type OrderUncheckedUpdateWithoutBeginnerQuestAcknowledgementsInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -3954,6 +4086,8 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -4009,6 +4143,8 @@ export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -4078,6 +4214,8 @@ export type OrderCreateWithoutQuoteInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -4133,6 +4271,8 @@ export type OrderUncheckedCreateWithoutQuoteInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -4202,6 +4342,8 @@ export type OrderCreateWithoutCandleEvidenceInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
@@ -4257,6 +4399,8 @@ export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
@@ -4332,6 +4476,8 @@ export type OrderCreateManyTradingAccountInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -4367,6 +4513,8 @@ export type OrderUpdateWithoutTradingAccountInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -4422,6 +4570,8 @@ export type OrderUncheckedUpdateWithoutTradingAccountInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -4471,6 +4621,8 @@ export type OrderUncheckedUpdateManyWithoutTradingAccountInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -4512,6 +4664,8 @@ export type OrderCreateManyAssetInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -4547,6 +4701,8 @@ export type OrderUpdateWithoutAssetInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -4602,6 +4758,8 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -4651,6 +4809,8 @@ export type OrderUncheckedUpdateManyWithoutAssetInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -4692,6 +4852,8 @@ export type OrderCreateManyAssetPriceSnapshotInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -4727,6 +4889,8 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -4782,6 +4946,8 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -4831,6 +4997,8 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -4872,6 +5040,8 @@ export type OrderCreateManySessionCloseEvidenceInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -4907,6 +5077,8 @@ export type OrderUpdateWithoutSessionCloseEvidenceInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -4962,6 +5134,8 @@ export type OrderUncheckedUpdateWithoutSessionCloseEvidenceInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -5011,6 +5185,8 @@ export type OrderUncheckedUpdateManyWithoutSessionCloseEvidenceInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -5052,6 +5228,8 @@ export type OrderCreateManyFxRateSnapshotInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -5087,6 +5265,8 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -5142,6 +5322,8 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -5191,6 +5373,8 @@ export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -5232,6 +5416,8 @@ export type OrderCreateManyQuoteInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -5267,6 +5453,8 @@ export type OrderUpdateWithoutQuoteInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -5322,6 +5510,8 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -5371,6 +5561,8 @@ export type OrderUncheckedUpdateManyWithoutQuoteInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -5412,6 +5604,8 @@ export type OrderCreateManyCandleEvidenceInput = {
   rejectedAt?: Date | string | null
   rejectReason?: string | null
   createdAt?: Date | string
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -5447,6 +5641,8 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
@@ -5502,6 +5698,8 @@ export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
@@ -5551,6 +5749,8 @@ export type OrderUncheckedUpdateManyWithoutCandleEvidenceInput = {
   rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -5642,6 +5842,8 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   rejectedAt?: boolean
   rejectReason?: boolean
   createdAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -5700,6 +5902,8 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   rejectedAt?: boolean
   rejectReason?: boolean
   createdAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -5749,6 +5953,8 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   rejectedAt?: boolean
   rejectReason?: boolean
   createdAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -5798,10 +6004,12 @@ export type OrderSelectScalar = {
   rejectedAt?: boolean
   rejectReason?: boolean
   createdAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "executedQuantity" | "canceledQuantity" | "requestedAmount" | "unspentAmount" | "executionEvidence" | "limitPrice" | "executedPrice" | "currencyCode" | "cashWalletScope" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservedQuantity" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "sessionCloseEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "executedQuantity" | "canceledQuantity" | "requestedAmount" | "unspentAmount" | "executionEvidence" | "limitPrice" | "executedPrice" | "currencyCode" | "cashWalletScope" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservedQuantity" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "sessionCloseEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "revisedAt" | "revision" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -5897,6 +6105,8 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     rejectedAt: Date | null
     rejectReason: string | null
     createdAt: Date
+    revisedAt: Date | null
+    revision: number
     updatedAt: Date
   }, ExtArgs["result"]["order"]>
   composites: {}
@@ -6374,6 +6584,8 @@ export interface OrderFieldRefs {
   readonly rejectedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly rejectReason: Prisma.FieldRef<"Order", 'String'>
   readonly createdAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly revisedAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly revision: Prisma.FieldRef<"Order", 'Int'>
   readonly updatedAt: Prisma.FieldRef<"Order", 'DateTime'>
 }
     

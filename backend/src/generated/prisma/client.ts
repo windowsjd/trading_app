@@ -233,6 +233,12 @@ export type FuturesTpSlSetting = Prisma.FuturesTpSlSettingModel
  */
 export type EntryTpSlPlan = Prisma.EntryTpSlPlanModel
 /**
+ * Model PendingOrderModification
+ * 대기주문·설정 변경의 append-only 기록 (docs/pending-order-modification-contract.md):
+ * the change's idempotency key and the terms before and after it.
+ */
+export type PendingOrderModification = Prisma.PendingOrderModificationModel
+/**
  * Model LimitOnCloseOrder
  * 
  */

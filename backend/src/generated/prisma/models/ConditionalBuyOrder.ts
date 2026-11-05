@@ -32,6 +32,7 @@ export type ConditionalBuyOrderAvgAggregateOutputType = {
   quantity: runtime.Decimal | null
   amount: runtime.Decimal | null
   attemptCount: number | null
+  revision: number | null
 }
 
 export type ConditionalBuyOrderSumAggregateOutputType = {
@@ -40,6 +41,7 @@ export type ConditionalBuyOrderSumAggregateOutputType = {
   quantity: runtime.Decimal | null
   amount: runtime.Decimal | null
   attemptCount: number | null
+  revision: number | null
 }
 
 export type ConditionalBuyOrderMinAggregateOutputType = {
@@ -66,6 +68,8 @@ export type ConditionalBuyOrderMinAggregateOutputType = {
   requestHash: string | null
   createdAt: Date | null
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number | null
   updatedAt: Date | null
 }
 
@@ -93,6 +97,8 @@ export type ConditionalBuyOrderMaxAggregateOutputType = {
   requestHash: string | null
   createdAt: Date | null
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number | null
   updatedAt: Date | null
 }
 
@@ -121,6 +127,8 @@ export type ConditionalBuyOrderCountAggregateOutputType = {
   requestHash: number
   createdAt: number
   endedAt: number
+  revisedAt: number
+  revision: number
   updatedAt: number
   _all: number
 }
@@ -132,6 +140,7 @@ export type ConditionalBuyOrderAvgAggregateInputType = {
   quantity?: true
   amount?: true
   attemptCount?: true
+  revision?: true
 }
 
 export type ConditionalBuyOrderSumAggregateInputType = {
@@ -140,6 +149,7 @@ export type ConditionalBuyOrderSumAggregateInputType = {
   quantity?: true
   amount?: true
   attemptCount?: true
+  revision?: true
 }
 
 export type ConditionalBuyOrderMinAggregateInputType = {
@@ -166,6 +176,8 @@ export type ConditionalBuyOrderMinAggregateInputType = {
   requestHash?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
 }
 
@@ -193,6 +205,8 @@ export type ConditionalBuyOrderMaxAggregateInputType = {
   requestHash?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
 }
 
@@ -221,6 +235,8 @@ export type ConditionalBuyOrderCountAggregateInputType = {
   requestHash?: true
   createdAt?: true
   endedAt?: true
+  revisedAt?: true
+  revision?: true
   updatedAt?: true
   _all?: true
 }
@@ -336,6 +352,8 @@ export type ConditionalBuyOrderGroupByOutputType = {
   requestHash: string
   createdAt: Date
   endedAt: Date | null
+  revisedAt: Date | null
+  revision: number
   updatedAt: Date
   _count: ConditionalBuyOrderCountAggregateOutputType | null
   _avg: ConditionalBuyOrderAvgAggregateOutputType | null
@@ -387,6 +405,8 @@ export type ConditionalBuyOrderWhereInput = {
   requestHash?: Prisma.StringFilter<"ConditionalBuyOrder"> | string
   createdAt?: Prisma.DateTimeFilter<"ConditionalBuyOrder"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"ConditionalBuyOrder"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"ConditionalBuyOrder"> | Date | string | null
+  revision?: Prisma.IntFilter<"ConditionalBuyOrder"> | number
   updatedAt?: Prisma.DateTimeFilter<"ConditionalBuyOrder"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
@@ -421,6 +441,8 @@ export type ConditionalBuyOrderOrderByWithRelationInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   asset?: Prisma.AssetOrderByWithRelationInput
@@ -460,6 +482,8 @@ export type ConditionalBuyOrderWhereUniqueInput = Prisma.AtLeast<{
   requestHash?: Prisma.StringFilter<"ConditionalBuyOrder"> | string
   createdAt?: Prisma.DateTimeFilter<"ConditionalBuyOrder"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"ConditionalBuyOrder"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"ConditionalBuyOrder"> | Date | string | null
+  revision?: Prisma.IntFilter<"ConditionalBuyOrder"> | number
   updatedAt?: Prisma.DateTimeFilter<"ConditionalBuyOrder"> | Date | string
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
@@ -494,6 +518,8 @@ export type ConditionalBuyOrderOrderByWithAggregationInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.ConditionalBuyOrderCountOrderByAggregateInput
   _avg?: Prisma.ConditionalBuyOrderAvgOrderByAggregateInput
@@ -530,6 +556,8 @@ export type ConditionalBuyOrderScalarWhereWithAggregatesInput = {
   requestHash?: Prisma.StringWithAggregatesFilter<"ConditionalBuyOrder"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ConditionalBuyOrder"> | Date | string
   endedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ConditionalBuyOrder"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ConditionalBuyOrder"> | Date | string | null
+  revision?: Prisma.IntWithAggregatesFilter<"ConditionalBuyOrder"> | number
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"ConditionalBuyOrder"> | Date | string
 }
 
@@ -553,6 +581,8 @@ export type ConditionalBuyOrderCreateInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutConditionalBuyOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutConditionalBuyOrdersInput
@@ -587,6 +617,8 @@ export type ConditionalBuyOrderUncheckedCreateInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutConditionalBuyOrderInput
 }
@@ -611,6 +643,8 @@ export type ConditionalBuyOrderUpdateInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
@@ -645,6 +679,8 @@ export type ConditionalBuyOrderUncheckedUpdateInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutConditionalBuyOrderNestedInput
 }
@@ -674,6 +710,8 @@ export type ConditionalBuyOrderCreateManyInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -697,6 +735,8 @@ export type ConditionalBuyOrderUpdateManyMutationInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -725,6 +765,8 @@ export type ConditionalBuyOrderUncheckedUpdateManyInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -778,6 +820,8 @@ export type ConditionalBuyOrderCountOrderByAggregateInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -787,6 +831,7 @@ export type ConditionalBuyOrderAvgOrderByAggregateInput = {
   quantity?: Prisma.SortOrder
   amount?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
 }
 
 export type ConditionalBuyOrderMaxOrderByAggregateInput = {
@@ -813,6 +858,8 @@ export type ConditionalBuyOrderMaxOrderByAggregateInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -840,6 +887,8 @@ export type ConditionalBuyOrderMinOrderByAggregateInput = {
   requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
+  revisedAt?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -849,6 +898,7 @@ export type ConditionalBuyOrderSumOrderByAggregateInput = {
   quantity?: Prisma.SortOrder
   amount?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
 }
 
 export type ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput = {
@@ -1095,6 +1145,8 @@ export type ConditionalBuyOrderCreateWithoutTradingAccountInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   asset: Prisma.AssetCreateNestedOneWithoutConditionalBuyOrdersInput
   order?: Prisma.OrderCreateNestedOneWithoutConditionalBuyInput
@@ -1127,6 +1179,8 @@ export type ConditionalBuyOrderUncheckedCreateWithoutTradingAccountInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutConditionalBuyOrderInput
 }
@@ -1185,6 +1239,8 @@ export type ConditionalBuyOrderScalarWhereInput = {
   requestHash?: Prisma.StringFilter<"ConditionalBuyOrder"> | string
   createdAt?: Prisma.DateTimeFilter<"ConditionalBuyOrder"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"ConditionalBuyOrder"> | Date | string | null
+  revisedAt?: Prisma.DateTimeNullableFilter<"ConditionalBuyOrder"> | Date | string | null
+  revision?: Prisma.IntFilter<"ConditionalBuyOrder"> | number
   updatedAt?: Prisma.DateTimeFilter<"ConditionalBuyOrder"> | Date | string
 }
 
@@ -1208,6 +1264,8 @@ export type ConditionalBuyOrderCreateWithoutAssetInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutConditionalBuyOrdersInput
   order?: Prisma.OrderCreateNestedOneWithoutConditionalBuyInput
@@ -1240,6 +1298,8 @@ export type ConditionalBuyOrderUncheckedCreateWithoutAssetInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutConditionalBuyOrderInput
 }
@@ -1290,6 +1350,8 @@ export type ConditionalBuyOrderCreateWithoutRegistrationSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutConditionalBuyOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutConditionalBuyOrdersInput
@@ -1322,6 +1384,8 @@ export type ConditionalBuyOrderUncheckedCreateWithoutRegistrationSnapshotInput =
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutConditionalBuyOrderInput
 }
@@ -1356,6 +1420,8 @@ export type ConditionalBuyOrderCreateWithoutTriggerSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutConditionalBuyOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutConditionalBuyOrdersInput
@@ -1388,6 +1454,8 @@ export type ConditionalBuyOrderUncheckedCreateWithoutTriggerSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutConditionalBuyOrderInput
 }
@@ -1454,6 +1522,8 @@ export type ConditionalBuyOrderCreateWithoutOrderInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutConditionalBuyOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutConditionalBuyOrdersInput
@@ -1485,6 +1555,8 @@ export type ConditionalBuyOrderUncheckedCreateWithoutOrderInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutConditionalBuyOrderInput
 }
@@ -1525,6 +1597,8 @@ export type ConditionalBuyOrderUpdateWithoutOrderInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
@@ -1556,6 +1630,8 @@ export type ConditionalBuyOrderUncheckedUpdateWithoutOrderInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutConditionalBuyOrderNestedInput
 }
@@ -1580,6 +1656,8 @@ export type ConditionalBuyOrderCreateWithoutEntryTpSlPlansInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutConditionalBuyOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutConditionalBuyOrdersInput
@@ -1613,6 +1691,8 @@ export type ConditionalBuyOrderUncheckedCreateWithoutEntryTpSlPlansInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1652,6 +1732,8 @@ export type ConditionalBuyOrderUpdateWithoutEntryTpSlPlansInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
@@ -1685,6 +1767,8 @@ export type ConditionalBuyOrderUncheckedUpdateWithoutEntryTpSlPlansInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1712,6 +1796,8 @@ export type ConditionalBuyOrderCreateManyTradingAccountInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1735,6 +1821,8 @@ export type ConditionalBuyOrderUpdateWithoutTradingAccountInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   asset?: Prisma.AssetUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
   order?: Prisma.OrderUpdateOneWithoutConditionalBuyNestedInput
@@ -1767,6 +1855,8 @@ export type ConditionalBuyOrderUncheckedUpdateWithoutTradingAccountInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutConditionalBuyOrderNestedInput
 }
@@ -1795,6 +1885,8 @@ export type ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1822,6 +1914,8 @@ export type ConditionalBuyOrderCreateManyAssetInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1845,6 +1939,8 @@ export type ConditionalBuyOrderUpdateWithoutAssetInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
   order?: Prisma.OrderUpdateOneWithoutConditionalBuyNestedInput
@@ -1877,6 +1973,8 @@ export type ConditionalBuyOrderUncheckedUpdateWithoutAssetInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutConditionalBuyOrderNestedInput
 }
@@ -1905,6 +2003,8 @@ export type ConditionalBuyOrderUncheckedUpdateManyWithoutAssetInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1932,6 +2032,8 @@ export type ConditionalBuyOrderCreateManyRegistrationSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1959,6 +2061,8 @@ export type ConditionalBuyOrderCreateManyTriggerSnapshotInput = {
   requestHash: string
   createdAt?: Date | string
   endedAt?: Date | string | null
+  revisedAt?: Date | string | null
+  revision?: number
   updatedAt?: Date | string
 }
 
@@ -1982,6 +2086,8 @@ export type ConditionalBuyOrderUpdateWithoutRegistrationSnapshotInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
@@ -2014,6 +2120,8 @@ export type ConditionalBuyOrderUncheckedUpdateWithoutRegistrationSnapshotInput =
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutConditionalBuyOrderNestedInput
 }
@@ -2042,6 +2150,8 @@ export type ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotInp
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -2065,6 +2175,8 @@ export type ConditionalBuyOrderUpdateWithoutTriggerSnapshotInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutConditionalBuyOrdersNestedInput
@@ -2097,6 +2209,8 @@ export type ConditionalBuyOrderUncheckedUpdateWithoutTriggerSnapshotInput = {
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutConditionalBuyOrderNestedInput
 }
@@ -2125,6 +2239,8 @@ export type ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotInput = 
   requestHash?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -2184,6 +2300,8 @@ export type ConditionalBuyOrderSelect<ExtArgs extends runtime.Types.Extensions.I
   requestHash?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -2219,6 +2337,8 @@ export type ConditionalBuyOrderSelectCreateManyAndReturn<ExtArgs extends runtime
   requestHash?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -2252,6 +2372,8 @@ export type ConditionalBuyOrderSelectUpdateManyAndReturn<ExtArgs extends runtime
   requestHash?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -2285,10 +2407,12 @@ export type ConditionalBuyOrderSelectScalar = {
   requestHash?: boolean
   createdAt?: boolean
   endedAt?: boolean
+  revisedAt?: boolean
+  revision?: boolean
   updatedAt?: boolean
 }
 
-export type ConditionalBuyOrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "triggerCondition" | "triggerPrice" | "executionType" | "limitPrice" | "quantity" | "amount" | "currencyCode" | "status" | "orderId" | "registrationSnapshotId" | "triggerSnapshotId" | "triggerEvidenceJson" | "triggeredAt" | "attemptCount" | "lastAttemptAt" | "failureCode" | "terminalReason" | "idempotencyKey" | "requestHash" | "createdAt" | "endedAt" | "updatedAt", ExtArgs["result"]["conditionalBuyOrder"]>
+export type ConditionalBuyOrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "triggerCondition" | "triggerPrice" | "executionType" | "limitPrice" | "quantity" | "amount" | "currencyCode" | "status" | "orderId" | "registrationSnapshotId" | "triggerSnapshotId" | "triggerEvidenceJson" | "triggeredAt" | "attemptCount" | "lastAttemptAt" | "failureCode" | "terminalReason" | "idempotencyKey" | "requestHash" | "createdAt" | "endedAt" | "revisedAt" | "revision" | "updatedAt", ExtArgs["result"]["conditionalBuyOrder"]>
 export type ConditionalBuyOrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -2348,6 +2472,8 @@ export type $ConditionalBuyOrderPayload<ExtArgs extends runtime.Types.Extensions
     requestHash: string
     createdAt: Date
     endedAt: Date | null
+    revisedAt: Date | null
+    revision: number
     updatedAt: Date
   }, ExtArgs["result"]["conditionalBuyOrder"]>
   composites: {}
@@ -2802,6 +2928,8 @@ export interface ConditionalBuyOrderFieldRefs {
   readonly requestHash: Prisma.FieldRef<"ConditionalBuyOrder", 'String'>
   readonly createdAt: Prisma.FieldRef<"ConditionalBuyOrder", 'DateTime'>
   readonly endedAt: Prisma.FieldRef<"ConditionalBuyOrder", 'DateTime'>
+  readonly revisedAt: Prisma.FieldRef<"ConditionalBuyOrder", 'DateTime'>
+  readonly revision: Prisma.FieldRef<"ConditionalBuyOrder", 'Int'>
   readonly updatedAt: Prisma.FieldRef<"ConditionalBuyOrder", 'DateTime'>
 }
     

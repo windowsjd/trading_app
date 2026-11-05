@@ -36,6 +36,7 @@ const notification = (s: Scope, a: string) =>
  * No user filter, date cutoff, TRUNCATE, generic cascade or shared evidence deletion. */
 export const LAUNCH_TEST_CLEANUP_STEPS: Step[] = [
   ...[
+    'pending_order_modifications',
     'beginner_quest_acknowledgements',
     'entry_tp_sl_plans',
     'futures_tp_sl_settings',

@@ -207,6 +207,12 @@ export interface RecordSeasonEquityDto {
 
 export interface RecordOrderItemDto {
   conditionalChildId?: string | null;
+  /** The SELL intent / Conditional BUY watch that placed this order (account-scoped reads). */
+  conditionalSellId?: string | null;
+  conditionalBuyId?: string | null;
+  /** 설정 변경 (2026-11-05): the revision a change names; absent on an older server (0). */
+  revision?: number;
+  createdAt?: IsoDateTimeString;
   marketExecution?: MarketExecutionDto | null;
   orderId?: string;
   id?: string;

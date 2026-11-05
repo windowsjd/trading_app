@@ -51,8 +51,13 @@ function toLimitOnCloseFields(value: unknown): RecordOrderItemDto['limitOnClose'
 export function toRecordOrderItem(row: AccountOrderRow): RecordOrderItemDto {
   const asset = (row.asset ?? null) as Record<string, unknown> | null;
 
+  const conditionalSell = (row.conditionalSell ?? null) as Record<string, unknown> | null;
   return {
     conditionalChildId: strOrNull(row.conditionalChildId),
+    conditionalSellId: str(conditionalSell?.id) ?? null,
+    conditionalBuyId: strOrNull(row.conditionalBuyId) ?? null,
+    revision: typeof row.revision === 'number' ? row.revision : undefined,
+    createdAt: str(row.createdAt),
     orderId: str(row.orderId) ?? str(row.id),
     id: str(row.id),
     assetId: str(asset?.id) ?? str(row.assetId),

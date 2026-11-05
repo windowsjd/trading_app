@@ -421,6 +421,7 @@ export const ModelName = {
   ConditionalSellOrder: 'ConditionalSellOrder',
   FuturesTpSlSetting: 'FuturesTpSlSetting',
   EntryTpSlPlan: 'EntryTpSlPlan',
+  PendingOrderModification: 'PendingOrderModification',
   LimitOnCloseOrder: 'LimitOnCloseOrder',
   SessionClosePriceEvidence: 'SessionClosePriceEvidence',
   BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
@@ -475,7 +476,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3214,6 +3215,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.EntryTpSlPlanCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.EntryTpSlPlanCountAggregateOutputType> | number
+        }
+      }
+    }
+    PendingOrderModification: {
+      payload: Prisma.$PendingOrderModificationPayload<ExtArgs>
+      fields: Prisma.PendingOrderModificationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PendingOrderModificationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PendingOrderModificationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>
+        }
+        findFirst: {
+          args: Prisma.PendingOrderModificationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PendingOrderModificationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>
+        }
+        findMany: {
+          args: Prisma.PendingOrderModificationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>[]
+        }
+        create: {
+          args: Prisma.PendingOrderModificationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>
+        }
+        createMany: {
+          args: Prisma.PendingOrderModificationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PendingOrderModificationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>[]
+        }
+        delete: {
+          args: Prisma.PendingOrderModificationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>
+        }
+        update: {
+          args: Prisma.PendingOrderModificationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>
+        }
+        deleteMany: {
+          args: Prisma.PendingOrderModificationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PendingOrderModificationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PendingOrderModificationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>[]
+        }
+        upsert: {
+          args: Prisma.PendingOrderModificationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PendingOrderModificationPayload>
+        }
+        aggregate: {
+          args: Prisma.PendingOrderModificationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePendingOrderModification>
+        }
+        groupBy: {
+          args: Prisma.PendingOrderModificationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PendingOrderModificationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PendingOrderModificationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PendingOrderModificationCountAggregateOutputType> | number
         }
       }
     }
@@ -6650,6 +6725,8 @@ export const FuturesLimitOrderScalarFieldEnum = {
   terminalReason: 'terminalReason',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -6782,6 +6859,8 @@ export const OrderScalarFieldEnum = {
   rejectedAt: 'rejectedAt',
   rejectReason: 'rejectReason',
   createdAt: 'createdAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -6813,6 +6892,8 @@ export const ConditionalBuyOrderScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -6846,6 +6927,8 @@ export const FuturesConditionalEntryScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -6879,6 +6962,8 @@ export const ConditionalSellOrderScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -6908,6 +6993,8 @@ export const FuturesTpSlSettingScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -6939,10 +7026,28 @@ export const EntryTpSlPlanScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
 export type EntryTpSlPlanScalarFieldEnum = (typeof EntryTpSlPlanScalarFieldEnum)[keyof typeof EntryTpSlPlanScalarFieldEnum]
+
+
+export const PendingOrderModificationScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  targetType: 'targetType',
+  targetId: 'targetId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  revision: 'revision',
+  beforeJson: 'beforeJson',
+  afterJson: 'afterJson',
+  createdAt: 'createdAt'
+} as const
+
+export type PendingOrderModificationScalarFieldEnum = (typeof PendingOrderModificationScalarFieldEnum)[keyof typeof PendingOrderModificationScalarFieldEnum]
 
 
 export const LimitOnCloseOrderScalarFieldEnum = {
@@ -8890,6 +8995,7 @@ export type GlobalOmitConfig = {
   conditionalSellOrder?: Prisma.ConditionalSellOrderOmit
   futuresTpSlSetting?: Prisma.FuturesTpSlSettingOmit
   entryTpSlPlan?: Prisma.EntryTpSlPlanOmit
+  pendingOrderModification?: Prisma.PendingOrderModificationOmit
   limitOnCloseOrder?: Prisma.LimitOnCloseOrderOmit
   sessionClosePriceEvidence?: Prisma.SessionClosePriceEvidenceOmit
   beginnerQuestAcknowledgement?: Prisma.BeginnerQuestAcknowledgementOmit

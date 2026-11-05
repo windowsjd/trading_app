@@ -5,6 +5,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { useTradingAccount } from '../tradingAccount/TradingAccountContext';
 import { getAccountDisplay } from '../tradingAccount/accountDisplay';
 import {
+  getPendingOrderEvents,
   getTradingAccountOrder,
   getTradingAccountOrders,
   type TradingAccountDto,
@@ -13,7 +14,7 @@ import { getAccountPendingOrders } from '../record/accountOrders';
 import { getConditionalBuyOrder, getConditionalBuyOrders } from '../conditional/conditionalBuyApi';
 import { getConditionalSellOrder, getConditionalSellOrders } from '../conditional/conditionalSellApi';
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
-import { getApiErrorInfo } from '../../services/api/errorMapper';
+import { getApiErrorCode, getApiErrorInfo } from '../../services/api/errorMapper';
 import { rootNavigationRef } from '../../app/navigation/navigationRef';
 import { questNavigationAllowed } from '../quest/questNavigationGuard';
 import {
@@ -30,6 +31,15 @@ import {
   type FillTracker,
 } from './fillTracker';
 import { subscribeOrderFillEvents } from './fillEvents';
+import {
+  PENDING_EVENT_POLL_MS,
+  advancePendingEvents,
+  buildPendingEventNotice,
+  enqueuePendingEventNotices,
+  type PendingEventCursor,
+  type PendingOrderEventDto,
+} from './pendingEvents';
+import { readPendingEventCursor, writePendingEventCursor } from './pendingEventStorage';
 import OrderFillBanner, { type FillHistoryOutcome } from './OrderFillBanner';
 
 /**
@@ -80,6 +90,21 @@ function FillSession({ generation, accounts }: { generation: number; accounts: T
     if (!notice || !current() || !tracker.settle(accountId, notice.orderId)) return;
     setQueue((previous) => enqueueFillNotice(previous, notice));
   }, [current, labels, tracker]);
+
+  /**
+   * The server's confirmed fills and met conditions (발동·체결 알림), also
+   * those since the app was last open. One notice per key between this feed
+   * and the reads above (`settle`), in the same one-at-a-time queue.
+   */
+  const announceEvents = useCallback((accountId: string, events: PendingOrderEventDto[], skipped: number) => {
+    if (!current()) return;
+    const label = labels.get(accountId) ?? null;
+    const notices = events
+      .map((event) => buildPendingEventNotice(accountId, event, label))
+      .filter((notice): notice is FillNotice => !!notice && tracker.settle(accountId, notice.orderId));
+    if (notices.length) setQueue((previous) => enqueuePendingEventNotices(previous, notices, skipped));
+    touched();
+  }, [current, labels, touched, tracker]);
 
   /** A failed read is unknown, never a cancel: keep the target for a later check. */
   const failed = useCallback((accountId: string, target: FillTarget, cause: unknown) => {
@@ -190,6 +215,9 @@ function FillSession({ generation, accounts }: { generation: number; accounts: T
           onOrderGone={resolveOrder} onWatchGone={resolveWatch} onSellWatchGone={resolveSellWatch}
           onRetryDue={retryDue} touched={touched} />
       ))}
+      {accounts.map((account) => (
+        <AccountEventWatcher key={`events:${account.id}`} accountId={account.id} active={active} onEvents={announceEvents} />
+      ))}
       <OrderFillBanner
         notice={head}
         onDone={() => setQueue((previous) => previous.slice(1))}
@@ -299,5 +327,50 @@ function AccountFillWatcher({ accountId, active, tracker, onOrderGone, onWatchGo
     gone.forEach((watchId) => void onSellWatchGone(accountId, watchId));
     touched();
   }, [accountId, onSellWatchGone, sellWatches.data, sellWatches.dataUpdatedAt, touched, tracker]);
+  return null;
+}
+
+/**
+ * 발동·체결 알림 feed for one account (pendingEvents.ts): read when the app
+ * comes to the foreground and every 30 s while it stays there, never in the
+ * background. A read without a stored cursor only sets one; a cursor the
+ * server refuses is dropped the same way, so nothing old floods in.
+ */
+function AccountEventWatcher({ accountId, active, onEvents }: {
+  accountId: string;
+  active: boolean;
+  onEvents: (accountId: string, events: PendingOrderEventDto[], skipped: number) => void;
+}) {
+  // undefined = not read from storage yet; null = none.
+  const cursor = useRef<PendingEventCursor | null | undefined>(undefined);
+  const feed = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.pendingOrderEvents(accountId),
+    queryFn: async ({ signal }) => {
+      if (cursor.current === undefined) cursor.current = await readPendingEventCursor(accountId);
+      let page;
+      try {
+        page = await getPendingOrderEvents(accountId, cursor.current?.cursor ?? null, signal);
+      } catch (error) {
+        if (getApiErrorCode(error) !== 'INVALID_EVENT_CURSOR' || !cursor.current) throw error;
+        cursor.current = null;
+        page = await getPendingOrderEvents(accountId, null, signal);
+      }
+      const { announce, skipped, next } = advancePendingEvents(cursor.current, page);
+      cursor.current = next;
+      await writePendingEventCursor(accountId, next);
+      return { tradingAccountId: page.tradingAccountId, announce, skipped };
+    },
+    enabled: active,
+    refetchInterval: active ? PENDING_EVENT_POLL_MS : false,
+    refetchIntervalInBackground: false,
+    retry: 1,
+  });
+  const seen = useRef(0);
+  useEffect(() => {
+    const data = feed.data;
+    if (!data || data.tradingAccountId !== accountId || feed.dataUpdatedAt === seen.current) return;
+    seen.current = feed.dataUpdatedAt;
+    if (data.announce.length) onEvents(accountId, data.announce, data.skipped);
+  }, [accountId, feed.data, feed.dataUpdatedAt, onEvents]);
   return null;
 }

@@ -32,8 +32,8 @@ test('a pending Short limit entry takes plans by share of its fill: take-profit 
   h.entryTpSlEntry = (id: string) => entryDto(id);
   await h.start(); t.after(h.close);
   await h.view('pending');
-  assert.equal(h.node('pending-futures-entry-tp-sl').props.label, '손절가/익절가 설정');
-  await h.press('pending-futures-entry-tp-sl');
+  assert.equal(h.node('pending-item-futures_limit-entry-tp-sl').props.label, '손절가/익절가 설정');
+  await h.press('pending-item-futures_limit-entry-tp-sl');
   assert.equal(words(h.node('tp-sl-entry-summary')), '선물 지정가 Short 37x · 100 USD');
   assert.equal(words(h.node('tp-sl-entry-quantity')), '체결 예정 수량 1 BTC');
   await h.press('tp-sl-take-profit-toggle');
@@ -69,8 +69,10 @@ test('a pending plan can be canceled; a filled entry sends the user to the posit
   h.entryTpSlEntry = (id: string) => entryDto(id);
   await h.start(); t.after(h.close);
   await h.view('pending');
-  assert.equal(words(h.node('pending-futures-entry-tp-sl-summary')), '손절 1건');
-  await h.press('pending-futures-entry-tp-sl');
+  assert.equal(words(h.node('pending-item-futures_limit-entry-tp-sl-summary')), '손절 1건');
+  // The plan is also its own card in the one list, after its entry.
+  assert.equal(h.node('pending-item-entry_plan-plan-1') !== undefined, true);
+  await h.press('pending-item-futures_limit-entry-tp-sl');
   assert.equal(words(h.node('tp-sl-plan-plan-1-state')), '체결 후 활성화');
   await h.press('tp-sl-plan-plan-1-cancel');
   if (h.node('tp-sl-plan-plan-1-confirm-cancel')) await h.press('tp-sl-plan-plan-1-confirm-cancel');
@@ -97,13 +99,14 @@ test('a conditional entry and the limit entry it created share one plan set', as
     triggerCondition: 'at_or_below', triggerPrice: '100' })];
   await h.start(); t.after(h.close);
   await h.view('pending');
-  // The all view lists the created order once: on its entry, not again as a 지정가 card.
-  assert.equal(words(h.node('futures-conditional-p-tp-sl-summary')), '손절 1건');
-  assert.equal(h.node('pending-futures-limit-1-tp-sl-summary') === undefined, true);
-  await h.press('pending-kind-limit');
-  assert.equal(words(h.node('pending-futures-limit-1-tp-sl-summary')), '손절 1건', 'the created order shows the conditional entry’s plans');
-  await h.press('pending-kind-conditional');
-  assert.equal(words(h.node('futures-conditional-p-tp-sl-summary')), '손절 1건');
+  // The one list shows the created order once: on its entry, never again as a 지정가 card.
+  assert.equal(words(h.node('pending-item-futures_conditional-p-tp-sl-summary')), '손절 1건');
+  assert.equal(h.node('pending-item-futures_limit-limit-1') === undefined, true);
+  assert.match(words(h.node('pending-item-futures_conditional-p-edit-reason')), /접수된 지정가 주문은 변경할 수 없어요/);
+  // Its cancel cancels the created limit entry, as before.
+  await h.press('pending-item-futures_conditional-p-cancel');
+  await h.press('pending-item-futures_conditional-p-confirm-cancel');
+  assert.equal(h.requests.at(-1).path, '/trading-accounts/A/futures/limit-orders/limit-1/cancel');
 });
 
 test('an activation the holding rules refused stays visible as 활성화 실패 with its reason', async t => {
@@ -113,9 +116,8 @@ test('an activation the holding rules refused stays visible as 활성화 실패 
     basisQuantity: '0.4', endedAt: at })];
   await h.start(); t.after(h.close);
   await h.view('pending');
-  await h.press('pending-kind-protection');
-  await h.press('entry-tp-sl-history-toggle');
-  assert.equal(words(h.node('entry-tp-sl-failed-1-state')), '활성화 실패');
-  assert.equal(words(h.node('entry-tp-sl-failed-1-note')), '감시 중인 설정이 너무 많아 활성화하지 못했어요.');
-  assert.equal(h.node('entry-tp-sl-failed-1-cancel') === undefined, true, 'an ended plan cannot be canceled');
+  assert.equal(h.node('pending-item-entry_plan-failed-1') === undefined, true, 'an ended plan is not pending');
+  await h.press('pending-history-toggle');
+  assert.equal(words(h.node('pending-history-entry_plan-failed-1-state')), '활성화 실패');
+  assert.equal(words(h.node('pending-history-entry_plan-failed-1-reason')), '감시 중인 설정이 너무 많아 활성화하지 못했어요.');
 });

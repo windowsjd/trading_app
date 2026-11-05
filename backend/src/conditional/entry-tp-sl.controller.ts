@@ -47,6 +47,16 @@ export class EntryTpSlController {
   ) {
     return this.service.create(req.user?.userId, id, body);
   }
+  @Post(':planId/modify')
+  @HttpCode(200)
+  modify(
+    @Req() req: AuthRequest,
+    @Param('accountId') id: string,
+    @Param('planId') planId: string,
+    @Body() body: unknown,
+  ) {
+    return this.service.modify(req.user?.userId, id, planId, body);
+  }
   @Post(':planId/cancel')
   @HttpCode(200)
   cancel(

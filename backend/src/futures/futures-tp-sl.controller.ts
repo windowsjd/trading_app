@@ -47,6 +47,16 @@ export class FuturesTpSlController {
   ) {
     return this.settings.create(req.user?.userId, id, body);
   }
+  @Post(':settingId/modify')
+  @HttpCode(200)
+  modify(
+    @Req() req: AuthenticatedRequest,
+    @Param('accountId') id: string,
+    @Param('settingId') settingId: string,
+    @Body() body: unknown,
+  ) {
+    return this.settings.modify(req.user?.userId, id, settingId, body);
+  }
   @Post(':settingId/cancel')
   @HttpCode(200)
   cancel(

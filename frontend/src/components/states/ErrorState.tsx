@@ -22,6 +22,8 @@ interface ErrorStateProps {
   /** Legacy wiring; new surfaces use error. */
   diagnosticError?: unknown;
   diagnosticRuntime?: RuntimeFacts;
+  /** A second way out under the retry (e.g. back to the first screen), drawn quieter than it. */
+  secondaryAction?: { label: string; onPress: () => void; testID?: string };
   children?: React.ReactNode;
 }
 
@@ -33,6 +35,7 @@ export default function ErrorState({
   error,
   diagnosticError,
   diagnosticRuntime,
+  secondaryAction,
   children,
 }: ErrorStateProps) {
   return (
@@ -45,6 +48,11 @@ export default function ErrorState({
         {onRetry ? (
           <ActionPressable accessibilityRole="button" feedback="button" style={styles.button} onPress={onRetry}>
             <Text style={styles.buttonText}>{actionLabel}</Text>
+          </ActionPressable>
+        ) : null}
+        {secondaryAction ? (
+          <ActionPressable testID={secondaryAction.testID} accessibilityRole="button" feedback="button" style={styles.secondary} onPress={secondaryAction.onPress}>
+            <Text style={styles.secondaryText}>{secondaryAction.label}</Text>
           </ActionPressable>
         ) : null}
       </ScrollView>
@@ -93,5 +101,16 @@ const styles = StyleSheet.create({
   buttonText: {
     color: semantic.onAccent,
     fontWeight: '700',
+  },
+  secondary: {
+    marginTop: 8,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  secondaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: semantic.secondaryActionForeground,
   },
 });

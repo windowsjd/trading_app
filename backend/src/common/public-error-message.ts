@@ -3,6 +3,17 @@
  * approve arbitrary exception/Provider/DB prose for users or operators.
  */
 const PUBLIC_MESSAGES = new Set<string>([
+  // Pending order/setting changes (2026-11-05, docs/pending-order-modification-contract.md).
+  'expectedRevision must be the revision the change was made from.',
+  'This order or setting can no longer be changed.',
+  'The order or setting changed; review its latest terms.',
+  'The new terms are the same as the current ones.',
+  'Pending stop-loss/take-profit plans of this entry would no longer protect it at the new price.',
+  'Limit-on-Close orders cannot be changed; cancel and place a new one.',
+  'An order placed by a condition or another setting cannot be changed; cancel it instead.',
+  'Orders protected by an existing TP/SL (OCO) cannot be changed; cancel the protection first.',
+  // Pending order trigger/fill notices (2026-11-05, docs/pending-order-events-contract.md).
+  'The event cursor must be a past ISO time from this API.',
   // Self-service account deletion (2026-10-18, docs/account-deletion-contract.md).
   'A valid account deletion request key is required.',
   'Confirm the account deletion to continue.',

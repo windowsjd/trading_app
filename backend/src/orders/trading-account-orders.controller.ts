@@ -85,6 +85,22 @@ export class TradingAccountOrdersController {
     );
   }
 
+  /** 설정 변경 of a submitted limit order (docs/pending-order-modification-contract.md). */
+  @Post(':orderId/modify')
+  modifyOrder(
+    @Param('accountId') accountId: string,
+    @Param('orderId') orderId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.ordersService.modifyOrderForTradingAccount(
+      this.extractUserId(request),
+      accountId,
+      orderId,
+      body,
+    );
+  }
+
   @Post(':orderId/cancel')
   cancelOrder(
     @Param('accountId') accountId: string,

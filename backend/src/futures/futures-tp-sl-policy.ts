@@ -142,6 +142,34 @@ function leg(
   };
 }
 
+/** The new price and quantity of a change, read as a registration of the row's own kind and position. */
+export function parseFuturesTpSlModify(
+  body: unknown,
+  row: { positionId: string; kind: ProtectionKind },
+  idempotencyKey: string,
+): FuturesTpSlIntent {
+  const terms =
+    body && typeof body === 'object' && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : {};
+  const leg = { triggerPrice: terms.triggerPrice, quantity: terms.quantity };
+  return parseFuturesTpSlBody({
+    positionId: row.positionId,
+    idempotencyKey,
+    ...(row.kind === 'stop_loss' ? { stopLoss: leg } : { takeProfit: leg }),
+  }).intents[0];
+}
+
+/** A setting's canonical terms (decimal text): compared, hashed and recorded on a change. */
+export function futuresTpSlTerms(
+  intent: Pick<FuturesTpSlIntent, 'triggerPrice' | 'quantity'>,
+) {
+  return {
+    triggerPrice: intent.triggerPrice.toFixed(8),
+    quantity: intent.quantity.toFixed(8),
+  };
+}
+
 /** Request identity for create idempotency (normalized decimal text). */
 export function futuresTpSlHash(accountId: string, input: FuturesTpSlInput) {
   return conditionalHash({

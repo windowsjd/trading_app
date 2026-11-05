@@ -594,6 +594,7 @@ async function ownedRowCounts(ids: {
   const a = ids.accountIds;
   const p = ids.participantIds;
   const byAccount = [
+    'pending_order_modifications',
     'beginner_quest_acknowledgements',
     'entry_tp_sl_plans',
     'futures_tp_sl_settings',

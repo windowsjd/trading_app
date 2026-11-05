@@ -1,6 +1,7 @@
 import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
+import { evidenceFloor } from '../common/pending-order-modification';
 import {
   assertPendingChild,
   reconcileSpotProtection,
@@ -160,6 +161,7 @@ const EXEC_ORDER_SELECT = {
   reservedQuantity: true,
   reservationFeeRate: true,
   submittedAt: true,
+  revisedAt: true,
   asset: {
     select: {
       id: true,
@@ -481,7 +483,8 @@ export class LimitOrderExecutionService {
           evidence.assetId !== order.assetId ||
           evidence.currencyCode !==
             (order.asset.priceCurrency ?? order.asset.currencyCode) ||
-          evidence.effectiveAt < order.submittedAt ||
+          // Only a trade after submission (or the latest 설정 변경) fills the terms.
+          evidence.effectiveAt < evidenceFloor(order, order.submittedAt) ||
           !evidence.price.eq(plan.executedPrice)
         ) {
           return {
@@ -523,7 +526,7 @@ export class LimitOrderExecutionService {
             (!session || evidenceAt > session.closeTime)) ||
           !plan.executedPrice.eq(order.limitPrice) ||
           !this.candleEvidence.selectTriggerCandleForOrder([plan.candle], {
-            submittedAt: order.submittedAt,
+            submittedAt: evidenceFloor(order, order.submittedAt),
             limitPrice: order.limitPrice,
             side: order.side,
             seasonEndAt: season?.endAt ?? null,

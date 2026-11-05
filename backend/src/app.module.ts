@@ -1,3 +1,5 @@
+import { PendingOrderEventsModule } from './pending-order-events/pending-order-events.module';
+import { AppReleaseModule } from './app-release/app-release.module';
 import { FriendsModule } from './friends/friends.module';
 import { ConditionalModule } from './conditional/conditional.module';
 import { Module } from '@nestjs/common';
@@ -52,6 +54,8 @@ import { WalletsModule } from './wallets/wallets.module';
     HomeModule,
     InquiriesModule,
     NotificationsModule,
+    AppReleaseModule,
+    PendingOrderEventsModule,
     OperatorModule,
     OpsModule,
     OrdersModule,

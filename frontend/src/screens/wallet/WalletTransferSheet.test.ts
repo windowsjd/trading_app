@@ -414,3 +414,91 @@ test('back from 환전 the transfer says so above the form', async t => {
   await h.start(); t.after(h.close);
   assert.match(String(h.node('wallet-transfer-notice').props.children), /환전이 완료되었습니다/);
 });
+
+// 이체 비율 (2026-11-05): the order/환전 ratio controls on what can be sent now.
+const ratioState = h => ({
+  amount: h.node('wallet-transfer-amount').props.value,
+  percent: h.node('wallet-transfer-ratio-percent').props.children.join(''),
+  selected: [25, 50, 75, 100].filter(p => h.node(`wallet-transfer-ratio-${p}`).props.accessibilityState.selected),
+});
+
+test('ratio picks size the amount from balance − reserved, rounded down; 100% is exactly the transferable amount and can be sent', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close);
+  // 증권 USD: 1000 − 300 reserved = 700.
+  for (const [pick, amount] of [[25, '175'], [50, '350'], [75, '525'], [100, '700']]) {
+    await h.press(`wallet-transfer-ratio-${pick}`);
+    assert.deepEqual(ratioState(h), { amount, percent: `${pick}%`, selected: [pick] });
+  }
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+  assert.doesNotMatch(text(h), /잔액이 부족/);
+  // A share that is not representable in 8 decimals is rounded DOWN, never up.
+  h.wallets.A.wallets.find(w => w.id === 'A:securities').balanceAmount = '300.00000003';
+  await h.update();
+  await h.press('wallet-transfer-ratio-50');
+  assert.equal(ratioState(h).amount, '0.00000001');
+  await h.press('wallet-transfer-ratio-100');
+  assert.equal(ratioState(h).amount, '0.00000003');
+  await h.press('wallet-transfer-submit');
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.requests[0].body.amount, '0.00000003');
+});
+
+test('typing an amount moves the thumb and clears the pick; dragging to 0 clears the amount', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close);
+  await h.press('wallet-transfer-ratio-75');
+  await h.amount('350');
+  assert.deepEqual(ratioState(h), { amount: '350', percent: '50%', selected: [] });
+  const slider = h.renderer.root.findAll(node => typeof node.type === 'string' && node.props['data-testid'] === 'wallet-transfer-ratio-slider')[0];
+  assert.equal(slider.props['aria-valuetext'], '50%');
+  await h.amount('9999');
+  assert.equal(ratioState(h).percent, '100%', 'the thumb stops at the end; the amount is not rewritten');
+  assert.equal(ratioState(h).amount, '9999');
+  assert.match(text(h), /잔액이 부족합니다\./);
+});
+
+test('another sending wallet re-sizes a picked ratio from its own transferable amount; a typed amount is kept', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close);
+  await h.press('wallet-transfer-ratio-50');
+  assert.equal(ratioState(h).amount, '350');
+  // 현물 USD: 200 − 50 reserved = 150.
+  await h.choose('destination', 'crypto_futures');
+  await h.choose('source', 'crypto_spot');
+  assert.deepEqual(ratioState(h), { amount: '75', percent: '50%', selected: [50] });
+  // 선물 USD: the free collateral (25), not the cash balance (50).
+  await h.choose('destination', 'securities');
+  await h.choose('source', 'crypto_futures');
+  assert.deepEqual(ratioState(h), { amount: '12.5', percent: '50%', selected: [50] });
+  await h.press('wallet-transfer-ratio-100');
+  assert.equal(ratioState(h).amount, '25');
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+  await h.amount('20');
+  await h.choose('destination', 'crypto_spot');
+  await h.choose('source', 'securities');
+  assert.deepEqual(ratioState(h), { amount: '20', percent: '3%', selected: [] });
+  assert.equal(h.requests.length, 0);
+});
+
+test('nothing to send or an unknown amount turns the ratio off with its reason; the field stays typeable', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close);
+  h.risk.A.collateral.freeCollateral = '0.00000000';
+  await h.choose('source', 'crypto_futures');
+  assert.equal(h.node('wallet-transfer-ratio-100').props.disabled, true);
+  assert.match(text(h), /보내는 지갑에 이체 가능한 금액이 없습니다/);
+  await h.press('wallet-transfer-ratio-100');
+  assert.equal(ratioState(h).amount, '');
+  // Unknown free collateral (no mark): the ratio never falls back to cash; a pick waits for the amount.
+  h.risk.A.collateral.freeCollateral = null;
+  await h.choose('source', 'securities');
+  await h.press('wallet-transfer-ratio-25');
+  assert.equal(ratioState(h).amount, '175');
+  await h.choose('source', 'crypto_futures');
+  assert.equal(h.node('wallet-transfer-ratio-25').props.disabled, true, 'free collateral unknown: no ratio');
+  assert.equal(h.node('wallet-transfer-amount').props.editable, true);
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled');
+  h.risk.A.collateral.freeCollateral = '8.00000000';
+  const { act } = createRequire(import.meta.url)('react-test-renderer');
+  await act(async () => { await h.client.refetchQueries(); });
+  await h.flush();
+  assert.deepEqual(ratioState(h), { amount: '2', percent: '25%', selected: [25] }, 'resized once the amount is known');
+  assert.equal(h.requests.length, 0);
+});

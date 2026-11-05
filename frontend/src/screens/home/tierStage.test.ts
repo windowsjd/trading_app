@@ -713,9 +713,9 @@ describe('스포트라이트: TierCard', () => {
     const h = stageHarness(t);
     h.layout();
     assert.equal(h.drops(), 1);
-    const drop = flatten(h.emblem().props.style).opacity.value;
     h.update({ paused: true });
     h.update({ paused: false });
+    const drop = flatten(h.emblem().props.style).opacity.value;
     h.update({ mode: 'dark' });
     assert.equal(flatten(h.emblem().props.style).opacity.value === drop, true, 'Light/Dark keeps the same motion');
     assert.equal(h.has('home-tier-background-gold-dark'), true);
@@ -757,6 +757,47 @@ describe('스포트라이트: TierCard', () => {
     assert.equal(h.running().length, 0, 'every animation stopped');
     h.update({ paused: false });
     assert.equal(h.drops(), 1);
+  });
+
+  it('a native drop stopped near its start reports that frame back after the settle: the emblem still rests visible', (t) => {
+    const h = stageHarness(t);
+    h.layout();
+    const fall = ui(h).animations.find((animation: any) => animation.options.toValue === 3);
+    assert.equal(fall.options.useNativeDriver, true, 'Android/iOS: the native driver runs the drop');
+    // As RN's native driver does: stopAnimation answers with the node's last frame, and the JS
+    // value takes it after anything JS set meanwhile; Fabric then commits that value.
+    const reports: Array<() => void> = [];
+    const stop = fall.stop;
+    fall.stop = () => { const value = fall.value; stop(); reports.push(() => { value.value = 0.04; }); };
+    h.update({ paused: true });
+    act(() => reports.forEach((report) => report()));
+    h.update({ paused: true });
+    assert.equal(reports.length, 1);
+    assert.deepEqual(h.emblemPose(), { opacity: 1, y: 0, scale: 1 }, 'paused mid-drop: at rest, not at the reported frame');
+    h.update({ paused: false });
+    assert.deepEqual([h.drops(), h.emblemPose().opacity], [1, 1], 'not replayed, still visible on return');
+  });
+
+  it('a tier change during the entrance: the next tier waits hidden for its own drop, never shown at rest first', (t) => {
+    const h = stageHarness(t);
+    h.layout();
+    assert.equal(h.drops(), 1);
+    h.update({ tier: 'platinum' });
+    const drops = ui(h).animations.filter((animation: any) => animation.options.toValue === 3);
+    assert.equal(drops.length, 2, 'a tier change in the same selection plays');
+    const next = h.values.find((entry: any) => entry.value === drops[1].value);
+    assert.equal(next !== undefined, true);
+    assert.equal(next.history[0], 0, "the next tier's drop starts hidden: no frame at rest before it falls");
+    act(() => drops[1].finish());
+    assert.deepEqual(h.emblemPose(), { opacity: 1, y: 0, scale: 1 });
+  });
+
+  it('reduced motion turned on while an entrance is still owed shows the emblem at rest, never at the hidden start', (t) => {
+    const h = stageHarness(t, { paused: true });
+    h.layout();
+    assert.equal(h.emblemPose().opacity, 0, 'owed: hidden while the tab is away');
+    h.update({ paused: false, reduced: true });
+    assert.deepEqual([h.drops(), h.emblemPose()], [0, { opacity: 1, y: 0, scale: 1 }]);
   });
 
   it('loops stop when the tab loses focus and resume from where they were; unmounting stops them', (t) => {

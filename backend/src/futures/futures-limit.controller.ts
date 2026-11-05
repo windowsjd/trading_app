@@ -38,6 +38,16 @@ export class FuturesLimitController {
   ) {
     return this.entries.read(req.user?.userId, id, query);
   }
+  @Post(':orderId/modify')
+  @HttpCode(200)
+  modify(
+    @Req() req: AuthenticatedRequest,
+    @Param('accountId') id: string,
+    @Param('orderId') orderId: string,
+    @Body() body: unknown,
+  ) {
+    return this.entries.modify(req.user?.userId, id, orderId, body);
+  }
   @Post(':orderId/cancel')
   @HttpCode(200)
   cancel(

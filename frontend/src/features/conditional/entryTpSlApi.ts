@@ -29,6 +29,9 @@ export interface EntryTpSlPlanDto {
   childOrderId: string | null;
   domain: 'spot' | 'futures';
   assetId: string;
+  /** Additive (2026-11-05): the plan's asset and price currency; absent on an older server. */
+  asset?: { id: string; symbol: string; name: string; market: string | null } | null;
+  currencyCode?: string;
   direction: 'long' | 'short';
   kind: EntryTpSlKind;
   triggerCondition: 'at_or_above' | 'at_or_below';
@@ -48,6 +51,9 @@ export interface EntryTpSlPlanDto {
   createdAt: string;
   endedAt: string | null;
   updatedAt: string;
+  /** 설정 변경 (2026-11-05): the revision a change names; absent on an older server (0). */
+  revision?: number;
+  revisedAt?: string | null;
 }
 
 /** The entry facts the sheet shows; they describe the entry, never a fill. */

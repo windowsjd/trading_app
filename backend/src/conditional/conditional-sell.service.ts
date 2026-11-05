@@ -39,10 +39,25 @@ import {
   independentTpSlEnabled,
   isConditionalSellMet,
   isRetryableConditionalSellFailure,
+  conditionalSellTerms,
   parseConditionalSellBody,
+  parseConditionalSellModify,
   resolveSellExecutionQuantity,
   type ConditionalSellBody,
+  type ConditionalSellInput,
+  type ConditionalSellIntentInput,
+  type ConditionalSellModifyBody,
 } from './conditional-sell-policy';
+import {
+  assertExpectedRevision,
+  assertTermsChanged,
+  evidenceFloor,
+  isReplayedModification,
+  modificationHash,
+  notModifiable,
+  parseModificationEnvelope,
+  recordModification,
+} from '../common/pending-order-modification';
 import {
   liveConditionalSell,
   openConditionalSell,
@@ -177,38 +192,7 @@ export class ConditionalSellService {
           'The account trading window ended.',
           409,
         );
-      const asset = await tx.asset.findUnique({
-        where: { id: input.assetId },
-      });
-      if (!asset)
-        throw createApiError('ASSET_NOT_FOUND', 'Asset not found.', 404);
-      if (!asset.isActive || isFuturesOnlyAsset(asset))
-        throw createApiError(
-          'ASSET_NOT_TRADABLE',
-          'Asset is not a Spot product.',
-          400,
-        );
-      // US stocks need the approved US price source (Tiingo, 2026-10-17).
-      if (asset.assetType === 'us_stock' && !usConditionalOrdersSupported())
-        throw createApiError(
-          'CONDITIONAL_SELL_MARKET_NOT_SUPPORTED',
-          'Conditional sell orders are not available for this market.',
-          409,
-        );
-      if (input.currencyCode && input.currencyCode !== asset.settlementCurrency)
-        throw createApiError(
-          'ASSET_CURRENCY_MISMATCH',
-          'currencyCode must match asset settlementCurrency.',
-          400,
-        );
-      for (const intent of input.intents)
-        assertOrderInputPolicy({
-          assetType: asset.assetType,
-          side: 'sell',
-          orderType: intent.executionType,
-          quantity: intent.quantity,
-          amount: null,
-        });
+      const asset = await this.sellAsset(tx, input);
       // Registering automation is an advanced action on a beginner account;
       // the resulting SELL itself stays risk reduction. A crypto stop-loss/
       // take-profit is the TP/SL practice (QUEST 04), opened at the same step
@@ -305,44 +289,14 @@ export class ConditionalSellService {
             409,
           );
       }
-      // A user condition on a confirmed-closed stock market registers without
-      // a price (its direction as sent, watched from the next regular
-      // session); stop-loss/take-profit settings keep requiring one.
-      const price = input.intents.every((intent) => intent.kind === 'condition')
-        ? await conditionalRegistrationReference(tx, asset, now)
-        : await conditionalPrice(tx, asset, 'spot', now);
-      if (!price) {
-        setAdminDiagnosticContext({
-          domain: 'CONDITIONAL',
-          operation: 'CONDITIONAL_SELL_CREATE',
-          failureStage: 'conditional_registration_price_selection',
-          entities: { tradingAccountId: accountId, assetId: asset.id },
-          evidence: {
-            evaluationState: 'reference_unavailable',
-            priceEvidenceAvailable: false,
-          },
-        });
-        throw createApiError(
-          'CONDITIONAL_PRICE_UNAVAILABLE',
-          'A fresh eligible reference price is required.',
-          409,
-        );
-      }
-      if (
-        price !== 'off_session' &&
-        input.intents.some((intent) =>
-          isConditionalSellMet(
-            intent.triggerCondition,
-            price.price,
-            intent.triggerPrice,
-          ),
-        )
-      )
-        throw createApiError(
-          'CONDITIONAL_SELL_ALREADY_MET',
-          'The current price already meets this condition.',
-          409,
-        );
+      const price = await this.sellReference(
+        tx,
+        accountId,
+        asset,
+        input.intents,
+        now,
+        'CONDITIONAL_SELL_CREATE',
+      );
       const rows: ConditionalSellRecord[] = [];
       for (const intent of input.intents)
         rows.push(
@@ -374,6 +328,193 @@ export class ConditionalSellService {
           409,
         );
       return this.response(accountId, rows, false, position);
+    });
+  }
+
+  /**
+   * 설정 변경 (docs/pending-order-modification-contract.md) of one watching
+   * SELL intent, in place under the trigger's fence (account, then the row).
+   * Its kind and holding stay; the new terms meet every registration rule —
+   * stop-loss/take-profit still execute at market, and the per-kind totals and
+   * distinct prices are checked against the OTHER live settings of the
+   * holding. Nothing is reserved while watching, so nothing is released or
+   * reserved here; the evidence floor moves to the change.
+   */
+  async modify(
+    userId: string | undefined,
+    accountId: string,
+    id: string,
+    body: ConditionalSellModifyBody,
+  ) {
+    this.user(userId);
+    const envelope = parseModificationEnvelope(body);
+    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockAccount(tx, accountId, userId);
+      await tx.$queryRaw`SELECT "id" FROM "conditional_sell_orders" WHERE "id" = ${id} AND "trading_account_id" = ${accountId} FOR UPDATE`;
+      const row = await tx.conditionalSellOrder.findFirst({
+        where: { id, tradingAccountId: accountId },
+        include: CONDITIONAL_SELL_INCLUDE,
+      });
+      if (!row)
+        throw createApiError(
+          'CONDITIONAL_SELL_NOT_FOUND',
+          'Conditional order not found.',
+          404,
+        );
+      const input = parseConditionalSellModify(
+        body,
+        row,
+        envelope.idempotencyKey,
+      );
+      const intent = input.intents[0];
+      const terms = conditionalSellTerms(intent);
+      const requestHash = modificationHash(
+        'conditional_sell',
+        id,
+        envelope.expectedRevision,
+        terms,
+      );
+      if (
+        await isReplayedModification(tx, {
+          accountId,
+          target: 'conditional_sell',
+          targetId: id,
+          idempotencyKey: envelope.idempotencyKey,
+          requestHash,
+        })
+      )
+        return this.single(accountId, row, true);
+      if (row.status !== 'watching') notModifiable();
+      assertExpectedRevision(row.revision, envelope.expectedRevision);
+      const before = conditionalSellTerms(row);
+      assertTermsChanged(before, terms);
+      assertConditionalSellKindEnabled(intent.kind);
+      if (
+        intent.executionType === 'limit' &&
+        (!isLimitOrderEnabled() ||
+          !readLimitOrderMatchingConfig().matchingEnabled)
+      )
+        throw createApiError(
+          'CONDITIONAL_LIMIT_UNAVAILABLE',
+          'Spot Limit registration and matching must be available.',
+          409,
+        );
+      const now = await this.now(tx);
+      const account = await this.access.getOwnedAccountOrThrow(
+        userId,
+        accountId,
+        tx,
+      );
+      if (!conditionalTradable(account, now))
+        throw createApiError(
+          'CONDITIONAL_ACCOUNT_NOT_TRADABLE',
+          'The account trading window ended.',
+          409,
+        );
+      const asset = await this.sellAsset(tx, input);
+      await assertBeginnerLearningAccess(
+        tx,
+        account,
+        intent.kind !== 'condition' && asset.assetType === 'crypto'
+          ? 'spotProtection'
+          : 'allTrading',
+      );
+      // The holding the intent was registered against (a flat holding ends
+      // its live intents, so a watching row's position is the current one).
+      const position = await tx.position.findUnique({
+        where: {
+          tradingAccountId_assetId: {
+            tradingAccountId: accountId,
+            assetId: asset.id,
+          },
+        },
+        select: { id: true, quantity: true, reservedQuantity: true },
+      });
+      if (
+        !position ||
+        position.quantity.lte(0) ||
+        position.id !== row.positionId
+      )
+        throw createApiError(
+          'CONDITIONAL_SELL_POSITION_UNAVAILABLE',
+          'An open position is required.',
+          409,
+        );
+      if (intent.quantity.gt(position.quantity))
+        throw createApiError(
+          'CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING',
+          'The quantity exceeds the current holding.',
+          409,
+        );
+      if (intent.kind !== 'condition') {
+        const conflict = findProtectionSettingConflict({
+          intents: [intent],
+          live: await tx.conditionalSellOrder.findMany({
+            where: {
+              tradingAccountId: accountId,
+              assetId: asset.id,
+              positionId: position.id,
+              kind: intent.kind,
+              id: { not: id },
+              ...liveConditionalSell,
+            },
+            select: { kind: true, triggerPrice: true, quantity: true },
+          }),
+          holding: position.quantity,
+        });
+        if (conflict === 'duplicate_price')
+          throw createApiError(
+            'CONDITIONAL_SELL_DUPLICATE_PRICE',
+            'An active setting of the same kind already uses this price.',
+            409,
+          );
+        if (conflict === 'total_exceeds_holding')
+          throw createApiError(
+            'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING',
+            'Active settings of the same kind would exceed the current holding.',
+            409,
+          );
+      }
+      const price = await this.sellReference(
+        tx,
+        accountId,
+        asset,
+        [intent],
+        now,
+        'CONDITIONAL_SELL_MODIFY',
+      );
+      const updated = await tx.conditionalSellOrder.update({
+        where: { id },
+        data: {
+          triggerCondition: intent.triggerCondition,
+          triggerPrice: intent.triggerPrice,
+          executionType: intent.executionType,
+          limitPrice: intent.limitPrice,
+          quantity: intent.quantity,
+          registrationSnapshotId: price === 'off_session' ? null : price.id,
+          revisedAt: now,
+          revision: { increment: 1 },
+        },
+        include: CONDITIONAL_SELL_INCLUDE,
+      });
+      await recordModification(tx, {
+        accountId,
+        target: 'conditional_sell',
+        targetId: id,
+        idempotencyKey: envelope.idempotencyKey,
+        requestHash,
+        revision: updated.revision,
+        before,
+        after: terms,
+        at: now,
+      });
+      return this.single(
+        accountId,
+        updated,
+        false,
+        new Map([[asset.id, position]]),
+      );
     });
   }
 
@@ -626,7 +767,8 @@ export class ConditionalSellService {
       const price = await conditionalPrice(tx, row.asset, 'spot', now);
       if (!price) return { state: 'price_unavailable' };
       // Only evidence of a trade after registration may trigger the intent.
-      if (price.effectiveAt < row.createdAt) return { state: 'awaiting_price' };
+      if (price.effectiveAt < evidenceFloor(row, row.createdAt))
+        return { state: 'awaiting_price' };
       if (
         !isConditionalSellMet(
           row.triggerCondition,
@@ -803,6 +945,98 @@ export class ConditionalSellService {
     };
   }
 
+  /** A SELL intent's asset rules, for a registration and a change alike. */
+  private async sellAsset(
+    tx: Prisma.TransactionClient,
+    input: Pick<ConditionalSellInput, 'assetId' | 'currencyCode' | 'intents'>,
+  ) {
+    const asset = await tx.asset.findUnique({
+      where: { id: input.assetId },
+    });
+    if (!asset)
+      throw createApiError('ASSET_NOT_FOUND', 'Asset not found.', 404);
+    if (!asset.isActive || isFuturesOnlyAsset(asset))
+      throw createApiError(
+        'ASSET_NOT_TRADABLE',
+        'Asset is not a Spot product.',
+        400,
+      );
+    // US stocks need the approved US price source (Tiingo, 2026-10-17).
+    if (asset.assetType === 'us_stock' && !usConditionalOrdersSupported())
+      throw createApiError(
+        'CONDITIONAL_SELL_MARKET_NOT_SUPPORTED',
+        'Conditional sell orders are not available for this market.',
+        409,
+      );
+    if (input.currencyCode && input.currencyCode !== asset.settlementCurrency)
+      throw createApiError(
+        'ASSET_CURRENCY_MISMATCH',
+        'currencyCode must match asset settlementCurrency.',
+        400,
+      );
+    for (const intent of input.intents)
+      assertOrderInputPolicy({
+        assetType: asset.assetType,
+        side: 'sell',
+        orderType: intent.executionType,
+        quantity: intent.quantity,
+        amount: null,
+      });
+    return asset;
+  }
+
+  /**
+   * The price intents are registered against. A user condition on a
+   * confirmed-closed stock market registers without a price (its direction as
+   * sent, watched from the next regular session); stop-loss/take-profit
+   * settings keep requiring one. No intent may already be met.
+   */
+  private async sellReference(
+    tx: Prisma.TransactionClient,
+    accountId: string,
+    asset: Awaited<ReturnType<ConditionalSellService['sellAsset']>>,
+    intents: ConditionalSellIntentInput[],
+    now: Date,
+    operation: 'CONDITIONAL_SELL_CREATE' | 'CONDITIONAL_SELL_MODIFY',
+  ) {
+    const price = intents.every((intent) => intent.kind === 'condition')
+      ? await conditionalRegistrationReference(tx, asset, now)
+      : await conditionalPrice(tx, asset, 'spot', now);
+    if (!price) {
+      setAdminDiagnosticContext({
+        domain: 'CONDITIONAL',
+        operation,
+        failureStage: 'conditional_registration_price_selection',
+        entities: { tradingAccountId: accountId, assetId: asset.id },
+        evidence: {
+          evaluationState: 'reference_unavailable',
+          priceEvidenceAvailable: false,
+        },
+      });
+      throw createApiError(
+        'CONDITIONAL_PRICE_UNAVAILABLE',
+        'A fresh eligible reference price is required.',
+        409,
+      );
+    }
+    if (
+      price !== 'off_session' &&
+      intents.some((intent) =>
+        isConditionalSellMet(
+          intent.triggerCondition,
+          price.price,
+          intent.triggerPrice,
+        ),
+      )
+    )
+      throw createApiError(
+        'CONDITIONAL_SELL_ALREADY_MET',
+        'The current price already meets this condition.',
+        409,
+      );
+    return price;
+  }
+
   private user(userId: string | undefined): asserts userId is string {
     if (!userId) throw createApiError('UNAUTHORIZED', 'Unauthorized', 401);
   }
@@ -938,6 +1172,9 @@ export function presentConditionalSell(
     failureCode: row.failureCode,
     terminalReason: row.terminalReason,
     createdAt: row.createdAt.toISOString(),
+    // 설정 변경: the revision a change names, and when the terms last changed.
+    revision: row.revision,
+    revisedAt: row.revisedAt?.toISOString() ?? null,
     endedAt: row.endedAt?.toISOString() ?? null,
     updatedAt: row.updatedAt.toISOString(),
   };

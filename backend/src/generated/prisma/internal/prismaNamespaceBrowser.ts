@@ -88,6 +88,7 @@ export const ModelName = {
   ConditionalSellOrder: 'ConditionalSellOrder',
   FuturesTpSlSetting: 'FuturesTpSlSetting',
   EntryTpSlPlan: 'EntryTpSlPlan',
+  PendingOrderModification: 'PendingOrderModification',
   LimitOnCloseOrder: 'LimitOnCloseOrder',
   SessionClosePriceEvidence: 'SessionClosePriceEvidence',
   BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
@@ -653,6 +654,8 @@ export const FuturesLimitOrderScalarFieldEnum = {
   terminalReason: 'terminalReason',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -785,6 +788,8 @@ export const OrderScalarFieldEnum = {
   rejectedAt: 'rejectedAt',
   rejectReason: 'rejectReason',
   createdAt: 'createdAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -816,6 +821,8 @@ export const ConditionalBuyOrderScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -849,6 +856,8 @@ export const FuturesConditionalEntryScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -882,6 +891,8 @@ export const ConditionalSellOrderScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -911,6 +922,8 @@ export const FuturesTpSlSettingScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
@@ -942,10 +955,28 @@ export const EntryTpSlPlanScalarFieldEnum = {
   requestHash: 'requestHash',
   createdAt: 'createdAt',
   endedAt: 'endedAt',
+  revisedAt: 'revisedAt',
+  revision: 'revision',
   updatedAt: 'updatedAt'
 } as const
 
 export type EntryTpSlPlanScalarFieldEnum = (typeof EntryTpSlPlanScalarFieldEnum)[keyof typeof EntryTpSlPlanScalarFieldEnum]
+
+
+export const PendingOrderModificationScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  targetType: 'targetType',
+  targetId: 'targetId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  revision: 'revision',
+  beforeJson: 'beforeJson',
+  afterJson: 'afterJson',
+  createdAt: 'createdAt'
+} as const
+
+export type PendingOrderModificationScalarFieldEnum = (typeof PendingOrderModificationScalarFieldEnum)[keyof typeof PendingOrderModificationScalarFieldEnum]
 
 
 export const LimitOnCloseOrderScalarFieldEnum = {
