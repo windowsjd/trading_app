@@ -3,6 +3,7 @@ import { formatKstDateTime, formatMoney, getAssetNameDisplay } from '../../utils
 import type { RecordOrderItemDto } from '../record/api';
 import type { ConditionalBuyOrderDto } from '../conditional/conditionalBuyApi';
 import type { ConditionalSellOrderDto } from '../conditional/conditionalSellApi';
+import { SELL_REFERENCE_HINT, SELL_REFERENCE_LABEL } from '../conditional/conditionalSellDisplay.ts';
 import type { EntryTpSlEntryType, EntryTpSlPlanDto } from '../conditional/entryTpSlApi';
 import type { FuturesConditionalEntry, FuturesLimitOrder } from '../futures/api';
 import type { FuturesTpSlSetting } from '../futures/tpSlApi';
@@ -97,7 +98,7 @@ export type EditValues = {
 export type PendingCancel = {
   kind: 'order' | 'conditional_buy' | 'conditional_sell' | 'futures_limit' | 'futures_conditional' | 'futures_tp_sl' | 'entry_plan';
   id: string;
-  /** What canceling ends, in the confirmation. */
+  /** The confirmation: one short question naming what canceling ends (the setting, or the order it placed). */
   confirm: string;
 };
 
@@ -184,10 +185,8 @@ export function withParticle(word: string, particle: '은' | '을') {
 
 /** A watch's trigger; a Spot SELL's decides the automatic sale and is not its fill price. */
 const WATCH_PRICE: TriggerTerm = { label: '감시가격' };
-const SELL_REFERENCE: TriggerTerm = {
-  label: '매도 기준가',
-  hint: '매도 기준가는 자동 매도 여부를 판단하는 가격이에요. 실제 체결가격은 다를 수 있어요.',
-};
+// The registration form's own words (SellIntentForm).
+const SELL_REFERENCE: TriggerTerm = { label: SELL_REFERENCE_LABEL, hint: SELL_REFERENCE_HINT };
 
 function product(quantity: string | null | undefined, price: string | null | undefined) {
   if (!quantity || !price) return null;
@@ -278,7 +277,7 @@ function spotLimitItem(order: RecordOrderItemDto): PendingItem | null {
               : { quantity: inputDecimal(order.quantity) }),
           },
         },
-    cancel: { kind: 'order', id, confirm: `${buy ? '지정가 매수' : '지정가 매도'} 주문을 취소할까요? 예약된 ${buy ? '금액' : '수량'}은 다시 사용할 수 있게 됩니다.` },
+    cancel: { kind: 'order', id, confirm: `${loc ? 'LOC' : '지정가'} ${buy ? '매수' : '매도'} 주문을 취소할까요?` },
     plans: buy && !loc ? { entryType: 'spot_limit_order', entryId: id, assetType: spotAssetType(order.market) } : null,
   };
 }
@@ -338,7 +337,10 @@ function conditionalBuyItem(row: ConditionalBuyOrderDto, limitAvailable: boolean
       trigger: { choose: true, ...WATCH_PRICE },
       executions: limitAvailable || row.executionType === 'limit' ? ['market', 'limit'] : ['market'],
       size: row.amount ? 'amount' : 'quantity',
-      quantityScale: stock ? 0 : 6,
+      // As registered: 6 decimals at market (fractional shares too); a stock
+      // executed at a limit takes whole shares.
+      quantityScale: 6,
+      ...(stock ? { limitQuantityScale: 0 } : {}),
       quantityUnit: unit,
       executionLabel: '매수 유형',
       initial: {
@@ -349,9 +351,10 @@ function conditionalBuyItem(row: ConditionalBuyOrderDto, limitAvailable: boolean
         ...(row.amount ? { amount: inputDecimal(row.amount) } : { quantity: inputDecimal(row.quantity) }),
       },
     },
+    // Once the watch placed its limit order, that order is what a cancel ends.
     cancel: row.state === 'order_pending' && row.order
-      ? { kind: 'order', id: row.order.orderId, confirm: '조건주문으로 접수된 지정가 매수를 취소할까요? 예약된 금액은 다시 사용할 수 있게 됩니다.' }
-      : { kind: 'conditional_buy', id: row.id, confirm: '조건주문 감시를 취소할까요? 감시 중에는 예약된 금액이 없어요.' },
+      ? { kind: 'order', id: row.order.orderId, confirm: '조건부 매수로 접수된 지정가 매수 주문을 취소할까요?' }
+      : { kind: 'conditional_buy', id: row.id, confirm: '조건부 매수 설정을 취소할까요?' },
     plans: { entryType: 'spot_conditional_buy', entryId: row.id, assetType: row.asset?.assetType ?? null },
   };
 }
@@ -416,8 +419,8 @@ function conditionalSellItem(row: ConditionalSellOrderDto, limitAvailable: boole
       },
     },
     cancel: row.state === 'order_pending' && row.order
-      ? { kind: 'order', id: row.order.orderId, confirm: `${kindWord} 설정으로 접수된 지정가 매도를 취소할까요? 예약된 수량은 다시 매도할 수 있게 됩니다.` }
-      : { kind: 'conditional_sell', id: row.id, confirm: `${kindWord} 매도 설정을 취소할까요? 감시 중에는 예약된 수량이 없어요.` },
+      ? { kind: 'order', id: row.order.orderId, confirm: `${protection ? `${kindWord} 설정으로` : '조건부 매도로'} 접수된 지정가 매도 주문을 취소할까요?` }
+      : { kind: 'conditional_sell', id: row.id, confirm: `${protection ? kindWord : '조건부'} 매도 설정을 취소할까요?` },
     plans: null,
   };
 }
@@ -457,7 +460,7 @@ function futuresLimitItem(order: FuturesLimitOrder): PendingItem {
       executionLabel: '진입 유형',
       initial: { limitPrice: inputDecimal(order.limitPrice), quantity: inputDecimal(order.quantity) },
     },
-    cancel: { kind: 'futures_limit', id: order.id, confirm: '선물 지정가 진입 주문을 취소할까요? 예약 증거금은 다시 사용할 수 있게 됩니다.' },
+    cancel: { kind: 'futures_limit', id: order.id, confirm: '선물 지정가 진입 주문을 취소할까요?' },
     plans: { entryType: 'futures_limit_order', entryId: order.id, assetType: null },
   };
 }
@@ -510,8 +513,8 @@ function futuresConditionalItem(row: FuturesConditionalEntry): PendingItem {
       },
     },
     cancel: row.state === 'order_pending' && row.limitOrder
-      ? { kind: 'futures_limit', id: row.limitOrder.orderId, confirm: '조건주문으로 접수된 선물 지정가 진입을 취소할까요? 예약 증거금은 다시 사용할 수 있게 됩니다.' }
-      : { kind: 'futures_conditional', id: row.id, confirm: '선물 조건주문 감시를 취소할까요? 감시 중에는 예약된 증거금이 없어요.' },
+      ? { kind: 'futures_limit', id: row.limitOrder.orderId, confirm: '조건주문으로 접수된 선물 지정가 진입 주문을 취소할까요?' }
+      : { kind: 'futures_conditional', id: row.id, confirm: '선물 조건주문 감시를 취소할까요?' },
     plans: { entryType: 'futures_conditional_entry', entryId: row.id, assetType: null },
   };
 }

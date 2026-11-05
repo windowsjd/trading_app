@@ -177,6 +177,30 @@ const sellRow = (id, kind, stateName, extra = {}) => ({
   createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString(), ...extra,
 });
 const sellStates = ['watching', 'triggered', 'order_pending', 'filled', 'failed', 'canceled', 'order_canceled'];
+// `pendingMix=1` (통합 대기목록, 2026-11-05): one live row per kind with fixed
+// registration times (09:00–09:06 KST), so the one list's order and badges are
+// deterministic — a Futures limit entry, an accepted SELL limit (no new ones
+// since 2026-11-05) and a BUY limit, a KRX conditional BUY at market with a
+// fractional quantity, a SELL condition and an independent 익절가/손절가 pair.
+// Use with `krx=1&asset=SAMSUNG` (the SELL settings take the screen's asset).
+const pendingMix = params.get('pendingMix') === '1';
+const mixAt = (minute) => new Date(Date.UTC(2026, 10, 5, 0, minute)).toISOString();
+const mixStock = () => ({ id: 'SAMSUNG', symbol: '005930', name: krxStock[0]?.name ?? '삼성전자', market: 'KRX' });
+const mixSpotOrders = () => [
+  { id: 'mix-sell-limit', orderId: 'mix-sell-limit', asset: { id: 'SUI', symbol: 'SUIUSDT', name: assets.find((a) => a.id === 'SUI').name, market: 'BINANCE' },
+    side: 'sell', orderType: 'limit', status: 'submitted', quantity: '1234567.123456', limitPrice: '0.9', currencyCode: 'USD',
+    reservedQuantity: '1234567.123456', submittedAt: mixAt(1), createdAt: mixAt(1), revision: 0 },
+  { id: 'mix-buy-limit', orderId: 'mix-buy-limit', asset: mixStock(), side: 'buy', orderType: 'limit', status: 'submitted',
+    quantity: '3', limitPrice: '69500', currencyCode: 'KRW', reservedAmount: '208604', submittedAt: mixAt(4), createdAt: mixAt(4), revision: 0 },
+];
+const mixConditionalBuy = () => conditionalRow('mix-cb', 'watching', {
+  assetId: 'SAMSUNG', asset: { ...mixStock(), assetType: 'domestic_stock' }, triggerPrice: '68000', executionType: 'market', limitPrice: null,
+  quantity: '3.164126', amount: null, currencyCode: 'KRW', attemptCount: 0, createdAt: mixAt(2), updatedAt: mixAt(2), revision: 1 });
+const mixConditionalSells = () => [
+  sellRow('mix-tp', 'take_profit', 'watching', { triggerPrice: '75000', quantity: '1.5', createdAt: mixAt(3), updatedAt: mixAt(3), revision: 1 }),
+  sellRow('mix-cs', 'condition', 'watching', { triggerCondition: 'at_or_above', triggerPrice: '72000', quantity: '2', createdAt: mixAt(5), updatedAt: mixAt(5), revision: 1 }),
+  sellRow('mix-sl', 'stop_loss', 'watching', { triggerPrice: '65000', quantity: '1.5', createdAt: mixAt(6), updatedAt: mixAt(6), revision: 1 }),
+];
 const account = {
   id: 'account-fixture',
   mode: 'general',
@@ -312,7 +336,7 @@ export const apiClient = {
         : kind === 'many'
           ? [...Array.from({ length: 35 }, (_, i) => conditionalRow('end-' + i, ['filled', 'canceled', 'failed', 'order_canceled'][i % 4])),
             ...['order_pending', 'triggered', 'watching'].map((s) => conditionalRow('old-' + s, s))]
-          : [];
+          : pendingMix ? [mixConditionalBuy()] : [];
       const open = new Set(['watching', 'triggered', 'order_pending']);
       const query = options.params ?? {};
       const rows = query.state === 'open' ? all.filter((r) => open.has(r.state))
@@ -336,7 +360,7 @@ export const apiClient = {
       const id = path.split('/')[2];
       const all = params.get('sellRows') === '1'
         ? ['condition', 'stop_loss', 'take_profit'].flatMap((kind) => sellStates.map((s) => sellRow(`${kind}-${s}`, kind, s)))
-        : [];
+        : pendingMix ? mixConditionalSells() : [];
       const open = new Set(['watching', 'triggered', 'order_pending']);
       const query = options.params ?? {};
       const kindRows = all.filter((r) => !query.kind || (query.kind === 'condition' ? r.kind === 'condition' : r.kind !== 'condition'));
@@ -407,9 +431,11 @@ export const apiClient = {
     if(path.includes('/futures/')) {
       // `?futuresPosition=1`: one open (large) position with its card and 손절가/익절가 sheet.
       const f=futuresFixture(state.accountId,{large:true,position:params.get('futuresPosition')==='1'});
-      if(path.includes('limit-orders')) return response({...scoped,orders:pendingFutures ? ['long','short'].map((direction,i)=>({id:'entry-'+direction,direction,marginMode:i?'cross':'isolated',leverage:100,quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',reservedAmount:'12345678901234.12345678',instrument:f.catalog.instruments[0]})) : [],pagination});
+      if(path.includes('limit-orders')) return response({...scoped,orders:pendingFutures ? ['long','short'].map((direction,i)=>({id:'entry-'+direction,direction,marginMode:i?'cross':'isolated',leverage:100,quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',reservedAmount:'12345678901234.12345678',instrument:f.catalog.instruments[0]}))
+        : pendingMix ? [{id:'mix-fl',tradingAccountId:state.accountId,instrumentId:f.catalog.instruments[0].id,direction:'long',marginMode:'isolated',leverage:5,quantity:'0.5',limitPrice:'95000',reservedAmount:'9509.5',status:'submitted',executionId:null,terminalReason:null,createdAt:mixAt(0),endedAt:null,revision:0,instrument:f.catalog.instruments[0]}] : [],pagination});
       return response(path.includes('/instruments')?f.catalog:path.includes('/positions')?f.positions:path.includes('/executions')?f.executions:path.includes('/liquidations')?f.liquidations:f.final);
     }
+    if(path.endsWith('/orders') && pendingMix && !pendingSpot) return response({...scoped,orders:mixSpotOrders(),pagination:{...pagination,total:2,returned:2}});
     if(path.endsWith('/orders')) return response({...scoped,orders:pendingSpot ? ['buy','sell','child'].map((id)=>({id,orderId:id,asset:{id:'SUI',symbol:'SUIUSDT',name:assets.find(a=>a.id==='SUI').name,market:'BINANCE'},side:id==='buy'?'buy':'sell',orderType:'limit',status:'submitted',quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',currencyCode:'USD',conditionalChildId:id==='child'?'child':null})) : [],pagination:{...pagination,total:pendingSpot?3:0,returned:pendingSpot?3:0}});
     if (path.endsWith('/portfolio')) return response({
       ...scoped, mode: account.mode, sectionErrors: [],
@@ -487,6 +513,8 @@ export const apiClient = {
   },
   async post(path, body) {
     state.requests.push({ path, body });
+    // 설정 변경 (POST …/:id/modify): the server commits it; the lists read their rows again.
+    if (path.endsWith('/modify')) return response({ tradingAccountId: state.accountId, duplicate: false });
     // `conditionalResult=<state>`: the create answers as a same-key replay of a watch that moved on.
     const result = params.get('conditionalResult');
     if (path.endsWith('/conditional-buy-orders'))

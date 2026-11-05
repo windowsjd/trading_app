@@ -11,7 +11,7 @@ import OrderNumberInput from '../order/OrderNumberInput';
 import OrderRatioControls from '../order/OrderRatioControls';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { QUERY_KEYS } from '../../constants/queryKeys';
-import { checkEdit, editQuantityScale } from '../../features/order/pendingEdit';
+import { checkEdit, editQuantityScale, wholeShareNotice } from '../../features/order/pendingEdit';
 import { getTradingAccountPositions, modifyPendingOrder } from '../../features/tradingAccount/api';
 import { getAccountHoldings } from '../../features/tradingAccount/holdings';
 import { quantityForPercent } from '../../features/conditional/tpSlModel';
@@ -83,6 +83,7 @@ function EditBody({ accountId, item, spec, onBusyChange, onChanged, onClose }: {
   };
   const execution = spec.executions.length === 1 ? spec.executions[0] : draft.executionType;
   const quantityScale = editQuantityScale(spec, execution);
+  const whole = wholeShareNotice(spec, draft);
   const save = async () => {
     if (!('body' in check) || pending) return;
     const body = JSON.stringify(check.body);
@@ -130,7 +131,8 @@ function EditBody({ accountId, item, spec, onBusyChange, onChanged, onClose }: {
                 {!fixedTrigger ? (
                   <SegmentedControl testID="pending-edit-direction" accessibilityLabel="감시 방향" compact
                     value={draft.triggerCondition ?? 'at_or_above'} onChange={(value) => set({ triggerCondition: value })}
-                    options={[{ key: 'at_or_above', label: '이상' }, { key: 'at_or_below', label: '이하' }]} />
+                    options={[{ key: 'at_or_above', label: '이상', testID: 'pending-edit-direction-at_or_above' },
+                      { key: 'at_or_below', label: '이하', testID: 'pending-edit-direction-at_or_below' }]} />
                 ) : (
                   <Text style={styles.hint} testID="pending-edit-direction-fixed">
                     {fixedTrigger.condition === 'at_or_below' ? '이하' : '이상'} 도달 시 실행 · {fixedTrigger.kind === 'stop_loss' ? '손절가' : '익절가'}는 방향이 정해져 있어요
@@ -147,7 +149,8 @@ function EditBody({ accountId, item, spec, onBusyChange, onChanged, onClose }: {
               {spec.executions.length > 1 ? (
                 <SegmentedControl testID="pending-edit-execution" accessibilityLabel={spec.executionLabel} compact
                   value={draft.executionType ?? 'market'} onChange={(value) => set({ executionType: value })}
-                  options={[{ key: 'market', label: '시장가' }, { key: 'limit', label: '지정가' }]} />
+                  options={[{ key: 'market', label: '시장가', testID: 'pending-edit-execution-market' },
+                    { key: 'limit', label: '지정가', testID: 'pending-edit-execution-limit' }]} />
               ) : (
                 <Text style={styles.hint} testID="pending-edit-execution-fixed">
                   {execution === 'limit' ? '지정가' : '시장가'} · 이 {item.kindLabel}의 실행 유형은 바꿀 수 없어요
@@ -165,6 +168,11 @@ function EditBody({ accountId, item, spec, onBusyChange, onChanged, onClose }: {
                 value={draft[spec.size] ?? ''} onChangeText={(value) => set({ [spec.size]: value })}
                 keyboardType={spec.size === 'ratio' || quantityScale === 0 ? 'number-pad' : 'decimal-pad'} editable={!pending}
                 onFieldFocus={scroll.onInputFocus} onBlur={scroll.onInputBlur} unit={unit} style={styles.input} />
+              {whole ? (
+                <Text testID="pending-edit-quantity-whole" accessibilityLiveRegion="polite" style={whole.tone === 'warning' ? styles.warning : styles.hint}>
+                  {whole.text}
+                </Text>
+              ) : null}
               {spec.size === 'amount' ? <Text style={styles.hint}>수량은 새 지정가로 다시 계산돼요 (소수점 아래는 버림).</Text> : null}
               {spec.holdingShare && spec.size === 'quantity' ? (
                 <HoldingShare accountId={accountId} assetId={spec.holdingShare.assetId} quantity={draft.quantity ?? ''}

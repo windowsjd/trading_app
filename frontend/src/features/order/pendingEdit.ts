@@ -35,6 +35,19 @@ export function editQuantityScale(spec: EditableSpec, execution: ExecutionType |
   return execution === 'limit' && spec.limitQuantityScale !== undefined ? spec.limitQuantityScale : spec.quantityScale;
 }
 
+/**
+ * The line under the quantity while a stock is executed at a limit (whole
+ * shares there): a reminder, or what to fix while the quantity still has a
+ * fraction — kept as typed, never cut for the user. Null otherwise.
+ */
+export function wholeShareNotice(spec: EditableSpec, draft: EditValues): { tone: 'hint' | 'warning'; text: string } | null {
+  const execution = spec.executions.length === 1 ? spec.executions[0] : draft.executionType;
+  if (spec.size !== 'quantity' || editQuantityScale(spec, execution) >= spec.quantityScale) return null;
+  return (draft.quantity ?? '').includes('.')
+    ? { tone: 'warning', text: '소수점 수량은 시장가로만 실행돼요. 지정가로 실행하려면 수량을 정수로 수정해 주세요.' }
+    : { tone: 'hint', text: '지정가로 실행할 때는 정수 수량만 가능해요.' };
+}
+
 /** Checks a draft against its spec; the body is what the server's modify route takes. */
 export function checkEdit(spec: EditableSpec, draft: EditValues): EditCheck {
   const execution = spec.executions.length === 1 ? spec.executions[0] : draft.executionType;

@@ -197,6 +197,9 @@ describe('Conditional BUY', () => {
     h.method = 'conditional';
     await h.mount(); t.after(h.close);
     assert.equal(h.renderer.root.findAll((n: any) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('conditional-trigger-at_or')).length, 0);
+    // A BUY watch keeps 감시가격 (only a Spot SELL's trigger reads 매도 기준가).
+    const triggerInput = h.node('conditional-trigger-price');
+    assert.deepEqual([triggerInput.props.accessibilityLabel, triggerInput.props.placeholder], ['감시가격 USD', '감시가격 입력']);
     await h.input('conditional-size', '10');
     await h.input('conditional-trigger-price', '763.79');
     assert.equal(panelText(h.node('conditional-trigger-direction')), '현재가와 같은 가격은 감시가격으로 쓸 수 없어요.');

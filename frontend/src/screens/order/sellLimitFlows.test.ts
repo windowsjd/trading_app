@@ -87,7 +87,8 @@ describe('a SELL limit accepted earlier', () => {
       { limitPrice: '950', quantity: '2', expectedRevision: 3, idempotencyKey: 'string' });
     assert.equal(h.requests.some((request: any) => request.url.endsWith('/orders')), false, 'never a new order');
     await h.press('pending-item-spot_limit-sell-1-cancel');
-    assert.match(text(h.node('pending-item-spot_limit-sell-1-confirm')), /지정가 매도 주문을 취소할까요\? 예약된 수량은 다시 사용할 수 있게 됩니다/);
+    // One short question naming the order; no reservation explanation.
+    assert.match(text(h.node('pending-item-spot_limit-sell-1-confirm')), /^지정가 매도 주문을 취소할까요\?유지취소하기$/);
     await h.press('pending-item-spot_limit-sell-1-confirm-cancel'); await h.flush();
     assert.deepEqual(h.requests.filter((request: any) => request.url.endsWith('/cancel')).map((request: any) => request.url),
       ['/trading-accounts/general/orders/sell-1/cancel']);

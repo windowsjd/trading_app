@@ -61,7 +61,8 @@ describe('spot chart lines', () => {
     });
     // The watch price — never the limit price the condition would submit (159).
     assert.deepEqual(summary(lines), [
-      ['trigger', '조건 매수 감시가', 160, null], ['trigger', '조건 매도 감시가', 200, null],
+      // A SELL condition's trigger is its 매도 기준가; a BUY watch keeps 감시가.
+      ['trigger', '조건 매수 감시가', 160, null], ['trigger', '조건 매도 기준가', 200, null],
       ['trigger', '손절가', 150, null], ['trigger', '익절가', 230, null],
     ]);
   });

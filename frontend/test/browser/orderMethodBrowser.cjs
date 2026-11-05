@@ -1,7 +1,8 @@
 // Optional real RN Web check of the 주문방식 sheet (with its method icons), conditional/LOC forms,
-// the conditional list and the real-fill banner: screenshots at 320/360/390/430px,
-// light/dark and 1x/1.5x/2x fonts, plus a clipped-text and page-overflow detector.
-// Requires external esbuild and Playwright (see README).
+// the one pending list (통합 대기목록: order, kinds, 설정 변경 / 설정 취소, 종료 이력) and the
+// real-fill banner: screenshots at 320/360/390/430px, light/dark and 1x/1.5x/2x fonts, plus a
+// clipped-text and page-overflow detector. Requires external esbuild and Playwright (see README);
+// ORDER_METHOD_QUICK=1 checks 360 light 1x and 320 dark 2x only.
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -305,33 +306,145 @@ async function run() {
       await shot('us-sell-sheet');
       await page.getByTestId('order-method-sheet-close').click();
 
-      // 5. The account's conditional orders with every state.
-      await go('asset=SUI&conditional=enabled&conditionalRows=1');
+      // 5. 통합 대기목록 (2026-11-05; the per-kind tabs are gone): every kind in one list,
+      // oldest registration first, each card with its kind's badge and side.
+      const cards = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="pending-item-"]')]
+        .map((el) => el.getAttribute('data-testid')).filter((id) => document.querySelector(`[data-testid="${id}-registered"]`)));
+      const asked = async (id) => (await page.getByTestId(`${id}-confirm`).innerText()).split('\n')[0].trim();
+      const sent = (suffix) => page.evaluate((end) => window.fixture.state.requests.filter((r) => r.path.endsWith(end))
+        .map((r) => ({ path: r.path, body: r.body ?? null })), suffix);
+      await go('krx=1&asset=SAMSUNG&stock=1&holding=10&longName=1&pendingMix=1&conditional=enabled&sell=enabled');
       await page.getByTestId('holdings-filter-pending').click();
-      await page.getByTestId('pending-kind-conditional').click();
-      await page.getByTestId('conditional-orders-list').waitFor();
-      await page.getByTestId('conditional-orders-list').scrollIntoViewIfNeeded();
+      await page.getByTestId('pending-count').waitFor();
+      // [card, badge, side line, 설정 취소 question] in registration order (09:00–09:06 KST).
+      const mix = [
+        ['futures_limit-mix-fl', '선물 지정가', '롱 진입 · 격리 5x', '선물 지정가 진입 주문을 취소할까요?'],
+        ['spot_limit-mix-sell-limit', '지정가', '매도', '지정가 매도 주문을 취소할까요?'],
+        ['conditional_buy-mix-cb', '조건주문', '매수', '조건부 매수 설정을 취소할까요?'],
+        ['spot_take_profit-mix-tp', '익절가/손절가', '매도 · 익절가', '익절가 매도 설정을 취소할까요?'],
+        ['spot_limit-mix-buy-limit', '지정가', '매수', '지정가 매수 주문을 취소할까요?'],
+        ['conditional_sell-mix-cs', '조건주문', '매도', '조건부 매도 설정을 취소할까요?'],
+        ['spot_stop_loss-mix-sl', '익절가/손절가', '매도 · 손절가', '손절가 매도 설정을 취소할까요?'],
+      ];
+      assert.deepEqual(await cards(), mix.map(([key]) => `pending-item-${key}`), `registration order (${tag})`);
+      assert.equal(await page.getByTestId('pending-count').innerText(), `대기 ${mix.length}건 · 먼저 등록한 순`, `count (${tag})`);
+      for (const [index, [key, badge, side]] of mix.entries()) {
+        assert.equal((await page.getByTestId(`pending-item-${key}-type`).innerText()).trim(), badge, `${key} badge (${tag})`);
+        assert.equal(await page.getByTestId(`pending-item-${key}-registered`).innerText(), `등록 2026-11-05 09:0${index}`, `${key} time (${tag})`);
+        assert.ok((await page.getByTestId(`pending-item-${key}`).innerText()).includes(side), `${key} side (${tag})`);
+      }
+      // Spot SELL settings read 매도 기준가; the BUY watch keeps 감시가격.
+      for (const key of ['spot_take_profit-mix-tp', 'conditional_sell-mix-cs', 'spot_stop_loss-mix-sl'])
+        assert.ok((await page.getByTestId(`pending-item-${key}-condition`).innerText()).includes('매도 기준가'), `${key} term (${tag})`);
+      assert.ok((await page.getByTestId('pending-item-conditional_buy-mix-cb-condition').innerText()).includes('감시가격 68,000원 이하'), `BUY term (${tag})`);
+      await page.getByTestId('pending-list').scrollIntoViewIfNeeded();
+      await shot('pending-list');
+
+      // 5a. A 익절가/손절가 card opens its own 설정 변경 on its current terms (the sheet's
+      // ratio and review: pendingTpSlEditBrowser.cjs).
+      const closeSheet = async () => {
+        await page.getByTestId('pending-edit-sheet-close').click();
+        await page.waitForTimeout(450);
+      };
+      await page.getByTestId('pending-item-spot_take_profit-mix-tp-edit').scrollIntoViewIfNeeded();
+      await page.getByTestId('pending-item-spot_take_profit-mix-tp-edit').click();
+      await page.getByTestId('pending-edit-quantity-ratio').waitFor();
+      assert.equal(await page.getByTestId('pending-edit-trigger-price').inputValue(), '75000', `TP price (${tag})`);
+      assert.equal(await page.getByTestId('pending-edit-quantity').inputValue(), '1.5', `TP quantity (${tag})`);
+      await shot('pending-tp-edit');
+      await closeSheet();
+
+      // 5b. The KRX conditional BUY at market (3.164126주): at 지정가 the sheet asks for whole
+      // shares and keeps the fraction as typed; back at 시장가 a 감시가격-only change saves
+      // as ONE modify carrying the fraction unchanged.
+      const cb = 'pending-item-conditional_buy-mix-cb';
+      assert.ok((await page.getByTestId(`${cb}-amount`).innerText()).includes('3.164126주'), `BUY quantity (${tag})`);
+      await page.getByTestId(`${cb}-edit`).scrollIntoViewIfNeeded();
+      await page.getByTestId(`${cb}-edit`).click();
+      await page.getByTestId('pending-edit-execution-limit').waitFor();
+      assert.equal(await page.getByTestId('pending-edit-quantity').inputValue(), '3.164126', `BUY registered quantity (${tag})`);
+      await page.getByTestId('pending-edit-execution-limit').click();
+      await page.getByTestId('pending-edit-quantity-whole').waitFor();
+      assert.equal(await page.getByTestId('pending-edit-quantity-whole').innerText(),
+        '소수점 수량은 시장가로만 실행돼요. 지정가로 실행하려면 수량을 정수로 수정해 주세요.', `whole-share guidance (${tag})`);
+      assert.equal(await page.getByTestId('pending-edit-quantity').inputValue(), '3.164126', `fraction kept (${tag})`);
+      await page.getByTestId('pending-edit-quantity-whole').scrollIntoViewIfNeeded();
+      await shot('pending-buy-limit-whole');
+      await page.getByTestId('pending-edit-execution-market').click();
+      await page.getByTestId('pending-edit-quantity-whole').waitFor({ state: 'detached' });
+      await page.getByTestId('pending-edit-trigger-price').fill('67000');
+      await page.getByTestId('pending-edit-review').scrollIntoViewIfNeeded();
+      await page.getByTestId('pending-edit-review').click();
+      await page.getByTestId('pending-edit-changes').waitFor();
+      const changes = await page.getByTestId('pending-edit-changes').innerText();
+      assert.ok(changes.includes('68,000원') && changes.includes('67,000원') && !changes.includes('수량'), `price-only change (${tag})`);
+      await shot('pending-buy-review');
+      await page.getByTestId('pending-edit-save').click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="pending-notice"]')?.textContent.includes('변경했어요'));
+      const modified = await sent('/modify');
+      assert.deepEqual(modified.map((r) => r.path), ['/trading-accounts/account-fixture/conditional-buy-orders/mix-cb/modify'], `one modify (${tag})`);
+      const { triggerPrice, executionType, quantity, expectedRevision } = modified[0].body;
+      assert.deepEqual([triggerPrice, executionType, quantity, expectedRevision], ['67000', 'market', '3.164126', 1], `the fraction is sent unchanged (${tag})`);
+      await page.waitForTimeout(450);
+
+      // 5c. 설정 취소 asks one short question naming what ends (no reservation
+      // explanation); 유지 keeps it; 취소하기 sends that one cancel.
+      for (const [key, , , question] of mix) {
+        const id = `pending-item-${key}`;
+        await page.getByTestId(`${id}-cancel`).scrollIntoViewIfNeeded();
+        await page.getByTestId(`${id}-cancel`).click();
+        await page.getByTestId(`${id}-confirm`).waitFor();
+        assert.equal(await asked(id), question, `${key} confirm (${tag})`);
+        if (key === 'spot_take_profit-mix-tp') await shot('pending-cancel-confirm');
+        await page.getByTestId(`${id}-keep`).click();
+        await page.getByTestId(`${id}-confirm`).waitFor({ state: 'detached' });
+      }
+      assert.deepEqual(await sent('/cancel'), [], `유지 sends nothing (${tag})`);
+      await page.getByTestId('pending-item-conditional_sell-mix-cs-cancel').click();
+      await page.getByTestId('pending-item-conditional_sell-mix-cs-confirm-cancel').click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="pending-notice"]')?.textContent.includes('취소했어요'));
+      assert.deepEqual((await sent('/cancel')).map((r) => r.path), ['/trading-accounts/account-fixture/conditional-sell-orders/mix-cs/cancel'], `one cancel (${tag})`);
+
+      // 5d. Conditional BUY watches in every state: open ones are cards (triggered and
+      // order_pending say why they cannot change; order_pending cancels the order it
+      // placed), ended ones are only in 종료 이력.
+      await go('asset=SUI&conditional=enabled&conditionalRows=1&longName=1');
+      await page.getByTestId('holdings-filter-pending').click();
+      const watch = (s) => `pending-item-conditional_buy-cb-${s}`;
+      for (const s of ['watching', 'triggered', 'order_pending']) await page.getByTestId(watch(s)).waitFor();
+      for (const s of ['filled', 'failed', 'canceled', 'order_canceled', 'order_rejected'])
+        assert.equal(await page.getByTestId(watch(s)).count(), 0, `${s} is not pending (${tag})`);
+      assert.ok((await page.getByTestId(`${watch('triggered')}-edit-reason`).innerText()).includes('조건이 충족되어 주문을 처리하고 있어요'), `triggered reason (${tag})`);
+      assert.ok((await page.getByTestId(`${watch('order_pending')}-edit-reason`).innerText()).includes('접수된 지정가 주문은 변경할 수 없어요'), `order_pending reason (${tag})`);
+      await page.getByTestId(`${watch('order_pending')}-cancel`).scrollIntoViewIfNeeded();
+      await page.getByTestId(`${watch('order_pending')}-cancel`).click();
+      assert.equal(await asked(watch('order_pending')), '조건부 매수로 접수된 지정가 매수 주문을 취소할까요?', `child order confirm (${tag})`);
+      await page.getByTestId('pending-list').scrollIntoViewIfNeeded();
       await shot('conditional-list');
-      // 5b. Old open rows behind 35 newer ended rows: all open rows listed, history pages,
-      // and a cancel that lost its race shows reviewed copy (never the raw server text).
-      await go('asset=SUI&conditional=enabled&conditionalRows=many&longName=1&alertConfirm=1&conditionalCancel=fail');
+      await page.getByTestId(`${watch('order_pending')}-keep`).click();
+      // 5e. Old open rows behind 35 newer ended rows are all listed (the open read pages
+      // `state=open` itself); 종료 이력 shows the newest 30 of the kind (유형별 최근 30건 —
+      // the one history has no further pages); a cancel that lost its race shows
+      // reviewed copy, never the server's raw text.
+      await go('asset=SUI&conditional=enabled&conditionalRows=many&longName=1&conditionalCancel=fail');
       await page.getByTestId('holdings-filter-pending').click();
-      await page.getByTestId('pending-kind-conditional').click();
-      await page.getByTestId('conditional-orders-open').waitFor();
-      const rowsIn = (section) => page.getByTestId(`conditional-orders-${section}`).locator('[data-testid^="conditional-order-"]:not([data-testid$="-state"]):not([data-testid$="-cancel"])').count();
-      assert.equal(await rowsIn('open'), 3, `old open rows listed (${tag})`);
-      await page.getByTestId('conditional-orders-more').waitFor();
-      assert.equal(await rowsIn('ended'), 30, `first history page (${tag})`);
-      await page.getByTestId('conditional-orders-open').scrollIntoViewIfNeeded();
-      await shot('conditional-open');
-      await page.getByTestId('conditional-orders-more').click();
-      await page.getByTestId('conditional-orders-more').waitFor({ state: 'detached' });
-      assert.equal(await rowsIn('ended'), 35, `all history after 더 보기 (${tag})`);
-      await page.getByTestId('conditional-order-old-watching-cancel').click();
-      await page.getByTestId('conditional-orders-cancel-error').waitFor();
-      const cancelError = await page.getByTestId('conditional-orders-cancel-error').innerText();
+      for (const s of ['order_pending', 'triggered', 'watching']) await page.getByTestId(`pending-item-conditional_buy-old-${s}`).waitFor();
+      assert.equal(await page.getByTestId('pending-count').innerText(), '대기 3건 · 먼저 등록한 순', `old open rows listed (${tag})`);
+      await page.getByTestId('pending-history-toggle').scrollIntoViewIfNeeded();
+      await page.getByTestId('pending-history-toggle').click();
+      await page.getByTestId('pending-history').waitFor();
+      assert.equal(await page.locator('[data-testid^="pending-history-conditional_buy-"]:not([data-testid$="-state"]):not([data-testid$="-reason"])').count(),
+        30, `newest 30 ended rows (${tag})`);
+      await page.getByTestId('pending-history').scrollIntoViewIfNeeded();
+      await shot('pending-history');
+      const old = 'pending-item-conditional_buy-old-watching';
+      await page.getByTestId(`${old}-cancel`).scrollIntoViewIfNeeded();
+      await page.getByTestId(`${old}-cancel`).click();
+      await page.getByTestId(`${old}-confirm-cancel`).click();
+      await page.getByTestId(`${old}-error`).waitFor();
+      const cancelError = await page.getByTestId(`${old}-error`).innerText();
       assert.ok(cancelError.includes('이미 주문이 만들어진 조건주문입니다') && !cancelError.includes('raw server text'), `cancel error copy (${tag})`);
-      await page.getByTestId('conditional-orders-cancel-error').scrollIntoViewIfNeeded();
+      await page.getByTestId(`${old}-error`).scrollIntoViewIfNeeded();
       await shot('conditional-cancel-error');
 
       // 6. The real-fill banner over the order screen.

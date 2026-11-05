@@ -14,9 +14,10 @@ import {
  * kept while only the market moves; `recheck` compares it with the latest
  * price right before sending and, when it no longer holds, re-decides it and
  * returns the message that asks the user to confirm again (nothing is sent).
- * A `.tsx` module so test harnesses load it with their React mocks.
+ * A `.tsx` module so test harnesses load it with their React mocks. `term`
+ * names the price in that message (a Spot SELL's is 매도 기준가).
  */
-export function useTriggerDirection(triggerPrice: string, reference: string | null | undefined) {
+export function useTriggerDirection(triggerPrice: string, reference: string | null | undefined, term?: string) {
   const key = triggerPrice.trim();
   const [decided, setDecided] = useState<{ key: string; condition: TriggerCondition } | null>(null);
   const stored = decided && decided.key === key ? decided : null;
@@ -34,7 +35,7 @@ export function useTriggerDirection(triggerPrice: string, reference: string | nu
       if (direction.state === 'ready' && isTriggerDirectionValid(direction.condition, triggerPrice, latest)) return null;
       const next = resolveTriggerDirection(triggerPrice, latest);
       setDecided(next.state === 'ready' ? { key, condition: next.condition } : null);
-      return next.state === 'ready' ? TRIGGER_DIRECTION_CHANGED : getTriggerDirectionText(next, triggerPrice, '') ?? TRIGGER_DIRECTION_CHANGED;
+      return next.state === 'ready' ? TRIGGER_DIRECTION_CHANGED : getTriggerDirectionText(next, triggerPrice, '', undefined, term) ?? TRIGGER_DIRECTION_CHANGED;
     },
     /** After the server found the condition already met: decide again from the latest price. */
     reset() {

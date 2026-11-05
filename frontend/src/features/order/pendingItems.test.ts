@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildPendingItems, formatPendingPrice, registeredLabel, type PendingItem } from './pendingItems.ts';
-import { checkEdit } from './pendingEdit.ts';
+import { checkEdit, wholeShareNotice } from './pendingEdit.ts';
 
 const at = (minute: number) => `2026-11-05T01:${String(minute).padStart(2, '0')}:00.000Z`;
 const asset = (symbol: string, name: string, market: string, assetType: string) => ({ id: `a-${symbol}`, symbol, name, market, assetType });
@@ -85,7 +85,7 @@ describe('통합 대기목록', () => {
     assert.deepEqual(items.map((item) => item.key).sort(), ['conditional_buy:cb-1', 'futures_conditional:fc-1']);
     const pending = byKey(items, 'conditional_buy:cb-1');
     assert.deepEqual(pending.notes, ['조건 충족 · 지정가 주문 체결 대기']);
-    assert.deepEqual(pending.cancel, { kind: 'order', id: 'child-3', confirm: '조건주문으로 접수된 지정가 매수를 취소할까요? 예약된 금액은 다시 사용할 수 있게 됩니다.' });
+    assert.deepEqual(pending.cancel, { kind: 'order', id: 'child-3', confirm: '조건부 매수로 접수된 지정가 매수 주문을 취소할까요?' });
     assert.equal(pending.edit.editable, false);
     assert.match((pending.edit as { reason: string }).reason, /접수된 지정가 주문은 변경할 수 없어요/);
     assert.deepEqual(byKey(items, 'futures_conditional:fc-1').cancel?.id, 'fchild');
@@ -216,6 +216,56 @@ describe('통합 대기목록', () => {
     assert.equal(byKey(items, 'spot_limit:o-2').edit.editable, true, 'only the protected entry');
   });
 
+  it('설정 취소 asks one short question naming what ends — the setting, or the order it placed — and cancels the same target', () => {
+    const loc = { limitOnClose: { status: 'pending', sessionDate: '2026-11-05', decisionReason: null } };
+    const items = buildPendingItems({
+      spotOrders: [
+        spotLimit(), spotLimit({ orderId: 's', id: 's', side: 'sell', reservedAmount: null }),
+        spotLimit({ orderId: 'loc-b', id: 'loc-b', ...loc }), spotLimit({ orderId: 'loc-s', id: 'loc-s', side: 'sell', ...loc }),
+      ],
+      conditionalBuys: [
+        watch(),
+        watch({ id: 'cb-2', state: 'order_pending', status: 'ordered', executionType: 'limit', limitPrice: '94.00000000', order: { orderId: 'cb-2-order' } }),
+      ],
+      conditionalSells: [
+        sell({ id: 'sl' }), sell({ id: 'tp', kind: 'take_profit', triggerCondition: 'at_or_above' }),
+        sell({ id: 'c', kind: 'condition', triggerCondition: 'at_or_above' }),
+        sell({ id: 'c-2', kind: 'condition', state: 'order_pending', status: 'ordered', executionType: 'limit', limitPrice: '190.00000000', order: { orderId: 'c-2-order' } }),
+        sell({ id: 'sl-2', state: 'order_pending', status: 'ordered', executionType: 'limit', limitPrice: '170.00000000', order: { orderId: 'sl-2-order' } }),
+      ],
+      futuresLimits: [futuresLimit()],
+      futuresConditionals: [
+        futuresWatch(),
+        futuresWatch({ id: 'fc-2', state: 'order_pending', status: 'ordered', limitOrder: { orderId: 'fc-2-order', status: 'submitted', reservedAmount: '50.00000000' } }),
+      ],
+      futuresTpSl: [tpSl()], entryPlans: [plan()],
+    });
+    const cancels = Object.fromEntries(items.map((item) => [item.key, item.cancel]));
+    assert.deepEqual(cancels, {
+      'spot_limit:o-1': { kind: 'order', id: 'o-1', confirm: '지정가 매수 주문을 취소할까요?' },
+      'spot_limit:s': { kind: 'order', id: 's', confirm: '지정가 매도 주문을 취소할까요?' },
+      'spot_limit:loc-b': { kind: 'order', id: 'loc-b', confirm: 'LOC 매수 주문을 취소할까요?' },
+      'spot_limit:loc-s': { kind: 'order', id: 'loc-s', confirm: 'LOC 매도 주문을 취소할까요?' },
+      'conditional_buy:cb-1': { kind: 'conditional_buy', id: 'cb-1', confirm: '조건부 매수 설정을 취소할까요?' },
+      'conditional_buy:cb-2': { kind: 'order', id: 'cb-2-order', confirm: '조건부 매수로 접수된 지정가 매수 주문을 취소할까요?' },
+      'spot_stop_loss:sl': { kind: 'conditional_sell', id: 'sl', confirm: '손절가 매도 설정을 취소할까요?' },
+      'spot_take_profit:tp': { kind: 'conditional_sell', id: 'tp', confirm: '익절가 매도 설정을 취소할까요?' },
+      'conditional_sell:c': { kind: 'conditional_sell', id: 'c', confirm: '조건부 매도 설정을 취소할까요?' },
+      'conditional_sell:c-2': { kind: 'order', id: 'c-2-order', confirm: '조건부 매도로 접수된 지정가 매도 주문을 취소할까요?' },
+      'spot_stop_loss:sl-2': { kind: 'order', id: 'sl-2-order', confirm: '손절가 설정으로 접수된 지정가 매도 주문을 취소할까요?' },
+      'futures_limit:fl-1': { kind: 'futures_limit', id: 'fl-1', confirm: '선물 지정가 진입 주문을 취소할까요?' },
+      'futures_conditional:fc-1': { kind: 'futures_conditional', id: 'fc-1', confirm: '선물 조건주문 감시를 취소할까요?' },
+      'futures_conditional:fc-2': { kind: 'futures_limit', id: 'fc-2-order', confirm: '조건주문으로 접수된 선물 지정가 진입 주문을 취소할까요?' },
+      'futures_take_profit:ft-1': { kind: 'futures_tp_sl', id: 'ft-1', confirm: '선물 익절가 설정을 취소할까요?' },
+      'entry_plan:ep-1': { kind: 'entry_plan', id: 'ep-1', confirm: '체결 후 활성화될 손절가 설정을 취소할까요?' },
+    });
+    // No reservation explanation anywhere: one question per confirmation.
+    for (const [key, cancel] of Object.entries(cancels)) {
+      assert.equal(/예약|감시 중에는|다시 (사용|매도)할 수/u.test(cancel?.confirm ?? ''), false, key);
+      assert.equal((cancel?.confirm ?? '').split('?').length, 2, key);
+    }
+  });
+
   it('prices keep every given decimal with separators; nothing is rounded for display', () => {
     assert.equal(formatPendingPrice('0.00001234', 'USD'), '$0.00001234');
     assert.equal(formatPendingPrice('1234567.50000000', 'USD'), '$1,234,567.5');
@@ -279,6 +329,65 @@ describe('설정 변경 입력 확인', () => {
     const crypto = spec(buildPendingItems({ conditionalSells: [sell({ id: 'c', kind: 'condition', triggerCondition: 'at_or_above',
       asset: asset('BTCUSDT', 'Bitcoin', 'BINANCE', 'crypto'), quantity: '0.12345600' })], conditionalSellLimitAvailable: true }), 'conditional_sell:c');
     assert.equal(checkEdit(crypto, { ...crypto.initial, executionType: 'limit', limitPrice: '186' }).ok, true);
+  });
+
+  it('a KRX/US stock conditional BUY keeps its fractional quantity at market (6 decimals, as registered) and takes whole shares at a limit', () => {
+    const stocks: Array<[ReturnType<typeof asset>, string, string, string]> = [
+      [asset('005930', '삼성전자', 'KRX', 'domestic_stock'), 'KRW', '68,000원', '67,000원'],
+      [asset('AAPL', 'Apple Inc.', 'NAS', 'us_stock'), 'USD', '$68,000', '$67,000'],
+    ];
+    for (const [stock, currency, before, after] of stocks) {
+      const buy = spec(buildPendingItems({
+        conditionalBuys: [watch({ asset: stock, currencyCode: currency, amount: null, quantity: '3.16412600', triggerPrice: '68000.00000000' })],
+        conditionalBuyLimitAvailable: true,
+      }), 'conditional_buy:cb-1');
+      // Only the 감시가격 changes: the registered fraction is sent as it was, never rounded or cut.
+      assert.deepEqual(checkEdit(buy, { ...buy.initial, triggerPrice: '67000' }), {
+        ok: true, body: { triggerPrice: '67000', triggerCondition: 'at_or_below', executionType: 'market', quantity: '3.164126' },
+        changes: [{ label: '감시가격', before, after }],
+      }, currency);
+      assert.deepEqual([buy.size, buy.quantityScale, buy.limitQuantityScale, buy.initial.quantity], ['quantity', 6, 0, '3.164126'], currency);
+      const resized = checkEdit(buy, { ...buy.initial, quantity: '1.582063' });
+      assert.deepEqual(resized.ok && resized.body.quantity, '1.582063', currency);
+      assert.deepEqual(checkEdit(buy, { ...buy.initial, quantity: '1.5820631' }), { ok: false, message: '수량은 0보다 큰 숫자로, 소수점 6자리까지 입력해 주세요.' });
+      // Switched to a limit, a stock takes whole shares: the fraction is reported, not cut.
+      const limit = { ...buy.initial, executionType: 'limit' as const, limitPrice: '67500' };
+      assert.deepEqual(checkEdit(buy, limit), { ok: false, message: '주식을 지정가로 실행할 때는 수량을 1 이상의 정수로 입력해 주세요.' });
+      const whole = checkEdit(buy, { ...limit, quantity: '3' });
+      assert.deepEqual(whole.ok && whole.body, { triggerPrice: '68000', triggerCondition: 'at_or_below', executionType: 'limit', limitPrice: '67500', quantity: '3' });
+      assert.deepEqual(whole.ok && whole.changes.map((change) => change.label), ['매수 유형', '지정가', '수량']);
+    }
+  });
+
+  it('a crypto conditional BUY keeps its amount and its rules under either execution', () => {
+    const buy = spec(buildPendingItems({ conditionalBuys: [watch()], conditionalBuyLimitAvailable: true }), 'conditional_buy:cb-1');
+    assert.deepEqual([buy.size, buy.quantityScale, 'limitQuantityScale' in buy, buy.initial.amount], ['amount', 6, false, '100']);
+    assert.deepEqual(checkEdit(buy, { ...buy.initial, amount: '100.123456789' }), { ok: false, message: '금액은 0보다 큰 숫자로, 소수점 8자리까지 입력해 주세요.' });
+    const limit = checkEdit(buy, { ...buy.initial, executionType: 'limit', limitPrice: '94', amount: '150.12345678' });
+    assert.deepEqual(limit.ok && limit.body, { triggerPrice: '95', triggerCondition: 'at_or_below', executionType: 'limit', limitPrice: '94', amount: '150.12345678' });
+    assert.equal(wholeShareNotice(buy, { ...buy.initial, executionType: 'limit' }), null);
+  });
+
+  it('the whole-share line shows only while a stock is executed at a limit, as a warning while the quantity keeps a fraction', () => {
+    const buy = spec(buildPendingItems({
+      conditionalBuys: [watch({ asset: asset('005930', '삼성전자', 'KRX', 'domestic_stock'), currencyCode: 'KRW', amount: null, quantity: '3.16412600' })],
+      conditionalBuyLimitAvailable: true,
+    }), 'conditional_buy:cb-1');
+    assert.equal(wholeShareNotice(buy, buy.initial), null, 'market takes fractions: nothing to say');
+    assert.deepEqual(wholeShareNotice(buy, { ...buy.initial, executionType: 'limit' }),
+      { tone: 'warning', text: '소수점 수량은 시장가로만 실행돼요. 지정가로 실행하려면 수량을 정수로 수정해 주세요.' });
+    assert.deepEqual(wholeShareNotice(buy, { ...buy.initial, executionType: 'limit', quantity: '3' }), { tone: 'hint', text: '지정가로 실행할 때는 정수 수량만 가능해요.' });
+    // The same rule on a stock SELL condition; a plain limit order, a market-only stop-loss and crypto never show it.
+    const condition = spec(buildPendingItems({ conditionalSells: [sell({ id: 'c', kind: 'condition', triggerCondition: 'at_or_above', quantity: '2.50000000' })],
+      conditionalSellLimitAvailable: true }), 'conditional_sell:c');
+    assert.equal(wholeShareNotice(condition, { ...condition.initial, executionType: 'limit' })?.tone, 'warning');
+    const stockLimit = spec(buildPendingItems({ spotOrders: [spotLimit()] }), 'spot_limit:o-1');
+    assert.equal(wholeShareNotice(stockLimit, stockLimit.initial), null);
+    const stop = spec(buildPendingItems({ conditionalSells: [sell()] }), 'spot_stop_loss:cs-1');
+    assert.equal(wholeShareNotice(stop, { ...stop.initial, quantity: '1.5' }), null);
+    const crypto = spec(buildPendingItems({ conditionalSells: [sell({ id: 'c', kind: 'condition', triggerCondition: 'at_or_above',
+      asset: asset('BTCUSDT', 'Bitcoin', 'BINANCE', 'crypto'), quantity: '0.12345600' })], conditionalSellLimitAvailable: true }), 'conditional_sell:c');
+    assert.equal(wholeShareNotice(crypto, { ...crypto.initial, executionType: 'limit' }), null);
   });
 
   it('stop-loss/take-profit and entry plans send no direction or execution choice; ratio is a whole percent', () => {

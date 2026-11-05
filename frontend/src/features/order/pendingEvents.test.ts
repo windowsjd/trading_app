@@ -74,20 +74,21 @@ describe('발동·체결 알림 copy', () => {
   });
 
   it('a met condition says 조건 충족 and never 체결; its history is the one the order went to', () => {
-    const cases: Array<[Partial<PendingOrderEventDto>, string]> = [
-      [{ key: 'trigger:conditional_buy:c1', origin: 'condition', side: 'buy' }, '삼성전자 조건주문 매수 조건 충족'],
-      [{ key: 'trigger:conditional_sell:c2', origin: 'condition', side: 'sell' }, '삼성전자 조건주문 매도 조건 충족'],
-      [{ key: 'trigger:conditional_sell:c3', origin: 'stop_loss', side: 'sell' }, '삼성전자 손절 조건 충족'],
-      [{ key: 'trigger:conditional_sell:c4', origin: 'take_profit', side: 'sell' }, '삼성전자 익절 조건 충족'],
-      [{ key: 'trigger:futures_conditional_entry:f1', market: 'futures', origin: 'futures_condition', side: null, direction: 'long', asset: btc }, 'Bitcoin 롱 조건주문 조건 충족'],
-      [{ key: 'trigger:futures_tp_sl:f2', market: 'futures', origin: 'futures_stop_loss', side: null, direction: 'short', asset: btc }, 'Bitcoin 숏 손절 조건 충족'],
+    // A Spot SELL setting's trigger reads 매도 기준가; BUY watches and Futures keep 감시가격.
+    const cases: Array<[Partial<PendingOrderEventDto>, string, string]> = [
+      [{ key: 'trigger:conditional_buy:c1', origin: 'condition', side: 'buy' }, '삼성전자 조건주문 매수 조건 충족', '감시가격'],
+      [{ key: 'trigger:conditional_sell:c2', origin: 'condition', side: 'sell' }, '삼성전자 조건주문 매도 조건 충족', '매도 기준가'],
+      [{ key: 'trigger:conditional_sell:c3', origin: 'stop_loss', side: 'sell' }, '삼성전자 손절 조건 충족', '매도 기준가'],
+      [{ key: 'trigger:conditional_sell:c4', origin: 'take_profit', side: 'sell' }, '삼성전자 익절 조건 충족', '매도 기준가'],
+      [{ key: 'trigger:futures_conditional_entry:f1', market: 'futures', origin: 'futures_condition', side: null, direction: 'long', asset: btc }, 'Bitcoin 롱 조건주문 조건 충족', '감시가격'],
+      [{ key: 'trigger:futures_tp_sl:f2', market: 'futures', origin: 'futures_stop_loss', side: null, direction: 'short', asset: btc }, 'Bitcoin 숏 손절 조건 충족', '감시가격'],
     ];
-    for (const [overrides, title] of cases) {
+    for (const [overrides, title, term] of cases) {
       const notice = buildPendingEventNotice('general', event({ type: 'trigger', quantity: null, executionType: 'market', ...overrides }));
       assert.equal(notice?.title, title);
       assert.equal(notice?.trigger, true);
       assert.doesNotMatch(said(notice), /체결/, title);
-      assert.equal(notice?.detail, '감시가격 70000 도달 · 처리 결과는 거래 내역에서 확인할 수 있어요');
+      assert.equal(notice?.detail, `${term} 70000 도달 · 처리 결과는 거래 내역에서 확인할 수 있어요`);
       assert.equal(notice?.orderId, overrides.key, 'a trigger never claims its order id');
       assert.deepEqual(notice?.history, overrides.market === 'futures' ? { market: 'futures', futuresView: 'executions' } : undefined);
     }

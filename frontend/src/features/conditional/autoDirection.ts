@@ -50,11 +50,18 @@ export function isTriggerDirectionValid(condition: TriggerCondition, triggerPric
   return condition === 'at_or_above' ? trigger.gt(base) : trigger.lt(base);
 }
 
-/** The short line under the watch price input; null while nothing is typed. */
-export function getTriggerDirectionText(direction: TriggerDirection, triggerPrice: string, currency: string, subject = '현재가') {
+/** A word with 으로/로 (로 after a vowel or ㄹ). */
+function withEuro(word: string) {
+  const syllable = word.charCodeAt(word.length - 1) - 0xac00;
+  const final = syllable >= 0 && syllable < 11172 ? syllable % 28 : 0;
+  return `${word}${final === 0 || final === 8 ? '로' : '으로'}`;
+}
+
+/** The short line under the watch price input; null while nothing is typed. `term` names that price (a Spot SELL's is 매도 기준가). */
+export function getTriggerDirectionText(direction: TriggerDirection, triggerPrice: string, currency: string, subject = '현재가', term = '감시가격') {
   if (direction.state === 'empty' || direction.state === 'invalid') return null;
   if (direction.state === 'no_reference') return `${subject}를 확인할 수 없어 감시 방향을 정할 수 없어요.`;
-  if (direction.state === 'equal') return `${subject}와 같은 가격은 감시가격으로 쓸 수 없어요.`;
+  if (direction.state === 'equal') return `${subject}와 같은 가격은 ${withEuro(term)} 쓸 수 없어요.`;
   return `${triggerPrice.trim()} ${currency} ${TRIGGER_DIRECTION_LABEL[direction.condition]} 도달 시`;
 }
 

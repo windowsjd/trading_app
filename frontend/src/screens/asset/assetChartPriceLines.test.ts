@@ -47,7 +47,7 @@ describe('the spot chart draws the selected account\'s own prices', () => {
     const h = chartHarness();
     assert.deepEqual(lines(h), [
       ['average', '평단가', 68000, '+3.68%'], ['limit', '지정가 매수', 65000, null],
-      ['trigger', '조건 매도 감시가', 75000, null], ['trigger', '손절가', 60000, null],
+      ['trigger', '조건 매도 기준가', 75000, null], ['trigger', '손절가', 60000, null],
     ]);
     // The order screen's own reads, one each, enabled while this screen is in front.
     const queries = lineQueries(h);

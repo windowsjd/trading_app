@@ -12,8 +12,9 @@ import {
 import { formatSignedPercent } from '../../utils/format.ts';
 
 const SIDE = { buy: '매수', sell: '매도' } as const;
+// A SELL condition's trigger is its 매도 기준가 (the card's and the form's word).
 const SELL_TRIGGER_TITLE = {
-  condition: '조건 매도 감시가',
+  condition: '조건 매도 기준가',
   stop_loss: '손절가',
   take_profit: '익절가',
 } as const;

@@ -17,6 +17,8 @@ import {
 } from '../../features/conditional/conditionalSellApi';
 import {
   SELL_EXECUTION_TYPE_LABEL,
+  SELL_REFERENCE_HINT,
+  SELL_REFERENCE_LABEL,
   SELL_TRIGGER_CONDITION_LABEL,
   getConditionalSellKindLabel,
   getConditionalSellResultNotice,
@@ -61,10 +63,11 @@ const UNCERTAIN_CREATE = '등록 결과를 확인하지 못했어요. 대기 목
 
 /**
  * A new SELL condition on an open KRX/US/crypto Spot holding (조건주문 매도):
- * a watch price, market or limit execution and its own target quantity, typed
- * or picked as a share of the holding (ratio controls). During the session
- * (and always for crypto) 이상/이하 follows the watch price against the fresh
- * current price; while a stock market is closed the user chooses it and the
+ * a 매도 기준가 (the price that decides the sale, not its fill price), market
+ * or limit execution and its own target quantity, typed or picked as a share
+ * of the holding (ratio controls). During the session (and always for crypto)
+ * 이상/이하 follows that price against the fresh current price; while a
+ * stock market is closed the user chooses it and the
  * server watches from the next regular session (2026-10-18); an unknown
  * market state registers nothing. Nothing is reserved while watching; several
  * settings may target more than the holding, and a firing one sells at most
@@ -117,7 +120,7 @@ export default function SellIntentForm({
   const manual = directionMode.mode === 'manual';
   const [leg, setLeg] = useState<SellLegDraft>(EMPTY_LEG);
   // Automatic only in session: a closed market's last price is no reference.
-  const trigger = useTriggerDirection(leg.triggerPrice, manual ? null : currentPrice);
+  const trigger = useTriggerDirection(leg.triggerPrice, manual ? null : currentPrice, SELL_REFERENCE_LABEL);
   const [chosenCondition, setChosenCondition] = useState<TriggerCondition | null>(null);
   // Every closed period starts without a choice; nothing is ever assumed.
   useEffect(() => {
@@ -195,12 +198,12 @@ export default function SellIntentForm({
   const directionError = directionMode.mode === 'blocked' ? directionMode.reason
     : manual ? chosenCondition ? null : DIRECTION_REQUIRED
       : trigger.direction.state === 'no_reference' ? LIVE_PRICE_UNAVAILABLE
-        : trigger.direction.state === 'equal' ? getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency) : null;
+        : trigger.direction.state === 'equal' ? getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency, undefined, SELL_REFERENCE_LABEL) : null;
   const draftError = legError ?? directionError;
   // A chosen direction reads like an automatic one once a valid price is typed.
   const triggerEntered = trigger.direction.state !== 'empty' && trigger.direction.state !== 'invalid';
   const directionText = getTriggerDirectionText(manual && chosenCondition && triggerEntered
-    ? { state: 'ready', condition: chosenCondition } : trigger.direction, leg.triggerPrice, currency);
+    ? { state: 'ready', condition: chosenCondition } : trigger.direction, leg.triggerPrice, currency, undefined, SELL_REFERENCE_LABEL);
   // The market moved past the watch price after the direction was decided.
   const crossed = !manual && !!condition && !!currentPrice && !isTriggerDirectionValid(condition, leg.triggerPrice, currentPrice);
   const createBlocked = !family?.canCreate ? '현재 조건주문 매도를 새로 등록할 수 없어요.' : null;
@@ -264,16 +267,16 @@ export default function SellIntentForm({
     return (
       <View style={styles.legFields}>
         <View style={styles.group}>
-          <Text style={styles.label}>감시가격 ({currency})</Text>
+          <Text style={styles.label}>{SELL_REFERENCE_LABEL} ({currency})</Text>
           <OrderNumberInput
             testID={`${id}-trigger-price`}
-            accessibilityLabel={`감시가격 ${currency}`}
+            accessibilityLabel={`${SELL_REFERENCE_LABEL} ${currency}`}
             editable={!pending}
             style={orderInputStyle}
             value={leg.triggerPrice}
             onChangeText={(value) => patchLeg({ triggerPrice: value })}
             keyboardType="decimal-pad"
-            placeholder="감시가격 입력"
+            placeholder={`${SELL_REFERENCE_LABEL} 입력`}
             onFieldFocus={onInputFocus}
             onBlur={onInputBlur}
           />
@@ -322,9 +325,10 @@ export default function SellIntentForm({
           ) : null}
           {crossed ? (
             <Text testID="sell-intent-already-met" style={styles.warning}>
-              현재가가 감시가격을 지났어요. 등록할 때 감시 방향을 다시 확인해요.
+              현재가가 매도 기준가를 지났어요. 등록할 때 감시 방향을 다시 확인해요.
             </Text>
           ) : null}
+          <Text testID={`${id}-trigger-hint`} style={styles.helper}>{SELL_REFERENCE_HINT}</Text>
         </View>
         <View style={styles.group}>
           <Text style={styles.label}>발동 시 주문방식</Text>
@@ -429,7 +433,7 @@ export default function SellIntentForm({
           {result.detail ? <Text style={styles.helper}>{result.detail}</Text> : null}
           {registered.map((row) => (
             <Text key={row.id} style={styles.helper}>
-              {getConditionalSellKindLabel(row.kind)} · 감시가격 {formatDisplayDecimal(row.triggerPrice)} {currency}{' '}
+              {getConditionalSellKindLabel(row.kind)} · {SELL_REFERENCE_LABEL} {formatDisplayDecimal(row.triggerPrice)} {currency}{' '}
               {SELL_TRIGGER_CONDITION_LABEL[row.triggerCondition] ?? ''} 시{' '}
               {row.executionType === 'limit' && row.limitPrice ? `지정가 ${formatDisplayDecimal(row.limitPrice)} ${currency}` : '시장가'}
               {' '}매도 · 설정 수량 {formatDisplayDecimal(row.quantity)}

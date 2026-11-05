@@ -953,6 +953,85 @@ describe('익절가/손절가 설정 변경: 수량 비율 (현물, 2026-11-05)'
   });
 });
 
+describe('조건부 매수 설정 변경: 주식 소수 수량 (시장가 6자리 · 지정가 정수)', () => {
+  const value = (h: any, id: string) => [h.node(id)?.props.value].flat().join('');
+  const modifies = (h: any) => h.requests.filter((r: any) => r.url.endsWith('/modify'));
+  const watch = (patch: Record<string, unknown> = {}) => ({
+    id: 'cb-krx', assetId: 'samsung', asset: { id: 'samsung', symbol: '005930', name: '삼성전자', market: 'KRX', assetType: 'domestic_stock' },
+    side: 'buy', triggerCondition: 'at_or_below', triggerPrice: '68000.00000000', executionType: 'market', limitPrice: null,
+    quantity: '3.16412600', amount: null, currencyCode: 'KRW', status: 'watching', state: 'watching', trigger: null, order: null,
+    attemptCount: 0, lastAttemptAt: null, failureCode: null, terminalReason: null, registeredOffSession: false,
+    createdAt: '2026-11-05T01:00:00.000Z', endedAt: null, updatedAt: '2026-11-05T01:00:00.000Z', revision: 2, ...patch,
+  });
+  const open = async (h: any, rows: unknown[]) => {
+    h.conditionalList = { tradingAccountId: 'general',
+      capabilities: { enabled: true, canCreate: true, canCancel: true, canUseLimit: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
+      conditionalOrders: rows, pagination: { limit: 100, offset: 0, total: rows.length, returned: rows.length, nextOffset: null } };
+    h.orders = { general: [] };
+    await h.mount(); await h.press('holdings-filter-pending');
+    for (let i = 0; i < 20 && pendingIds(h).length === 0; i += 1) await h.flush();
+  };
+  const id = 'pending-item-conditional_buy-cb-krx';
+
+  it('changing only the 감시가격 keeps the registered fractional quantity and sends it unchanged in ONE modify', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [watch()]);
+    assert.match(text(h.node(`${id}-amount`)), /3\.164126주/);
+    await h.press(`${id}-edit`);
+    assert.equal(value(h, 'pending-edit-quantity'), '3.164126');
+    assert.equal(h.node('pending-edit-quantity').props.keyboardType, 'decimal-pad');
+    assert.equal(h.node('pending-edit-quantity-whole') === undefined, true, 'market takes fractions: no whole-share line');
+    await h.input('pending-edit-trigger-price', '67000');
+    await h.press('pending-edit-review');
+    assert.equal(h.node('pending-edit-message') === undefined, true, 'no whole-share error at market');
+    assert.match(text(h.node('pending-edit-changes')), /감시가격68,000원 → 67,000원/);
+    assert.doesNotMatch(text(h.node('pending-edit-changes')), /수량/);
+    await h.press('pending-edit-save'); await h.flush();
+    assert.deepEqual(modifies(h).map((r: any) => r.url), ['/trading-accounts/general/conditional-buy-orders/cb-krx/modify']);
+    assert.deepEqual({ ...modifies(h)[0].body, idempotencyKey: typeof modifies(h)[0].body.idempotencyKey },
+      { triggerPrice: '67000', triggerCondition: 'at_or_below', executionType: 'market', quantity: '3.164126', expectedRevision: 2, idempotencyKey: 'string' });
+    assert.equal(h.requests.some((r: any) => r.url.endsWith('/cancel') || r.url.endsWith('/conditional-buy-orders')), false, 'never a cancel plus a new watch');
+  });
+
+  it('switching to 지정가 asks for whole shares without cutting the fraction; a whole quantity saves as limit', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [watch()]);
+    await h.press(`${id}-edit`);
+    await h.press('pending-edit-execution-limit');
+    assert.equal(value(h, 'pending-edit-quantity'), '3.164126', 'the typed fraction is kept, never rounded');
+    assert.equal(h.node('pending-edit-quantity').props.keyboardType, 'number-pad');
+    assert.equal(text(h.node('pending-edit-quantity-whole')), '소수점 수량은 시장가로만 실행돼요. 지정가로 실행하려면 수량을 정수로 수정해 주세요.');
+    await h.input('pending-edit-limit-price', '67500');
+    await h.press('pending-edit-review');
+    assert.equal(text(h.node('pending-edit-message')), '주식을 지정가로 실행할 때는 수량을 1 이상의 정수로 입력해 주세요.');
+    assert.equal(h.node('pending-edit-changes') === undefined, true, 'no review of an invalid change');
+    await h.input('pending-edit-quantity', '3');
+    assert.equal(text(h.node('pending-edit-quantity-whole')), '지정가로 실행할 때는 정수 수량만 가능해요.');
+    // Back to 시장가 the fraction is fine again (nothing was cut on the way).
+    await h.press('pending-edit-execution-market');
+    assert.equal(h.node('pending-edit-quantity-whole') === undefined, true);
+    await h.press('pending-edit-execution-limit');
+    await h.input('pending-edit-limit-price', '67500');
+    await h.press('pending-edit-review');
+    assert.match(text(h.node('pending-edit-changes')), /매수 유형시장가 → 지정가/);
+    assert.match(text(h.node('pending-edit-changes')), /수량3\.164126 주 → 3 주/);
+    await h.press('pending-edit-save'); await h.flush();
+    assert.equal(modifies(h).length, 1);
+    assert.deepEqual({ ...modifies(h)[0].body, idempotencyKey: typeof modifies(h)[0].body.idempotencyKey },
+      { triggerPrice: '68000', triggerCondition: 'at_or_below', executionType: 'limit', limitPrice: '67500', quantity: '3', expectedRevision: 2, idempotencyKey: 'string' });
+  });
+
+  it('설정 취소 asks only what it cancels and sends the same one cancel', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [watch()]);
+    await h.press(`${id}-cancel`);
+    assert.equal(text(h.node(`${id}-confirm`)), '조건부 매수 설정을 취소할까요?유지취소하기');
+    await h.press(`${id}-confirm-cancel`); await h.flush();
+    assert.deepEqual(h.requests.filter((r: any) => r.url.endsWith('/cancel')).map((r: any) => r.url),
+      ['/trading-accounts/general/conditional-buy-orders/cb-krx/cancel']);
+  });
+});
+
 describe('order panel side colors in the trading screen', () => {
   it('keeps BUY green and SELL red on selected tabs and final CTA', async (t) => {
     const h = inlineTradingHarness();

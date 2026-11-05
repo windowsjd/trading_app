@@ -75,6 +75,13 @@ describe('SELL condition (KRX, crypto)', () => {
       await sellWith(h, 'conditional');
       assert.equal(h.node(submit) === undefined, true, 'the ordinary submit is replaced');
       assert.equal(h.node('sell-intent-submit').props.state, 'disabled');
+      // The trigger is the 매도 기준가 — as on the pending card and in 설정 변경 — never a fill price.
+      const triggerInput = h.node('sell-condition-trigger-price');
+      assert.deepEqual([triggerInput.props.accessibilityLabel, triggerInput.props.placeholder], ['매도 기준가 KRW', '매도 기준가 입력']);
+      expectText(h, /^매도 기준가 \(KRW\)$/m);
+      assert.equal([h.node('sell-condition-trigger-hint').props.children].flat().join(''),
+        '매도 기준가는 자동 매도 여부를 판단하는 가격이에요. 실제 체결가격은 다를 수 있어요.');
+      expectNoText(h, /감시가격/);
       await h.input('sell-condition-trigger-price', '69000');
       // 70,000 KRW now: a lower watch price waits for a fall (never chosen by hand).
       expectText(h, /^감시 조건 · 69000 KRW 이하 도달 시$/m);
@@ -94,6 +101,7 @@ describe('SELL condition (KRX, crypto)', () => {
       });
       assert.match(body.idempotencyKey, /^conditional_sell_[A-Za-z0-9:_-]{8,}$/);
       expectText(h, /조건주문 설정이 등록되었습니다\. 감시 중입니다\./);
+      expectText(h, /^조건주문 · 매도 기준가 69,?000 KRW 이하 도달 시 지정가 68,?500 KRW 매도 · 설정 수량 10$/m);
       expectNoText(h, /체결됐어요|체결 완료/);
       assert.deepEqual(events.map((event) => [event.kind, event.side, event.accountId]), [['watch', 'sell', accountId]]);
       assert.ok(h.invalidations.some((key: any[]) => key[1] === 'conditionalSellOrders' && key[2] === accountId));
@@ -174,7 +182,7 @@ describe('SELL condition (KRX, crypto)', () => {
     assert.equal(h.renderer.root.findAll((n: any) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('sell-trigger-at_or')).length, 0);
     await h.input('sell-condition-quantity', '2');
     await h.input('sell-condition-trigger-price', '763.79');
-    expectText(h, /^현재가와 같은 가격은 감시가격으로 쓸 수 없어요\.$/m);
+    expectText(h, /^현재가와 같은 가격은 매도 기준가로 쓸 수 없어요\.$/m);
     assert.equal(h.node('sell-intent-submit').props.state, 'disabled');
     await h.input('sell-condition-trigger-price', '780');
     expectText(h, /^감시 조건 · 780 USD 이상 도달 시$/m);
@@ -184,6 +192,7 @@ describe('SELL condition (KRX, crypto)', () => {
     await h.update(); await h.flush();
     expectText(h, /^감시 조건 · 780 USD 이상 도달 시$/m);
     assert.equal(h.node('sell-intent-already-met') !== undefined, true);
+    expectText(h, /^현재가가 매도 기준가를 지났어요\. 등록할 때 감시 방향을 다시 확인해요\.$/m);
     await h.press('sell-intent-submit'); await h.flush();
     assert.equal(h.requests.length, 0, 'the stale direction is never sent');
     expectText(h, /현재가가 바뀌어 감시 방향이 달라졌어요/);

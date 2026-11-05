@@ -434,7 +434,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.CONDITIONAL_SELL_LIMIT_EXCEEDED:
       return '감시 중인 매도 설정이 최대 개수에 도달했습니다. 기존 설정을 확인해주세요.';
     case ERROR_CODE.CONDITIONAL_SELL_ALREADY_MET:
-      return '현재 가격이 이미 감시가격에 도달해 등록하지 않았습니다. 표시된 감시 조건과 가격을 확인한 뒤 다시 등록해주세요.';
+      return '현재 가격이 이미 매도 기준가에 도달해 등록하지 않았습니다. 표시된 감시 조건과 가격을 확인한 뒤 다시 등록해주세요.';
     case ERROR_CODE.CONDITIONAL_SELL_POSITION_UNAVAILABLE:
       return '보유 수량이 없어 매도 설정을 등록할 수 없습니다.';
     case ERROR_CODE.CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING:
@@ -454,7 +454,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.INVALID_CONDITIONAL_SELL:
       return '매도 설정 입력값을 다시 확인해주세요.';
     case ERROR_CODE.INVALID_CONDITIONAL_SELL_PRICE:
-      return '감시가격, 지정가격 또는 수량을 다시 확인해주세요.';
+      return '매도 기준가, 지정가격 또는 수량을 다시 확인해주세요.';
     case ERROR_CODE.PROTECTION_CONFLICT:
       return '이 종목의 기존 손절가/익절가(OCO) 보호와 함께 사용할 수 없습니다. 대기 목록의 손절가/익절가에서 기존 보호를 확인하고 취소한 뒤 다시 시도해주세요.';
     case ERROR_CODE.PROTECTION_REGISTRATION_RETIRED:

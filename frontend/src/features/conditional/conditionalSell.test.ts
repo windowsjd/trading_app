@@ -106,7 +106,8 @@ describe('SELL leg draft (hint; the server decides)', () => {
     assert.match(getSellLegDraftError({ ...leg, executionType: 'limit', limitPrice: '68000', quantity: '1.5' }, { assetType: 'domestic_stock', holding: '10' })!, /정수 수량/);
     assert.equal(getSellLegDraftError({ ...leg, executionType: 'limit', limitPrice: '68000', quantity: '1.5' }, { assetType: 'crypto', holding: '10' }), null);
     assert.match(getSellLegDraftError({ ...leg, executionType: 'limit' }, { assetType: 'crypto', holding: '10' })!, /지정가격을 입력/);
-    assert.match(getSellLegDraftError({ ...leg, triggerPrice: '0' }, { assetType: 'crypto', holding: '10', label: '손절' })!, /^손절 감시가격은/);
+    assert.match(getSellLegDraftError({ ...leg, triggerPrice: '0' }, { assetType: 'crypto', holding: '10', label: '손절' })!, /^손절 매도 기준가는 0보다 큰 숫자/);
+    assert.equal(getSellLegDraftError({ ...leg, triggerPrice: ' ' }, { assetType: 'domestic_stock', holding: '10' }), '매도 기준가를 입력해주세요.');
     assert.match(getSellLegDraftError({ ...leg, quantity: '0.1234567' }, { assetType: 'crypto', holding: '10' })!, /최대 6자리/);
   });
 });

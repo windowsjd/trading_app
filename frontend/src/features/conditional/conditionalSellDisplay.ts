@@ -47,6 +47,14 @@ export const SELL_EXECUTION_TYPE_LABEL: Record<ConditionalSellExecutionType, str
   limit: '지정가',
 };
 
+/**
+ * What a Spot SELL setting's trigger price is called wherever it is entered or
+ * shown: the price that decides the automatic sale, never a promised fill
+ * price. Conditional BUY watches and Futures keep 감시가격.
+ */
+export const SELL_REFERENCE_LABEL = '매도 기준가';
+export const SELL_REFERENCE_HINT = '매도 기준가는 자동 매도 여부를 판단하는 가격이에요. 실제 체결가격은 다를 수 있어요.';
+
 export function isLiveConditionalSell(row: Pick<ConditionalSellOrderDto, 'state'>) {
   return row.state === 'watching' || row.state === 'triggered';
 }
@@ -209,8 +217,8 @@ export function getSellLegDraftError(
   input: { assetType: string | null | undefined; holding: string | null; label?: string },
 ): string | null {
   const prefix = input.label ? `${input.label} ` : '';
-  if (!draft.triggerPrice.trim()) return `${prefix}감시가격을 입력해주세요.`;
-  if (!positiveDecimal(draft.triggerPrice, 8)) return `${prefix}감시가격은 0보다 큰 숫자와 소수점 이하 최대 8자리로 입력해주세요.`;
+  if (!draft.triggerPrice.trim()) return `${prefix}매도 기준가를 입력해주세요.`;
+  if (!positiveDecimal(draft.triggerPrice, 8)) return `${prefix}매도 기준가는 0보다 큰 숫자와 소수점 이하 최대 8자리로 입력해주세요.`;
   if (draft.executionType === 'limit') {
     if (!draft.limitPrice.trim()) return `${prefix}발동 시 주문할 지정가격을 입력해주세요.`;
     if (!positiveDecimal(draft.limitPrice, 8)) return `${prefix}지정가격은 0보다 큰 숫자와 소수점 이하 최대 8자리로 입력해주세요.`;

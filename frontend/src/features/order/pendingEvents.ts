@@ -1,4 +1,5 @@
 import { formatDisplayDecimal, getAssetNameDisplay } from '../../utils/format.ts';
+import { SELL_REFERENCE_LABEL } from '../conditional/conditionalSellDisplay.ts';
 import { enqueueFillNotice, type FillNotice } from './fillTracker.ts';
 
 /**
@@ -149,7 +150,9 @@ export function buildPendingEventNotice(accountId: string, event: PendingOrderEv
       title: `${name} ${event.origin === 'loc' ? 'LOC ' : ''}${action} 체결 완료`,
       detail: parts(accountLabel, SPOT_LABEL[event.origin], quantity) };
   }
-  const watched = event.price ? `감시가격 ${formatDisplayDecimal(event.price)} 도달` : null;
+  // A Spot SELL setting's trigger is its 매도 기준가; BUY watches and Futures keep 감시가격.
+  const term = !futures && event.side === 'sell' ? SELL_REFERENCE_LABEL : '감시가격';
+  const watched = event.price ? `${term} ${formatDisplayDecimal(event.price)} 도달` : null;
   const kind = futures
     ? `${direction(event.direction) ?? ''} ${FUTURES_CLOSE[event.origin] ?? '조건주문'}`.trim()
     : event.origin === 'condition' ? `조건주문 ${side(event.side) ?? ''}`.trim() : SPOT_LABEL[event.origin] ?? '조건주문';
