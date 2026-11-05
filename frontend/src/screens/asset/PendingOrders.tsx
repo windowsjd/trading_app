@@ -27,7 +27,7 @@ import {
   getFuturesLimitOrders,
 } from '../../features/futures/api';
 import { cancelFuturesTpSlSetting, getFuturesTpSlSettings } from '../../features/futures/tpSlApi';
-import { buildPendingItems, registeredLabel, type PendingCancel, type PendingItem } from '../../features/order/pendingItems';
+import { buildPendingItems, registeredLabel, withParticle, type PendingCancel, type PendingItem } from '../../features/order/pendingItems';
 import { getApiErrorCode, getErrorMessageFromCode } from '../../services/api/errorMapper';
 import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
 import { isEntryTpSlMarketSupported } from '../../features/order/orderMethods';
@@ -68,7 +68,7 @@ const SOURCE_LABEL = {
   spot: '현물 지정가 주문',
   buys: '조건부 매수',
   sellConditions: '조건부 매도',
-  sellProtections: '손절가/익절가',
+  sellProtections: '익절가/손절가',
   futuresLimits: '선물 지정가 주문',
   futuresWatches: '선물 조건주문',
   futuresTpSl: '선물 손절가/익절가',
@@ -201,7 +201,7 @@ function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
       else if (target.kind === 'futures_tp_sl') await cancelFuturesTpSlSetting(accountId, target.id);
       else await cancelEntryTpSlPlan(accountId, target.id);
       if (!current()) return;
-      setNotice(`${item.assetName} ${item.typeLabel} 설정을 취소했어요.`);
+      setNotice(`${item.assetName} ${item.kindLabel} 설정을 취소했어요.`);
       await refreshAfter(target.kind);
     } catch (error) {
       if (!current()) return;
@@ -214,7 +214,7 @@ function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
   };
   const changed = (item: PendingItem) => {
     setEditing(null);
-    setNotice(`${item.assetName} ${item.typeLabel} 설정을 변경했어요.`);
+    setNotice(`${item.assetName} ${item.kindLabel} 설정을 변경했어요.`);
     void refreshAfter(item.cancel?.kind ?? 'order');
     if (item.kind === 'spot_limit') void invalidateAfterOrderCreate(client, accountId, { seasonUi });
     if (item.kind === 'entry_plan') void client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.entryTpSl.all(accountId) });
@@ -233,8 +233,8 @@ function BoundPendingOrders({ accountId, isFocused, seasonUi }: Props) {
         return (
         <View key={source} style={styles.failure} testID={`pending-source-error-${source}`}>
           <ErrorNotice error={queries[source].error} message={integrity
-            ? `${SOURCE_LABEL[source]}을 안전하게 표시할 수 없어요. ${integrity}`
-            : `${SOURCE_LABEL[source]}을 불러오지 못했어요. 아래 목록에 빠진 항목이 있을 수 있어요.`} />
+            ? `${withParticle(SOURCE_LABEL[source], '을')} 안전하게 표시할 수 없어요. ${integrity}`
+            : `${withParticle(SOURCE_LABEL[source], '을')} 불러오지 못했어요. 아래 목록에 빠진 항목이 있을 수 있어요.`} />
           <ActionPressable testID={`pending-source-retry-${source}`} accessibilityRole="button" style={styles.retry} onPress={() => void queries[source].refetch()}>
             <Text style={styles.retryText}>다시 시도</Text>
           </ActionPressable>

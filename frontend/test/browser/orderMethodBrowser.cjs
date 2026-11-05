@@ -203,31 +203,26 @@ async function run() {
       await page.getByTestId('order-quantity-input').fill('2');
       await shot('krx-loc');
 
-      // 4. KRX SELL: market plus the server-gated 지정가 (2026-10-18), 조건주문 and LOC
-      // rows; no 손절가/익절가 row (it lives on the holding card). Without automatic
-      // matching the SELL limit is listed but unavailable.
+      // 4. KRX SELL: market plus the server-gated 조건주문 and LOC rows; no new
+      // 지정가 (2026-11-05) and no 손절가/익절가 row (it lives on the holding card).
       await go('krx=1&asset=SAMSUNG&longName=1');
       await page.getByTestId('asset-detail-sell-button').click();
       await defaultField();
       await field().click();
       await row('loc').waitFor();
-      assert.equal(await row('limit').count(), 1, 'the SELL limit is listed');
-      assert.equal(await page.getByTestId('order-method-limit-badge').innerText(), '이용 불가', `unmatched SELL limit unavailable (${tag})`);
+      assert.equal(await row('limit').count(), 0, `no new SELL limit (${tag})`);
       assert.equal(await row('protection').count(), 0, 'no 손절가/익절가 주문방식');
       await shot('krx-sell-sheet');
-      await sheetReachable(['market', 'limit', 'conditional', 'loc']);
+      await sheetReachable(['market', 'conditional', 'loc']);
       await page.getByTestId('order-method-sheet-close').click();
 
-      // 4a. KRX SELL limit once limits are matched: 100% is the unreserved part
-      // (10 held − 4 reserved), whole shares; the card shows the expected proceeds.
+      // 4a. Limits registered AND matched still add no SELL 지정가 row.
       await go('krx=1&asset=SAMSUNG&longName=1&limitSell=enabled&stock=1&holding=10&reserved=4');
       await page.getByTestId('asset-detail-sell-button').click();
       await field().click();
-      await row('limit').click();
-      await page.getByTestId('order-limit-price-input').fill('71000');
-      await page.getByTestId('order-ratio-100').click();
-      assert.equal(await page.getByTestId('order-quantity-input').inputValue(), '6', `100% = unreserved part (${tag})`);
-      await shot('krx-sell-limit');
+      await row('loc').waitFor();
+      assert.equal(await row('limit').count(), 0, `no SELL limit with matching on (${tag})`);
+      await page.getByTestId('order-method-sheet-close').click();
 
       // 4b'. KRX closed: a conditional BUY takes a chosen 이상/이하 (none preselected);
       // market-execution ratio picks are off without a current price, a limit
@@ -306,8 +301,7 @@ async function run() {
         await row(method).waitFor();
         assert.equal(await page.getByTestId(`order-method-${method}-badge`).count(), 0, `US sell ${method} available (${tag})`);
       }
-      // The SELL limit follows automatic matching (off in this fixture).
-      assert.equal(await row('limit').count(), 1, `US sell limit listed (${tag})`);
+      assert.equal(await row('limit').count(), 0, `no US sell limit (${tag})`);
       await shot('us-sell-sheet');
       await page.getByTestId('order-method-sheet-close').click();
 

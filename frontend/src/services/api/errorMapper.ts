@@ -440,7 +440,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING:
       return '설정 수량은 현재 보유 수량을 넘을 수 없습니다.';
     case ERROR_CODE.CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING:
-      return '감시 중인 같은 종류(익절 또는 손절) 설정과 합친 수량이 현재 보유 수량을 넘어 등록할 수 없습니다. 비율을 줄이거나 기존 설정을 확인해주세요.';
+      return '감시 중인 같은 종류(익절 또는 손절) 설정과 합친 수량이 현재 보유 수량을 넘어 등록하거나 변경할 수 없습니다. 수량(비율)을 줄이거나 기존 설정을 확인해주세요.';
     case ERROR_CODE.CONDITIONAL_SELL_DUPLICATE_PRICE:
       return '같은 가격으로 감시 중인 같은 종류의 설정이 이미 있습니다. 다른 가격을 입력해주세요.';
     case ERROR_CODE.CONDITIONAL_SELL_QUANTITY_UNAVAILABLE:

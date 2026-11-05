@@ -6,12 +6,14 @@ import { TP_SL_TITLE } from '../tpSlModel';
 
 /**
  * The entry point to the 손절가/익절가 sheet on a holding, a pending entry or
- * an entry being created. The label never changes; a short count of what is
- * set (`익절 2건 · 손절 1건`) sits beside it. A futures position's card pairs
+ * an entry being created. The label never changes for its target (a Spot
+ * holding's reads 익절가/손절가 설정); a short count of what is set
+ * (`익절 2건 · 손절 1건`) sits beside it. A futures position's card pairs
  * the same label with 포지션 종료 as two equal buttons (FuturesPositionCard).
  */
-export default function TpSlButton({ testID, summary, disabled = false, learningHint = null, onPress }: {
+export default function TpSlButton({ testID, label = TP_SL_TITLE, summary, disabled = false, learningHint = null, onPress }: {
   testID: string;
+  label?: string;
   /** `익절 2건 · 손절 1건`; null when nothing is set (or not yet known). */
   summary: string | null;
   disabled?: boolean;
@@ -20,7 +22,7 @@ export default function TpSlButton({ testID, summary, disabled = false, learning
 }) {
   return (
     <View style={styles.row}>
-      <CTAButton variant="secondary" testID={testID} label={TP_SL_TITLE} style={styles.button}
+      <CTAButton variant="secondary" testID={testID} label={label} style={styles.button}
         state={disabled ? 'disabled' : 'enabled'} learningHint={learningHint} onPress={onPress} />
       {summary ? <Text testID={`${testID}-summary`} style={styles.summary}>{summary}</Text> : null}
     </View>

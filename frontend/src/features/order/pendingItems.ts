@@ -18,11 +18,15 @@ import type { FuturesTpSlSetting } from '../futures/tpSlApi';
  * - 금액 first, the quantity in parentheses. An amount computed from a
  *   condition price is an estimate (예상 금액 ≈ …), never a fill amount.
  * - A size decided only at execution (a crypto BUY watch by amount, a SELL
- *   setting's "up to" target, an entry plan's share of a fill) never gets an
+ *   setting's target, an entry plan's share of a fill) never gets an
  *   invented quantity.
  * - Futures show the notional (명목금액) and, apart from it, the reserved
  *   margin (예약 증거금) — never one as the other.
  * - An order a condition placed is shown on that condition's card only.
+ * - Spot SELL settings (2026-11-05): a stop-loss/take-profit's badge names
+ *   the group (익절가/손절가) while its side line and `kindLabel` keep the
+ *   kind; its trigger reads 매도 기준가 — the price that decides the
+ *   automatic sale, never a promised fill price.
  */
 
 export type PendingKind =
@@ -49,6 +53,9 @@ export type PendingModifyKind =
 export type TriggerCondition = 'at_or_above' | 'at_or_below';
 export type ExecutionType = 'market' | 'limit';
 
+/** What the trigger price is called (감시가격, or 매도 기준가 on a Spot SELL) and an optional line under it. */
+type TriggerTerm = { label: string; hint?: string };
+
 /** What a change may touch, and the values it starts from. */
 export type PendingEditSpec =
   | { editable: false; reason: string }
@@ -58,16 +65,22 @@ export type PendingEditSpec =
       revision: number;
       currency: string;
       /** Whether 이상/이하 is the user's (a condition) or fixed by the kind (stop-loss/take-profit). */
-      trigger: null | { choose: true } | { choose: false; condition: TriggerCondition };
+      trigger: null
+        | ({ choose: true } & TriggerTerm)
+        | ({ choose: false; condition: TriggerCondition; kind: 'stop_loss' | 'take_profit' } & TriggerTerm);
       /** Execution choices; a single entry is fixed (shown, not changeable). */
       executions: readonly ExecutionType[];
       /** The size field: an amount to spend, a quantity, or a share of a fill. */
       size: 'amount' | 'quantity' | 'ratio';
       /** Decimal places of the quantity; 0 for whole shares. */
       quantityScale: number;
+      /** Decimal places while executed at a limit, when they differ (a stock takes whole shares there). */
+      limitQuantityScale?: number;
       quantityUnit: string;
       /** The label of the execution row (매수 유형, 매도 유형, 진입 유형, 청산 유형). */
       executionLabel: string;
+      /** A Spot stop-loss/take-profit: the quantity may also be picked as a share of this asset's holding. */
+      holdingShare?: { assetId: string };
       initial: EditValues;
     };
 
@@ -96,7 +109,10 @@ export type PendingItem = {
   id: string;
   registeredAt: string;
   assetName: string;
+  /** The badge; a Spot stop-loss/take-profit's names its group (익절가/손절가). */
   typeLabel: string;
+  /** What this one item is in a sentence (이 손절가…, 손절가 설정을 취소했어요). */
+  kindLabel: string;
   sideLabel: string;
   tone: 'buy' | 'sell' | 'long' | 'short';
   /** 금액 (수량), 실행 유형, 주문 조건 — in that order. */
@@ -149,7 +165,8 @@ export function formatPendingPrice(value: string | null | undefined, currency: s
   return currency === 'KRW' ? `${text}원` : currency === 'USD' ? `$${text}` : `${text} ${currency}`;
 }
 
-function quantityText(value: string | null | undefined, unit: string) {
+/** A quantity with separators and every given decimal, then its unit (`3.164126주`, `0.5 BTC`). */
+export function formatPendingQuantity(value: string | null | undefined, unit: string) {
   if (!value) return '-';
   const match = /^(\d+)(?:\.(\d*))?$/u.exec(value.trim());
   if (!match) return `${value}${unit}`;
@@ -157,6 +174,20 @@ function quantityText(value: string | null | undefined, unit: string) {
   const integer = match[1].replace(/\B(?=(\d{3})+(?!\d))/gu, ',');
   return `${fraction ? `${integer}.${fraction}` : integer}${unit === '주' ? '주' : ` ${unit}`}`;
 }
+
+/** A word with 은/는 or 을/를, by whether its last syllable ends in a consonant. */
+export function withParticle(word: string, particle: '은' | '을') {
+  const syllable = word.charCodeAt(word.length - 1) - 0xac00;
+  const consonant = syllable >= 0 && syllable < 11172 && syllable % 28 !== 0;
+  return `${word}${particle === '은' ? (consonant ? '은' : '는') : consonant ? '을' : '를'}`;
+}
+
+/** A watch's trigger; a Spot SELL's decides the automatic sale and is not its fill price. */
+const WATCH_PRICE: TriggerTerm = { label: '감시가격' };
+const SELL_REFERENCE: TriggerTerm = {
+  label: '매도 기준가',
+  hint: '매도 기준가는 자동 매도 여부를 판단하는 가격이에요. 실제 체결가격은 다를 수 있어요.',
+};
 
 function product(quantity: string | null | undefined, price: string | null | undefined) {
   if (!quantity || !price) return null;
@@ -217,10 +248,11 @@ function spotLimitItem(order: RecordOrderItemDto): PendingItem | null {
     registeredAt: order.createdAt ?? order.submittedAt,
     assetName: getAssetNameDisplay({ name: order.name, symbol: order.symbol, market: order.market }).primary,
     typeLabel: loc ? 'LOC' : '지정가',
+    kindLabel: loc ? 'LOC' : '지정가',
     sideLabel: buy ? '매수' : '매도',
     tone: buy ? 'buy' : 'sell',
     rows: [
-      { key: 'amount', label: '금액', value: `${amount ? formatMoney(amount, currency) : '-'} (${quantityText(order.quantity, unit)})` },
+      { key: 'amount', label: '금액', value: `${amount ? formatMoney(amount, currency) : '-'} (${formatPendingQuantity(order.quantity, unit)})` },
       { key: 'execution', label: buy ? '매수 유형' : '매도 유형', value: loc ? 'LOC(장 마감 지정가)' : '지정가' },
       { key: 'condition', label: '주문 조건', value: `지정가 ${formatPendingPrice(order.limitPrice, currency)}${loc ? ' · 종가 기준' : ''}` },
     ],
@@ -273,7 +305,7 @@ function conditionalBuyItem(row: ConditionalBuyOrderDto, limitAvailable: boolean
   const amountRow = row.amount
     // By amount: the quantity is decided when it fills.
     ? `${formatMoney(row.amount, currency)} (수량은 체결 시 결정)`
-    : `${limit ? '' : '≈ '}${formatMoney(product(row.quantity, priced), currency)} (${quantityText(row.quantity, unit)})`;
+    : `${limit ? '' : '≈ '}${formatMoney(product(row.quantity, priced), currency)} (${formatPendingQuantity(row.quantity, unit)})`;
   const state = watchState(row.state, row.executionType);
   return {
     key: `conditional_buy:${row.id}`,
@@ -282,6 +314,7 @@ function conditionalBuyItem(row: ConditionalBuyOrderDto, limitAvailable: boolean
     registeredAt: row.createdAt,
     assetName: getAssetNameDisplay(row.asset).primary,
     typeLabel: '조건주문',
+    kindLabel: '조건주문',
     sideLabel: '매수',
     tone: 'buy',
     rows: [
@@ -302,7 +335,7 @@ function conditionalBuyItem(row: ConditionalBuyOrderDto, limitAvailable: boolean
       target: { kind: 'conditional_buy', id: row.id },
       revision: row.revision ?? 0,
       currency,
-      trigger: { choose: true },
+      trigger: { choose: true, ...WATCH_PRICE },
       executions: limitAvailable || row.executionType === 'limit' ? ['market', 'limit'] : ['market'],
       size: row.amount ? 'amount' : 'quantity',
       quantityScale: stock ? 0 : 6,
@@ -327,9 +360,9 @@ function conditionalSellItem(row: ConditionalSellOrderDto, limitAvailable: boole
   const currency = row.currencyCode;
   const stock = isStock(row.asset?.assetType, row.asset?.market);
   const unit = spotUnit(row.asset?.symbol, stock);
-  const protection = row.kind !== 'condition';
-  const kind: PendingKind = row.kind === 'stop_loss' ? 'spot_stop_loss' : row.kind === 'take_profit' ? 'spot_take_profit' : 'conditional_sell';
-  const kindWord = row.kind === 'stop_loss' ? '손절가' : row.kind === 'take_profit' ? '익절가' : '조건주문';
+  const protection = row.kind === 'stop_loss' || row.kind === 'take_profit' ? row.kind : null;
+  const kind: PendingKind = protection === 'stop_loss' ? 'spot_stop_loss' : protection === 'take_profit' ? 'spot_take_profit' : 'conditional_sell';
+  const kindWord = protection === 'stop_loss' ? '손절가' : protection === 'take_profit' ? '익절가' : '조건주문';
   const limit = row.executionType === 'limit' && row.limitPrice;
   const priced = limit ? row.limitPrice : row.triggerPrice;
   const state = watchState(row.state, row.executionType);
@@ -339,17 +372,19 @@ function conditionalSellItem(row: ConditionalSellOrderDto, limitAvailable: boole
     id: row.id,
     registeredAt: row.createdAt,
     assetName: getAssetNameDisplay(row.asset).primary,
-    typeLabel: kindWord,
+    // The group on the badge; which one it is stays on the side line.
+    typeLabel: protection ? '익절가/손절가' : kindWord,
+    kindLabel: kindWord,
     sideLabel: protection ? `매도 · ${kindWord}` : '매도',
     tone: 'sell',
     rows: [
       // A SELL setting's quantity is a target: what sells is decided at execution.
-      { key: 'amount', label: '예상 금액', value: `≈ ${formatMoney(product(row.quantity, priced), currency)} (최대 ${quantityText(row.quantity, unit)})` },
+      { key: 'amount', label: '예상 금액', value: `≈ ${formatMoney(product(row.quantity, priced), currency)} (${formatPendingQuantity(row.quantity, unit)})` },
       { key: 'execution', label: '매도 유형', value: limit ? '지정가' : '시장가' },
       {
         key: 'condition',
         label: '주문 조건',
-        value: `감시가격 ${formatPendingPrice(row.triggerPrice, currency)} ${conditionWord(row.triggerCondition)}${limit ? ` · 지정가 ${formatPendingPrice(row.limitPrice, currency)}` : ''}`,
+        value: `${SELL_REFERENCE.label} ${formatPendingPrice(row.triggerPrice, currency)} ${conditionWord(row.triggerCondition)}${limit ? ` · 지정가 ${formatPendingPrice(row.limitPrice, currency)}` : ''}`,
       },
     ],
     notes: [
@@ -362,12 +397,16 @@ function conditionalSellItem(row: ConditionalSellOrderDto, limitAvailable: boole
       revision: row.revision ?? 0,
       currency,
       // Stop-loss sells at or below, take-profit at or above; both at market.
-      trigger: protection ? { choose: false, condition: row.triggerCondition } : { choose: true },
+      trigger: protection ? { choose: false, condition: row.triggerCondition, kind: protection, ...SELL_REFERENCE } : { choose: true, ...SELL_REFERENCE },
       executions: protection ? ['market'] : limitAvailable || row.executionType === 'limit' ? ['market', 'limit'] : ['market'],
       size: 'quantity',
-      quantityScale: stock ? 0 : 6,
+      // As registered: 6 decimals at market (fractional shares too); a stock
+      // executed at a limit takes whole shares.
+      quantityScale: 6,
+      ...(stock ? { limitQuantityScale: 0 } : {}),
       quantityUnit: unit,
       executionLabel: '매도 유형',
+      ...(protection ? { holdingShare: { assetId: row.assetId } } : {}),
       initial: {
         triggerCondition: row.triggerCondition,
         triggerPrice: inputDecimal(row.triggerPrice),
@@ -396,10 +435,11 @@ function futuresLimitItem(order: FuturesLimitOrder): PendingItem {
     registeredAt: order.createdAt,
     assetName: order.instrument.underlying.name,
     typeLabel: '선물 지정가',
+    kindLabel: '선물 지정가',
     sideLabel: `${directionWord(order.direction)} 진입 · ${order.marginMode === 'cross' ? '교차' : '격리'} ${order.leverage}x`,
     tone: order.direction === 'long' ? 'long' : 'short',
     rows: [
-      { key: 'amount', label: '명목금액', value: `${formatMoney(notional, 'USD')} (${quantityText(order.quantity, unit)})` },
+      { key: 'amount', label: '명목금액', value: `${formatMoney(notional, 'USD')} (${formatPendingQuantity(order.quantity, unit)})` },
       { key: 'execution', label: '진입 유형', value: '지정가' },
       { key: 'condition', label: '주문 조건', value: `지정가 ${formatPendingPrice(order.limitPrice, 'USD')}` },
     ],
@@ -434,10 +474,11 @@ function futuresConditionalItem(row: FuturesConditionalEntry): PendingItem {
     registeredAt: row.createdAt,
     assetName: row.instrument.underlying.name,
     typeLabel: '선물 조건주문',
+    kindLabel: '선물 조건주문',
     sideLabel: `${directionWord(row.direction)} 진입 · ${row.marginMode === 'cross' ? '교차' : '격리'} ${row.leverage}x`,
     tone: row.direction === 'long' ? 'long' : 'short',
     rows: [
-      { key: 'amount', label: limit ? '명목금액' : '예상 명목금액', value: `${limit ? '' : '≈ '}${formatMoney(notional, 'USD')} (${quantityText(row.quantity, unit)})` },
+      { key: 'amount', label: limit ? '명목금액' : '예상 명목금액', value: `${limit ? '' : '≈ '}${formatMoney(notional, 'USD')} (${formatPendingQuantity(row.quantity, unit)})` },
       { key: 'execution', label: '진입 유형', value: limit ? '지정가' : '시장가' },
       {
         key: 'condition',
@@ -454,7 +495,7 @@ function futuresConditionalItem(row: FuturesConditionalEntry): PendingItem {
       target: { kind: 'futures_conditional_entry', id: row.id },
       revision: row.revision ?? 0,
       currency: 'USD',
-      trigger: { choose: true },
+      trigger: { choose: true, ...WATCH_PRICE },
       executions: ['market', 'limit'],
       size: 'quantity',
       quantityScale: 8,
@@ -486,10 +527,11 @@ function futuresTpSlItem(row: FuturesTpSlSetting): PendingItem {
     registeredAt: row.createdAt,
     assetName: row.instrument.underlying.name,
     typeLabel: `선물 ${word}`,
+    kindLabel: `선물 ${word}`,
     sideLabel: `${directionWord(row.direction)} 포지션 · ${word}`,
     tone: row.direction === 'long' ? 'sell' : 'buy',
     rows: [
-      { key: 'amount', label: '예상 명목금액', value: `≈ ${formatMoney(product(row.quantity, row.triggerPrice), 'USD')} (최대 ${quantityText(row.quantity, unit)})` },
+      { key: 'amount', label: '예상 명목금액', value: `≈ ${formatMoney(product(row.quantity, row.triggerPrice), 'USD')} (최대 ${formatPendingQuantity(row.quantity, unit)})` },
       { key: 'execution', label: '청산 유형', value: '시장가' },
       { key: 'condition', label: '주문 조건', value: `선물 Last ${formatPendingPrice(row.triggerPrice, 'USD')} ${conditionWord(row.triggerCondition)}` },
     ],
@@ -501,7 +543,7 @@ function futuresTpSlItem(row: FuturesTpSlSetting): PendingItem {
           target: { kind: 'futures_tp_sl', id: row.id },
           revision: row.revision ?? 0,
           currency: 'USD',
-          trigger: { choose: false, condition: row.triggerCondition },
+          trigger: { choose: false, condition: row.triggerCondition, kind: row.kind, ...WATCH_PRICE },
           executions: ['market'],
           size: 'quantity',
           quantityScale: 8,
@@ -534,6 +576,7 @@ function entryPlanItem(plan: EntryTpSlPlanDto): PendingItem {
     registeredAt: plan.createdAt,
     assetName: getAssetNameDisplay(plan.asset).primary,
     typeLabel: `체결 후 ${word}`,
+    kindLabel: `체결 후 ${word}`,
     sideLabel: `${ENTRY_LABEL[plan.entryType]} 체결 후 · ${word}`,
     tone: 'sell',
     rows: [
@@ -548,7 +591,7 @@ function entryPlanItem(plan: EntryTpSlPlanDto): PendingItem {
       target: { kind: 'entry_tp_sl_plan', id: plan.id },
       revision: plan.revision ?? 0,
       currency,
-      trigger: { choose: false, condition },
+      trigger: { choose: false, condition, kind: plan.kind, ...WATCH_PRICE },
       executions: ['market'],
       size: 'ratio',
       quantityScale: 0,

@@ -60,13 +60,14 @@ describe('beginner staged access on a Korean stock (B차)', () => {
     assert.deepEqual(h.alerts.map((alert: unknown[]) => alert[1]), [ALL]);
   });
 
-  it('a SELL: market stays risk reduction, a user limit SELL waits for every quest', async (t) => {
+  it('a SELL: market stays risk reduction, 조건주문 and LOC wait for every quest; no SELL 지정가 is offered', async (t) => {
     const h = beginner(6);
     await h.mount(); t.after(h.close);
     await h.press(sell);
     assert.equal(h.node(submit).props.learningHint ?? null, null);
     await h.press('order-type-select');
-    assert.deepEqual([learningLocked(h, 'market'), learningLocked(h, 'limit')], [false, true]);
+    assert.deepEqual([learningLocked(h, 'market'), learningLocked(h, 'conditional'), learningLocked(h, 'loc')], [false, true, true]);
+    assert.equal(h.node('order-method-limit') === undefined, true);
   });
 
   it('QUEST 07 done: the Korean market BUY waits for every quest; all ten done opens it again', async (t) => {

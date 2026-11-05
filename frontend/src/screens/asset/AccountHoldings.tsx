@@ -25,7 +25,7 @@ import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
 import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSlSheet';
 import { getConditionalSellOrders } from '../../features/conditional/conditionalSellApi';
 import { getOpenConditionalSellOrders } from '../../features/conditional/conditionalSellLists';
-import { tpSlCountSummary } from '../../features/conditional/tpSlModel';
+import { SPOT_TP_SL_TITLE, tpSlCountSummary } from '../../features/conditional/tpSlModel';
 import PendingOrders from './PendingOrders';
 import { OrderAsidePortal } from '../order/OrderAside';
 import { HoldingSummaryCard } from '../order/StockOrderAside';
@@ -105,7 +105,7 @@ export default function AccountHoldings({
     : null;
   // 내 보유 (A-2): this asset's holding, drawn in the order card's right column.
   const ownTpSl = currentInAside && accountId && ownPosition && !query.isError && isTpSlMarket(ownPosition, tpSlMarkets) ? (
-    <TpSlButton testID={`holding-${assetId}-tp-sl`} summary={tpSlSummary(assetId)}
+    <TpSlButton testID={`holding-${assetId}-tp-sl`} label={SPOT_TP_SL_TITLE} summary={tpSlSummary(assetId)}
       onPress={() => setTpSlTarget({ type: 'spot_holding', accountId, assetId })} />
   ) : null;
   const ownCard = currentInAside && accountId ? (
@@ -218,7 +218,7 @@ function HoldingRow({ position, guideTarget, tpSlSummary, onTpSl, onSelect }: {
   const summary = <PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} onPress={onSelect}
     style={onSelect ? onTpSl ? [styles.pressableSummary, styles.pressableAboveAction] : styles.pressableSummary : undefined}
     accessibilityHint={onSelect ? '이 종목의 주문 화면으로 전환합니다' : undefined} />;
-  const tpSl = onTpSl ? <TpSlButton testID={`holding-${position.assetId}-tp-sl`} summary={tpSlSummary} onPress={onTpSl} /> : null;
+  const tpSl = onTpSl ? <TpSlButton testID={`holding-${position.assetId}-tp-sl`} label={SPOT_TP_SL_TITLE} summary={tpSlSummary} onPress={onTpSl} /> : null;
   return (
     <View style={styles.row} testID={`holding-${position.assetId}`}>
       {guideTarget ? <QuestTarget id="asset-holdings">{summary}</QuestTarget> : summary}

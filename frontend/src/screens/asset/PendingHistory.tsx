@@ -28,7 +28,7 @@ async function readHistory(accountId: string, signal?: AbortSignal) {
   };
   const parts: Part[] = [
     { label: '조건부 매수', read: async (s) => ({ conditionalBuys: scoped(await getConditionalBuyOrders(accountId, { state: 'ended', limit: PAGE, offset: 0 }, s)).conditionalOrders }) },
-    { label: '조건부 매도·손절가/익절가', read: async (s) => ({
+    { label: '조건부 매도·익절가/손절가', read: async (s) => ({
       conditionalSells: [
         ...scoped(await getConditionalSellOrders(accountId, { state: 'ended', kind: 'condition', limit: PAGE, offset: 0 }, s)).conditionalOrders,
         ...scoped(await getConditionalSellOrders(accountId, { state: 'ended', kind: 'protection', limit: PAGE, offset: 0 }, s)).conditionalOrders,

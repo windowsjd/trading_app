@@ -18,6 +18,11 @@ export type TpSlKind = 'take_profit' | 'stop_loss';
 export type TpSlDirection = 'long' | 'short';
 
 export const TP_SL_TITLE = '손절가/익절가 설정';
+/**
+ * A Spot holding's button and sheet (2026-11-05): 익절 first, as its form
+ * reads. Futures positions and pending-entry plans keep TP_SL_TITLE.
+ */
+export const SPOT_TP_SL_TITLE = '익절가/손절가 설정';
 /** 익절 first, then 손절 (the form's order). */
 export const TP_SL_KINDS: readonly TpSlKind[] = ['take_profit', 'stop_loss'];
 export const TP_SL_KIND_LABEL: Record<TpSlKind, string> = { take_profit: '익절', stop_loss: '손절' };

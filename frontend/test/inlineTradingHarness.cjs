@@ -428,7 +428,12 @@ function inlineTradingHarness() {
         if (resource === 'conditionalBuyOrders') return { ...base, data: h.conditionalList ?? { tradingAccountId: id,
           capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
           conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
-        if (resource === 'conditionalSellOrders') return { ...base, data: h.sellList ?? defaultSellList(id) };
+        if (resource === 'conditionalSellOrders') {
+          const list = h.sellList ?? defaultSellList(id);
+          // The one pending list reads each family apart (`open`, condition | protection).
+          const family = options.queryKey[3] === 'open' ? options.queryKey[4] : null;
+          return { ...base, data: family ? { ...list, conditionalOrders: list.conditionalOrders.filter((row) => (row.kind === 'condition') === (family === 'condition')) } : list };
+        }
         // Trusted USD/KRW for a KRW holding's 매도 가능 금액: unknown unless a test sets it.
         if (scope === 'wallet' && resource === 'fx-rate') return { ...base, data: h.fxRate };
         // 손절가/익절가 plans on pending entries: closed and empty unless a test sets them.

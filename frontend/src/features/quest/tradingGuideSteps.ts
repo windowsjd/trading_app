@@ -29,7 +29,7 @@ export const TRADING_GUIDE_STEPS: Record<TradingQuestKey, TradingGuideStep[]> = 
   // Spot 손절가/익절가 is set from the practiced holding's card (under the
   // order form), in its bottom sheet — not a 주문방식 (2026-10-16).
   protection: [
-    { screen: 'order', target: 'asset-protection', title: '손절가/익절가 설정', body: '아래 보유종목 카드에서 손절가/익절가 설정을 눌러 주세요. 보유한 현물을 정한 가격에서 자동으로 매도하도록 예약하는 방법이에요.' },
+    { screen: 'order', target: 'asset-protection', title: '익절가/손절가 설정', body: '아래 보유종목 카드에서 익절가/손절가 설정을 눌러 주세요. 보유한 현물을 정한 가격에서 자동으로 매도하도록 예약하는 방법이에요.' },
     { screen: 'order', target: 'protection-editor', title: '익절가와 손절가', body: '익절가는 이익을 실현할 목표가격, 손절가는 손실을 줄이려는 가격이에요. 둘 중 하나 이상을 선택하고 가격과 매도 수량 비율을 정해 주세요. 가격에 도달하면 정한 수량을 시장가로 매도해요.', next: true },
     { screen: 'order', target: 'protection-submit', title: '등록하기', body: '가격과 수량을 확인한 뒤 등록하기를 눌러 주세요. 등록이 확정되면 완료되며 발동까지 기다리지 않아요.' },
   ],

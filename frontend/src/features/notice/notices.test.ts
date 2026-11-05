@@ -33,17 +33,22 @@ it('the order-method notice is newest and states how each method fills', () => {
   assert.equal(notices[0].id, NOTICE_IDS.orderMethodsAndExecution);
   const notice = findNotice(NOTICE_IDS.orderMethodsAndExecution)!;
   assert.equal(notice.title, '주문방식 및 체결 기준 안내');
-  assert.equal(notice.publishedOn, '2026-10-18');
+  assert.equal(notice.publishedOn, '2026-11-05');
   assert.deepEqual(notice.sections.map((section) => section.heading), ['시장가', '지정가', '조건주문', 'LOC 주문', '손절가/익절가 설정', '선물']);
   const text = notice.sections.flatMap((section) => [section.heading, ...section.paragraphs]).join('\n');
+  // 2026-11-05: no new spot SELL limit, which no longer "can be chosen while matched".
+  assert.equal(text.includes('자동으로 체결하고 있을 때만 선택할 수 있습니다'), false);
   for (const required of [
     '실제 거래소로 전송되지 않고',
     '화면에서 본 가격과 최종 체결가격은 다를 수 있으며',
     '주문 접수는 체결이 아닙니다',
-    // 2026-10-18: a new SELL limit, and stock conditions registered off-session.
+    // Accepted SELL limits keep their fill rule; stock conditions register off-session (2026-10-18).
     '매도 지정가는 시세가 지정가격 이상으로 확인되면',
     '매도 수량만큼 보유 수량을 예약합니다',
-    '자동으로 체결하고 있을 때만 선택할 수 있습니다',
+    '현물 매도 주문방식에서는 새 지정가 매도를 선택할 수 없습니다',
+    '이미 접수된 지정가 매도 주문은 대기 목록에서 그대로 확인·변경·취소할 수 있고',
+    '보유종목 카드의 「익절가/손절가 설정」',
+    '선물 포지션 카드와 체결을 기다리는 매수·진입 주문의 「손절가/익절가 설정」',
     '정규장 외 시간(주말·휴장일 포함)에도 조건주문을 등록할 수 있습니다',
     '감시 방향을 직접 선택해야 하며, 선택한 방향은 바뀌지 않습니다',
     '정규장 외 가격이나 이전 종가로는 발동하지 않습니다',
@@ -57,7 +62,7 @@ it('the order-method notice is newest and states how each method fills', () => {
     '5분 이상 간격으로 같은 값이 두 번 확인되어야 확정합니다',
     '뉴욕 시간 23:00까지 확정하지 못하면 주문이 종료되고 예약이 해제됩니다',
     '확정 뒤에 자료가 정정되어도 이미 처리된 체결은 바뀌지 않습니다',
-    '감시가격은 체결을 보장하는 가격이 아닙니다',
+    '현물의 매도 기준가와 선물의 감시가격은 자동 실행 여부를 판단하는 가격이며, 체결을 보장하는 가격이 아닙니다',
     '방향이 달라졌으면 등록하지 않고',
     '감시 중에는 현금·수량·담보를 예약하지 않습니다',
     '그 종가로 전량 체결됩니다',
@@ -110,7 +115,7 @@ it('merges published important notices by KST date without replacing app notices
   assert.equal(kstDate('2026-10-19T15:30:00.000Z'), '2026-10-20');
   assert.equal(kstDate('2026-10-19T14:59:00.000Z'), '2026-10-19');
   const merged = mergeNotices(notices, [
-    { id: 'server-1', title: '점검', publishedAt: '2026-10-18T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
+    { id: 'server-1', title: '점검', publishedAt: '2026-11-05T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
     { id: 'draft', title: '초안', publishedAt: null, sections: [] },
     { id: NOTICE_IDS.executionGapProtection, title: '덮어쓰기', publishedAt: '2026-10-18T00:00:00.000Z', sections: [] },
   ]);

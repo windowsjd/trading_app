@@ -4,7 +4,7 @@ import InlineBottomSheet from '../../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../../components/common/ScreenSheetHost';
 import { useFocusedInputScroll } from '../../../hooks/useFocusedInputScroll';
 import type { EntryTpSlDraftDto, EntryTpSlEntryType } from '../entryTpSlApi';
-import { TP_SL_TITLE, type TpSlDirection } from '../tpSlModel';
+import { SPOT_TP_SL_TITLE, TP_SL_TITLE, type TpSlDirection } from '../tpSlModel';
 import SpotHoldingTpSl from './SpotHoldingTpSl';
 import FuturesPositionTpSl from './FuturesPositionTpSl';
 import EntryTpSl from './EntryTpSl';
@@ -31,7 +31,8 @@ type Common = {
 
 /**
  * The 손절가/익절가 bottom sheet, the same for a holding, a position and a
- * pending entry. It rises from the bottom in the app's sheet layer (below the
+ * pending entry (a Spot holding's is titled 익절가/손절가 설정, like its
+ * button). It rises from the bottom in the app's sheet layer (below the
  * beginner guide), scrolls inside its own height, keeps the focused price
  * input and the submit above the keyboard, and never closes while a command
  * is in flight. Each target mounts a fresh body: another account, asset or
@@ -45,7 +46,8 @@ export default function TpSlSheet({ target, onClose }: { target: TpSlTarget | nu
   const [busy, setBusy] = useState(false);
   return (
     <SheetPortal>
-      <InlineBottomSheet testID="tp-sl-sheet" title={TP_SL_TITLE} visible={!!target} dismissible={!busy} onClose={onClose}>
+      <InlineBottomSheet testID="tp-sl-sheet" title={shown?.type === 'spot_holding' ? SPOT_TP_SL_TITLE : TP_SL_TITLE}
+        visible={!!target} dismissible={!busy} onClose={onClose}>
         {shown ? (
           <SheetScroll key={tpSlTargetKey(shown)} onBusyChange={setBusy}>
             {(common) => shown.type === 'spot_holding'

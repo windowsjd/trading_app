@@ -121,7 +121,7 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
     onSuccess: async (result, request) => {
       for (const row of result.conditionalOrders)
         emitOrderFillEvent({ kind: 'watch', side: 'sell', accountId: request.accountId, watchId: row.id });
-      request.reportQuestCommand({ kind: 'protection', accountId: request.accountId, assetId, summary: '손절가/익절가 설정이 서버에 등록됐어요.' });
+      request.reportQuestCommand({ kind: 'protection', accountId: request.accountId, assetId, summary: '익절가/손절가 설정이 서버에 등록됐어요.' });
       if (isCurrent(request)) {
         actionRef.current = null;
         setRegistered(result.conditionalOrders);
@@ -184,10 +184,10 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
     : position.assetType !== 'domestic_stock' && position.assetType !== 'crypto');
   const blockedReason = !position
     ? holdingsQuery.isError ? '보유 수량을 확인하지 못했어요.' : holdingsQuery.data ? '보유 수량이 없어 설정할 수 없어요.' : '보유 수량을 확인하는 중이에요.'
-    : unsupported ? '이 종목은 손절가/익절가 설정을 지원하지 않아요.'
+    : unsupported ? '이 종목은 익절가/손절가 설정을 지원하지 않아요.'
     : settingsQuery.isError && !settingsData ? '등록된 설정을 확인하지 못했어요.'
     : !settingsData ? '등록된 설정을 확인하는 중이에요.'
-    : !settingsData.capabilities.protection?.canCreate ? '현재 손절가/익절가를 새로 등록할 수 없어요.'
+    : !settingsData.capabilities.protection?.canCreate ? '현재 익절가/손절가를 새로 등록할 수 없어요.'
     : ocoActive ? '이 종목에는 기존 손절가/익절가(OCO) 보호가 있어 함께 설정할 수 없어요. 대기 목록의 손절가/익절가에서 기존 보호를 취소한 뒤 등록해 주세요.'
     : null;
   const canSubmit = !blockedReason && !draftError && !pending;

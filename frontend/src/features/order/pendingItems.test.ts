@@ -108,14 +108,14 @@ describe('통합 대기목록', () => {
     ]);
   });
 
-  it('amounts from a condition price are estimates; SELL targets are "up to"; Futures keep notional apart from margin', () => {
+  it('amounts from a condition price are estimates; SELL targets show their quantity; Futures keep notional apart from margin', () => {
     const items = buildPendingItems({
       conditionalBuys: [watch({ id: 'q', asset: asset('005930', '삼성전자', 'KRX', 'domestic_stock'), currencyCode: 'KRW', amount: null, quantity: '3.00000000', triggerPrice: '68000.00000000' })],
       conditionalSells: [sell()], futuresLimits: [futuresLimit()], futuresConditionals: [futuresWatch({ executionType: 'market', limitPrice: null })],
       futuresTpSl: [tpSl()], entryPlans: [plan()],
     });
     assert.deepEqual([row(byKey(items, 'conditional_buy:q'), 'amount')?.label, row(byKey(items, 'conditional_buy:q'), 'amount')?.value], ['예상 금액', '≈ 204,000원 (3주)']);
-    assert.deepEqual(row(byKey(items, 'spot_stop_loss:cs-1'), 'amount')?.value, '≈ $540 (최대 3주)');
+    assert.deepEqual(row(byKey(items, 'spot_stop_loss:cs-1'), 'amount')?.value, '≈ $540 (3주)');
     assert.equal(byKey(items, 'spot_stop_loss:cs-1').sideLabel, '매도 · 손절가');
     const limit = byKey(items, 'futures_limit:fl-1');
     assert.deepEqual([row(limit, 'amount')?.label, row(limit, 'amount')?.value, limit.notes[0]], ['명목금액', '$200 (2 ETH)', '예약 증거금 $40.1 (수수료 포함)']);
@@ -123,9 +123,61 @@ describe('통합 대기목록', () => {
     assert.deepEqual([row(byKey(items, 'futures_conditional:fc-1'), 'amount')?.label, row(byKey(items, 'futures_conditional:fc-1'), 'condition')?.value],
       ['예상 명목금액', '선물 Last $150 이상']);
     assert.deepEqual(row(byKey(items, 'futures_take_profit:ft-1'), 'execution'), { key: 'execution', label: '청산 유형', value: '시장가' });
+    // Futures are unchanged: their own "up to" quantity and the 선물 Last trigger.
+    assert.deepEqual(row(byKey(items, 'futures_take_profit:ft-1'), 'amount')?.value, '≈ $700 (최대 0.01 BTC)');
     const planItem = byKey(items, 'entry_plan:ep-1');
     assert.deepEqual(planItem.rows.map((entry) => entry.value), ['체결 수량의 50%', '시장가', '감시가격 65,000원 이하']);
     assert.equal(planItem.typeLabel, '체결 후 손절가');
+  });
+
+  it('Spot SELL settings: the badge names 익절가/손절가, the side line and kindLabel keep the kind, the trigger reads 매도 기준가', () => {
+    const samsung = asset('005930', '삼성전자', 'KRX', 'domestic_stock');
+    const krw = { asset: samsung, assetId: 'a-005930', currencyCode: 'KRW', quantity: '3.16412600' };
+    const items = buildPendingItems({
+      conditionalSells: [
+        sell({ ...krw, id: 'sl', triggerPrice: '199000.00000000' }),
+        sell({ ...krw, id: 'tp', kind: 'take_profit', triggerCondition: 'at_or_above', triggerPrice: '220000.00000000' }),
+        sell({ ...krw, id: 'c', kind: 'condition', triggerCondition: 'at_or_above', triggerPrice: '210000.00000000', executionType: 'limit', limitPrice: '209000.00000000' }),
+      ],
+      conditionalBuys: [watch()], futuresTpSl: [tpSl({ kind: 'stop_loss', triggerCondition: 'at_or_below' })],
+    });
+    const stop = byKey(items, 'spot_stop_loss:sl');
+    const take = byKey(items, 'spot_take_profit:tp');
+    assert.deepEqual([stop.typeLabel, stop.sideLabel, stop.kindLabel], ['익절가/손절가', '매도 · 손절가', '손절가']);
+    assert.deepEqual([take.typeLabel, take.sideLabel, take.kindLabel], ['익절가/손절가', '매도 · 익절가', '익절가']);
+    // 199,000 × 3.164126 = 629,661.07: an estimate with the quantity as registered, no 최대.
+    assert.deepEqual(stop.rows.map((entry) => [entry.label, entry.value]), [
+      ['예상 금액', '≈ 629,661원 (3.164126주)'], ['매도 유형', '시장가'], ['주문 조건', '매도 기준가 199,000원 이하'],
+    ]);
+    assert.equal(row(take, 'condition')?.value, '매도 기준가 220,000원 이상');
+    const condition = byKey(items, 'conditional_sell:c');
+    assert.deepEqual([condition.typeLabel, condition.kindLabel, condition.sideLabel], ['조건주문', '조건주문', '매도']);
+    assert.deepEqual([row(condition, 'amount')?.value, row(condition, 'condition')?.value],
+      ['≈ 661,302원 (3.164126주)', '매도 기준가 210,000원 이상 · 지정가 209,000원']);
+    // The kind is structured, never read back from a label.
+    const fixed = (item: PendingItem) => (item.edit as Extract<PendingItem['edit'], { editable: true }>).trigger;
+    assert.deepEqual(fixed(stop), { choose: false, condition: 'at_or_below', kind: 'stop_loss', label: '매도 기준가',
+      hint: '매도 기준가는 자동 매도 여부를 판단하는 가격이에요. 실제 체결가격은 다를 수 있어요.' });
+    const takeTrigger = fixed(take);
+    assert.equal(takeTrigger && 'kind' in takeTrigger ? takeTrigger.kind : null, 'take_profit');
+    assert.deepEqual([fixed(condition)?.choose, fixed(condition)?.label], [true, '매도 기준가']);
+    // BUY watches, Futures and entry plans keep 감시가격 and their labels.
+    assert.equal(row(byKey(items, 'conditional_buy:cb-1'), 'condition')?.value, '감시가격 $95 이하');
+    assert.deepEqual(fixed(byKey(items, 'conditional_buy:cb-1')), { choose: true, label: '감시가격' });
+    const futuresStop = byKey(items, 'futures_stop_loss:ft-1');
+    assert.deepEqual([futuresStop.typeLabel, futuresStop.kindLabel], ['선물 손절가', '선물 손절가']);
+    assert.deepEqual(fixed(futuresStop), { choose: false, condition: 'at_or_below', kind: 'stop_loss', label: '감시가격' });
+    assert.equal(fixed(byKey(buildPendingItems({ entryPlans: [plan()] }), 'entry_plan:ep-1'))?.label, '감시가격');
+  });
+
+  it('only a Spot stop-loss/take-profit offers a share of its holding; conditions and every other kind do not', () => {
+    const items = buildPendingItems({
+      conditionalSells: [sell(), sell({ id: 'c', kind: 'condition', triggerCondition: 'at_or_above' })],
+      spotOrders: [spotLimit()], futuresTpSl: [tpSl()], entryPlans: [plan()],
+    });
+    const share = (key: string) => (byKey(items, key).edit as Extract<PendingItem['edit'], { editable: true }>).holdingShare ?? null;
+    assert.deepEqual(share('spot_stop_loss:cs-1'), { assetId: 'a-AAPL' });
+    for (const key of ['conditional_sell:c', 'spot_limit:o-1', 'futures_take_profit:ft-1', 'entry_plan:ep-1']) assert.equal(share(key), null, key);
   });
 
   it('change rules per kind: LOC and in-flight rows give their reason; market-only kinds offer no execution choice', () => {
@@ -140,7 +192,8 @@ describe('통합 대기목록', () => {
     assert.deepEqual([loc.typeLabel, loc.edit.editable], ['LOC', false]);
     assert.match((loc.edit as { reason: string }).reason, /LOC/);
     const stop = byKey(items, 'spot_stop_loss:cs-1').edit as Extract<PendingItem['edit'], { editable: true }>;
-    assert.deepEqual([stop.executions, stop.trigger], [['market'], { choose: false, condition: 'at_or_below' }]);
+    assert.deepEqual([stop.executions, stop.trigger && 'kind' in stop.trigger ? [stop.trigger.choose, stop.trigger.condition, stop.trigger.kind] : null],
+      [['market'], [false, 'at_or_below', 'stop_loss']]);
     // A condition registered with limit keeps limit as a choice even while new limit registrations are off.
     assert.deepEqual((byKey(items, 'conditional_sell:c').edit as typeof stop).executions, ['market', 'limit']);
     assert.equal(byKey(items, 'futures_take_profit:busy').edit.editable, false);
@@ -194,6 +247,38 @@ describe('설정 변경 입력 확인', () => {
     assert.equal(result.ok, true);
     assert.deepEqual(result.ok && result.body, { triggerPrice: '105', triggerCondition: 'at_or_above', executionType: 'limit', limitPrice: '94', amount: '100' });
     assert.deepEqual(result.ok && result.changes.map((change) => change.label), ['감시 방향', '감시가격', '매수 유형', '지정가']);
+  });
+
+  it('a Spot stock stop-loss keeps its fractional quantity (6 decimals at market): a price-only change sends it unchanged', () => {
+    const stop = spec(buildPendingItems({ conditionalSells: [sell({ asset: asset('005930', '삼성전자', 'KRX', 'domestic_stock'),
+      currencyCode: 'KRW', quantity: '3.16412600', triggerPrice: '199000.00000000' })] }), 'spot_stop_loss:cs-1');
+    assert.deepEqual([stop.quantityScale, stop.limitQuantityScale, stop.initial.quantity], [6, 0, '3.164126']);
+    const priced = checkEdit(stop, { ...stop.initial, triggerPrice: '198000' });
+    assert.deepEqual(priced, { ok: true, body: { triggerPrice: '198000', executionType: 'market', quantity: '3.164126' },
+      changes: [{ label: '매도 기준가', before: '199,000원', after: '198,000원' }] });
+    const resized = checkEdit(stop, { ...stop.initial, quantity: '1.582063' });
+    assert.deepEqual(resized.ok && resized.changes, [{ label: '수량', before: '3.164126 주', after: '1.582063 주' }]);
+    assert.deepEqual(checkEdit(stop, { ...stop.initial, quantity: '1.5820631' }), { ok: false, message: '수량은 0보다 큰 숫자로, 소수점 6자리까지 입력해 주세요.' });
+    for (const quantity of ['', '0', '0.000000'])
+      assert.deepEqual(checkEdit(stop, { ...stop.initial, quantity }), { ok: false, message: '수량은 0보다 큰 숫자로, 소수점 6자리까지 입력해 주세요.' }, quantity);
+    assert.deepEqual(checkEdit(stop, { ...stop.initial, triggerPrice: '' }), { ok: false, message: '매도 기준가는 0보다 큰 숫자로, 소수점 8자리까지 입력해 주세요.' });
+  });
+
+  it('a Spot stock SELL condition takes fractional shares at market and whole shares once switched to limit', () => {
+    const condition = spec(buildPendingItems({
+      conditionalSells: [sell({ id: 'c', kind: 'condition', triggerCondition: 'at_or_above', quantity: '2.50000000' })],
+      conditionalSellLimitAvailable: true,
+    }), 'conditional_sell:c');
+    const market = checkEdit(condition, { ...condition.initial, triggerPrice: '185' });
+    assert.deepEqual(market.ok && market.body, { triggerPrice: '185', triggerCondition: 'at_or_above', executionType: 'market', quantity: '2.5' });
+    assert.deepEqual(checkEdit(condition, { ...condition.initial, executionType: 'limit', limitPrice: '186' }),
+      { ok: false, message: '주식을 지정가로 실행할 때는 수량을 1 이상의 정수로 입력해 주세요.' });
+    const limit = checkEdit(condition, { ...condition.initial, executionType: 'limit', limitPrice: '186', quantity: '2' });
+    assert.deepEqual(limit.ok && limit.changes.map((change) => change.label), ['매도 유형', '지정가', '수량']);
+    // Crypto keeps 6 decimals under either execution.
+    const crypto = spec(buildPendingItems({ conditionalSells: [sell({ id: 'c', kind: 'condition', triggerCondition: 'at_or_above',
+      asset: asset('BTCUSDT', 'Bitcoin', 'BINANCE', 'crypto'), quantity: '0.12345600' })], conditionalSellLimitAvailable: true }), 'conditional_sell:c');
+    assert.equal(checkEdit(crypto, { ...crypto.initial, executionType: 'limit', limitPrice: '186' }).ok, true);
   });
 
   it('stop-loss/take-profit and entry plans send no direction or execution choice; ratio is a whole percent', () => {

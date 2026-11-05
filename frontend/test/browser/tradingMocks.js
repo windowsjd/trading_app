@@ -327,7 +327,7 @@ export const apiClient = {
     }
     if (path.endsWith('/order-capabilities')) {
       const id = path.split('/')[2];
-      // `limitSell=enabled`: limits are registered AND matched, so a SELL limit is offered (2026-10-18).
+      // `limitSell=enabled`: limits are registered AND matched (a new SELL still has no 지정가 since 2026-11-05).
       return response({ tradingAccountId: id, limitOrder: { enabled: true, autoExecutionEnabled: params.get('limitSell') === 'enabled' },
         limitOnClose: { enabled: locEnabled, markets: ['KRX', ...(usOfficial ? ['US'] : [])], sides: ['buy'], attachedProtection: false },
         limitOnCloseSell: { enabled: params.get('locSell') === 'enabled', markets: ['KRX', ...(usOfficial ? ['US'] : [])] } });

@@ -71,7 +71,7 @@ test('marketSell: 매도하기 on the detail, then holdings and the sell form on
   assert.equal(holdings.kind,'spotlight');if(holdings.kind==='spotlight')assert.deepEqual(holdings.targets,['asset-holdings']);
   assert.equal(followGuideFocus({...atOrder,step:3},'order').step,3);
 });
-test('protection: the practiced holding card’s 손절가/익절가 설정, then its sheet editor and 등록하기',()=>{
+test('protection: the practiced holding card’s 익절가/손절가 설정, then its sheet editor and 등록하기',()=>{
   const session=startGuideSession(6,account,'protection',questProgress(3))!;
   assert.equal(followGuideFocus(session,'order').step,0);
   const holdings={screen:'holdings' as const,accountId:account,assetId:session.assetId,holdingsVisible:true};
@@ -81,7 +81,7 @@ test('protection: the practiced holding card’s 손절가/익절가 설정, the
   for(const order of [{orderType:'market'},{orderType:'market',methodSheetOpen:true},{side:'buy',orderType:'market'},{orderType:'market',blocked:true}]){
     const view=resolveGuideView(session,'order',facts(order));
     assert.equal(view.kind,'spotlight');
-    if(view.kind==='spotlight'){assert.deepEqual(view.targets,['asset-protection']);assert.match(view.card.body,/보유종목 카드에서 손절가\/익절가 설정을 눌러/);assert.equal(view.card.next??null,null,'pressing the button moves on, not 다음');}
+    if(view.kind==='spotlight'){assert.deepEqual(view.targets,['asset-protection']);assert.match(view.card.body,/보유종목 카드에서 익절가\/손절가 설정을 눌러/);assert.equal(view.card.next??null,null,'pressing the button moves on, not 다음');}
   }
   // The open sheet mounts the editor: its readiness gates 다음, then 등록하기.
   for(const ready of [false,true]){

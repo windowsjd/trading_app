@@ -8,7 +8,8 @@
  * be neither selected nor submitted. How each method fills is explained once,
  * in 전체 > 공지사항 (주문방식 및 체결 기준 안내), not in the sheet. 손절가/익절가
  * is not an order method: it is set from a holding, a position or a pending
- * entry (2026-10-16). Pure module: runs under `node --test`.
+ * entry (2026-10-16). A new spot SELL has no 지정가 (2026-11-05). Pure module:
+ * runs under `node --test`.
  */
 export type OrderMethod = 'market' | 'limit' | 'conditional' | 'loc';
 
@@ -65,23 +66,21 @@ export function getOrderMethodOptions(input: {
   conditional: ServerGate;
   /** The side's own LOC gate (LOC BUY or LOC SELL). */
   loc: ServerGate;
-  /** SELL only: the ordinary limit gate (registration and automatic matching). */
-  limit?: ServerGate;
 }): OrderMethodOption[] {
   const { assetType, side } = input;
   const krx = assetType === 'domestic_stock';
   const us = assetType === 'us_stock';
   const crypto = assetType === 'crypto';
-  // A new SELL limit (2026-10-18) is offered on KRX/US stocks and Spot crypto
-  // only while the server registers AND automatically matches limit orders: a
-  // sell that could only wait unmatched is never shown as working. BUY keeps
-  // its unconditional 지정가. US conditional/LOC (2026-10-17, Tiingo prices
-  // and end-of-day close) follow the same server gates as KRX: the server
-  // lists 'US' only when the US flags are on.
+  // A new SELL offers no ordinary 지정가 (2026-11-05): it sells at market, by
+  // a condition (market or limit execution) or, on stocks, LOC; 손절가/익절가
+  // stay on the holding. SELL limits already accepted keep their list,
+  // change, fill and cancel. BUY keeps its unconditional 지정가. US
+  // conditional/LOC (2026-10-17, Tiingo prices and end-of-day close) follow
+  // the same server gates as KRX: the server lists 'US' only when the US
+  // flags are on.
   const options = side === 'buy'
     ? [option('market', AVAILABLE), option('limit', AVAILABLE)]
-    : [option('market', AVAILABLE),
-      ...(krx || us || crypto ? [option('limit', fromGate(input.limit ?? { state: 'loading' }))] : [])];
+    : [option('market', AVAILABLE)];
   if (krx || us || crypto) options.push(option('conditional', fromGate(input.conditional)));
   if (krx || us) options.push(option('loc', fromGate(input.loc)));
   return options;
@@ -195,25 +194,6 @@ export function getConditionalSellGate(
   if (!market || !query.data.capabilities.markets.includes(market))
     return { state: 'ready', enabled: false, reason: `이 시장은 ${name} 매도를 지원하지 않아요.` };
   if (!capability.canCreate) return { state: 'ready', enabled: false, reason: `현재 계정 상태에서는 ${name} 매도를 등록할 수 없어요.` };
-  return { state: 'ready', enabled: true };
-}
-
-/**
- * Server capability → gate for a new ordinary SELL Limit (2026-10-18): the
- * order capabilities' `limitOrder` (LIMIT_ORDER_ENABLED, and automatic
- * matching on top of it). With matching off the server would accept the
- * order and only reserve the holding, so the method is unavailable instead.
- * Quote and create still decide the session, holding and account rules.
- */
-export function getLimitSellGate(
-  query: { isLoading: boolean; isError: boolean; data?: { limitOrder?: { enabled: boolean; autoExecutionEnabled: boolean } } | null },
-): ServerGate {
-  if (query.isError) return { state: 'error' };
-  if (query.isLoading || !query.data) return { state: 'loading' };
-  const limit = query.data.limitOrder;
-  if (!limit?.enabled) return { state: 'ready', enabled: false, reason: '현재 운영 상태에서 지정가 매도를 이용할 수 없어요.' };
-  if (!limit.autoExecutionEnabled)
-    return { state: 'ready', enabled: false, reason: '지금은 지정가 주문이 자동 체결되지 않아 지정가 매도를 접수할 수 없어요.' };
   return { state: 'ready', enabled: true };
 }
 

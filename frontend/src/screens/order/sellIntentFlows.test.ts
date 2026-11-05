@@ -159,7 +159,7 @@ describe('SELL condition (KRX, crypto)', () => {
     await h.press('order-method-conditional');
     // The holding sheet follows its own gate: visible, nothing registers.
     await openTpSl(h);
-    expectText(h, /현재 손절가\/익절가를 새로 등록할 수 없어요/);
+    expectText(h, /현재 익절가\/손절가를 새로 등록할 수 없어요/);
     assert.equal(h.node('tp-sl-take-profit-toggle').props.disabled, true);
     assert.equal(h.node('tp-sl-submit').props.state, 'disabled');
   });
@@ -194,7 +194,7 @@ describe('SELL condition (KRX, crypto)', () => {
   });
 });
 
-describe('손절가/익절가 설정 from the holding card (independent stop-loss / take-profit, market only)', () => {
+describe('익절가/손절가 설정 from the holding card (independent stop-loss / take-profit, market only)', () => {
   /** A live SELL setting of this account, as the list returns it. */
   const live = (kind: 'stop_loss' | 'take_profit', triggerPrice: string, quantity: string, assetId = 'bnb') => ({
     id: `${kind}-${triggerPrice}`, assetId, kind, state: 'watching', status: 'watching', triggerPrice, quantity, currencyCode: 'USD',
@@ -215,9 +215,9 @@ describe('손절가/익절가 설정 from the holding card (independent stop-los
     assert.equal(h.node('order-method-protection') === undefined, true);
     await h.press('order-method-market');
     await waitForHolding(h);
-    assert.equal(h.node('holding-bnb-tp-sl').props.label, '손절가/익절가 설정');
+    assert.equal(h.node('holding-bnb-tp-sl').props.label, '익절가/손절가 설정');
     await openTpSl(h);
-    expectText(h, /^손절가\/익절가 설정$/m);
+    expectText(h, /^익절가\/손절가 설정$/m);
     expectNoText(h, /발동 시 주문방식|지정가격/);
     const order = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^tp-sl-(take-profit|stop-loss)-section$/.test(n.props.testID ?? ''))
       .map((n: any) => n.props.testID);
@@ -281,7 +281,7 @@ describe('손절가/익절가 설정 from the holding card (independent stop-los
     h.sellList = { ...sellList('general'), conditionalOrders: [live('stop_loss', '700', '6'), live('take_profit', '900', '10'), live('stop_loss', '600', '4', 'btc')] };
     await h.mount(); t.after(h.close);
     await waitForHolding(h);
-    assert.equal(h.node('holding-bnb-tp-sl').props.label, '손절가/익절가 설정');
+    assert.equal(h.node('holding-bnb-tp-sl').props.label, '익절가/손절가 설정');
     assert.equal([h.node('holding-bnb-tp-sl-summary')?.props.children].flat().join(''), '익절 1건 · 손절 1건', 'the card counts this holding only');
     await openTpSl(h);
     assert.equal(h.node('tp-sl-setting-stop_loss-700') !== undefined && h.node('tp-sl-setting-stop_loss-600') === undefined, true);

@@ -1,4 +1,4 @@
-import { formatPendingPrice, type EditValues, type ExecutionType, type PendingEditSpec, type TriggerCondition } from './pendingItems.ts';
+import { formatPendingPrice, withParticle, type EditValues, type ExecutionType, type PendingEditSpec, type TriggerCondition } from './pendingItems.ts';
 
 type EditableSpec = Extract<PendingEditSpec, { editable: true }>;
 
@@ -30,6 +30,11 @@ const same = (a: string | undefined, b: string | undefined) => {
 const conditionText = (condition: TriggerCondition | undefined) => (condition === 'at_or_above' ? '이상' : condition === 'at_or_below' ? '이하' : '-');
 const executionText = (execution: ExecutionType | undefined) => (execution === 'limit' ? '지정가' : execution === 'market' ? '시장가' : '-');
 
+/** Decimal places the quantity takes under this execution (a stock executed at a limit: whole shares). */
+export function editQuantityScale(spec: EditableSpec, execution: ExecutionType | undefined) {
+  return execution === 'limit' && spec.limitQuantityScale !== undefined ? spec.limitQuantityScale : spec.quantityScale;
+}
+
 /** Checks a draft against its spec; the body is what the server's modify route takes. */
 export function checkEdit(spec: EditableSpec, draft: EditValues): EditCheck {
   const execution = spec.executions.length === 1 ? spec.executions[0] : draft.executionType;
@@ -39,7 +44,8 @@ export function checkEdit(spec: EditableSpec, draft: EditValues): EditCheck {
   if (spec.trigger?.choose && condition !== 'at_or_above' && condition !== 'at_or_below')
     return { ok: false, message: '감시 방향(이상/이하)을 선택해 주세요.' };
   const triggerPrice = spec.trigger ? positive(draft.triggerPrice, 8) : null;
-  if (spec.trigger && !triggerPrice) return { ok: false, message: '감시가격은 0보다 큰 숫자로, 소수점 8자리까지 입력해 주세요.' };
+  if (spec.trigger && !triggerPrice)
+    return { ok: false, message: `${withParticle(spec.trigger.label, '은')} 0보다 큰 숫자로, 소수점 8자리까지 입력해 주세요.` };
   const limitPrice = execution === 'limit' ? positive(draft.limitPrice, 8) : null;
   if (execution === 'limit' && !limitPrice) return { ok: false, message: '지정가는 0보다 큰 숫자로, 소수점 8자리까지 입력해 주세요.' };
   let size: string | null = null;
@@ -52,11 +58,14 @@ export function checkEdit(spec: EditableSpec, draft: EditValues): EditCheck {
     size = positive(draft.amount, 8);
     if (!size) return { ok: false, message: '금액은 0보다 큰 숫자로, 소수점 8자리까지 입력해 주세요.' };
   } else {
-    size = positive(draft.quantity, spec.quantityScale);
+    const scale = editQuantityScale(spec, execution);
+    size = positive(draft.quantity, scale);
     if (!size)
       return {
         ok: false,
-        message: spec.quantityScale === 0 ? '수량은 1 이상의 정수로 입력해 주세요.' : `수량은 0보다 큰 숫자로, 소수점 ${spec.quantityScale}자리까지 입력해 주세요.`,
+        message: scale > 0 ? `수량은 0보다 큰 숫자로, 소수점 ${scale}자리까지 입력해 주세요.`
+          : scale === spec.quantityScale ? '수량은 1 이상의 정수로 입력해 주세요.'
+          : '주식을 지정가로 실행할 때는 수량을 1 이상의 정수로 입력해 주세요.',
       };
   }
   const { initial } = spec;
@@ -66,7 +75,7 @@ export function checkEdit(spec: EditableSpec, draft: EditValues): EditCheck {
     if (spec.trigger.choose && condition !== initial.triggerCondition)
       changes.push({ label: '감시 방향', before: conditionText(initial.triggerCondition), after: conditionText(condition) });
     if (!same(triggerPrice, initial.triggerPrice))
-      changes.push({ label: '감시가격', before: price(initial.triggerPrice), after: price(triggerPrice) });
+      changes.push({ label: spec.trigger.label, before: price(initial.triggerPrice), after: price(triggerPrice) });
   }
   if (spec.executions.length > 1 && execution !== initial.executionType)
     changes.push({ label: spec.executionLabel, before: executionText(initial.executionType), after: executionText(execution) });

@@ -39,10 +39,10 @@ test('plans are optional and never offered for Market, LOC or Sell',async t=>{
  await h.mount();t.after(h.close);
  assert.equal(h.node('order-tp-sl-button')===undefined,true,'시장가 has no entry to attach plans to');
  await h.press(TEST_IDS.assetDetail.sellButton);
- // A SELL limit (2026-10-18) exits a holding: there is no entry to attach plans to.
- await h.selectOrderType('limit');
- assert.equal(h.node(TEST_IDS.order.limitPriceInput)!==undefined,true,'the SELL limit form is shown');
+ // A SELL exits a holding: there is no entry to attach plans to (and no new SELL 지정가 since 2026-11-05).
  assert.equal(h.node('order-tp-sl-button')===undefined,true);
+ await h.press(TEST_IDS.order.typeSelect);
+ assert.equal(h.node('order-method-limit')===undefined,true,'no SELL limit form to attach plans to');
 });
 
 test('plan prices must sit on the protective side of the limit price',async t=>{

@@ -46,13 +46,13 @@ const empty = (h: any) =>
     .map((n: any) => n.props.title)
     .join(' ');
 
-it('a holding card opens its 손절가/익절가 sheet (no inline editor); an existing spot OCO protection stays listed, cancelable and in history under 대기 목록 › TP/SL', async t => {
+it('a holding card opens its 익절가/손절가 sheet (no inline editor); an existing spot OCO protection stays listed, cancelable and in history under 대기 목록 › TP/SL', async t => {
   const h=inlineTradingHarness(); h.holdings={general:[holding('bnb')]};
   const {conditionalFixture}=require('../../../test/conditionalFixtures.cjs');
   h.protections=conditionalFixture('general',{domain:'spot',active:true});
   await h.mount(); t.after(h.close); await h.flush();
   assert.equal(h.node('holding-bnb') !== undefined,true);
-  assert.equal(h.node('holding-bnb-tp-sl').props.label,'손절가/익절가 설정','one button on the card');
+  assert.equal(h.node('holding-bnb-tp-sl').props.label,'익절가/손절가 설정','one button on the card');
   assert.equal(h.node('holding-protection-bnb') === undefined,true,'no old OCO button');
   assert.equal(h.node('protection-panel') === undefined,true,'no inline TP/SL editor');
   assert.doesNotMatch(text(h.node('account-holdings')),/TP\/SL 설정·관리|남은 보유 수량 전체를 보호/);
@@ -714,6 +714,242 @@ describe('설정 변경 / 설정 취소 on the one pending list', () => {
     for (let i = 0; i < 10 && pendingIds(h).length !== 1; i += 1) await h.flush();
     assert.deepEqual(pendingIds(h), ['pending-item-spot_limit-loc-1']);
     assert.match(text(h.node('pending-notice')), /ETH 지정가 설정을 취소했어요/);
+  });
+});
+
+describe('익절가/손절가 설정 변경: 수량 비율 (현물, 2026-11-05)', () => {
+  const value = (h: any, id: string) => [h.node(id)?.props.value].flat().join('');
+  const label = (h: any, id: string) => [h.node(id)?.props.children].flat().join('');
+  const sheetOpen = (h: any) => h.node('pending-edit-sheet')?.props.pointerEvents === 'auto';
+  const modifies = (h: any) => h.requests.filter((r: any) => r.url.endsWith('/modify'));
+  const samsung = { assetId: 'samsung', asset: { id: 'samsung', symbol: '005930', name: '삼성전자', market: 'KRX', assetType: 'domestic_stock' }, currencyCode: 'KRW' };
+  const setting = (kind: 'stop_loss' | 'take_profit', patch: Record<string, unknown> = {}) => ({
+    id: `cs-${kind}`, ...samsung, side: 'sell', kind, positionId: 'generalsamsung',
+    triggerCondition: kind === 'stop_loss' ? 'at_or_below' : 'at_or_above', triggerPrice: kind === 'stop_loss' ? '199000.00000000' : '220000.00000000',
+    executionType: 'market', limitPrice: null, quantity: '3.16412600', status: 'watching', state: 'watching', position: null,
+    executionAvailableQuantity: null, quantityLimited: false, trigger: null, order: null, attemptCount: 0, lastAttemptAt: null,
+    failureCode: null, terminalReason: null, createdAt: '2026-11-05T01:00:00.000Z', endedAt: null, updatedAt: '2026-11-05T01:00:00.000Z',
+    revision: 4, ...patch,
+  });
+  const sells = (rows: unknown[]) => ({ tradingAccountId: 'general',
+    capabilities: { enabled: true, condition: { enabled: true, canCreate: true, canUseLimit: false },
+      protection: { enabled: true, canCreate: true, canUseLimit: false }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 30 },
+    conditionalOrders: rows, pagination: { limit: 100, offset: 0, total: rows.length, returned: rows.length, nextOffset: null } });
+  const open = async (h: any, rows: unknown[], positions: unknown[]) => {
+    h.sellList = sells(rows);
+    h.holdings = { general: positions };
+    h.orders = { general: [] };
+    await h.mount(); await h.press('holdings-filter-pending');
+    for (let i = 0; i < 20 && pendingIds(h).length === 0; i += 1) await h.flush();
+  };
+  const edit = async (h: any, key = 'spot_stop_loss-cs-stop_loss') => {
+    await h.press(`pending-item-${key}-edit`);
+    for (let i = 0; i < 20 && h.node('pending-edit-quantity-basis') === undefined; i += 1) await h.flush();
+  };
+
+  it('the card reads 익절가/손절가 · 매도 · 손절가 · 매도 기준가 with no 최대; 설정 변경 opens on the registered quantity and its share, sending nothing', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [setting('stop_loss')], [holding('samsung', '6.328252')]);
+    const id = 'pending-item-spot_stop_loss-cs-stop_loss';
+    assert.equal(text(h.node(`${id}-type`)), '익절가/손절가');
+    assert.match(text(h.node(id)), /매도 · 손절가/);
+    assert.match(text(h.node(`${id}-amount`)), /예상 금액≈ 629,661원 \(3\.164126주\)/);
+    assert.match(text(h.node(`${id}-condition`)), /매도 기준가 199,000원 이하/);
+    assert.doesNotMatch(text(h.node(id)), /최대|감시가격|보유수량의/);
+    await edit(h);
+    assert.equal(sheetOpen(h), true);
+    assert.equal(value(h, 'pending-edit-quantity'), '3.164126');
+    assert.equal(label(h, 'pending-edit-quantity-ratio-percent'), '50%');
+    assert.equal(label(h, 'pending-edit-quantity-basis'), '현재 보유 6.328252주 기준');
+    assert.equal(['25', '50', '75', '100'].some((p) => h.node(`pending-edit-quantity-ratio-${p}`).props.accessibilityState.selected), false, 'no pick is claimed on open');
+    assert.match(label(h, 'pending-edit-direction-fixed'), /이하 도달 시 실행 · 손절가는 방향이 정해져 있어요/);
+    assert.match(label(h, 'pending-edit-execution-fixed'), /시장가 · 이 손절가의 실행 유형은 바꿀 수 없어요/);
+    assert.equal(h.node('pending-edit-trigger-price').props.accessibilityLabel, '매도 기준가');
+    assert.match(label(h, 'pending-edit-trigger-hint'), /자동 매도 여부를 판단하는 가격이에요\. 실제 체결가격은 다를 수 있어요/);
+    assert.doesNotMatch(text(h.node('pending-edit-sheet')), /감시가격/);
+    assert.equal(modifies(h).length, 0);
+  });
+
+  it('25/50/75/100% and the slider write a share of the TOTAL holding, rounded down to 6 decimals; typing moves the thumb and is never rewritten', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [setting('stop_loss')], [holding('samsung', '6.328252')]);
+    await edit(h);
+    await h.press('pending-edit-quantity-ratio-25');
+    assert.equal(value(h, 'pending-edit-quantity'), '1.582063');
+    assert.equal(h.node('pending-edit-quantity-ratio-25').props.accessibilityState.selected, true);
+    await h.press('pending-edit-quantity-ratio-75');
+    assert.equal(value(h, 'pending-edit-quantity'), '4.746189');
+    await h.press('pending-edit-quantity-ratio-100');
+    assert.equal(value(h, 'pending-edit-quantity'), '6.328252');
+    await h.slide('pending-edit-quantity-ratio-slider', 30);
+    assert.deepEqual([value(h, 'pending-edit-quantity'), label(h, 'pending-edit-quantity-ratio-percent')], ['1.898475', '30%']);
+    await h.input('pending-edit-quantity', '2.5');
+    assert.deepEqual([value(h, 'pending-edit-quantity'), label(h, 'pending-edit-quantity-ratio-percent')], ['2.5', '40%']);
+    assert.equal(['25', '50', '75', '100'].some((p) => h.node(`pending-edit-quantity-ratio-${p}`).props.accessibilityState.selected), false);
+    await h.slide('pending-edit-quantity-ratio-slider', 0);
+    assert.equal(value(h, 'pending-edit-quantity'), '');
+    await h.press('pending-edit-review');
+    assert.match(label(h, 'pending-edit-message'), /수량은 0보다 큰 숫자로, 소수점 6자리까지/);
+    await h.input('pending-edit-quantity', '2.5');
+    await h.press('pending-edit-review');
+    assert.match(text(h.node('pending-edit-changes')), /수량3\.164126 주 → 2\.5 주/);
+    await h.press('pending-edit-save'); await h.flush();
+    assert.deepEqual(modifies(h).map((r: any) => r.url), ['/trading-accounts/general/conditional-sell-orders/cs-stop_loss/modify']);
+    assert.deepEqual({ ...modifies(h)[0].body, idempotencyKey: typeof modifies(h)[0].body.idempotencyKey },
+      { triggerPrice: '199000', executionType: 'market', quantity: '2.5', expectedRevision: 4, idempotencyKey: 'string' });
+    assert.equal(h.requests.some((r: any) => r.url.endsWith('/cancel') || r.url.endsWith('/conditional-sell-orders')), false, 'never a cancel plus a new setting');
+    for (let i = 0; i < 10 && !h.node('pending-notice'); i += 1) await h.flush();
+    assert.match(text(h.node('pending-notice')), /삼성전자 손절가 설정을 변경했어요/);
+  });
+
+  it('changing only the 매도 기준가 keeps the fractional registered quantity (no whole-share rule at market)', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [setting('take_profit')], [holding('samsung', '6.328252')]);
+    await edit(h, 'spot_take_profit-cs-take_profit');
+    assert.match(label(h, 'pending-edit-direction-fixed'), /이상 도달 시 실행 · 익절가는 방향이 정해져 있어요/);
+    await h.input('pending-edit-trigger-price', '225000');
+    await h.press('pending-edit-review');
+    assert.equal(h.node('pending-edit-message') === undefined, true);
+    assert.match(text(h.node('pending-edit-changes')), /매도 기준가220,000원 → 225,000원/);
+    assert.doesNotMatch(text(h.node('pending-edit-changes')), /수량/);
+    await h.press('pending-edit-save'); await h.flush();
+    assert.deepEqual([modifies(h).length, modifies(h)[0].body.triggerPrice, modifies(h)[0].body.quantity, modifies(h)[0].body.executionType],
+      [1, '225000', '3.164126', 'market']);
+  });
+
+  it('without a holding read the share is off and computes nothing; typing still works, and the read turns it on', async (t) => {
+    const loading = inlineTradingHarness(); t.after(loading.close);
+    loading.holdingsGate = { general: deferred() };
+    await open(loading, [setting('stop_loss')], [holding('samsung', '6.328252')]);
+    await loading.press('pending-item-spot_stop_loss-cs-stop_loss-edit');
+    assert.equal(label(loading, 'pending-edit-quantity-ratio-reason'), '보유 수량을 확인하는 중이에요.');
+    assert.equal(loading.node('pending-edit-quantity-ratio-slider').props.disabled, true);
+    await loading.press('pending-edit-quantity-ratio-50');
+    assert.deepEqual([value(loading, 'pending-edit-quantity'), label(loading, 'pending-edit-quantity-ratio-percent')], ['3.164126', '0%']);
+    await act(async () => loading.holdingsGate.general.resolve()); await loading.flush();
+    assert.equal(loading.node('pending-edit-quantity-ratio-reason') === undefined, true);
+    assert.equal(label(loading, 'pending-edit-quantity-ratio-percent'), '50%');
+    assert.equal(value(loading, 'pending-edit-quantity'), '3.164126', 'the read changes the thumb, never the quantity');
+
+    const failed = inlineTradingHarness(); t.after(failed.close);
+    failed.holdingsError = new Error('offline');
+    await open(failed, [setting('stop_loss')], [holding('samsung', '6.328252')]);
+    await failed.press('pending-item-spot_stop_loss-cs-stop_loss-edit');
+    // Opening retries the failed read (확인하는 중) before it reports the failure.
+    for (let i = 0; i < 10 && !/확인하지 못해/u.test(label(failed, 'pending-edit-quantity-ratio-reason')); i += 1) await failed.flush();
+    assert.equal(label(failed, 'pending-edit-quantity-ratio-reason'), '보유 수량을 확인하지 못해 비율로 정할 수 없어요. 수량은 직접 입력할 수 있어요.');
+    await failed.press('pending-edit-quantity-ratio-100');
+    assert.equal(value(failed, 'pending-edit-quantity'), '3.164126');
+    await failed.input('pending-edit-quantity', '1');
+    await failed.press('pending-edit-review');
+    assert.match(text(failed.node('pending-edit-changes')), /수량3\.164126 주 → 1 주/);
+  });
+
+  it('a setting above today\'s holding opens as registered (never shrunk); the server rules decide a change', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [setting('stop_loss')], [holding('samsung', '2')]);
+    await edit(h);
+    assert.deepEqual([value(h, 'pending-edit-quantity'), label(h, 'pending-edit-quantity-ratio-percent')], ['3.164126', '100%']);
+    assert.match(label(h, 'pending-edit-quantity-over'), /설정 수량이 현재 보유 수량보다 많아요/);
+    await h.input('pending-edit-trigger-price', '198000');
+    await h.press('pending-edit-review');
+    h.modifyFailures = [{ response: { status: 409, data: { error: { code: 'CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING', message: 'raw' } } } }];
+    await h.press('pending-edit-save'); await h.flush();
+    assert.match(text(h.node('pending-edit-error')), /설정 수량은 현재 보유 수량을 넘을 수 없습니다/);
+    assert.equal(h.node('pending-edit-save')?.props.label, '저장하기', 'a definite refusal is not an unconfirmed result');
+    await h.press('pending-edit-back');
+    await h.press('pending-edit-quantity-ratio-100');
+    assert.equal(value(h, 'pending-edit-quantity'), '2');
+    assert.equal(h.node('pending-edit-quantity-over') === undefined, true);
+    // Other live settings of the same kind still count on the server.
+    await h.press('pending-edit-review');
+    h.modifyFailures = [{ response: { status: 409, data: { error: { code: 'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING', message: 'raw' } } } }];
+    await h.press('pending-edit-save'); await h.flush();
+    assert.match(text(h.node('pending-edit-error')), /같은 종류\(익절 또는 손절\) 설정과 합친 수량이 현재 보유 수량을 넘어 등록하거나 변경할 수 없습니다/);
+    assert.equal(modifies(h).length, 2);
+    assert.notEqual(modifies(h)[1].body.idempotencyKey, modifies(h)[0].body.idempotencyKey, 'another change, another key');
+  });
+
+  it('a crypto pick below the smallest unit writes and sends nothing, and says why', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    const bnb = { assetId: 'bnb', asset: { id: 'bnb', symbol: 'BNBUSDT', name: 'BNB', market: 'BINANCE', assetType: 'crypto' },
+      currencyCode: 'USD', triggerPrice: '700.00000000', quantity: '0.00000200' };
+    await open(h, [setting('stop_loss', bnb)], [holding('bnb', '0.000003')]);
+    await edit(h);
+    assert.equal(label(h, 'pending-edit-quantity-basis'), '현재 보유 0.000003 BNB 기준');
+    await h.press('pending-edit-quantity-ratio-25');
+    assert.equal(value(h, 'pending-edit-quantity'), '0.000002');
+    assert.match(label(h, 'pending-edit-quantity-ratio-notice'), /최소 단위보다 적어요/);
+    await h.press('pending-edit-quantity-ratio-100');
+    assert.equal(value(h, 'pending-edit-quantity'), '0.000003');
+    assert.equal(h.node('pending-edit-quantity-ratio-notice') === undefined, true);
+    assert.equal(modifies(h).length, 0);
+  });
+
+  it('a SELL condition and a Futures stop-loss keep their sheets: no holding share; Futures keep 감시가격', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    h.futuresTpSl = { general: { open: [{ id: 'ft-1', tradingAccountId: 'general', instrumentId: 'i', positionId: 'pos', direction: 'long',
+      instrument: { underlying: { symbol: 'BTCUSDT', name: 'BTC', displayPriceDecimals: 2 } }, kind: 'stop_loss', triggerCondition: 'at_or_below',
+      triggerPrice: '60000.00000000', quantity: '0.01000000', status: 'watching', state: 'watching', position: null, execution: null,
+      quantityLimited: false, trigger: null, entryPlanId: null, attemptCount: 0, lastAttemptAt: null, failureCode: null, terminalReason: null,
+      createdAt: '2026-11-05T00:00:00.000Z', endedAt: null, updatedAt: '2026-11-05T00:00:00.000Z', revision: 1 }] } };
+    await open(h, [setting('stop_loss', { id: 'c-1', kind: 'condition', triggerCondition: 'at_or_above', quantity: '2.50000000' })],
+      [holding('samsung', '6.328252')]);
+    for (let i = 0; i < 20 && !h.node('pending-item-futures_stop_loss-ft-1'); i += 1) await h.flush();
+    assert.equal(text(h.node('pending-item-conditional_sell-c-1-type')), '조건주문');
+    assert.match(text(h.node('pending-item-conditional_sell-c-1-condition')), /매도 기준가 199,000원 이상/);
+    await h.press('pending-item-conditional_sell-c-1-edit');
+    assert.equal(h.node('pending-edit-quantity-ratio') === undefined, true, 'conditions keep their sheet');
+    assert.equal(h.node('pending-edit-direction') !== undefined, true);
+    assert.equal(value(h, 'pending-edit-quantity'), '2.5');
+    await h.press('pending-edit-sheet-close');
+    assert.equal(text(h.node('pending-item-futures_stop_loss-ft-1-type')), '선물 손절가');
+    assert.match(text(h.node('pending-item-futures_stop_loss-ft-1-amount')), /최대 0\.01 BTC/);
+    await h.press('pending-item-futures_stop_loss-ft-1-edit');
+    assert.equal(h.node('pending-edit-quantity-ratio') === undefined, true);
+    assert.equal(h.node('pending-edit-trigger-hint') === undefined, true);
+    assert.equal(h.node('pending-edit-trigger-price').props.accessibilityLabel, '감시가격');
+    assert.match(label(h, 'pending-edit-direction-fixed'), /이하 도달 시 실행 · 손절가는 방향이 정해져 있어요/);
+    assert.match(label(h, 'pending-edit-execution-fixed'), /시장가 · 이 선물 손절가의 실행 유형은 바꿀 수 없어요/);
+  });
+
+  it('a double save is one change (one key); a setting that fired or ended meanwhile is refused, offering only 닫기', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [setting('stop_loss')], [holding('samsung', '6.328252')]);
+    await edit(h);
+    await h.press('pending-edit-quantity-ratio-25');
+    await h.press('pending-edit-review');
+    h.modifyGate = deferred();
+    const save = h.node('pending-edit-save').props.onPress;
+    await act(async () => { save(); save(); });
+    await act(async () => h.modifyGate.resolve()); await h.flush();
+    assert.equal(new Set(modifies(h).map((r: any) => r.body.idempotencyKey)).size, 1, 'the server applies it once');
+    h.modifyGate = null;
+
+    const moved = inlineTradingHarness(); t.after(moved.close);
+    await open(moved, [setting('stop_loss')], [holding('samsung', '6.328252')]);
+    await edit(moved);
+    await moved.press('pending-edit-quantity-ratio-25');
+    await moved.press('pending-edit-review');
+    moved.modifyFailures = [{ response: { status: 409, data: { error: { code: 'PENDING_ORDER_NOT_MODIFIABLE', message: 'raw' } } } }];
+    await moved.press('pending-edit-save'); await moved.flush();
+    assert.match(text(moved.node('pending-edit-error')), /이미 체결·발동·취소되어 변경할 수 없어요/);
+    assert.equal(moved.node('pending-edit-save') === undefined, true, 'no retry of a refused change');
+    await moved.press('pending-edit-close'); await moved.flush();
+    assert.equal(sheetOpen(moved), false);
+    assert.equal(modifies(moved).length, 1);
+    assert.equal(moved.requests.some((r: any) => r.url.endsWith('/cancel') || r.url.endsWith('/conditional-sell-orders')), false);
+  });
+
+  it('switching the account closes the sheet before anything is sent', async (t) => {
+    const h = inlineTradingHarness(); t.after(h.close);
+    await open(h, [setting('stop_loss')], [holding('samsung', '6.328252')]);
+    await edit(h);
+    await h.press('pending-edit-quantity-ratio-50');
+    h.accountId = 'season'; h.routeAccountId = 'season';
+    await h.update(); await h.flush();
+    assert.equal(sheetOpen(h), false);
+    assert.equal(modifies(h).length, 0);
   });
 });
 
