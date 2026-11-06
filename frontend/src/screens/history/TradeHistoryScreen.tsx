@@ -18,6 +18,8 @@ import ActionPressable from '../../components/common/ActionPressable';
 import { SafeAreaView } from '../../theme/safeArea';
 import SegmentedControl from '../../components/common/SegmentedControl';
 import FuturesHistory from '../futures/FuturesHistory';
+import { ScreenSheetHost } from '../../components/common/ScreenSheetHost';
+import CompletedTrades from './CompletedTrades';
 import {
   useInfiniteQuery,
   useMutation,
@@ -70,7 +72,8 @@ import WhaleLoader from '../../components/states/WhaleLoader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHistory'>;
 type Filter = 'all' | 'buy' | 'sell';
-type Market = 'spot' | 'futures';
+/** 현물 orders, 선물 records, and 거래 완료 (completed trades, each shareable). */
+type Market = 'spot' | 'futures' | 'completed';
 
 export default function TradeHistoryScreen({ route }: Props) {
   const recordScope = route.params;
@@ -330,8 +333,25 @@ export default function TradeHistoryScreen({ route }: Props) {
       options={[
         { key: 'spot', label: '현물', testID: 'trade-history-spot' },
         { key: 'futures', label: '선물', testID: 'trade-history-futures' },
+        { key: 'completed', label: '거래 완료', testID: 'trade-history-completed' },
       ]} />
   );
+
+  // 거래 완료: the account's confirmed completed trades and their 수익 공유
+  // card. Keyed by account so no row, card or share in flight outlives a
+  // change of the pinned subject. The share sheet draws in the host over the
+  // whole screen (its dim reaches the bottom edge; it pads the inset itself).
+  if (market === 'completed') {
+    return (
+      <ScreenSheetHost>
+        <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.container}>
+          {hasAccount ? (
+            <CompletedTrades key={accountId} accountId={accountId} header={<View>{accountLine}{marketSwitch}</View>} />
+          ) : null}
+        </SafeAreaView>
+      </ScreenSheetHost>
+    );
+  }
 
   // 선물: the account's executions and forced liquidations (existing futures
   // history API, 20 a page). Keyed by account so no other account's page or

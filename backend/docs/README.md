@@ -31,6 +31,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/sell-automation-activation-2026-10-15.md` — activation of Conditional BUY/SELL, TP/SL and LOC BUY/SELL: flags, dependencies, observed production state and the production checks NOT yet performed
    - `docs/pending-order-modification-contract.md` — 2026-11-05: 설정 변경 of every pending order/setting in place (one command, revision + idempotency, reservation re-derivation, evidence floor `revised_at`, append-only `pending_order_modifications`); LOC/child/OCO-protected not modifiable
    - `docs/pending-order-events-contract.md` — 2026-11-05: read-only feed of confirmed fills and met conditions per account (cursor, look-back, trigger-vs-fill rule) for the app's banners; no push coupling
+   - `docs/completed-trades-share-contract.md` — 2026-11-06: read-only owner list of completed trades (the 거래 완료 종목 policy) with share-card evidence (completion time, average entry/exit prices, leverage, close kind); general-reset Spot epoch; for the app's 수익 공유 card
    - `docs/independent-tp-sl-entry-plans-contract.md` — 2026-10-16: independent partial stop-loss/take-profit on holdings, Futures positions and pending entries (plans activated by the actual fill), retirement of new OCO registration, automatic 이상/이하 of conditional orders; default OFF
    - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`

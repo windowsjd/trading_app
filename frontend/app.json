@@ -6,7 +6,12 @@
   "ios": {
     "bundleIdentifier": "com.leagueoftrading",
     "infoPlist": {
-      "ITSAppUsesNonExemptEncryption": false
+      "ITSAppUsesNonExemptEncryption": false,
+      "LSApplicationQueriesSchemes": [
+        "instagram-stories",
+        "kakaotalk",
+        "tg"
+      ]
     }
   },
   "android": {
@@ -15,7 +20,8 @@
       "com.google.android.gms.permission.AD_ID",
       "android.permission.ACCESS_ADSERVICES_AD_ID",
       "android.permission.ACCESS_ADSERVICES_ATTRIBUTION",
-      "android.permission.ACCESS_ADSERVICES_TOPICS"
+      "android.permission.ACCESS_ADSERVICES_TOPICS",
+      "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
     ],
     "adaptiveIcon": {
       "foregroundImage": "./assets/icon/trading-class-android-foreground-432.png",
@@ -53,6 +59,15 @@
       "expo-notifications",
       {
         "defaultChannel": "default"
+      }
+    ],
+    [
+      "expo-media-library",
+      {
+        "photosPermission": "프로필 사진을 선택하려면 사진 접근 권한이 필요합니다.",
+        "savePhotosPermission": "수익 카드 이미지를 사진 앱에 저장하려면 사진 추가 권한이 필요합니다.",
+        "isAccessMediaLocationEnabled": false,
+        "granularPermissions": []
       }
     ]
   ],

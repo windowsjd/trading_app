@@ -403,6 +403,9 @@ jobs:
       # Ownership, participant↔account linkage, financial scope, trading scope,
       # general-account creation and initial grant, snapshot/ranking scope.
       FRIENDS_DB_INTEGRATION: "1"
+      # 수익 공유: the owner's completed trades (friend policy figures, stored
+      # execution prices, general reset epoch, owner-only HTTP); reads only.
+      COMPLETED_TRADES_DB_INTEGRATION: "1"
       TRADING_ACCOUNT_DB_INTEGRATION: "1"
       BEGINNER_ACCOUNT_DB_INTEGRATION: "1"
       # Complete general trading lifecycle: KRW market buy, market sell,
@@ -489,6 +492,7 @@ jobs:
           src/batch/season-settlement-exclusion-race.integration.spec.ts
           src/ranking/season-final-qualification.integration.spec.ts
           src/friends/friends.integration.spec.ts
+          src/completed-trades/completed-trades.integration.spec.ts
           src/notifications/push-notifications.integration.spec.ts
           src/inquiries/inquiries.integration.spec.ts
           src/seasons/seasons.join.integration.spec.ts

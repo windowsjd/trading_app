@@ -123,3 +123,24 @@ it('선물 records page 20 at a time with 이전/다음; a page replaces the pre
   assert.equal(pageButton('다음').props.accessibilityState.disabled, true, 'no page after the last');
   assert.equal(pageButton('이전').props.accessibilityState.disabled, false);
 });
+
+for (const scope of scopes) {
+  it(`거래 완료 (route ${JSON.stringify(scope)}): the pinned account's completed trades with 공유; another selected account never retargets it`, async t => {
+    const h = createRecordScreenHarness('history', scope); t.after(h.close); await h.settle();
+    await h.press('trade-history-completed');
+    assert.equal(h.orderOptions.enabled, false, 'the order list and its polling wait while 거래 완료 is shown');
+    assert.equal(h.requests.some(r => r.path === '/trading-accounts/historical/completed-trades'), true,
+      'a settled season record reads its own (closed) season account');
+    assert.equal(has(h, /실현 손익 \+\$152\.34 · 수익률 \+3\.42%/), true);
+    assert.equal(has(h, /2026-11-05 21:44:04 완료 · 10x/), true);
+    h.selectedAccount = h.accounts[1]; await h.update();
+    assert.equal(h.requests.filter(r => r.path.endsWith('/completed-trades')).every(r => r.path === '/trading-accounts/historical/completed-trades'), true);
+    await h.press('completed-trade-futures:lifetime-1-share');
+    assert.equal(Boolean(h.find('trade-share-body')), true, 'the 수익 공유 sheet opens over the list');
+    assert.equal(h.text(h.find('trade-share-card-nickname')), '기록왕');
+    assert.equal(h.text(h.find('trade-share-card-headline')), '+152.34');
+    await h.press('trade-history-spot');
+    assert.equal(Boolean(h.find('record-order-list-screen')), true);
+    assert.equal(h.orderOptions.enabled, true);
+  });
+}

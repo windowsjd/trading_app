@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, StyleSheet, View, type ViewStyle } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
+import { profileImageUri } from '../../features/me/profileImageUri';
 
 type Props = {
   profileImageUrl?: string | null;
@@ -10,21 +11,14 @@ type Props = {
   accessibilityLabel?: string;
   /** Background and border for a placement that draws its own ring (TOP 3 시상대); size and shape stay. */
   frameStyle?: Pick<ViewStyle, 'backgroundColor' | 'borderWidth'>;
+  /** The photo finished loading or failed (the fallback then draws): an image capture can proceed. */
+  onImageSettled?: () => void;
 };
 
-export function profileImageUri(value?: string | null): string | null {
-  if (!value?.trim()) return null;
-  try {
-    const url = new URL(value.trim());
-    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname
-      ? url.href : null;
-  } catch {
-    return null;
-  }
-}
+export { profileImageUri };
 
 /** Original geometric head/shoulders; no external placeholder image or asset. */
-export default function ProfileAvatar({ profileImageUrl, size = 36, testID = 'profile-avatar', accessibilityLabel, frameStyle }: Props) {
+export default function ProfileAvatar({ profileImageUrl, size = 36, testID = 'profile-avatar', accessibilityLabel, frameStyle, onImageSettled }: Props) {
   const uri = profileImageUri(profileImageUrl);
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const box = { width: size, height: size, borderRadius: size / 2 };
@@ -36,7 +30,9 @@ export default function ProfileAvatar({ profileImageUrl, size = 36, testID = 'pr
       importantForAccessibility={accessibilityLabel ? 'yes' : 'no-hide-descendants'}>
       {uri && uri !== failedUri ? (
         <Image key={uri} testID={`${testID}-image`} source={{ uri }} resizeMode="cover"
-          accessible={false} style={styles.image} onError={() => setFailedUri(uri)} onLoad={() => setFailedUri(null)} />
+          accessible={false} style={styles.image}
+          onError={() => { setFailedUri(uri); onImageSettled?.(); }}
+          onLoad={() => { setFailedUri(null); onImageSettled?.(); }} />
       ) : (
         <View testID={`${testID}-fallback`} style={styles.image} accessible={false}>
           <View style={styles.head} />

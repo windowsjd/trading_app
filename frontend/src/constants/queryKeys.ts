@@ -369,6 +369,8 @@ export const QUERY_KEYS = {
     pendingHistory: (id: string) => ['tradingAccount', 'pendingHistory', id] as const,
     /** 발동·체결 알림 feed reads (the cursor lives in device storage, not here). */
     pendingOrderEvents: (id: string) => ['tradingAccount', 'pendingOrderEvents', id] as const,
+    /** 거래 완료: the account's confirmed completed trades (수익 공유). */
+    completedTrades: (id: string) => ['tradingAccount', 'completedTrades', id] as const,
     conditionalBuy: {
       all: (id: string) => ['tradingAccount', 'conditionalBuyOrders', id] as const,
       list: (id: string, filters: { history: boolean; limit: number; assetId?: string }) =>

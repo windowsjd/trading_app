@@ -1,4 +1,5 @@
 import { PendingOrderEventsModule } from './pending-order-events/pending-order-events.module';
+import { CompletedTradesModule } from './completed-trades/completed-trades.module';
 import { AppReleaseModule } from './app-release/app-release.module';
 import { FriendsModule } from './friends/friends.module';
 import { ConditionalModule } from './conditional/conditional.module';
@@ -56,6 +57,7 @@ import { WalletsModule } from './wallets/wallets.module';
     NotificationsModule,
     AppReleaseModule,
     PendingOrderEventsModule,
+    CompletedTradesModule,
     OperatorModule,
     OpsModule,
     OrdersModule,

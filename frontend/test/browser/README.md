@@ -1,5 +1,13 @@
 # Trading UI browser regression
 
+수익 공유 카드·시트(2026-11-06)는 `NODE_PATH=/path/to/browser-tools/node_modules BROWSER_EXECUTABLE_PATH=…
+node test/browser/tradeShareBrowser.cjs` (`TRADE_SHARE_QUICK=1`: 카드 3개·시트 320/390px만). 실제 TradeShareCard를
+`tradeShareFixture.jsx`로 공유 이미지와 같은 1080×1920 격자(DPR 1)에 9개 시나리오(시안, 수익률, 대규모 손실·Short·125x·소수 가격,
+수익률 대규모 손실, 원화 현물, 0 손익·긴 닉네임, 초대형 원화, 가격 근거 없음, 프로필 사진)로 그려 글자가 카드 안·잘림 없음(극단
+닉네임의 2줄 말줄임만 note), 인스타그램 상하단 250px 밖, 블록 겹침 없음, 큰 숫자 색(수익 #14FA2A·손실 #FF3B4A·0 중립),
+브랜드 문구, 분류 문구 없음을 확인하고, 실제 TradeShareSheet를 320/360/390/430px × 글꼴 1/1.5/2배 × Light/Dark에서 가로 스크롤·
+라벨 잘림·화면 밖 없음, 시트가 화면 안(올라오는 동작이 멈춘 뒤 측정), 미리보기 9:16을 확인한다. 출력 `TRADE_SHARE_OUTPUT`.
+
 차트 거래 가격선(2026-11-04)은 `NODE_PATH=/path/to/browser-tools/node_modules BROWSER_EXECUTABLE_PATH=…
 node test/browser/chartPriceLinesBrowser.cjs` (`CHART_LINES_WIDTHS=320` for one width, `CHART_LINES_FONTS=1` for one font
 scale). 실제 CandlestickChart를 `chartPriceLinesFixture.jsx`로 렌더링해 320/360/390px × Light/Dark × 글꼴 1x/2x × 시나리오 5개(떨어진

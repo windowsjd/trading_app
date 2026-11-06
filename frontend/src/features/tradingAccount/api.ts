@@ -6,6 +6,7 @@ import { apiClient } from '../../services/api/client';
 import type {
   ApiSuccessResponse,
   AdminDiagnosticDto,
+  IsoDateTimeString,
   MoneyString,
   OffsetPagination,
   PercentString,
@@ -25,6 +26,7 @@ import type {
   WalletTransactionFiltersDto,
 } from '../wallet/api';
 import type { PositionItemDto } from '../position/api';
+import type { FriendCompletedTrade } from '../ranking/api';
 import type {
   CancelOrderDto,
   CreateOrderDto,
@@ -916,4 +918,51 @@ export async function acknowledgeBeginnerQuest(accountId: string, stepId: 'holdi
   const response = await apiClient.post<ApiSuccessResponse<BeginnerQuestsDto>>(
     accountPath(accountId, '/quests/acknowledgements'), { stepId, orderId });
   return parseBeginnerQuests(response.data.data, accountId);
+}
+
+/**
+ * 거래 완료 (backend docs/completed-trades-share-contract.md): the owner's own
+ * completed trades — a Spot holding closed now, or a closed Futures lifetime —
+ * with the 거래 완료 종목 policy's confirmed result and return rate, plus the
+ * stored evidence the 수익 공유 card shows. Prices are averages of stored
+ * executions and null when the evidence is missing; the client never
+ * estimates one.
+ */
+export type CompletedTrade =
+  | (Extract<FriendCompletedTrade, { kind: 'spot' }> & {
+      key: string;
+      completedAt: IsoDateTimeString;
+      averageBuyPrice: MoneyString | null;
+      averageSellPrice: MoneyString | null;
+      displayPriceDecimals: number | null;
+    })
+  | (Extract<FriendCompletedTrade, { kind: 'futures' }> & {
+      key: string;
+      positionId: string;
+      leverage: number;
+      marginMode: 'isolated' | 'cross';
+      /** How the lifetime ended: by the user, a forced liquidation or the season-final close. */
+      closeKind: 'closed' | 'liquidated' | 'season_closed';
+      completedAt: IsoDateTimeString;
+      averageEntryPrice: MoneyString | null;
+      averageExitPrice: MoneyString | null;
+      displayPriceDecimals: number | null;
+    });
+
+export interface CompletedTradesDto {
+  tradingAccountId: string;
+  items: CompletedTrade[];
+  /** Older completed trades exist beyond the newest ones listed. */
+  hasMore: boolean;
+}
+
+/** GET .../completed-trades (2026-11-06): this account's completed trades for 수익 공유. */
+export async function getCompletedTrades(accountId: string, signal?: AbortSignal) {
+  const response = await apiClient.get<ApiSuccessResponse<CompletedTradesDto>>(
+    accountPath(accountId, '/completed-trades'), { signal });
+  const data = assertAccountScope('GET /trading-accounts/:accountId/completed-trades', accountId, response.data.data);
+  // The answer must name this account; one without its id or its list is not shown as it.
+  if (data?.tradingAccountId !== accountId || !Array.isArray(data.items))
+    throw new Error('거래 완료 내역을 확인할 수 없습니다.');
+  return data;
 }

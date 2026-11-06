@@ -8,6 +8,8 @@ const scale = Number(
 );
 export const Text = React.forwardRef((props, ref) => {
   const style = Native.StyleSheet.flatten(props.style) ?? {};
+  // Like the device: text that opts out of the system font size keeps its size.
+  const factor = props.allowFontScaling === false ? 1 : scale;
   return (
     <Native.Text
       {...props}
@@ -15,8 +17,8 @@ export const Text = React.forwardRef((props, ref) => {
       style={[
         props.style,
         {
-          fontSize: (style.fontSize ?? 14) * scale,
-          ...(style.lineHeight ? { lineHeight: style.lineHeight * scale } : {}),
+          fontSize: (style.fontSize ?? 14) * factor,
+          ...(style.lineHeight ? { lineHeight: style.lineHeight * factor } : {}),
         },
       ]}
     />

@@ -23,6 +23,13 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
       let data;
       if (path.startsWith('/records/me/seasons/')) {
         data = path.includes('/equity') ? h.equity : h.detail;
+      } else if (path.endsWith('/completed-trades')) {
+        // 거래 완료 (owner completed trades, backend docs/completed-trades-share-contract.md).
+        data = h.completedData ?? { tradingAccountId: path.split('/')[2], hasMore: false, items: [{ kind: 'futures', key: 'futures:lifetime-1',
+          assetId: 'asset-btc', symbol: 'BTCUSDT', name: 'Bitcoin', market: 'BINANCE', direction: 'long', currencyCode: 'USD',
+          entryMargin: '4454.20000000', realizedPnl: '152.34000000', returnRate: '3.42000000', positionId: 'lifetime-1', leverage: 10,
+          marginMode: 'isolated', closeKind: 'closed', completedAt: '2026-11-05T12:44:04.000Z', averageEntryPrice: '80958.27000000',
+          averageExitPrice: '85681.22000000', displayPriceDecimals: 2 }] };
       } else if (path.includes('/futures/')) {
         // The existing futures history API (executions/liquidations) and catalog.
         if (h.futuresFailure) throw h.futuresFailure;
@@ -42,13 +49,15 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
       return { data: { success: true, data: { tradingAccountId: path.split('/')[2] } } };
     },
   } };
-  const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'Pressable', 'ActivityIndicator', 'RefreshControl'].map(name => [name, name]));
+  const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'Pressable', 'ActivityIndicator', 'RefreshControl', 'Image'].map(name => [name, name]));
+  // The 수익 공유 sheet over 거래 완료: native sizing, keyboard and back hosts.
+  Object.assign(native, { PixelRatio: { get: () => 3 }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} }, BackHandler: { addEventListener: () => ({ remove() {} }) } });
   native.StyleSheet = { create: s => s };
   native.Platform = { OS: 'android' };
   native.useWindowDimensions = () => ({ width: 390, height: 844, fontScale: 1 });
   native.AppState = { currentState: 'active', addEventListener: (_event, callback) => { h.appState = callback; return { remove() {} }; } };
   native.Alert = { alert: (...args) => h.alerts.push(args) };
-  native.FlatList = ({ data, renderItem, ListHeaderComponent, ListFooterComponent, ...props }) => React.createElement('FlatList', props, ListHeaderComponent, ...data.map((item, index) => React.cloneElement(renderItem({ item, index }), { key: item.id })), ListFooterComponent);
+  native.FlatList = ({ data, renderItem, ListHeaderComponent, ListFooterComponent, ...props }) => React.createElement('FlatList', props, ListHeaderComponent, ...data.map((item, index) => React.cloneElement(renderItem({ item, index }), { key: props.keyExtractor?.(item) ?? item.id })), ListFooterComponent);
   const recordApi = load(resolve('src/features/record/api.ts'), { '../../services/api/client': transport });
   const accountApi = load(resolve('src/features/tradingAccount/api.ts'), { '../../services/api/client': transport });
   const futuresApi = load(resolve('src/features/futures/api.ts'), { '../../services/api/client': transport });
@@ -56,7 +65,7 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
     'react-native': native,
     '@react-navigation/native': { useIsFocused: () => h.focused !== false },
     '@tanstack/react-query': { ...query, useInfiniteQuery: options => { h.orderOptions = options; return query.useInfiniteQuery(options); } },
-    '../../features/me/api': { getMe: async () => ({ role }) },
+    '../../features/me/api': { getMe: async () => ({ role, id: 'user-1', nickname: '기록왕', profileImageUrl: null }) },
     '../../features/record/api': recordApi,
     '../../features/tradingAccount/api': accountApi,
     '../../features/futures/api': futuresApi,
