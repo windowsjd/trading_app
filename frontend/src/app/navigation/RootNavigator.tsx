@@ -24,6 +24,7 @@ import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
 import OrderFillNotifier from '../../features/order/OrderFillNotifier';
 import FriendRequestNotifier from '../../features/friends/FriendRequestNotifier';
 import PushNotificationsHost from '../../features/notifications/PushNotificationsHost';
+import AndroidExitConfirm from './AndroidExitConfirm';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -99,6 +100,8 @@ export default function RootNavigator() {
       {/* Push permission (first launch, before sign-in), device registration
           after sign-in, and tap routing. Draws nothing; no-op on web. */}
       <PushNotificationsHost />
+      {/* Android: the Back that would leave the app asks first. Draws nothing. */}
+      <AndroidExitConfirm />
     </NavigationContainer>
   );
 }

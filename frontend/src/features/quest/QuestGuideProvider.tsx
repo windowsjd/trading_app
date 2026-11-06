@@ -105,7 +105,7 @@ function readFocusedTab(): string | null {
   return tabs && typeof tabs.index === 'number' ? tabs.routes[tabs.index]?.name ?? null : null;
 }
 
-const openQuestList = () => rootNavigationRef.navigate('MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } });
+const openQuestList = () => rootNavigationRef.navigate('MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }, { pop: true });
 
 /** Close practice stacks out of sight: before a start (Back retraces only the practice) and after the return. */
 function popStacksToRoot(names: readonly string[]) {
@@ -119,21 +119,23 @@ function popStacksToRoot(names: readonly string[]) {
 
 // A practice screen opens over the Market list (`initial: false`, see
 // app/navigation/marketTabEntry), so Back always has a screen to return to.
+// The outer `pop` returns from a screen over the tabs (a chart) to the tabs,
+// never a second MainTabs on top (React Navigation 7 pushes otherwise).
 function openPractice(session: GuideSession) {
   if (!isTradingQuest(session.quest)) {
-    rootNavigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet', pop: true } });
+    rootNavigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet', pop: true } }, { pop: true });
   } else if (session.quest === 'futuresLong' || session.quest === 'futuresShort') {
-    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: session.accountId }, initial: false } });
+    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: session.accountId }, initial: false } }, { pop: true });
   } else if (session.assetId) {
     // Holdings, TP/SL and limit review steps live on the order screen of that asset.
     if (TRADING_GUIDE_STEPS[session.quest][session.step]?.screen === 'order') {
       rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Order', params: {
-        assetId: session.assetId, accountId: session.accountId, side: session.quest === 'marketSell' || session.quest === 'protection' ? 'sell' : 'buy' }, pop: true, initial: false } });
+        assetId: session.assetId, accountId: session.accountId, side: session.quest === 'marketSell' || session.quest === 'protection' ? 'sell' : 'buy' }, pop: true, initial: false } }, { pop: true });
     } else {
-      rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: session.assetId }, pop: true, initial: false } });
+      rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: session.assetId }, pop: true, initial: false } }, { pop: true });
     }
   } else {
-    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market', params: { assetType: session.quest === 'krStock' ? 'domestic_stock' : session.quest === 'usStock' ? 'us_stock' : 'crypto' }, pop: true } });
+    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market', params: { assetType: session.quest === 'krStock' ? 'domestic_stock' : session.quest === 'usStock' ? 'us_stock' : 'crypto' }, pop: true } }, { pop: true });
   }
 }
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useIsFocused } from '@react-navigation/native';
 import { ScrollView, Text, View } from '../../theme/native';
-import { SafeAreaView } from '../../theme/safeArea';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from '../../theme/safeArea';
 import { semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -60,36 +60,40 @@ export default function FuturesChartScreen({ route, navigation }: FuturesChartSc
     futuresServerNow(instruments.data, clock),
   );
   return (
-    <SafeAreaView style={styles.screen} testID="futures-chart-screen">
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} nestedScrollEnabled>
-        <View style={styles.header}>
-          <ActionPressable testID="futures-chart-back" accessibilityRole="button"
-            accessibilityLabel="차트 뒤로가기" style={styles.back} onPress={() => navigation.goBack()}>
-            <Text style={styles.backText}>←</Text>
-          </ActionPressable>
-          <View style={styles.heading}>
-            {/* The futures screen's own pair line: symbol and its 무기한 badge. */}
-            <View style={styles.titleRow}>
-              <Text testID="futures-chart-symbol" style={styles.title}>{symbol}</Text>
-              <Text style={styles.badge}>무기한</Text>
+    // Its own provider, as AssetChart's: a full-screen modal is outside the
+    // app's provider view, so the back button follows the modal's safe area.
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <SafeAreaView style={styles.screen} testID="futures-chart-screen">
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} nestedScrollEnabled>
+          <View style={styles.header}>
+            <ActionPressable testID="futures-chart-back" accessibilityRole="button"
+              accessibilityLabel="차트 뒤로가기" style={styles.back} onPress={() => navigation.goBack()}>
+              <Text style={styles.backText}>←</Text>
+            </ActionPressable>
+            <View style={styles.heading}>
+              {/* The futures screen's own pair line: symbol and its 무기한 badge. */}
+              <View style={styles.titleRow}>
+                <Text testID="futures-chart-symbol" style={styles.title}>{symbol}</Text>
+                <Text style={styles.badge}>무기한</Text>
+              </View>
+              <Text testID="futures-chart-last" style={styles.price} selectable>
+                Last {lastFresh && last ? formatAssetPrice(last, 'USD', displayPriceDecimals) : '시세 확인 불가'}
+              </Text>
             </View>
-            <Text testID="futures-chart-last" style={styles.price} selectable>
-              Last {lastFresh && last ? formatAssetPrice(last, 'USD', displayPriceDecimals) : '시세 확인 불가'}
-            </Text>
           </View>
-        </View>
-        <FuturesCandleChart
-          key={instrumentId}
-          instrumentId={instrumentId}
-          accountId={lineAccountId}
-          displayPriceDecimals={displayPriceDecimals}
-          currentPrice={lastFresh ? last : null}
-          timeframe={timeframe}
-          onTimeframeChange={setTimeframe}
-          variant="fullscreen"
-        />
-      </ScrollView>
-    </SafeAreaView>
+          <FuturesCandleChart
+            key={instrumentId}
+            instrumentId={instrumentId}
+            accountId={lineAccountId}
+            displayPriceDecimals={displayPriceDecimals}
+            currentPrice={lastFresh ? last : null}
+            timeframe={timeframe}
+            onTimeframeChange={setTimeframe}
+            variant="fullscreen"
+          />
+        </ScrollView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

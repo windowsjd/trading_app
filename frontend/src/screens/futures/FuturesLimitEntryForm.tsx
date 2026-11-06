@@ -49,6 +49,10 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, unit, d
   const selected = useRef(selectedAccountId); selected.current = selectedAccountId;
   const request = useRef<FuturesLimitCommand | null>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  // Gone while the screen still shows its inputs (one failed 2 s read swaps this form for an
+  // error, then remounts it): they are not held for an intent no longer on screen. A request
+  // still in flight releases them when it settles (the server holds one pending entry per direction).
+  useEffect(() => () => { if (!locked.current) onBusy(false); }, [onBusy]);
   const caps = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.entryTpSl.list(accountId, 'open'),
     queryFn: ({ signal }) => getAccountEntryTpSlPlans(accountId, 'open', signal),
@@ -102,7 +106,7 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, unit, d
       setFailure(error); setMessage(retry ? '접수 여부를 확인해야 합니다. 동일 요청으로 다시 확인해주세요.'
         : info.serverCode?.startsWith('ENTRY_TP_SL') || info.serverCode === 'INVALID_ENTRY_TP_SL' || info.serverCode === 'FUTURES_TP_SL_DISABLED'
           ? getErrorMessageFromCode(info.serverCode) : futuresErrorMessage(info.serverCode, false));
-    } finally { locked.current = false; if (current()) { setBusy(false); onBusy(!!request.current); } }
+    } finally { locked.current = false; if (current()) { setBusy(false); onBusy(!!request.current); } else onBusy(false); }
   };
   const validLimit = /^\d{1,16}(\.\d{1,8})?$/.test(limitPrice.trim()) && Number(limitPrice) > 0;
   return <View style={styles.stack} testID="futures-limit-entry">

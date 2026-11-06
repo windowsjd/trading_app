@@ -135,12 +135,15 @@ export default function MarketScreen({ navigation, route }: Props) {
 
   // Live overlay: the currently loaded rows subscribe on the app's shared
   // socket. Changing tab releases the previous tab's rows; loading another page
-  // only adds the new ids.
+  // only adds the new ids. Under a pushed detail or behind another tab the
+  // list stays subscribed but stops re-rendering (its newest prices show on return).
   const { tickersByAssetId, showReconnectBanner, staleAssetIds, subscriptionErrorAssetIds, runtime: tickerRuntime } =
     useMarketTickers({
       assetIds,
       wsUrl: wsUrl ?? '',
       enabled: !!wsUrl && !futuresMarket && !guest,
+      visible: focused,
+      diagnostics: isAdmin,
     });
 
   const openAsset = useCallback(
@@ -202,6 +205,9 @@ export default function MarketScreen({ navigation, route }: Props) {
             ) : null}
             {futuresMarket ? <FuturesMarketControls market={futures} sort={sort} onSortChange={setSort} /> : <>
             <ActionPressable
+              accessibilityRole="button"
+              accessibilityLabel="종목 검색"
+              accessibilityHint="종목명이나 심볼로 검색하는 화면을 엽니다."
               style={styles.searchEntry}
               onPress={() => navigation.navigate('MarketSearch', { sort })}
             >

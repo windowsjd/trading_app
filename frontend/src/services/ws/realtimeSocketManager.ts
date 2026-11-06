@@ -99,6 +99,14 @@ export interface RealtimeSocketManagerDeps {
   createSocket: (url: string) => WebSocketLike;
   getToken: () => Promise<string | null>;
   reconnectDelaysMs?: readonly number[];
+  /**
+   * After the server refuses a connection's token: a newer token for one more
+   * try, or null. A reconnect reads the STORED token, which expires while the
+   * app sits in the background (2026-11-06: every price then stayed frozen
+   * until some screen subscribed anew). Asked at most once until a
+   * subscription is accepted again, so a refused fresh token never loops.
+   */
+  renewToken?: (refused: string | null) => Promise<string | null>;
 }
 
 const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 30000] as const;
@@ -143,6 +151,10 @@ export class RealtimeSocketManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private hasConnectedBefore = false;
   private authFailed = false;
+  /** The token of the latest connection attempt (what a refusal refused). */
+  private connectToken: string | null = null;
+  /** A renewal was asked for since the server last accepted a subscription. */
+  private renewalAsked = false;
   private connectSequence = 0;
   private readonly wsUrl: string;
   private readonly deps: RealtimeSocketManagerDeps;
@@ -315,6 +327,7 @@ export class RealtimeSocketManager {
       this.emitRuntime();
     }
 
+    this.connectToken = token;
     let socket: WebSocketLike;
     try {
       socket = this.deps.createSocket(appendToken(this.wsUrl, token));
@@ -397,6 +410,8 @@ export class RealtimeSocketManager {
     }
 
     if (payload.type === 'subscribed' && typeof payload.channel === 'string') {
+      // The server took this connection's token: a later refusal may renew again.
+      this.renewalAsked = false;
       const entry = this.findEntry(payload);
       if (entry) {
         entry.acked = true;
@@ -604,6 +619,24 @@ export class RealtimeSocketManager {
       'auth_failed',
       source === 'close_1008' ? 'auth_failed_close' : 'auth_failed_control',
     );
+    this.renewAfterRefusal();
+  }
+
+  /** One more try with a newer token, once per refusal episode (see `renewToken`). */
+  private renewAfterRefusal(): void {
+    const renew = this.deps.renewToken;
+    if (!renew || this.renewalAsked || this.subscriptions.size === 0) return;
+    this.renewalAsked = true;
+    const refused = this.connectToken;
+    renew(refused).then(
+      (token) => {
+        // A new subscription or another renewal may already have reconnected.
+        if (token && token !== refused && this.authFailed && !this.socket && this.subscriptions.size > 0) {
+          this.reconnectWithFreshToken();
+        }
+      },
+      () => {},
+    );
   }
 
   private scheduleReconnect(): void {
@@ -656,6 +689,7 @@ export class RealtimeSocketManager {
     this.reconnectAttempt = 0;
     this.hasConnectedBefore = false;
     this.authFailed = false;
+    this.renewalAsked = false;
   }
 
   private clearReconnectTimer(): void {

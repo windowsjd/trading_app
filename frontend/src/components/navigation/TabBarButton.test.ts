@@ -36,7 +36,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
   const dimensions = { fontScale: 1 };
   const insets = { bottom: 34 };
   const HostedTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
-    'react-native': { useWindowDimensions: () => dimensions },
+    'react-native': { useWindowDimensions: () => dimensions, Platform: { OS: platform } },
     'react-native-safe-area-context': { useSafeAreaInsets: () => insets },
     '@react-navigation/native': { getFocusedRouteNameFromRoute: route => route.params?.screen },
     '@react-navigation/bottom-tabs': { createBottomTabNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
@@ -67,7 +67,7 @@ describe('bottom tab touch feedback', () => {
       it(`${platform}/${mode}: connects all five tabs while preserving events, icons and accessibility`, () => {
         const h = harness(platform, mode);
         const tree = h.MainTabs();
-        const policy = tabTransition(false);
+        const policy = tabTransition(false, platform);
         assert.equal(tree.props.screenOptions.animation, policy.animation);
         assert.deepEqual(tree.props.screenOptions.transitionSpec, policy.transitionSpec);
         const screens = elements(tree, 'Screen');

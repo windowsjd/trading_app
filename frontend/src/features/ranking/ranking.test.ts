@@ -654,5 +654,6 @@ it('friend ranking empty state keeps the tabs and opens friend discovery', () =>
   assert.ok(h.presses.some((press) => press.testID === TEST_IDS.ranking.tabFriends));
   const cta = h.presses.find((press) => renderToStaticMarkup(press.children).includes('친구 찾기'));
   cta.onPress();
-  assert.deepEqual(h.navigations.at(-1), ['MyTab', { screen: 'Friends' }]);
+  // Over MY's 전체 even before MY was opened (back returns there).
+  assert.deepEqual(h.navigations.at(-1), ['MyTab', { screen: 'Friends', initial: false }]);
 });

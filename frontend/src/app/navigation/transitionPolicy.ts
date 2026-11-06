@@ -35,11 +35,20 @@ export function rootTransition(reducedMotion: boolean, platform: string): Native
 // Fast onset, smooth settling and no overshoot for peer destinations.
 export const tabEaseOut = (progress: number) => 1 - (1 - progress) * (1 - progress);
 
-/** Peer destinations have no horizontal depth; allow a brief settling fade. */
-export function tabTransition(reducedMotion: boolean): BottomTabNavigationOptions {
+/**
+ * Peer destinations have no horizontal depth. On phones a tab switches in
+ * place, like the platforms' own tab bars (2026-11-06): bottom-tabs' cross-fade
+ * drew the leaving tab through the arriving one for its whole length (both
+ * half transparent), held that blend on screen whenever mounting the arriving
+ * tab stalled the UI thread, and kept every tab left of the focused one
+ * attached under it (it detaches a tab only once it fades out to the right).
+ * Web keeps a brief settling fade.
+ */
+export function tabTransition(reducedMotion: boolean, platform: string): BottomTabNavigationOptions {
+  const fade = !reducedMotion && platform === 'web';
   return {
-    animation: reducedMotion ? 'none' : 'fade',
-    transitionSpec: { animation: 'timing', config: { duration: reducedMotion ? 0 : 190, easing: tabEaseOut } },
+    animation: fade ? 'fade' : 'none',
+    transitionSpec: { animation: 'timing', config: { duration: fade ? 190 : 0, easing: tabEaseOut } },
   };
 }
 

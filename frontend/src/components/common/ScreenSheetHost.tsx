@@ -1,4 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+// Core's context is the one @react-navigation/native re-exports; core itself is plain JS.
+import { NavigationContext } from '@react-navigation/core';
 import { View } from '../../theme/native';
 
 type SetSheet = (key: number, node: React.ReactNode | null) => void;
@@ -40,20 +42,60 @@ export function ScreenSheetHost({ children }: { children: React.ReactNode }) {
   );
 }
 
+type FocusSource = {
+  isFocused?: () => boolean;
+  addListener?: (type: 'focus' | 'blur', listener: () => void) => () => void;
+};
+
+/**
+ * Whether the screen this renders in is the one on screen: false while
+ * another tab or a screen pushed over it covers it. Outside a screen (MainTabs'
+ * own update notice) it is always true. `useIsFocused` without its throw.
+ */
+export function useOwnerScreenFocused(): boolean {
+  const navigation = useContext(NavigationContext) as FocusSource | undefined;
+  const [focused, setFocused] = useState(() => navigation?.isFocused?.() ?? true);
+  useEffect(() => {
+    if (!navigation?.addListener) return undefined;
+    setFocused(navigation.isFocused?.() ?? true);
+    const offFocus = navigation.addListener('focus', () => setFocused(true));
+    const offBlur = navigation.addListener('blur', () => setFocused(false));
+    return () => {
+      offFocus();
+      offBlur();
+    };
+  }, [navigation]);
+  return focused;
+}
+
+const SheetOwnerFocusContext = createContext(true);
+
+/** Inside a sheet: whether the screen that opened it is on screen (see SheetPortal). */
+export function useSheetOwnerFocused(): boolean {
+  return useContext(SheetOwnerFocusContext);
+}
+
 /**
  * Renders its children in the nearest host (or in place without one). The
  * children keep their state across the owner's re-renders; they must not rely
  * on screen-only context such as the header height.
+ *
+ * The host lies over every tab, so the children also learn whether their
+ * screen is on screen (2026-11-06): a sheet left open when a banner or push
+ * tap moved to another tab or screen stayed drawn over that screen, its dim
+ * swallowing every touch and its Back listener taking the next Back.
  */
 export function SheetPortal({ children }: { children: React.ReactNode }) {
   const setSheet = useContext(SheetHostContext);
+  const focused = useOwnerScreenFocused();
   const key = useRef(0);
   if (!key.current) key.current = ++nextPortalKey;
+  const node = <SheetOwnerFocusContext.Provider value={focused}>{children}</SheetOwnerFocusContext.Provider>;
   useEffect(() => {
-    setSheet?.(key.current, children);
+    setSheet?.(key.current, node);
   });
   useEffect(() => () => setSheet?.(key.current, null), [setSheet]);
-  return setSheet ? null : <>{children}</>;
+  return setSheet ? null : node;
 }
 
 // Plain objects: this host wraps the navigator and needs nothing native.

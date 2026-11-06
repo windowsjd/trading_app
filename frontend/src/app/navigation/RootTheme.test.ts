@@ -25,6 +25,7 @@ for (const mode of ['light', 'dark'] as const) {
       '../../features/order/OrderFillNotifier': { default: 'OrderFillNotifier', __esModule: true },
       '../../features/notifications/PushNotificationsHost': { default: 'PushNotificationsHost', __esModule: true },
       '../../features/friends/FriendRequestNotifier': { default: 'FriendRequestNotifier', __esModule: true },
+      './AndroidExitConfirm': { default: 'AndroidExitConfirm', __esModule: true },
     };
     for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
       '../../screens/history/TradeHistoryScreen', '../../screens/history/OrderFailureScreen', '../../screens/asset/AssetChartScreen', '../../screens/futures/FuturesChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen', '../../screens/season/SeasonFinalResultScreen']) {
@@ -51,6 +52,8 @@ for (const mode of ['light', 'dark'] as const) {
     // Push permission/registration/tap routing also lives inside navigation,
     // mounted once for every route (sign-in included).
     assert.equal(elements(tree, 'PushNotificationsHost').length, 1);
+    // Android's leave-the-app Back asks first, for every route (sign-in included).
+    assert.equal(elements(tree, 'AndroidExitConfirm').length, 1);
     // Both full-screen charts (spot AssetChart, the futures contract's FuturesChart) open the same way.
     for (const name of ['AssetChart', 'FuturesChart']) {
       const chart = screens.find((s: any) => s.props.name === name);

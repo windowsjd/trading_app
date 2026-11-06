@@ -120,7 +120,9 @@ function load(file, mocks) {
     if (name.endsWith('/tierBackgrounds')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (name.endsWith('/ProfileAvatar')) return { default: 'ProfileAvatar', __esModule: true };
     if (name.endsWith('/theme/native')) return withNativeDefaults(mocks['react-native']);
-    if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) };
+    // A screen presented as its own modal (the full-screen charts) wraps itself in a provider.
+    if (name.endsWith('/theme/safeArea')) return { SafeAreaProvider: 'SafeAreaProvider', initialWindowMetrics: null,
+      ...(mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) }) };
     if (name.endsWith('/theme/useReducedMotion')) return { useReducedMotion: () => false, useReducedMotionSettled: () => true };
     if (name.endsWith('/theme/appearance')) return { AppearanceProvider: ({ children }) => children, useAppearance: () => ({ preference: 'system', financialPreference: 'red_blue', financialColors: require('../src/theme/financialColors.ts').getFinancialColors('light'), mode: 'light', colors: { screen: '#fff', text: '#111', border: '#ddd', ...LIGHT_TONES }, setPreference() {} }) };
     // Interaction animation is a native boundary here; its real component has

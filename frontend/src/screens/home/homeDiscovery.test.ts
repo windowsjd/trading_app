@@ -85,7 +85,8 @@ it('HOT uses the Market turnover DESC result and stable order for each category,
     const market = h.node('home-hot-market');
     assert.equal(market.props.primary, true);
     assert.equal(market.findByType('Text').props.style.color, primaryGradient.foreground);
-    assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Market', params: { assetType: type } } }]);
+    // `pop`: the Market list already open under a detail or order screen, never a second one.
+    assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Market', params: { assetType: type }, pop: true } }]);
   }
   const keys = h.client.getQueryCache().findAll().filter(q => q.queryKey[0] === 'market').map(q => q.queryKey);
   assert.equal(keys.length, 3);

@@ -15,6 +15,7 @@ import { semantic } from '../../theme/tokens';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { useKeyboardCover } from '../../hooks/useKeyboardCover';
 import ActionPressable from './ActionPressable';
+import { useSheetOwnerFocused } from './ScreenSheetHost';
 
 /** Bottom sheets rise on a decelerate and fall on a short accelerate. */
 export const sheetMotion = { openDuration: 280, closeDuration: 220 } as const;
@@ -64,9 +65,13 @@ export function useSheetMotion(visible: boolean) {
  * backdrop, close button, Android back — from looking like a cancel.
  */
 export default function InlineBottomSheet(props: SheetProps) {
+  const ownerFocused = useSheetOwnerFocused();
   const { mounted, progress } = useSheetMotion(props.visible);
-  // Closed sheets mount nothing (no insets, keyboard or back listeners).
-  return mounted ? <SheetFrame {...props} progress={progress} /> : null;
+  // Closed sheets mount nothing (no insets, keyboard or back listeners). An
+  // open sheet whose screen another tab or pushed screen covers stays mounted
+  // (its form and a command in flight keep their state) but draws nothing,
+  // takes no touch and leaves Back to the screen on top; it shows on return.
+  return mounted ? <SheetFrame {...props} hidden={!ownerFocused} progress={progress} /> : null;
 }
 
 type SheetProps = {
@@ -80,27 +85,28 @@ type SheetProps = {
   children: React.ReactNode;
 };
 
-function SheetFrame({ visible, onClose, dismissible = true, title, testID, floating = false, children, progress }: SheetProps & { progress: Animated.Value }) {
+function SheetFrame({ visible, hidden, onClose, dismissible = true, title, testID, floating = false, children, progress }: SheetProps & { hidden: boolean; progress: Animated.Value }) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const shown = visible && !hidden;
 
   useEffect(() => {
-    if (!visible) return;
+    if (!shown) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (dismissible) onClose();
       return true;
     });
     return () => subscription.remove();
-  }, [dismissible, onClose, visible]);
+  }, [dismissible, onClose, shown]);
 
   // The sheet rises above the keyboard on both platforms. Android draws edge
   // to edge, so the keyboard covers the window instead of resizing it. The
   // sheet layer spans the app window, so its bottom is the window's.
-  const keyboard = useKeyboardCover(visible, insets.bottom);
+  const keyboard = useKeyboardCover(shown, insets.bottom);
 
   const close = () => { if (dismissible) { Keyboard.dismiss(); onClose(); } };
   return (
-    <View testID={testID} style={StyleSheet.absoluteFill} pointerEvents={visible ? 'auto' : 'none'}>
+    <View testID={testID} style={[StyleSheet.absoluteFill, hidden && styles.hidden]} pointerEvents={shown ? 'auto' : 'none'}>
       <Animated.View pointerEvents="none" style={[styles.dim, { opacity: progress }]} />
       <Pressable testID={testID ? `${testID}-backdrop` : undefined} accessible={false} importantForAccessibility="no"
         style={StyleSheet.absoluteFill} onPress={close} />
@@ -133,6 +139,7 @@ function SheetFrame({ visible, onClose, dismissible = true, title, testID, float
 const FLOAT_GAP = 10;
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
   dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.32)' },
   anchor: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   sheet: {

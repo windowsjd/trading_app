@@ -30,9 +30,10 @@ export default function GuestHomeScreen(_props: HomeScreenProps) {
 
   const openAsset = (assetId: string) =>
     rootNavigation.navigate('MainTabs', openInMarketTab('AssetDetail', { assetId, returnTab: 'HomeTab' }));
+  // `pop`: back to a Market list already open under a detail screen, never a second one on top.
   const openMarket = (assetType: AssetType) =>
     rootNavigation.navigate('MainTabs', {
-      screen: 'MarketTab', params: { screen: 'Market', params: { assetType } },
+      screen: 'MarketTab', params: { screen: 'Market', params: { assetType }, pop: true },
     });
 
   return (

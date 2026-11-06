@@ -6,6 +6,8 @@ import { describe, it } from 'node:test';
 import type { BeginnerQuests } from './questProgress.ts';
 
 const require = createRequire(import.meta.url);
+// From a screen over the tabs (a chart) the guide returns to the tabs, never a second MainTabs on top.
+const POP = { pop: true };
 const React = require('react');
 const Renderer = require('react-test-renderer');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
@@ -152,7 +154,7 @@ describe('QuestGuideProvider', () => {
     assert.equal(h.view().kind, 'none');
 
     await h.start('exchange', progress(false));
-    assert.deepEqual(h.navigations, [['MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet', pop: true } }]]);
+    assert.deepEqual(h.navigations, [['MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet', pop: true } }, POP]]);
     assert.deepEqual(h.guide.active, { quest: 'exchange', phase: 'guiding', replay: false, accountId: ACCOUNT, step: 1, assetId: undefined, orderId: undefined, positionId: undefined });
 
     await h.focus('Wallet');
@@ -181,7 +183,7 @@ describe('QuestGuideProvider', () => {
     assert.equal(h.navigations.length, 1, 'still on the practice screen while celebrating');
 
     await h.act(() => t.mock.timers.tick(2100));
-    assert.deepEqual(h.navigations[1], ['MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }]);
+    assert.deepEqual(h.navigations[1], ['MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }, POP]);
     assert.equal(h.guide.returnCount, 1);
     assert.equal(h.guide.justCompleted, 'exchange');
     assert.equal(h.view().kind, 'celebration');
@@ -214,7 +216,7 @@ describe('QuestGuideProvider', () => {
     assert.equal(h.guide.active.phase, 'unconfirmed', 'a response without the FX proves nothing');
     await h.act(() => h.overlay.onAction('back', null));
     assert.equal(h.guide.active === null, true);
-    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }]);
+    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }, POP]);
   });
 
   it('rejects other accounts and routes, and adopts a replay only after its own success', async t => {
@@ -298,7 +300,7 @@ describe('QuestGuideProvider: transfer sheet and order-screen holdings', () => {
     const h = harness(); await h.render(); t.after(h.close);
     await h.start('protection', questProgress(3));
     assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Order',
-      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'sell' }, pop: true, initial: false } }]);
+      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'sell' }, pop: true, initial: false } }, POP]);
   });
 
   it('a claimed spot fill is reviewed on the order screen without navigating away', async t => {
@@ -330,7 +332,7 @@ describe('QuestGuideProvider: no resume — leaving ends the guide, a start is a
     assert.equal(h.guide.starting === null, true);
     assert.deepEqual([h.guide.active.step, h.guide.active.orderId, h.guide.active.assetId], [7, 'fill-1', 'crypto-1']);
     assert.deepEqual(h.navigations, [['MainTabs', { screen: 'MarketTab', params: { screen: 'Order',
-      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'buy' }, pop: true, initial: false } }]]);
+      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'buy' }, pop: true, initial: false } }, POP]]);
   });
 
   it('opens nothing when the read fails or the user left the list meanwhile', async t => {
@@ -440,7 +442,7 @@ describe('QuestGuideProvider: no resume — leaving ends the guide, a start is a
     const h = harness(); await h.render(); t.after(h.close);
     await h.start('futuresLong', questProgressInProgress(8, 'open-1', { longPositionId: 'position-1' }));
     assert.deepEqual([h.guide.active.step, h.guide.active.positionId], [5, 'position-1']);
-    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: ACCOUNT }, initial: false } }]);
+    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: ACCOUNT }, initial: false } }, POP]);
   });
 });
 
@@ -498,7 +500,7 @@ describe('QuestGuideProvider: the practice path is held, 안내 종료 lifts it'
     assert.equal(h.overlay.notice, false, 'silently: the scrim says where it goes');
     await h.act(() => t.mock.timers.tick(2100));
     assert.equal(h.guide.active.phase, 'returning');
-    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }]);
+    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }, POP]);
     assert.equal(await held(h, 'QuestTab'), false, 'the return to the list is never held');
     await h.focus('Guide');
     await h.act(() => t.mock.timers.tick(260));

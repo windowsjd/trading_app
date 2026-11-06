@@ -69,6 +69,8 @@ function MarketAssetRowComponent({
     <View>
       <ActionPressable
         testID={testID ?? TEST_IDS.market.item(item.id)}
+        // A screen reader names the row and that it opens (its texts make the label).
+        accessibilityRole="button"
         style={styles.itemRow}
         onPress={() => onPress(item.id)}
       >

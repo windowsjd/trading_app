@@ -144,6 +144,10 @@ export default function FuturesConditionalEntryForm({ accountId, instrumentId, d
   const selected = useRef(selectedAccountId); selected.current = selectedAccountId;
   const request = useRef<FuturesConditionalEntryCommand | null>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  // Gone while the screen still shows its inputs (one failed 2 s read swaps this form for an
+  // error, then remounts it): they are not held for an intent no longer on screen. A request
+  // still in flight releases them when it settles (the server holds one pending entry per direction).
+  useEffect(() => () => { if (!locked.current) onBusy(false); }, [onBusy]);
   const limit = draft.executionType === 'limit';
   const condition = draft.triggerCondition;
   const complete = validPrice(draft.triggerPrice) && (!limit || validPrice(draft.limitPrice)) && !!condition;
@@ -202,7 +206,7 @@ export default function FuturesConditionalEntryForm({ accountId, instrumentId, d
       setUncertain(retry); if (!retry) request.current = null;
       setFailure(error);
       setMessage(retry ? '접수 여부를 확인해야 합니다. 동일 요청으로 다시 확인해주세요.' : conditionalErrorMessage(info.serverCode));
-    } finally { locked.current = false; if (current()) { setBusy(false); onBusy(!!request.current); } }
+    } finally { locked.current = false; if (current()) { setBusy(false); onBusy(!!request.current); } else onBusy(false); }
   };
   return <View style={styles.stack} testID="futures-conditional-entry">
     <Text style={styles.summary} testID="futures-conditional-summary">

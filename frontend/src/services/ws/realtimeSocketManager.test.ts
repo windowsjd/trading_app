@@ -549,3 +549,81 @@ describe('shared runtime evidence', () => {
     off();
   });
 });
+
+describe("RealtimeSocketManager renews a refused token once (2026-11-06)", () => {
+  function renewing(renew: (refused: string | null) => Promise<string | null>) {
+    let token = "expired";
+    const asked: Array<string | null> = [];
+    FakeSocket.instances = [];
+    const manager = new RealtimeSocketManager("wss://app.example/api/v1/ws", {
+      createSocket: (url) => new FakeSocket(url),
+      getToken: async () => token,
+      reconnectDelaysMs: [1],
+      renewToken: async (refused) => {
+        asked.push(refused);
+        const next = await renew(refused);
+        if (next) token = next;
+        return next;
+      },
+    });
+    const ticker = collect();
+    manager.subscribe({ channel: "asset_ticker", assetId: "a1" }, ticker.listener);
+    return { manager, ticker, asked };
+  }
+  const subscribes = (socket: FakeSocket) => sentFrames(socket).filter((frame) => frame.type === "subscribe").length;
+
+  it("a reconnect refused for its stored (expired) token comes back on the renewed one and resubscribes", async () => {
+    const h = renewing(async () => "fresh");
+    await delay(5);
+    FakeSocket.instances[0].open();
+    FakeSocket.instances[0].drop(1008);
+    await delay(10);
+    assert.deepEqual(h.asked, ["expired"]);
+    assert.equal(FakeSocket.instances.length, 2);
+    assert.ok(FakeSocket.instances[1].url.includes("token=fresh"));
+    FakeSocket.instances[1].open();
+    assert.equal(subscribes(FakeSocket.instances[1]), 1);
+    assert.equal(h.manager.getStatus(), "connected");
+  });
+
+  it("no newer token (signed out, refresh without a verdict): it stays auth_failed as before", async () => {
+    const h = renewing(async () => null);
+    await delay(5);
+    FakeSocket.instances[0].open();
+    FakeSocket.instances[0].receive({ type: "error", code: "UNAUTHORIZED" });
+    await delay(10);
+    assert.equal(FakeSocket.instances.length, 1);
+    assert.equal(h.manager.getStatus(), "auth_failed");
+  });
+
+  it("a renewed token refused too is not renewed again (no refresh loop)", async () => {
+    let next = 0;
+    const h = renewing(async () => `fresh-${++next}`);
+    await delay(5);
+    FakeSocket.instances[0].open();
+    FakeSocket.instances[0].drop(1008);
+    await delay(10);
+    FakeSocket.instances[1].open();
+    FakeSocket.instances[1].drop(1008);
+    await delay(10);
+    assert.deepEqual(h.asked, ["expired"]);
+    assert.equal(FakeSocket.instances.length, 2);
+    assert.equal(h.manager.getStatus(), "auth_failed");
+  });
+
+  it("once a subscription was accepted, a later refusal renews again", async () => {
+    let next = 0;
+    const h = renewing(async () => `fresh-${++next}`);
+    await delay(5);
+    FakeSocket.instances[0].open();
+    FakeSocket.instances[0].drop(1008);
+    await delay(10);
+    FakeSocket.instances[1].open();
+    FakeSocket.instances[1].receive({ type: "subscribed", channel: "asset_ticker", assetId: "a1" });
+    FakeSocket.instances[1].drop(1008);
+    await delay(10);
+    assert.deepEqual(h.asked, ["expired", "fresh-1"]);
+    assert.equal(FakeSocket.instances.length, 3);
+    assert.ok(FakeSocket.instances[2].url.includes("token=fresh-2"));
+  });
+});

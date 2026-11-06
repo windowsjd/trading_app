@@ -88,10 +88,18 @@ describe('touch coverage and exclusions', () => {
   });
 
   it('leaves backdrop dismissal and its transparent touch surface unchanged', () => {
-    const Backdrop = load(resolve('src/components/common/BottomSheetBackdrop.tsx'), { 'react-native': native }).default;
+    let focused = true;
+    const Backdrop = load(resolve('src/components/common/BottomSheetBackdrop.tsx'), {
+      'react-native': native, './ScreenSheetHost': { useOwnerScreenFocused: () => focused },
+    }).default;
     let closes = 0;
     const onClose = () => { closes++; };
+    // Another screen covering its screen (a push tap opened 거래 내역): the Modal hides, never over that screen.
+    focused = false;
+    assert.equal(Backdrop({ visible: true, onClose, children: 'sheet content' }).props.visible, false);
+    focused = true;
     const tree = Backdrop({ visible: true, onClose, children: 'sheet content' });
+    assert.equal(tree.props.visible, true);
     const backdrop = elements(tree, 'Pressable')[0];
     assert.deepEqual(backdrop.props.style, { flex: 1 });
     assert.equal(backdrop.props.android_ripple, undefined);

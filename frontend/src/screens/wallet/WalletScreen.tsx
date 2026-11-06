@@ -83,7 +83,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   const closeFunding = useCallback(() => setFunding(null), []);
   const fundingToMarket = useCallback(() => {
     setFunding(null);
-    rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } });
+    // `pop`: back to a Market list already open under a detail or order screen, never a second one on top.
+    rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market', pop: true } });
   }, [rootNavigation]);
   const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
   const portfolioQuery = useQuery({

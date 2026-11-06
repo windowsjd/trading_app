@@ -531,9 +531,10 @@ export default function PortfolioScreen({ navigation }: Props) {
             <CTAButton
               label="마켓으로 이동"
               onPress={() =>
+                // `pop`: back to a Market list already open under a detail or order screen.
                 rootNavigation.navigate('MainTabs', {
                   screen: 'MarketTab',
-                  params: { screen: 'Market' },
+                  params: { screen: 'Market', pop: true },
                 })
               }
             />

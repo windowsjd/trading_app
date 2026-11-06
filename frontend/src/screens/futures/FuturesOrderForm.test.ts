@@ -480,3 +480,22 @@ test('large fonts in the narrow column: 롱/숏 segment labels keep Long/Short a
   await wide.start(); t.after(wide.close);
   assert.deepEqual(labels(wide), [['롱(Long)', '롱(Long)'], ['숏(Short)', '숏(Short)']]);
 });
+
+test('a confirmed add sends what the sheet showed; a position gone meanwhile sends nothing (no new position in its place)', async t => {
+  const { act } = createRequire(import.meta.url)('react-test-renderer');
+  const refetchPositions = (h: any) => act(async () => {
+    await h.client.refetchQueries({ predicate: (query: any) => JSON.stringify(query.queryKey).includes('positions') });
+  });
+  // Closed by its 손절가/익절가, a liquidation or another device while the sheet is open.
+  const gone = futuresHarness({ position: true, markPrice: '102' });
+  await gone.start(); t.after(gone.close);
+  await gone.setLeverage(50);
+  await gone.amount('102');
+  await gone.press('futures-submit');
+  assert.equal(gone.node('futures-leverage-change-sheet')?.props.pointerEvents, 'auto');
+  gone.options.position = false;
+  await refetchPositions(gone); await gone.flush();
+  await gone.press('futures-leverage-change-confirm');
+  assert.equal(gone.requests.length, 0, 'no open command for the add the user confirmed');
+  assert.match(JSON.stringify(gone.node('futures-leverage-change-error')?.props), /포지션이 바뀌어 주문하지 않았어요/);
+});

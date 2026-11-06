@@ -32,7 +32,7 @@ import type { AuthUserDto } from './api.ts';
 
 export type SessionQueryClient = {
   clear: () => void;
-  setQueryData: (queryKey: readonly unknown[], data: unknown) => unknown;
+  setQueryData: (queryKey: readonly unknown[], data: unknown, options?: { updatedAt?: number }) => unknown;
   invalidateQueries: (filters: {
     queryKey: readonly unknown[];
   }) => unknown;
@@ -61,7 +61,10 @@ export async function seedSessionCache(
   user: AuthUserDto,
 ) {
   queryClient.clear();
-  queryClient.setQueryData(QUERY_KEYS.me, user);
+  // Stale from the start (`updatedAt: 0`): the login response has no profile
+  // photo, 공개 setting or join date, so the first screen reading `me` (Home,
+  // 랭킹) fetches the full profile instead of keeping this one for a minute.
+  queryClient.setQueryData(QUERY_KEYS.me, user, { updatedAt: 0 });
   await queryClient.invalidateQueries({
     // The incoming user's OWN list key. `listAll` would also match, but naming
     // the user here is what makes "the list I am about to read is this user's"

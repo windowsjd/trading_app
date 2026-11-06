@@ -4,6 +4,18 @@ import { isOrderQuoteExpired } from './mapper.ts';
 
 export class OrderQuoteValidationError extends Error {}
 
+/**
+ * "Now" on the server's clock for a quote just received: its `quoteAt` plus
+ * the time this device spent since sending the request. Comparing `expiresAt`
+ * with the phone's own clock rejected every fresh quote (15 s TTL) when the
+ * clock ran 15 s or more ahead, so no spot order could be sent (2026-11-06).
+ * The request's round trip makes this a little late, never early.
+ */
+export function quoteServerNow(quote: Pick<OrderQuoteDto, 'quoteAt'>, sentAt: number, now = Date.now()) {
+  const quotedAt = Date.parse(quote.quoteAt);
+  return Number.isFinite(quotedAt) ? quotedAt + Math.max(0, now - sentAt) : now;
+}
+
 /** Validate the response before the first create. Account binding is checked
  * by quoteTradingAccountOrder; canonical decimal strings remain server-owned. */
 export function validateOrderQuote(

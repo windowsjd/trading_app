@@ -568,3 +568,127 @@ describe('new session recovery after expiry/storage failures', () => {
     assert.equal(h.disk.get('accessToken'), 'A-access');
   });
 });
+
+describe('a refresh without a verdict keeps the session (2026-11-06)', () => {
+  const axios = require('axios');
+  const response = (r: any, status: number) => ({ status, data: {}, headers: {}, statusText: String(status), config: r });
+  const failures: Record<string, { fail: (r: any) => unknown; seen: string | number }> = {
+    offline: { fail: (r) => new axios.AxiosError('Network Error', 'ERR_NETWORK', r, {}), seen: 'ERR_NETWORK' },
+    timeout: { fail: (r) => new axios.AxiosError('timeout of 10000ms exceeded', 'ECONNABORTED', r, {}), seen: 'ECONNABORTED' },
+    'server restart (503)': { fail: (r) => new axios.AxiosError('503', 'ERR_BAD_RESPONSE', r, {}, response(r, 503)), seen: 503 },
+    'rate limit (429)': { fail: (r) => new axios.AxiosError('429', 'ERR_BAD_REQUEST', r, {}, response(r, 429)), seen: 429 },
+  };
+  function refreshing(h: H, fail: (r: any) => unknown) {
+    const state = { up: false, refreshes: 0 };
+    h.setTransport(async (r: any) => {
+      if (r.url.endsWith('/auth/refresh')) {
+        state.refreshes++;
+        if (!state.up) throw fail(r);
+        return h.ok(r, { tokens: h.credentials('A-rotated') });
+      }
+      if (r.headers.Authorization !== 'Bearer A-rotated-access') throw h.unauthorized(r);
+      return h.ok(r, { fine: true });
+    });
+    return state;
+  }
+  for (const [kind, { fail, seen }] of Object.entries(failures))
+    it(`${kind}: the request fails with that error; tokens, cache and screen stay; the next request refreshes`, async (t) => {
+      const h = createSessionHarness();
+      t.after(h.close);
+      await h.install('A');
+      h.attachExpiry();
+      h.queryClient.setQueryData(['A-financial'], { balance: '100' });
+      const screens = h.navigation.length;
+      const refresh = refreshing(h, fail);
+      const first = await outcome(h.api.get('/private'));
+      const error = first.error as { code?: string; response?: { status?: number } };
+      assert.equal(error.response?.status ?? error.code, seen, 'a network/server error, not a 401 or a logout');
+      assert.equal(h.expiryCalls, 0);
+      assert.equal(h.navigation.length, screens);
+      assert.equal(h.disk.get('refreshToken'), 'A-refresh');
+      assert.equal(h.queryClient.getQueryData(h.keys.me)?.id, 'A');
+      assert.deepEqual(h.queryClient.getQueryData(['A-financial']), { balance: '100' });
+      refresh.up = true;
+      const second = await h.api.get('/private');
+      assert.deepEqual(second.data.data, { fine: true });
+      assert.equal(refresh.refreshes, 2, 'a new single-flight, not the failed one');
+      assert.equal(h.disk.get('refreshToken'), 'A-rotated-refresh');
+      assert.equal(h.expiryCalls, 0);
+    });
+  for (const status of [400, 401, 403])
+    it(`the refresh endpoint answering ${status} ends the session once and opens Login`, async (t) => {
+      const h = createSessionHarness();
+      t.after(h.close);
+      await h.install('A');
+      h.attachExpiry();
+      refreshing(h, (r) => new axios.AxiosError(String(status), 'ERR_BAD_REQUEST', r, {}, response(r, status)));
+      await outcome(h.api.get('/private'));
+      await h.waitForExpiry();
+      assert.equal(h.expiryCalls, 1);
+      assert.deepEqual(h.navigation, ['Login']);
+    });
+  it('mutation: taking every refresh failure as a verdict logs out on a network blip', async (t) => {
+    const h = createSessionHarness({
+      mutateSource: (file: string, source: string) => file.endsWith('/client.ts')
+        ? source.replace('throw isRefreshRejected(error) ? error : new RefreshUnavailableError(error);', 'throw error;') : source,
+    });
+    t.after(h.close);
+    await h.install('A');
+    h.attachExpiry();
+    refreshing(h, failures.offline.fail);
+    await outcome(h.api.get('/private'));
+    await h.waitForExpiry();
+    assert.equal(h.expiryCalls, 1, 'the logout the fix removes');
+    assert.deepEqual(h.navigation, ['Login']);
+  });
+});
+
+describe('the realtime socket renews a refused token through the session (2026-11-06)', () => {
+  it('a request already refreshed: the newer stored token, no refresh of its own', async (t) => {
+    const h = createSessionHarness();
+    t.after(h.close);
+    await h.install('A');
+    const client = h.load('src/services/api/client.ts');
+    assert.equal(await client.renewAccessToken('expired-before'), 'A-access');
+    assert.equal(h.requests.length, 0);
+  });
+  it('the stored token was the refused one: one shared refresh, and renewal listeners hear it', async (t) => {
+    const h = createSessionHarness();
+    t.after(h.close);
+    await h.install('A');
+    h.attachExpiry();
+    const client = h.load('src/services/api/client.ts');
+    let heard = 0;
+    t.after(client.onAccessTokenRenewed(() => { heard++; }));
+    h.setTransport(async (r: any) => h.ok(r, { tokens: h.credentials('A-rotated') }));
+    const [one, two] = await Promise.all([client.renewAccessToken('A-access'), client.renewAccessToken('A-access')]);
+    assert.equal(one, 'A-rotated-access');
+    assert.equal(two, 'A-rotated-access');
+    assert.equal(h.requests.filter((r: any) => r.url.endsWith('/auth/refresh')).length, 1);
+    assert.equal(heard, 1);
+    assert.equal(h.expiryCalls, 0);
+  });
+  it('a refresh without a verdict: null, and the session stays', async (t) => {
+    const h = createSessionHarness();
+    t.after(h.close);
+    await h.install('A');
+    h.attachExpiry();
+    const client = h.load('src/services/api/client.ts');
+    const axios = require('axios');
+    h.setTransport(async (r: any) => { throw new axios.AxiosError('Network Error', 'ERR_NETWORK', r, {}); });
+    assert.equal(await client.renewAccessToken('A-access'), null);
+    assert.equal(h.expiryCalls, 0);
+    assert.equal(h.disk.get('refreshToken'), 'A-refresh');
+  });
+  it('signed out: null without a request', async (t) => {
+    const h = createSessionHarness();
+    t.after(h.close);
+    await h.install('A');
+    await h.logout();
+    const client = h.load('src/services/api/client.ts');
+    const before = h.requests.length;
+    assert.equal(await client.renewAccessToken('A-access'), null);
+    assert.equal(h.requests.filter((r: any) => r.url.endsWith('/auth/refresh')).length, 0);
+    assert.ok(h.requests.length >= before);
+  });
+});

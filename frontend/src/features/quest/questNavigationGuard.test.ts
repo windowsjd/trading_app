@@ -183,9 +183,14 @@ describe('quest navigation guard', () => {
   });
 
   it('guards exactly the navigators users move through', () => {
-    for (const file of ['RootNavigator', 'MainTabs', 'MarketStack', 'WalletStack']) {
+    for (const file of ['RootNavigator', 'MarketStack', 'WalletStack']) {
       const source = readFileSync(new URL(`../../app/navigation/${file}.tsx`, import.meta.url), 'utf8');
       assert.match(source, /UNSTABLE_router=\{questNavigationRouter\}/, file);
     }
+    // The tabs apply it after their Back-to-Home step (tabBackPolicy.test.ts holds a move through it).
+    const tabs = readFileSync(new URL('../../app/navigation/MainTabs.tsx', import.meta.url), 'utf8');
+    assert.match(tabs, /UNSTABLE_router=\{mainTabsRouter\}/);
+    const policy = readFileSync(new URL('../../app/navigation/tabBackPolicy.ts', import.meta.url), 'utf8');
+    assert.match(policy, /questNavigationRouter\(back\)/);
   });
 });

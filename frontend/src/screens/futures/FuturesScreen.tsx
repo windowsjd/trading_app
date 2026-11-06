@@ -236,10 +236,15 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       scope.current.mounted = false;
     };
   }, []);
+  // The freshness clock runs while this screen is on screen: under the
+  // full-screen chart or behind another tab it re-rendered this whole screen
+  // every second for nothing (an unfocused screen already counts as unwatched).
   useEffect(() => {
+    if (!focused) return undefined;
+    setClock(Date.now());
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [focused]);
   const instruments = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.futures.instruments(accountId),
     queryFn: ({ signal }) => getFuturesInstruments(accountId, signal),
@@ -713,15 +718,19 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     }
     send(null);
   };
-  /** The market open or add, with the leverage the user confirmed changing from (or none). */
-  const send = (fromLeverage: number | null) => {
+  /**
+   * The market open or add, with the leverage the user confirmed changing from
+   * (or none). A confirmed add sends the quantity its sheet showed, not one the
+   * 2 s price poll recomputed while the sheet was open.
+   */
+  const send = (fromLeverage: number | null, quantity = selectedQuantity) => {
     if (!instrument || submitLock.current) return;
     const signature = JSON.stringify([
       scope.current.epoch,
       instrument.id,
       position?.id,
       effectiveOperation,
-      selectedQuantity,
+      quantity,
       selectedLeverage,
       direction,
       marginMode,
@@ -737,7 +746,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         session,
         command: position
           ? {
-              ...positionCommand(position, "increase", selectedQuantity, key),
+              ...positionCommand(position, "increase", quantity, key),
               leverage: Number(leverage),
               ...(fromLeverage === null ? {} : { fromLeverage }),
             }
@@ -747,7 +756,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               direction,
               marginMode,
               leverage: Number(leverage),
-              quantity: selectedQuantity,
+              quantity,
               idempotencyKey: key,
             },
       };
@@ -840,8 +849,14 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       return;
     }
     // An add: the order itself carries the leverage it confirmed changing from.
+    // Only the add that was confirmed: a position closed meanwhile (손절가/익절가,
+    // liquidation, another device) sends nothing, never a new position in its place.
+    if (request.method === 'market' && position?.id !== request.position.id) {
+      setLeverageError({ cause: null, message: '확인하는 동안 포지션이 바뀌어 주문하지 않았어요. 다시 확인해 주세요.' });
+      return;
+    }
     setLeverageConfirm(null);
-    if (request.method === 'market') send(request.position.leverage);
+    if (request.method === 'market') send(request.position.leverage, request.quantity ?? selectedQuantity);
     else {
       const proceed = leverageProceed.current;
       leverageProceed.current = null;

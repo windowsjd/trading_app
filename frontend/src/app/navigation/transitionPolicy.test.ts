@@ -13,8 +13,13 @@ test('native push matches the reference push length on iOS, Android direction an
   assert.deepEqual(stackTransition(true, 'android'), { animation: 'none' });
   assert.deepEqual(rootTransition(false, 'ios'), { animation: 'fade', animationDuration: 190 });
   assert.deepEqual(rootTransition(true, 'ios'), { animation: 'none' });
-  assert.deepEqual(tabTransition(false), { animation: 'fade', transitionSpec: { animation: 'timing', config: { duration: 190, easing: tabEaseOut } } });
-  assert.deepEqual(tabTransition(true), { animation: 'none', transitionSpec: { animation: 'timing', config: { duration: 0, easing: tabEaseOut } } });
+  // Phones switch tabs in place (no cross-fade drawing the leaving tab through the new one); web keeps its brief fade.
+  for (const platform of ['android', 'ios']) {
+    assert.deepEqual(tabTransition(false, platform), { animation: 'none', transitionSpec: { animation: 'timing', config: { duration: 0, easing: tabEaseOut } } });
+    assert.deepEqual(tabTransition(true, platform), { animation: 'none', transitionSpec: { animation: 'timing', config: { duration: 0, easing: tabEaseOut } } });
+  }
+  assert.deepEqual(tabTransition(false, 'web'), { animation: 'fade', transitionSpec: { animation: 'timing', config: { duration: 190, easing: tabEaseOut } } });
+  assert.deepEqual(tabTransition(true, 'web'), { animation: 'none', transitionSpec: { animation: 'timing', config: { duration: 0, easing: tabEaseOut } } });
   assert.deepEqual(chartTransition(false, 'ios'), { ...rootTransition(false, 'ios'), presentation: 'fullScreenModal' });
   assert.deepEqual(chartTransition(true, 'ios'), { animation: 'none', presentation: 'fullScreenModal' });
 });
@@ -31,7 +36,7 @@ test('all stacks share push policy and chart keeps fullscreen modal presentation
   assert.match(root, /chartTransition\(reducedMotion, Platform\.OS\)/);
   assert.match(root, /rootTransition\(reducedMotion, Platform\.OS\)/);
   const tabs = readFileSync(resolve('src/app/navigation/MainTabs.tsx'), 'utf8');
-  assert.match(tabs, /tabTransition\(reducedMotion\)/);
+  assert.match(tabs, /tabTransition\(reducedMotion, Platform\.OS\)/);
   assert.doesNotMatch(tabs, /duration:/);
   const reduced = readFileSync(resolve('src/theme/useReducedMotion.ts'), 'utf8');
   assert.match(reduced, /isReduceMotionEnabled/);

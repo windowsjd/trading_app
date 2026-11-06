@@ -2,6 +2,7 @@ import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { Modal, Pressable, StyleSheet, View, type ViewStyle } from '../../theme/native';
 import { useSafeAreaInsets } from '../../theme/safeArea';
+import { useOwnerScreenFocused } from './ScreenSheetHost';
 
 interface BottomSheetBackdropProps {
   visible: boolean;
@@ -21,9 +22,13 @@ export default function BottomSheetBackdrop({
   // bottom-anchored sheet would reach under the navigation bar: it ends above it
   // itself, as InlineBottomSheet does (and above iOS's home indicator). No inset: 20.
   const insets = useSafeAreaInsets();
+  // A Modal is its own window above every screen: while another screen covers
+  // this one (a push tap opened 거래 내역, the order screen opened its chart)
+  // it hides instead of blocking that screen, and shows again on return.
+  const focused = useOwnerScreenFocused();
   return (
     <Modal
-      visible={visible}
+      visible={visible && focused}
       transparent
       animationType="slide"
       onRequestClose={onClose}

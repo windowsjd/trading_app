@@ -37,8 +37,10 @@ function fakeQueryClient() {
       ops.push('clear');
       store.clear();
     },
-    setQueryData(queryKey: readonly unknown[], data: unknown) {
+    updatedAt: new Map<string, number | undefined>(),
+    setQueryData(queryKey: readonly unknown[], data: unknown, options?: { updatedAt?: number }) {
       ops.push(`setQueryData:${JSON.stringify(queryKey)}`);
+      this.updatedAt.set(JSON.stringify(queryKey), options?.updatedAt);
       store.set(JSON.stringify(queryKey), data);
       return data;
     },
@@ -154,6 +156,9 @@ describe('session boundary', () => {
       // account query stays disabled (`enabled: !!userId`), and the switcher
       // stays empty until the app is restarted.
       assert.deepEqual(client.read(QUERY_KEYS.me), USER_B);
+      // Stale at once: the login response lacks the profile photo and 공개 setting,
+      // so the first screen fetches the full profile (not a minute without the photo).
+      assert.equal(client.updatedAt.get(JSON.stringify(QUERY_KEYS.me)), 0);
     });
 
     it('refetches the owned-account list for the new user', async () => {

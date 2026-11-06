@@ -182,3 +182,27 @@ test('the Market Futures instrument list navigates with its account and rejects 
   assert.equal(h.navigation.length,1);
   await h.press('futures-market-btc'); assert.deepEqual(h.navigation[1],['B','btc']);
 });
+
+test('one failed positions read while the Limit entry is in flight does not leave the screen locked', async t => {
+  const { act } = createRequire(import.meta.url)('react-test-renderer');
+  const h = futuresHarness(); await h.start(); t.after(h.close); await draft(h);
+  const positions = (h.reads as string[]).find((path) => path.includes('/futures/positions'));
+  assert.ok(positions);
+  const refetchPositions = () => act(async () => {
+    await h.client.refetchQueries({ predicate: (query: any) => JSON.stringify(query.queryKey).includes('positions') });
+  });
+  h.gate = deferred();
+  await h.press('futures-limit-submit');
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.node('order-type-select').props.disabled, true, 'held while the entry is in flight');
+  // The 2 s poll fails once: the screen's error replaces the form, then the next poll recovers.
+  h.readFailures = { [positions as string]: new Error('network blip') };
+  await refetchPositions(); await h.flush();
+  assert.equal(h.node('futures-limit-entry') === undefined, true, 'the form left the screen');
+  h.gate.resolve(); await h.flush();
+  h.readFailures = {};
+  await refetchPositions(); await h.flush();
+  assert.equal(h.node('futures-limit-entry') !== undefined, true);
+  assert.equal(h.node('order-type-select').props.disabled, false, 'the method, amount and 포지션 종료 are usable again');
+  assert.equal(h.requests.length, 1, 'nothing was sent again');
+});

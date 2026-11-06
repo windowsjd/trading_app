@@ -4,12 +4,12 @@ import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import { GUEST_CANDLE_REFRESH_MS, GUEST_DETAIL_REFRESH_MS, guestRefetchInterval, isGuestBrowsing, retryGuestRead } from '../../features/auth/guestBrowsing';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
-import { SafeAreaView } from '../../theme/safeArea';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from '../../theme/safeArea';
 import { useIsFocused } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../app/navigation/types';
 import {
@@ -17,6 +17,7 @@ import {
   getAssetCandles,
   getAssetDetail,
   resolveAssetChartTimeframe,
+  type AssetCandlesDto,
   type AssetChartTimeframe,
 } from '../../features/asset/api';
 import { useAssetCandle } from '../../features/asset/useAssetCandle';
@@ -31,7 +32,7 @@ import { getLastSessionCloseNotice } from '../../features/asset/lastSessionClose
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
 import { selectDisplayPrice, wonChartDisplay } from '../../features/asset/displayPricePolicy';
-import { mergeAssetCandleSnapshot } from '../../features/asset/liveCandle';
+import { mergeAssetCandleSnapshot, type AssetCandleSnapshotMessage } from '../../features/asset/liveCandle';
 import { describeCandleError } from '../../features/asset/candleErrors';
 import { safeRuntimeCode } from '../../services/ws/runtimeDiagnostics';
 import {
@@ -116,12 +117,13 @@ export function AssetMarketChart({
       detailQuery.data?.asset?.assetType,
     ) ?? (detailQuery.isError ? selectedTimeframe : null);
   const chartWindow = requestTimeframe ?? selectedTimeframe;
+  const candlesKey = QUERY_KEYS.asset.candles(assetId, {
+    range: chartWindow.range,
+    interval: chartWindow.interval,
+    limit: chartWindow.limit,
+  });
   const candlesQuery = useQuery({
-    queryKey: QUERY_KEYS.asset.candles(assetId, {
-      range: chartWindow.range,
-      interval: chartWindow.interval,
-      limit: chartWindow.limit,
-    }),
+    queryKey: candlesKey,
     queryFn: () =>
       getAssetCandles(assetId, {
         range: chartWindow.range,
@@ -179,14 +181,38 @@ export function AssetMarketChart({
     assetDisplayPriceDecimals: asset?.displayPriceDecimals,
   });
   // Never overlay a previous asset/interval for the render before hook cleanup.
-  const chartCandles = mergeAssetCandleSnapshot(
-    candlesQuery.data,
-    !isCandleStale &&
-      latestCandle?.assetId === assetId &&
-      latestCandle.interval === selectedTimeframe.interval
-      ? latestCandle
-      : null,
-    chartWindow.limit,
+  const liveCandle = !isCandleStale &&
+    latestCandle?.assetId === assetId &&
+    latestCandle.interval === selectedTimeframe.interval
+    ? latestCandle
+    : null;
+  // The baseline is read once and the socket carries only the bucket in
+  // progress, so a bucket that finished while the chart stayed open fell back
+  // to its partial values from the read (or vanished) at every rollover
+  // (2026-11-06). When the next bucket starts, the finished one's last live
+  // state joins the cached baseline, unless the baseline was read again since
+  // (the server's values win); the next read replaces it all.
+  const queryClient = useQueryClient();
+  const lastLive = useRef<{ candle: AssetCandleSnapshotMessage; seenAt: number } | null>(null);
+  const baselineReadAt = useRef(candlesQuery.dataUpdatedAt);
+  baselineReadAt.current = candlesQuery.dataUpdatedAt;
+  const candlesKeyRef = useRef(candlesKey);
+  candlesKeyRef.current = candlesKey;
+  const chartLimit = chartWindow.limit;
+  useEffect(() => {
+    if (!liveCandle) return;
+    const previous = lastLive.current;
+    lastLive.current = { candle: liveCandle, seenAt: Date.now() };
+    if (!previous || previous.candle.candle.time === liveCandle.candle.time
+      || previous.candle.assetId !== liveCandle.assetId || previous.candle.interval !== liveCandle.interval
+      || previous.seenAt < baselineReadAt.current) return;
+    queryClient.setQueryData<AssetCandlesDto>(candlesKeyRef.current, (data) => data?.interval === previous.candle.interval
+      ? { ...data, candles: mergeAssetCandleSnapshot(data, previous.candle, chartLimit) } : data);
+  }, [chartLimit, liveCandle, queryClient]);
+  // Once per new baseline or live candle, not on every render (a pan, a ticker).
+  const chartCandles = useMemo(
+    () => mergeAssetCandleSnapshot(candlesQuery.data, liveCandle, chartLimit),
+    [candlesQuery.data, chartLimit, liveCandle],
   );
   const detailView = variant === 'detail';
   const changeRate = formatPercent(displayPrice.changeRate);
@@ -411,9 +437,16 @@ export function AssetMarketChart({
       {typeof footerContent === 'function' ? footerContent(inputScroll) : footerContent}
     </ScrollView>
   ) : (
-    <SafeAreaView style={styles.screen} testID="asset-chart-screen">
-      {chartBody}
-    </SafeAreaView>
+    // A full-screen modal sits outside the app's safe-area provider view. On
+    // iOS a bare SafeAreaView then reads its own insets once, when it reaches
+    // the window before the presentation is laid out, and nothing updates it:
+    // the back button could stay under the status bar. Its own provider
+    // follows the modal's real safe area (Android measures the same).
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <SafeAreaView style={styles.screen} testID="asset-chart-screen">
+        {chartBody}
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 const styles = StyleSheet.create({

@@ -110,3 +110,21 @@ test('another asset starts on the whale and never shows the previous asset\'s ca
   assert.equal(h.chart().candles[0].close, '99000');
   assert.equal(h.chart().viewportResetKey, 'btc:5m');
 });
+
+test('Chart: a bucket that finishes while the chart is open keeps its last live values, not the first read', async (t) => {
+  const h = chartHarness('Chart');
+  await h.mount();
+  t.after(h.close);
+  await h.flush();
+  const first = '2026-10-19T00:00:00Z', next = '2026-10-19T00:05:00Z';
+  await h.answer('bnb:5m', [{ time: first, open: '760', high: '770', low: '750', close: '765', volume: '1' }]);
+  // The bucket in progress moves on live, then the next bucket starts.
+  h.candle = { assetId: 'bnb', interval: '5m', candle: { time: first, open: '760', high: '780', low: '750', close: '779', volume: '9' } };
+  await h.update();
+  assert.equal(h.chart().candles.at(-1).close, '779');
+  h.candle = { assetId: 'bnb', interval: '5m', candle: { time: next, open: '779', high: '781', low: '778', close: '780', volume: '2' } };
+  await h.update();
+  await h.flush();
+  assert.deepEqual(h.chart().candles.map((row: { time: string; close: string }) => [row.time, row.close]), [[first, '779'], [next, '780']],
+    "the finished bucket keeps its last live close (not the read's 765)");
+});

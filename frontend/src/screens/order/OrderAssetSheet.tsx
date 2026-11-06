@@ -19,6 +19,7 @@ import { useAppearance } from '../../theme/appearance';
 import { semantic } from '../../theme/tokens';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import ActionPressable from '../../components/common/ActionPressable';
+import { useOwnerScreenFocused } from '../../components/common/ScreenSheetHost';
 import CTAButton from '../../components/common/CTAButton';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
@@ -56,6 +57,8 @@ type Props = {
  * only. Selecting reports the asset id and leaves navigation to the screen.
  */
 export default function OrderAssetSheet({ visible, onClose, onSelect }: Props) {
+  // A Modal draws over every screen: hidden while another one covers this screen.
+  const focused = useOwnerScreenFocused();
   const reduced = useReducedMotion();
   const native = Platform.OS !== 'web';
   const [mounted, setMounted] = useState(visible);
@@ -93,7 +96,7 @@ export default function OrderAssetSheet({ visible, onClose, onSelect }: Props) {
     <Modal
       testID="order-asset-sheet-modal"
       transparent
-      visible
+      visible={focused}
       statusBarTranslucent
       animationType="none"
       onRequestClose={() => {

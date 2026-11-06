@@ -113,8 +113,9 @@ export default function RankingScreen({ navigation }: Props) {
     queryKey: QUERY_KEYS.ranking.list(publicationParams),
     queryFn: () => getRankings(publicationParams),
     enabled: !!seasonQuery.data,
+    // Only while the ranking is on screen: a mounted tab behind another one polled every minute.
     refetchInterval: (query) =>
-      query.state.data?.rankType === 'final' || seasonQuery.data?.status === 'settled'
+      !isFocused || query.state.data?.rankType === 'final' || seasonQuery.data?.status === 'settled'
         ? false : 60_000,
   });
   const publication = topQuery.data;
@@ -507,7 +508,8 @@ export default function RankingScreen({ navigation }: Props) {
               title="현재 시즌 랭킹에 표시할 친구가 없습니다."
               message="친구를 추가하거나 친구의 시즌 참가를 기다려주세요."
               actionLabel="친구 찾기"
-              onAction={() => navigation.navigate('MyTab', { screen: 'Friends' })}
+              // `initial: false`: MY's 전체 stays under 친구 when MY was never opened (back returns there).
+              onAction={() => navigation.navigate('MyTab', { screen: 'Friends', initial: false })}
             />
           ) : (
             <EmptyState

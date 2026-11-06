@@ -36,6 +36,7 @@ import { getConditionalBuyOrders } from '../../features/conditional/conditionalB
 import { getConditionalSellOrders } from '../../features/conditional/conditionalSellApi';
 import { getSessionGeneration } from '../../services/api/sessionOwnership';
 import {
+  quoteServerNow,
   validateOrderQuote,
   OrderQuoteValidationError,
 } from '../../features/order/validateOrderQuote';
@@ -412,11 +413,13 @@ export function OrderForm({
     mutationFn: (action: QuotedAction<OrderRequest, OrderQuoteDto>) =>
       runQuotedAction(action, {
         quote: async (request) => {
+          const sentAt = Date.now();
           const quote = await quoteTradingAccountOrder(
             request.accountId,
             request.payload,
           );
-          validateOrderQuote(request.payload, quote);
+          // Expiry on the server's clock, not a phone clock that may run ahead.
+          validateOrderQuote(request.payload, quote, quoteServerNow(quote, sentAt));
           if (isActionCurrent(request)) setQuotedPreview(quote);
           return quote;
         },

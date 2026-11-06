@@ -67,6 +67,8 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
     wsUrl: wsUrl ?? '',
     // Guest browsing has no realtime socket: REST results only.
     enabled: !!wsUrl && !guest,
+    // Under the detail opened from a result: subscribed, not re-rendered.
+    visible: focused,
   });
 
   const openAsset = useCallback((assetId: string) => {
@@ -138,6 +140,11 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
                 return (
                   <ActionPressable
                     key={scope.key}
+                    // Announced like the order screen's same chips: a market choice and whether it is chosen.
+                    accessibilityRole="button"
+                    accessibilityLabel={`${scope.label} 시장`}
+                    accessibilityState={{ selected: active }}
+                    aria-selected={active}
                     style={[styles.scopeChip, active && styles.scopeChipActive]}
                     onPress={() => setAssetType(scope.key)}
                   >

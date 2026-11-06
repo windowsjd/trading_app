@@ -55,6 +55,56 @@ function getRefreshTokens(data: RefreshResponse['data']) {
 export const apiClient = axios.create({ baseURL: API_BASE_URL, timeout: 10000 });
 let refreshFlight: { generation: number; promise: Promise<string | null> } | null = null;
 
+/**
+ * Only the refresh endpoint's own verdict ends a session: a dead, revoked or
+ * malformed refresh token (400/401) or a user no longer active (403). Offline,
+ * a timeout, 429 or a 5xx while the server restarts say nothing about it —
+ * the server rotates the token in one transaction, so the stored one is still
+ * current — and used to log the user out over a network blip.
+ */
+function isRefreshRejected(error: unknown) {
+  const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+  return status === 400 || status === 401 || status === 403;
+}
+
+/** A refresh without a verdict: the request fails like a network error; the session stays. */
+class RefreshUnavailableError extends Error {
+  readonly reason: unknown;
+  constructor(reason: unknown) {
+    super('Session refresh unavailable');
+    this.reason = reason;
+  }
+}
+
+const renewedListeners = new Set<() => void>();
+
+/** Told after a refresh saved a new access token (a refused realtime socket tries it). */
+export function onAccessTokenRenewed(listener: () => void): () => void {
+  renewedListeners.add(listener);
+  return () => {
+    renewedListeners.delete(listener);
+  };
+}
+
+/**
+ * For the realtime socket the server refused: the stored access token when a
+ * request already refreshed past the refused one, else one refresh through the
+ * shared single-flight. Null without a usable session or without a verdict; a
+ * refresh the server refuses ends the session as any request's would.
+ */
+export async function renewAccessToken(refused: string | null): Promise<string | null> {
+  const owner = getSessionGeneration();
+  if (!canUseSessionCredentials(owner)) return null;
+  try {
+    const current = await getAccessToken(owner);
+    assertUsableSession(owner);
+    if (current && current !== refused) return current;
+    return await refreshAccessToken(owner);
+  } catch {
+    return null;
+  }
+}
+
 function assertUsableSession(owner: number) {
   if (!canUseSessionCredentials(owner)) throw new SessionSupersededError();
 }
@@ -70,11 +120,17 @@ function refreshAccessToken(owner: number): Promise<string | null> {
         notifySessionExpired(owner);
         return null;
       }
-      const response = await axios.post<RefreshResponse>(
-        `${API_BASE_URL}/auth/refresh`,
-        { refreshToken },
-        { timeout: 10000 },
-      );
+      let response;
+      try {
+        response = await axios.post<RefreshResponse>(
+          `${API_BASE_URL}/auth/refresh`,
+          { refreshToken },
+          { timeout: 10000 },
+        );
+      } catch (error) {
+        // No verdict: keep the credentials; the next request refreshes again.
+        throw isRefreshRejected(error) ? error : new RefreshUnavailableError(error);
+      }
       assertUsableSession(owner);
       const tokens = getRefreshTokens(response.data.data);
       if (!tokens) {
@@ -83,8 +139,16 @@ function refreshAccessToken(owner: number): Promise<string | null> {
       }
       await saveTokens(tokens.accessToken, tokens.refreshToken, owner);
       assertUsableSession(owner);
+      for (const listener of renewedListeners) {
+        try {
+          listener();
+        } catch {
+          // A listener's failure must not fail the refresh.
+        }
+      }
       return tokens.accessToken;
-    } catch {
+    } catch (error) {
+      if (error instanceof RefreshUnavailableError) throw error;
       notifySessionExpired(owner);
       return null;
     } finally {
@@ -146,6 +210,8 @@ apiClient.interceptors.response.use(
       if (!token) throw error;
       return apiClient(original);
     } catch (failure) {
+      // The refresh had no verdict: this request fails with its network/server error, signed in.
+      if (failure instanceof RefreshUnavailableError) throw failure.reason;
       notifySessionExpired(owner);
       throw failure;
     }

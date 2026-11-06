@@ -40,6 +40,11 @@ export function openInMarketTab<Name extends 'AssetDetail' | 'Futures'>(
  *
  * Back only: a reset (logout, account switch) or the 마켓 tab's pop to top
  * removes the detail without the user going back anywhere.
+ *
+ * The tabs remember the order they were visited in (tabBackPolicy). When the
+ * entry tab is the one visited before, the return is the tabs' own Back, so
+ * the detail's visit leaves no 마켓 entry behind: the next Back on Home leaves
+ * (after asking) instead of opening the Market list the user never chose.
  */
 export function returnToEntryTab({ navigation, route }: {
   navigation: Pick<NavigationProp<ParamListBase>, 'getParent'>;
@@ -49,7 +54,14 @@ export function returnToEntryTab({ navigation, route }: {
     beforeRemove: ({ data: { action } }: EventArg<'beforeRemove', true, { action: NavigationAction }>) => {
       const returnTab = (route.params as { returnTab?: EntryTab } | undefined)?.returnTab;
       const tabs = navigation.getParent();
-      if (returnTab && (action.type === 'GO_BACK' || action.type === 'POP') && tabs?.isFocused()) tabs.navigate(returnTab);
+      if (!returnTab || (action.type !== 'GO_BACK' && action.type !== 'POP') || !tabs?.isFocused()) return;
+      const state = tabs.getState() as { key: string; routes: { key: string; name: string }[]; history?: { key?: string }[] };
+      const previous = state.history?.[state.history.length - 2]?.key;
+      if (previous !== undefined && state.routes.find(tab => tab.key === previous)?.name === returnTab) {
+        tabs.dispatch({ type: 'GO_BACK', target: state.key });
+      } else {
+        tabs.navigate(returnTab);
+      }
     },
   };
 }

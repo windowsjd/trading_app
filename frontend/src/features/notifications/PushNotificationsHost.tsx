@@ -98,16 +98,18 @@ export function navigateTo(intent: PushIntent, pushAt: number) {
       });
       return;
     case 'friend_requests':
+      // `pop`: from a screen over the tabs (거래 내역, a chart) back to the tabs,
+      // never a second MainTabs pushed on top (React Navigation 7 pushes otherwise).
       rootNavigationRef.navigate('MainTabs', {
         screen: 'MyTab',
         params: { screen: 'Friends', initial: false, params: { tab: 'requests', pushAt } },
-      });
+      }, { pop: true });
       return;
     case 'notice':
       rootNavigationRef.navigate('MainTabs', {
         screen: 'MyTab',
         params: { screen: 'Notices', initial: false, params: { noticeId: intent.noticeId, pushAt } },
-      });
+      }, { pop: true });
       return;
     case 'season_record':
       rootNavigationRef.navigate('MainTabs', {
@@ -117,7 +119,7 @@ export function navigateTo(intent: PushIntent, pushAt: number) {
           initial: false,
           params: { screen: 'RecordSeasonDetail', initial: false, params: { seasonId: intent.seasonId } },
         },
-      });
+      }, { pop: true });
       return;
   }
 }

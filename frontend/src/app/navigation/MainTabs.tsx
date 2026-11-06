@@ -4,9 +4,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppearance } from '../../theme/appearance';
+import { Platform } from '../../theme/native';
 import { primaryGradient } from '../../theme/tokens';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { tabTransition } from './transitionPolicy';
+import { MAIN_TABS_BACK_BEHAVIOR, mainTabsRouter } from './tabBackPolicy';
 
 import TabBarIcon from '../../components/navigation/TabBarIcon';
 import TabBarButton from '../../components/navigation/TabBarButton';
@@ -16,7 +18,6 @@ import { useTradingAccount } from '../../features/tradingAccount/TradingAccountC
 import { ScreenSheetHost } from '../../components/common/ScreenSheetHost';
 import { QuestGuideProvider } from '../../features/quest/QuestGuideProvider';
 import AppUpdateNotice from '../../features/appRelease/AppUpdateNotice';
-import { questNavigationRouter } from '../../features/quest/questNavigationGuard';
 import { isGuestBrowsing } from '../../features/auth/guestBrowsing';
 import { GuestExitContext } from '../../components/guest/guestExit';
 import { leaveGuestBrowsing } from './seasonRouting';
@@ -69,15 +70,17 @@ export default function MainTabs(props: MainTabsScreenProps) {
       key={account?.id ?? 'guest'}
       id="MainTabs"
       initialRouteName="HomeTab"
-      // An active beginner quest holds tab switches outside its practice.
-      UNSTABLE_router={questNavigationRouter}
+      // Back on a tab's first screen: the tab visited before it, then Home (tabBackPolicy).
+      backBehavior={MAIN_TABS_BACK_BEHAVIOR}
+      // That Back-to-Home step; an active beginner quest holds tab switches outside its practice.
+      UNSTABLE_router={mainTabsRouter}
       screenOptions={{
         headerShown: false,
         tabBarButton: (props) => <TabBarButton {...props} reducedMotion={reducedMotion} />,
         tabBarLabelPosition: 'below-icon',
         tabBarActiveTintColor: primaryGradient.colors[0],
         tabBarInactiveTintColor: colors.navigationInactive,
-        ...tabTransition(reducedMotion),
+        ...tabTransition(reducedMotion, Platform.OS),
         tabBarStyle: {
           backgroundColor: colors.navigation,
           borderTopColor: colors.border,

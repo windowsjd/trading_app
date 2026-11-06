@@ -160,9 +160,9 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.equal(fxPanel.length, 1);
       assert.equal(fxPanel[0].props.initialFromCurrency, 'KRW');
       assert.equal(elements(opened, 'WalletTransferPanel').length, 0, 'one sheet at a time, never stacked');
-      // Its receipt's 마켓으로 가기 closes the sheet on the way to the market.
+      // Its receipt's 마켓으로 가기 closes the sheet on the way to the market (the list already open, never a second one).
       fxPanel[0].props.onGoMarket();
-      assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } }]);
+      assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Market', pop: true } }]);
       assert.equal(elements(h.renderWallet().tree, 'WalletFxPanel').length, 0);
       find(wallet, 'wallet-ledger').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['WalletTransactions']);

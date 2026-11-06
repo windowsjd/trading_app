@@ -310,11 +310,12 @@ describe('bottom tab visual states', () => {
           }
         }
 
-        assert.equal(options.animation, 'fade');
-        assert.deepEqual(options.transitionSpec, tabTransition(false).transitionSpec);
+        // The harness platform is Android: tabs switch in place there.
+        assert.equal(options.animation, 'none');
+        assert.deepEqual(options.transitionSpec, tabTransition(false, 'android').transitionSpec);
         const reduced = renderTabs(mode, false, appearance, true).props.screenOptions;
         assert.equal(reduced.animation, 'none');
-        assert.deepEqual(reduced.transitionSpec, tabTransition(true).transitionSpec);
+        assert.deepEqual(reduced.transitionSpec, tabTransition(true, 'android').transitionSpec);
         assert.equal(reduced.tabBarActiveTintColor, '#326FE5');
       });
     }
