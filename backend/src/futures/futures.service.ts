@@ -46,6 +46,11 @@ import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { buildPagination } from '../common/pagination';
+import {
+  FUTURES_HISTORY_PHASES,
+  readFuturesPositionHistory,
+  type FuturesHistoryPhase,
+} from './futures-position-history';
 import { futuresError } from './futures-error';
 import {
   futuresCommandHash,
@@ -1122,6 +1127,33 @@ export class FuturesService {
     );
   }
 
+  /** 포지션 진입 / 포지션 종료 records of one account (futures-position-history.ts). */
+  async positionHistory(
+    userId: string | undefined,
+    accountId: string,
+    query: { phase?: string; limit?: string; offset?: string } = {},
+  ) {
+    requireUser(userId);
+    const phase = historyPhase(query.phase);
+    const limit = pageNumber(query.limit, 20, 1, 100);
+    const offset = pageNumber(query.offset, 0, 0, 1_000_000);
+    await this.access.getOwnedAccountOrThrow(userId, accountId);
+    return this.prisma.$transaction(
+      async (tx) => {
+        await this.access.getOwnedAccountOrThrow(userId, accountId, tx);
+        const page = await readFuturesPositionHistory(tx, accountId, phase, {
+          limit,
+          offset,
+        });
+        return {
+          success: true,
+          data: { tradingAccountId: accountId, phase, ...page },
+        };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
+  }
+
   async finalSettlement(userId: string | undefined, accountId: string) {
     requireUser(userId);
     await this.access.getOwnedAccountOrThrow(userId, accountId);
@@ -1301,6 +1333,15 @@ function stage(failureStage: string, accountId: string) {
     entities: { tradingAccountId: accountId },
     nextInvestigation: ['backend/src/futures/futures.service.ts'],
   });
+}
+function historyPhase(raw: string | undefined): FuturesHistoryPhase {
+  if (!FUTURES_HISTORY_PHASES.includes(raw as FuturesHistoryPhase))
+    futuresError(
+      'INVALID_FUTURES_HISTORY_PHASE',
+      'The history phase must be entry or exit.',
+      HttpStatus.BAD_REQUEST,
+    );
+  return raw as FuturesHistoryPhase;
 }
 function pageNumber(
   raw: string | undefined,

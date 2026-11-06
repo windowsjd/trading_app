@@ -205,11 +205,43 @@ export type FuturesResult = {
   /** Absent from an older server and from responses committed before 2026-11-06. */
   leverageChange?: FuturesLeverageChange | null;
 };
-export type FuturesHistory = {
+/** 거래 내역 › 선물: 포지션 진입 (open/increase) or 포지션 종료 (reduce/close, liquidations, Season exit). */
+export type FuturesHistoryPhase = "entry" | "exit";
+/** The Season-final exit of one account: one record holding every position it closed. */
+export type FuturesSeasonExit = {
+  id: string;
+  seasonId: string;
+  endAt: string;
+  realizedPnl: string;
+  feeAmount: string;
+  settledFee: string;
+  settledCash: string;
+  bankruptcyShortfall: string;
+  executedAt: string;
+  closes: {
+    positionId: string;
+    instrumentId: string;
+    direction: Direction;
+    marginMode: MarginMode;
+    quantity: string;
+    executionPrice: string;
+    realizedPnl: string;
+    feeAmount: string;
+    priceBasis: "futures_last" | "spot_last";
+    instrument: FuturesInstrument;
+  }[];
+};
+/** One record as stored: an execution, a liquidation event or the Season exit, each with its own id. */
+export type FuturesPositionRecord = { id: string; executedAt: string } & (
+  | { kind: "execution"; execution: FuturesExecution }
+  | { kind: "liquidation"; liquidation: FuturesLiquidation }
+  | { kind: "season_settlement"; settlement: FuturesSeasonExit }
+);
+export type FuturesPositionHistory = {
   tradingAccountId: string;
+  phase: FuturesHistoryPhase;
   pagination: OffsetPagination;
-  executions?: FuturesExecution[];
-  liquidations?: FuturesLiquidation[];
+  records: FuturesPositionRecord[];
 };
 /** One Binance USDⓈ-M contract candle (contract trade price, not Mark). */
 export type FuturesCandle = {
@@ -356,12 +388,13 @@ export async function getFuturesMarketInstruments(signal?: AbortSignal): Promise
 }
 export const getFuturesPositions = (id: string, signal?: AbortSignal) =>
   sentRead<FuturesPositions>(id, "positions", signal);
-export const getFuturesHistory = (
+/** One page of the server's union for the phase (never a filter of another page; 2026-11-06). */
+export const getFuturesPositionHistory = (
   id: string,
-  kind: "executions" | "liquidations",
+  phase: FuturesHistoryPhase,
   offset: number,
   signal?: AbortSignal,
-) => read<FuturesHistory>(id, `${kind}?limit=20&offset=${offset}`, signal);
+) => read<FuturesPositionHistory>(id, `position-history?phase=${phase}&limit=20&offset=${offset}`, signal);
 export const getFuturesFinalSettlement = (id: string, signal?: AbortSignal) =>
   read<{
     tradingAccountId: string;

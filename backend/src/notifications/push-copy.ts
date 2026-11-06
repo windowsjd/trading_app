@@ -23,7 +23,9 @@ export type PushData = {
   uid: string;
   accountId?: string;
   market?: PushMarket;
-  futuresView?: 'executions' | 'liquidations';
+  /** 거래 내역 › 선물 view: `exits` (포지션 종료) for a reduce/close fill (2026-11-06), `executions` for
+   * an entry fill (older apps read every value but `liquidations` as their fill list), `liquidations`. */
+  futuresView?: 'executions' | 'exits' | 'liquidations';
   seasonId?: string;
   noticeId?: string;
   /** order_failure: which failure row (`<failureKind>:<failureId>` is its

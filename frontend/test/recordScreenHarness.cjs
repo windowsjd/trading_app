@@ -31,9 +31,9 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
           marginMode: 'isolated', closeKind: 'closed', completedAt: '2026-11-05T12:44:04.000Z', averageEntryPrice: '80958.27000000',
           averageExitPrice: '85681.22000000', displayPriceDecimals: 2 }] };
       } else if (path.includes('/futures/')) {
-        // The existing futures history API (executions/liquidations) and catalog.
+        // The futures position history (포지션 진입/종료) and catalog.
         if (h.futuresFailure) throw h.futuresFailure;
-        const key = path.includes('/executions') ? 'executions' : path.includes('/liquidations') ? 'liquidations' : 'catalog';
+        const key = path.includes('/position-history') ? (path.includes('phase=exit') ? 'exits' : 'entries') : 'catalog';
         data = h.futuresData?.(key, path) ?? futuresFixture(path.split('/')[2], { position: true })[key];
       } else {
         const all = h.orders.filter(row => !config.params.side || row.side === config.params.side);

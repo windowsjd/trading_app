@@ -44,6 +44,7 @@ export function tradingQuestTransport(response, committedAt, accountId, level) {
         if(path.endsWith('/instruments'))return response(f.catalog);
         if(path.endsWith('/positions'))return response(f.positions);
         if(path.includes('/limit-orders'))return response({tradingAccountId:accountId,orders:[],pagination:page([])});
+        if(path.includes('/position-history'))return response({...f.entries,records:[],pagination:page([])});
         if(path.includes('/executions'))return response({...f.executions,executions:[],pagination:page([])});
         if(path.includes('/liquidations'))return response({...f.liquidations,liquidations:[],pagination:page([])});
         return response(f.final);

@@ -56,8 +56,8 @@ createRoot(document.getElementById('root')).render(
     <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: innerWidth, height: innerHeight }, insets: { top: 0, right: 0, bottom: 0, left: 0 } }}>
       <QueryClientProvider client={client}>
         <AppearanceProvider>
-          {orderProbe ? <OrderSuccessBottomSheet visible payload={marketResult(orderProbe)} onClose={() => {}}
-            onGoAssetDetail={() => { window.fixture.orderAction = 'asset'; }}
+          {orderProbe ? <OrderSuccessBottomSheet visible payload={marketResult(orderProbe)}
+            onClose={() => { window.fixture.orderAction = 'close'; }}
             onGoOrderHistory={() => { window.fixture.orderAction = 'history'; }}
             onGoHome={() => { window.fixture.orderAction = 'home'; }} /> : primaryProbe ? <PrimaryProbes /> : probe ? <ScrollView contentContainerStyle={{ padding: 24, gap: 16, backgroundColor: semantic.screen }}>
             {[

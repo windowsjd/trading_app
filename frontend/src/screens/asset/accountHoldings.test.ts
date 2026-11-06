@@ -255,7 +255,7 @@ describe('holdings in Order with real React Query and order invalidation', () =>
             QUERY_KEYS.tradingAccount.holdings(accountId),
           );
           assert.equal(cached.positions[0]?.quantity ?? '0', after);
-          await act(async () => h.success().onGoAssetDetail());
+          await act(async () => h.success().onClose());
         }
         assert.match(
           empty(h),

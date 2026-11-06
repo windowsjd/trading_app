@@ -932,6 +932,11 @@ export type CompletedTrade =
   | (Extract<FriendCompletedTrade, { kind: 'spot' }> & {
       key: string;
       completedAt: IsoDateTimeString;
+      /**
+       * The executed SELL that completed this trade; null when two SELLs share
+       * that instant, absent from an older server (2026-11-06).
+       */
+      lastSellOrderId?: string | null;
       averageBuyPrice: MoneyString | null;
       averageSellPrice: MoneyString | null;
       displayPriceDecimals: number | null;

@@ -231,6 +231,14 @@ describe('push sources', () => {
       futuresView: 'executions',
       accountId: 'g1',
     });
+    // An entry keeps the fill list's view; a reduce/close fill opens 포지션 종료.
+    expect(scan.candidates.map((c) => c.data.futuresView)).toEqual([
+      'executions',
+      'executions',
+      'executions',
+      'executions',
+      'exits',
+    ]);
   });
 
   it('emits one notification per liquidation event', async () => {

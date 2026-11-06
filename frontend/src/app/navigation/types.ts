@@ -120,15 +120,20 @@ export type MainTabParamList = {
   ModesTab: NavigatorScreenParams<ModesStackParamList> | undefined;
 };
 
+/** A 거래 내역 › 선물 view a push or notice asks for (see TradeHistory). */
+export type FuturesHistoryView = 'executions' | 'exits' | 'liquidations';
+
 /** A tab a Market-tab screen can be opened from. */
 export type EntryTab = Exclude<keyof MainTabParamList, 'MarketTab'>;
 
 export type RootStackParamList = {
-  /** `market`/`futuresView` preselect the 현물|선물 and 체결|강제청산 views
-   * (push taps); the account stays the route's own subject. */
+  /** `market`/`futuresView` preselect the 현물|선물 and 포지션 진입|포지션 종료
+   * views (push taps); the account stays the route's own subject. `executions`
+   * (an entry fill, or any fill from an older push) opens 포지션 진입; `exits`
+   * (a reduce/close fill) and `liquidations` open 포지션 종료. */
   TradeHistory: RecordOrderAccountScope & {
     market?: 'spot' | 'futures';
-    futuresView?: 'executions' | 'liquidations';
+    futuresView?: FuturesHistoryView;
     /** Changes per push tap, so a repeated tap selects its view again. */
     pushAt?: number;
   };

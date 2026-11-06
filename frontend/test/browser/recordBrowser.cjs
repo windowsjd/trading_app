@@ -32,8 +32,8 @@ async function run() {
     }
     return clipped;
   });
-  // 거래내역 > 선물 (2026-10-16): the existing executions and forced-liquidation
-  // records with their paging, under the same account; 현물 brings the orders back.
+  // 거래내역 > 선물 (2026-11-06): 포지션 진입 / 포지션 종료, each one paged server
+  // union with its own paging, under the same account; 현물 brings the orders back.
   const futuresHistoryChecks = async (tag, shot) => {
     await id('trade-history-futures').click();
     await id('trade-history-futures-screen').waitFor();
@@ -41,21 +41,25 @@ async function run() {
     assert.equal(await id('record-order-item-order-1').count(), 0, `${tag}: no spot orders under 선물`);
     let text = await id('trade-history-futures-screen').innerText();
     assert.match(text, /수량 \/ 체결가 · 선물 Last/); assert.match(text, /수량 \/ 체결가 · Spot\(이전 기준\)/);
-    assert.doesNotMatch(text, /실제/);
-    assert.deepEqual(await clippedText(), [], `${tag} executions`);
-    if (shot) await page.screenshot({ path: path.join(out, `futures-executions-${shot}.png`), fullPage: true });
+    assert.match(text, /수량 추가\(Increase\) · 숏\(Short\)/);
+    assert.doesNotMatch(text, /실제|전량 종료|수량 감소|강제청산|시즌 종료 정산|체결 기록/);
+    assert.deepEqual(await clippedText(), [], `${tag} entries`);
+    if (shot) await page.screenshot({ path: path.join(out, `futures-entries-${shot}.png`), fullPage: true });
     await page.getByRole('button', { name: '다음', exact: true }).click();
     await page.getByText(/SOLUSDT · 수량 추가\(Increase\)/).waitFor();
     assert.equal(await page.getByText(/신규 진입\(Open\)/).count(), 0, `${tag}: page 2 replaces page 1`);
     await page.getByRole('button', { name: '이전', exact: true }).click();
     await page.getByText(/신규 진입\(Open\) · 롱\(Long\)/).waitFor();
-    await id('futures-history-liquidations').click();
+    await id('futures-history-exits').click();
     await page.getByText('Mark 청산가', { exact: true }).first().waitFor();
     text = await id('trade-history-futures-screen').innerText();
-    assert.match(text, /정산 수수료/); assert.match(text, /현금 정산/); assert.doesNotMatch(text, /실제/);
-    assert.deepEqual(await clippedText(), [], `${tag} liquidations`);
+    // The Season exit, a user close and one liquidation event, in the server's order.
+    assert.match(text, /시즌 종료 정산 · 1개 포지션[\s\S]*전량 종료\(Close\) · 숏\(Short\)[\s\S]*교차\(Cross\) 전량 강제청산 · 2개 포지션/);
+    assert.match(text, /시즌 종료 가격 · 선물 Last/);
+    assert.match(text, /정산 수수료/); assert.match(text, /현금 정산/); assert.doesNotMatch(text, /실제|신규 진입|강제청산 기록/);
+    assert.deepEqual(await clippedText(), [], `${tag} exits`);
     // The segment's selection slides (spring); capture it settled.
-    if (shot) { await page.waitForTimeout(450); await page.screenshot({ path: path.join(out, `futures-liquidations-${shot}.png`), fullPage: true }); }
+    if (shot) { await page.waitForTimeout(450); await page.screenshot({ path: path.join(out, `futures-exits-${shot}.png`), fullPage: true }); }
     await id('trade-history-spot').click();
     await id('record-order-item-order-1').waitFor();
   };
@@ -99,7 +103,10 @@ async function run() {
       if (screen === 'history') {
         // 2026-10-16: 현물 | 선물 above the orders; amounts without the 실제 prefix.
         await id('trade-history-market').waitFor();
-        assert.match(await id('record-order-item-order-1').innerText(), /체결가[\s\S]*총액[\s\S]*수수료[\s\S]*차감액/);
+        // A BUY ends with 총액 = what it paid, fee included (2026-11-06; 총액·차감액 before).
+        const buyRow = await id('record-order-item-order-1').innerText();
+        assert.match(buyRow, /체결가[\s\S]*수수료[\s\S]*총액/);
+        assert.doesNotMatch(buyRow, /차감액|총액[\s\S]*수수료/);
         assert.doesNotMatch(await page.locator('body').innerText(), /실제/);
       }
       if (screen === 'futures') await futuresHistoryChecks(tag, width === 320 && fontScale === 2 && preference === 'red_blue' ? `${appearance}-${long ? 'long' : 'normal'}` : null);

@@ -231,8 +231,8 @@ export type FillNotice = {
   overflowMixed?: boolean;
   /** A condition met, not a fill (pendingEvents.ts). */
   trigger?: boolean;
-  /** 내역 보기 target inside 거래 내역; the Spot list when absent. */
-  history?: { market: 'futures'; futuresView: 'executions' | 'liquidations' };
+  /** 내역 보기 target inside 거래 내역 (포지션 진입 / 포지션 종료); the Spot list when absent. */
+  history?: { market: 'futures'; futuresView: 'executions' | 'exits' | 'liquidations' };
 };
 
 /** A foreground liquidation push as a banner (its own copy, its own key). */

@@ -89,9 +89,13 @@ describe('Order screen lifecycle with real React and query mutations', () => {
                 key[0] === 'asset',
             ),
           );
-          await act(async () => h.success().onGoAssetDetail());
+          // The result names the order's own account (its 공유하기 reads only there).
+          assert.equal(h.success().accountId, accountId);
+          // 주문으로 돌아가기 closes the result and keeps this order screen.
+          await act(async () => h.success().onClose());
           assert.equal(h.success().visible, false);
-          assert.deepEqual(h.navigation, [['back']]);
+          assert.deepEqual(h.navigation, []);
+          assert.equal(h.requests.length, 2, 'closing never re-sends the order');
         });
       }
   for (const change of ['account', 'asset', 'side']) {

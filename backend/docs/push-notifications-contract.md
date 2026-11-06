@@ -72,7 +72,10 @@ of the event's own account, read in the same query as the event.
 - Futures: every `futures_executions` row by `executed_at` (manual market,
   limit entry, conditional entry, stop-loss/take-profit). Key
   `futures_execution:<id>`. Liquidations and Season final exits never write
-  this table.
+  this table. `futuresView` = `exits` (거래 내역 › 선물 › 포지션 종료) for a
+  `reduce`/`close` row (2026-11-06), `executions` (포지션 진입) for an
+  `open`/`increase` row; an app before 2026-11-06 reads every value except
+  `liquidations` as its fill list.
 - Never announced: `submitted` orders, triggers, watches, `ordered`
   conditional rows whose order has not filled, cancellations. A user's own
   market close or reduce of a Futures position is an execution and is
@@ -325,7 +328,7 @@ and cannot turn it back on; only a newer app can turn it off. The app shows no
   it changed (the in-app fill banner keeps announcing Spot fills). A
   `futures_liquidation` push for one of the signed-in user's own accounts is
   also handed to that same banner queue (`선물 강제청산` + the push body,
-  내역 보기 → 선물 > 강제청산 기록): one banner at a time, never stacked on a fill
+  내역 보기 → 선물 > 포지션 종료; 강제청산 기록 before 2026-11-06): one banner at a time, never stacked on a fill
   banner, and one liquidation event (`liquidationId`) is shown once even if
   delivered again. It depends on the push actually arriving (worker on,
   permission granted, type on); without it the futures screen's own position
@@ -338,7 +341,8 @@ and cannot turn it back on; only a newer app can turn it off. The app shows no
   failures/expiries → 주문 실패·만료 (`OrderFailure {accountId, kind,
   failureId}`, §2.3a: the stored result and reason, plus where the row is also
   listed; a LOC links to 거래 내역 > 현물), liquidation → 거래 내역 > 선물 >
-  강제청산 기록, friend request → 친구 > 받은 요청, notice → 공지사항
+  포지션 종료 (강제청산 기록 before 2026-11-06; a futures fill opens 포지션 진입
+  or 포지션 종료 by its `futuresView`), friend request → 친구 > 받은 요청, notice → 공지사항
   (opened), final result / ending soon → 시즌 전적 상세
   (`RecordSeasonDetail`). A beginner's active quest holds the move like any
   other navigation.

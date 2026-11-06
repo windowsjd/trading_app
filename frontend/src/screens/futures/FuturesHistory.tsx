@@ -4,7 +4,16 @@ import { useIsFocused } from '@react-navigation/native';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { QUERY_KEYS } from '../../constants/queryKeys';
-import { getFuturesHistory, getFuturesInstruments } from '../../features/futures/api';
+import type { FuturesHistoryView } from '../../app/navigation/types';
+import {
+  getFuturesInstruments,
+  getFuturesPositionHistory,
+  type FuturesExecution,
+  type FuturesHistoryPhase,
+  type FuturesInstrument,
+  type FuturesLiquidation,
+  type FuturesSeasonExit,
+} from '../../features/futures/api';
 import { futuresPriceBasisLabel } from '../../features/futures/policy';
 import { formatAssetPrice, formatDisplayDecimal, formatUsd } from '../../utils/format';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -21,27 +30,36 @@ const operationLabel = {
   close: '전량 종료(Close)',
 };
 
+/** A push or notice view → its tab: a close, reduce or liquidation is a position exit. */
+export function futuresHistoryPhase(view?: FuturesHistoryView): FuturesHistoryPhase {
+  return view === 'exits' || view === 'liquidations' ? 'exit' : 'entry';
+}
+
 /**
- * The account's futures executions and forced liquidations, 20 per page, from
- * the existing futures history API (the central 거래 내역's 선물 view). Read
- * only while shown; each record states the price basis it was actually
- * executed on, and liquidation separates economic loss, the cash settled and
- * the uncovered shortfall.
+ * The account's position records (the central 거래 내역's 선물 view), 20 per
+ * page, newest first: 포지션 진입 = executions that opened or added to a
+ * position; 포지션 종료 = executions that reduced or closed one, every forced
+ * liquidation and the Season-final exit. Each page is one page of the server's
+ * union for that tab (backend futures-api-contract.md › Position history),
+ * never a filter of a page, so nothing repeats or goes missing between kinds.
+ * Read only while shown; each record states the price basis it was executed
+ * on, and a liquidation or Season exit stays one record with all of its closes,
+ * separating economic loss, the cash settled and the uncovered shortfall.
  */
 export default function FuturesHistory({
   accountId,
-  initialKind = 'executions',
+  initialView,
 }: {
   accountId: string;
-  /** 강제청산 기록 for a liquidation push; 체결 기록 otherwise. */
-  initialKind?: 'executions' | 'liquidations';
+  /** 포지션 종료 for a liquidation or close push; 포지션 진입 otherwise. */
+  initialView?: FuturesHistoryView;
 }) {
   const focused = useIsFocused();
-  const [historyKind, setHistoryKind] = useState<'executions' | 'liquidations'>(initialKind);
+  const [phase, setPhase] = useState<FuturesHistoryPhase>(() => futuresHistoryPhase(initialView));
   const [offset, setOffset] = useState(0);
   const history = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.futures.history(accountId, historyKind, offset),
-    queryFn: ({ signal }) => getFuturesHistory(accountId, historyKind, offset, signal),
+    queryKey: QUERY_KEYS.tradingAccount.futures.history(accountId, phase, offset),
+    queryFn: ({ signal }) => getFuturesPositionHistory(accountId, phase, offset, signal),
     enabled: focused,
     retry: false,
   });
@@ -50,17 +68,17 @@ export default function FuturesHistory({
   const catalog = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.futures.instruments(accountId),
     queryFn: ({ signal }) => getFuturesInstruments(accountId, signal),
-    enabled: focused && historyKind === 'liquidations',
+    enabled: focused && phase === 'exit',
     retry: false,
   });
   const instruments = !catalog.isError && catalog.data?.tradingAccountId === accountId ? catalog.data.instruments : [];
   return (
     <View style={styles.stack} testID="futures-history">
-      <SegmentedControl testID="futures-history-kind" accessibilityLabel="선물 기록 종류" compact value={historyKind}
-        onChange={(kind) => { setHistoryKind(kind); setOffset(0); }}
+      <SegmentedControl testID="futures-history-kind" accessibilityLabel="선물 기록 종류" compact value={phase}
+        onChange={(next) => { setPhase(next); setOffset(0); }}
         options={[
-          { key: 'executions', label: '체결 기록', testID: 'futures-history-executions' },
-          { key: 'liquidations', label: '강제청산 기록', testID: 'futures-history-liquidations' },
+          { key: 'entry', label: '포지션 진입', testID: 'futures-history-entries' },
+          { key: 'exit', label: '포지션 종료', testID: 'futures-history-exits' },
         ]} />
       {history.isError ? (
         <>
@@ -71,40 +89,15 @@ export default function FuturesHistory({
         <Text style={styles.muted}>기록을 불러오고 있습니다.</Text>
       ) : (
         <>
-          {(history.data.executions ?? []).map((e) => (
-            <View key={e.id} style={styles.record}>
-              <Text style={styles.recordTitle}>
-                {e.instrument.underlying.symbol} · {operationLabel[e.operation]} · {directionLabel[e.direction]}
-              </Text>
-              <Metric
-                label={['수량 / 체결가', futuresPriceBasisLabel(e.priceEvidence?.priceBasis)].filter(Boolean).join(' · ')}
-                value={`${formatDisplayDecimal(e.quantity)} / ${price(e.executionPrice, e.instrument.underlying.displayPriceDecimals)}`}
-              />
-              <Metric label="실현 손익 / 수수료" value={`${usd(e.realizedPnl)} / ${usd(e.feeAmount)}`} />
-              <Text style={styles.muted}>{new Date(e.executedAt).toLocaleString('ko-KR')}</Text>
-            </View>
-          ))}
-          {(history.data.liquidations ?? []).map((e) => (
-            <View key={e.id} style={styles.record}>
-              <Text style={styles.recordTitle}>{marginLabel[e.marginMode]} 전량 강제청산 · {e.closes.length}개 포지션</Text>
-              <Metric label="경제적 실현 손익" value={usd(e.realizedPnl)} />
-              <Metric label="경제적 종료 수수료" value={usd(e.feeAmount)} />
-              {e.settledFee !== undefined ? <Metric label="정산 수수료" value={usd(e.settledFee)} /> : null}
-              <Metric label="현금 정산" value={usd(e.settledCash)} />
-              <Metric label="미충당 손실 · 부채 이월 없음" value={usd(e.bankruptcyShortfall)} />
-              {e.closes.map((c) => (
-                <View key={c.positionId} style={styles.record}>
-                  <Text style={styles.recordTitle}>{c.markSnapshot?.symbol ?? '종료 포지션'} · {directionLabel[c.direction]}</Text>
-                  <Metric label="종료 수량" value={formatDisplayDecimal(c.quantity)} />
-                  <Metric
-                    label="Mark 청산가"
-                    value={price(c.executionPrice, instruments.find((i) => i.id === c.instrumentId)?.underlying.displayPriceDecimals ?? 8)}
-                  />
-                </View>
-              ))}
-              <Text style={styles.muted}>{new Date(e.executedAt).toLocaleString('ko-KR')}</Text>
-            </View>
-          ))}
+          {(history.data.records ?? []).map((record) =>
+            record.kind === 'execution' ? (
+              <ExecutionRecord key={`execution:${record.id}`} execution={record.execution} />
+            ) : record.kind === 'liquidation' ? (
+              <LiquidationRecord key={`liquidation:${record.id}`} liquidation={record.liquidation} instruments={instruments} />
+            ) : (
+              <SeasonExitRecord key={`season:${record.id}`} settlement={record.settlement} />
+            ),
+          )}
           {history.data.pagination.returned === 0 ? <Text style={styles.muted}>기록이 없습니다.</Text> : null}
           <View style={styles.pages}>
             <Page label="이전" disabled={offset === 0} onPress={() => setOffset(Math.max(0, offset - 20))} />
@@ -113,6 +106,71 @@ export default function FuturesHistory({
           </View>
         </>
       )}
+    </View>
+  );
+}
+
+function ExecutionRecord({ execution: e }: { execution: FuturesExecution }) {
+  return (
+    <View testID={`futures-history-execution-${e.id}`} style={styles.record}>
+      <Text style={styles.recordTitle}>
+        {e.instrument.underlying.symbol} · {operationLabel[e.operation]} · {directionLabel[e.direction]}
+      </Text>
+      <Metric
+        label={['수량 / 체결가', futuresPriceBasisLabel(e.priceEvidence?.priceBasis)].filter(Boolean).join(' · ')}
+        value={`${formatDisplayDecimal(e.quantity)} / ${price(e.executionPrice, e.instrument.underlying.displayPriceDecimals)}`}
+      />
+      <Metric label="실현 손익 / 수수료" value={`${usd(e.realizedPnl)} / ${usd(e.feeAmount)}`} />
+      <Text style={styles.muted}>{new Date(e.executedAt).toLocaleString('ko-KR')}</Text>
+    </View>
+  );
+}
+
+function LiquidationRecord({ liquidation: e, instruments }: { liquidation: FuturesLiquidation; instruments: FuturesInstrument[] }) {
+  return (
+    <View testID={`futures-history-liquidation-${e.id}`} style={styles.record}>
+      <Text style={styles.recordTitle}>{marginLabel[e.marginMode]} 전량 강제청산 · {e.closes.length}개 포지션</Text>
+      <Metric label="경제적 실현 손익" value={usd(e.realizedPnl)} />
+      <Metric label="경제적 종료 수수료" value={usd(e.feeAmount)} />
+      {e.settledFee !== undefined ? <Metric label="정산 수수료" value={usd(e.settledFee)} /> : null}
+      <Metric label="현금 정산" value={usd(e.settledCash)} />
+      <Metric label="미충당 손실 · 부채 이월 없음" value={usd(e.bankruptcyShortfall)} />
+      {e.closes.map((c) => (
+        <View key={c.positionId} style={styles.record}>
+          <Text style={styles.recordTitle}>{c.markSnapshot?.symbol ?? '종료 포지션'} · {directionLabel[c.direction]}</Text>
+          <Metric label="종료 수량" value={formatDisplayDecimal(c.quantity)} />
+          <Metric
+            label="Mark 청산가"
+            value={price(c.executionPrice, instruments.find((i) => i.id === c.instrumentId)?.underlying.displayPriceDecimals ?? 8)}
+          />
+        </View>
+      ))}
+      <Text style={styles.muted}>{new Date(e.executedAt).toLocaleString('ko-KR')}</Text>
+    </View>
+  );
+}
+
+/** The Season-final exit: told apart from a user close and from a liquidation. */
+function SeasonExitRecord({ settlement: s }: { settlement: FuturesSeasonExit }) {
+  return (
+    <View testID={`futures-history-season-exit-${s.id}`} style={styles.record}>
+      <Text style={styles.recordTitle}>시즌 종료 정산 · {s.closes.length}개 포지션</Text>
+      <Metric label="경제적 실현 손익" value={usd(s.realizedPnl)} />
+      <Metric label="경제적 종료 수수료" value={usd(s.feeAmount)} />
+      <Metric label="정산 수수료" value={usd(s.settledFee)} />
+      <Metric label="현금 정산" value={usd(s.settledCash)} />
+      <Metric label="미충당 손실 · 부채 이월 없음" value={usd(s.bankruptcyShortfall)} />
+      {s.closes.map((c) => (
+        <View key={c.positionId} style={styles.record}>
+          <Text style={styles.recordTitle}>{c.instrument.underlying.symbol} · {directionLabel[c.direction]}</Text>
+          <Metric label="종료 수량" value={formatDisplayDecimal(c.quantity)} />
+          <Metric
+            label={['시즌 종료 가격', futuresPriceBasisLabel(c.priceBasis)].filter(Boolean).join(' · ')}
+            value={price(c.executionPrice, c.instrument.underlying.displayPriceDecimals)}
+          />
+        </View>
+      ))}
+      <Text style={styles.muted}>{new Date(s.executedAt).toLocaleString('ko-KR')}</Text>
     </View>
   );
 }

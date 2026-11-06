@@ -129,7 +129,10 @@ export function buildPendingEventNotice(accountId: string, event: PendingOrderEv
   const futures = event.market === 'futures';
   // A Spot fill is its order's notice (the in-session tracker uses the same key).
   const orderId = event.type === 'fill' && event.key.startsWith(SPOT_FILL_PREFIX) ? event.key.slice(SPOT_FILL_PREFIX.length) : event.key;
-  const history = futures ? { history: { market: 'futures' as const, futuresView: 'executions' as const } } : {};
+  // A stop-loss/take-profit closes a position (포지션 종료); entries are 포지션 진입.
+  const history = futures
+    ? { history: { market: 'futures' as const, futuresView: FUTURES_CLOSE[event.origin] ? 'exits' as const : 'executions' as const } }
+    : {};
   const parts = (...values: Array<string | null | undefined>) => {
     const kept = values.filter((value): value is string => !!value);
     return kept.length ? kept.join(' · ') : null;

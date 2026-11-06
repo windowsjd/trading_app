@@ -45,6 +45,7 @@ All routes are authenticated and account scoped under
 | GET `/positions/:positionId/leverage-preview?leverage=&quantity=&price=` | Read-only estimate of that change, alone or with an add |
 | GET `/executions?limit=20&offset=0` | User Market execution history, newest first; limit 1–100 |
 | GET `/liquidations?limit=20&offset=0` | System liquidation events with all closes/Mark evidence; same bounds |
+| GET `/position-history?phase=entry\|exit&limit=20&offset=0` | 거래 내역 › 선물: 포지션 진입 or 포지션 종료 records, newest first, one paged union ([below](#position-history-2026-11-06)); same bounds |
 | GET/POST `/conditional-entries`, POST `/conditional-entries/:entryId/cancel` | Futures Conditional Entry v1: reservation-free watch on Futures Last that opens one new position ([contract](futures-conditional-entry-contract.md)) |
 | GET `/final-settlement` | This account's single Season final exit, closes, pinned Futures Last (or legacy Spot) evidence and cash/shortfall; null if absent |
 
@@ -266,6 +267,50 @@ quantity, execution Mark FK and price, requirement components and economic PnL/f
 Cross cash settlement is deliberately attributed to the shared event, not arbitrarily
 allocated among its positions. Fee/PnL ledger references `futures_liquidation`.
 GET is ownership-scoped, read-only and repeatable-read; offset max is 1,000,000.
+
+## Position history (2026-11-06)
+
+`GET position-history?phase=entry|exit&limit=20&offset=0` lists one owned
+account's records by what they did to a position (read-only, RepeatableRead,
+404 for another member's or a missing account like every route here):
+
+- `entry` (포지션 진입): executions with `open` or `increase`, long and short,
+  whichever command filled them (market, limit, conditional entry).
+- `exit` (포지션 종료): executions with `reduce` or `close` (user close,
+  stop-loss/take-profit), every forced liquidation, and the Season-final exit
+  when it closed at least one position.
+
+Pending orders, watches and settings are not executions and never appear.
+`phase` is required (`INVALID_FUTURES_HISTORY_PHASE` otherwise); `limit` 1–100
+and `offset` 0–1,000,000 as above (`INVALID_PAGINATION`). The union is ordered
+by event time, then kind, then id (all descending) and paged once over all
+kinds, so a page never repeats or skips a record of another kind; `pagination`
+is the usual `{ limit, offset, total, returned, nextOffset }`.
+
+```json
+{ "tradingAccountId": "…", "phase": "exit", "pagination": { … },
+  "records": [
+    { "kind": "season_settlement", "id": "…", "executedAt": "…",
+      "settlement": { "id": "…", "seasonId": "…", "endAt": "…", "realizedPnl": "…",
+        "feeAmount": "…", "settledFee": "…", "settledCash": "…",
+        "bankruptcyShortfall": "…", "executedAt": "…",
+        "closes": [{ "positionId": "…", "instrumentId": "…", "direction": "short",
+          "marginMode": "isolated", "quantity": "…", "executionPrice": "…",
+          "realizedPnl": "…", "feeAmount": "…", "priceBasis": "futures_last",
+          "instrument": { "id": "…", "underlying": { "symbol": "BTCUSDT",
+            "displayPriceDecimals": 1, … }, … } }] } },
+    { "kind": "liquidation", "id": "…", "executedAt": "…", "liquidation": { … } },
+    { "kind": "execution", "id": "…", "executedAt": "…", "execution": { … } }
+  ] }
+```
+
+Each record keeps its own id and stored figures: `execution` is exactly an
+item of `/executions`, `liquidation` exactly an item of `/liquidations` (one
+event with all of its closes and Mark evidence), and `settlement` the
+account's `futures_season_settlements` row with its closes (`priceBasis`
+`futures_last` for a Futures Last pin, `spot_last` for a legacy Spot pin).
+Nothing is derived, merged across events or written; `/executions`,
+`/liquidations` and `/final-settlement` are unchanged.
 
 ## Error and diagnostic boundary
 

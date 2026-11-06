@@ -1608,16 +1608,14 @@ export function OrderForm({
           onPress={submitOrder}
         />
       </QuestTarget></View> : null}
+      {/* 주문으로 돌아가기 is onClose: this form stays, already reset for the next order. */}
       <OrderSuccessBottomSheet
         visible={!!successData}
         payload={successData}
         quote={successQuoteData}
         displayPriceDecimals={asset.displayPriceDecimals}
+        accountId={accountId}
         onClose={() => setSuccessState(clearOrderSuccess())}
-        onGoAssetDetail={() => {
-          setSuccessState(clearOrderSuccess());
-          onReturnToAsset();
-        }}
         onGoOrderHistory={() => {
           setSuccessState(clearOrderSuccess());
           rootNavigation.navigate('MainTabs', {

@@ -168,7 +168,7 @@ async function run() {
           assert.equal(await page.evaluate(() => window.fixture.orderAction), 'history');
         } else {
           assert.equal(await history.count(), 0);
-          await visual(page.getByRole('button', { name: '종목 상세로 돌아가기', exact: true }), `${mode}-${width}-${scale}-${preference}-full-neutral`, false);
+          await visual(page.getByRole('button', { name: '주문으로 돌아가기', exact: true }), `${mode}-${width}-${scale}-${preference}-full-neutral`, false);
         }
         const home = page.getByRole('button', { name: '홈으로 가기', exact: true });
         await visual(home, `${mode}-${width}-${scale}-${preference}-${kind}-home`);

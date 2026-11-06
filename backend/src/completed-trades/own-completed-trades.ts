@@ -14,11 +14,14 @@ import { presentFuturesInstrument } from '../futures/futures.presenter';
  * reconciliation, nothing recomputed); this reader only adds what the owner
  * may see of their own trade:
  *
- * - Spot: when it completed (the last SELL), and the quantity-weighted
- *   average executed BUY and SELL prices (Σ gross amount / Σ executed
- *   quantity) of the same orders the policy summed. A general account's
- *   Spot realized PnL restarts at its latest reset (re-based to 0 there), so
- *   only orders executed after `spotSince` belong to it.
+ * - Spot: when it completed (the last SELL) and that SELL's order id, and
+ *   the quantity-weighted average executed BUY and SELL prices (Σ gross
+ *   amount / Σ executed quantity) of the same orders the policy summed. The
+ *   id lets the order's own success screen prove it is the SELL that closed
+ *   this trade; two SELLs at the same instant leave it null (not guessed).
+ *   A general account's Spot realized PnL restarts at its latest reset
+ *   (re-based to 0 there), so only orders executed after `spotSince` belong
+ *   to it.
  * - Futures: the lifetime's id, leverage, margin mode, close time and how it
  *   ended (closed / forced liquidation / season-final close), and the
  *   quantity-weighted average entry price (open/increase executions) and exit
@@ -35,6 +38,8 @@ export type OwnCompletedTrade =
   | (Extract<FriendCompletedTrade, { kind: 'spot' }> & {
       key: string;
       completedAt: string;
+      /** The executed SELL at `completedAt`; null when another SELL shares that instant. */
+      lastSellOrderId: string | null;
       averageBuyPrice: string | null;
       averageSellPrice: string | null;
       displayPriceDecimals: number | null;
@@ -85,6 +90,9 @@ type SpotTotalsRow = {
   missingAmount: number;
   missingGross: number;
   lastExecutedAt: Date | null;
+  /** The newest order of the side, and the instant of the one before it (a tie check). */
+  lastOrderId: string | null;
+  previousExecutedAt: Date | null;
 };
 
 type FuturesTotalsRow = {
@@ -113,6 +121,14 @@ const CLOSE_SELECT = {
   feeAmount: true,
   executionPrice: true,
 } as const;
+
+/** The side's newest order, unless another order executed at the same instant. */
+function soleLastOrderId(row: SpotTotalsRow | undefined) {
+  if (!row?.lastOrderId || !row.lastExecutedAt) return null;
+  return row.previousExecutedAt?.getTime() === row.lastExecutedAt.getTime()
+    ? null
+    : row.lastOrderId;
+}
 
 /** A Spot side's average executed price, or null when any order lacks its gross amount. */
 function spotSidePrice(row: SpotTotalsRow | undefined) {
@@ -184,7 +200,9 @@ export async function readOwnCompletedTrades(
                    COUNT(*)::int AS "count",
                    (COUNT(*) - COUNT(o.net_amount))::int AS "missingAmount",
                    (COUNT(*) - COUNT(o.gross_amount))::int AS "missingGross",
-                   MAX(o.executed_at) AS "lastExecutedAt"
+                   MAX(o.executed_at) AS "lastExecutedAt",
+                   (ARRAY_AGG(o.id ORDER BY o.executed_at DESC NULLS LAST, o.id DESC))[1] AS "lastOrderId",
+                   (ARRAY_AGG(o.executed_at ORDER BY o.executed_at DESC NULLS LAST, o.id DESC))[2] AS "previousExecutedAt"
             FROM orders o
             WHERE o.trading_account_id = ${tradingAccountId}
               AND o.status = 'executed'
@@ -233,6 +251,7 @@ export async function readOwnCompletedTrades(
         ...summary,
         key: `spot:${position.assetId}`,
         completedAt: soldAt.toISOString(),
+        lastSellOrderId: soleLastOrderId(sell),
         averageBuyPrice: spotSidePrice(buy),
         averageSellPrice: spotSidePrice(sell),
         displayPriceDecimals: options.spotDisplayDecimals(position.asset),

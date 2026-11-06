@@ -78,6 +78,7 @@ export const apiClient = {
       const result = futures(accountId);
       if (path.endsWith('/positions')) { await before('futures', path); return response(result.positions); }
       if (path.endsWith('/instruments')) return response(result.catalog);
+      if (path.includes('/position-history')) return response(path.includes('phase=exit') ? result.exits : result.entries);
       if (path.endsWith('/executions')) return response(result.executions);
       if (path.endsWith('/liquidations')) return response(result.liquidations);
       if (path.endsWith('/final-settlement')) return response(result.final);

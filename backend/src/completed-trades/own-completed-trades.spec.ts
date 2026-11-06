@@ -34,7 +34,9 @@ const spotPosition = {
   realizedPnl: D('62815.00000005'),
   asset: samsung,
 };
-const spotRows = (overrides: { buyMissingGross?: number } = {}) => [
+const spotRows = (
+  overrides: { buyMissingGross?: number; previousSellAt?: Date | null } = {},
+) => [
   {
     assetId: 'asset-samsung',
     side: 'buy',
@@ -46,6 +48,8 @@ const spotRows = (overrides: { buyMissingGross?: number } = {}) => [
     missingAmount: 0,
     missingGross: overrides.buyMissingGross ?? 0,
     lastExecutedAt: at('2026-11-05T10:00:00.000Z'),
+    lastOrderId: 'order-buy-2',
+    previousExecutedAt: at('2026-11-05T09:00:00.000Z'),
   },
   {
     assetId: 'asset-samsung',
@@ -58,6 +62,8 @@ const spotRows = (overrides: { buyMissingGross?: number } = {}) => [
     missingAmount: 0,
     missingGross: 0,
     lastExecutedAt: at('2026-11-05T12:44:04.000Z'),
+    lastOrderId: 'order-sell-1',
+    previousExecutedAt: overrides.previousSellAt ?? null,
   },
 ];
 const btc = {
@@ -189,11 +195,33 @@ describe('own completed trades (수익 공유)', () => {
         returnRate: '5.92002337',
         key: 'spot:asset-samsung',
         completedAt: '2026-11-05T12:44:04.000Z',
+        lastSellOrderId: 'order-sell-1',
         averageBuyPrice: '70666.66666667',
         averageSellPrice: '75000.00000000',
         displayPriceDecimals: null,
       },
     ]);
+  });
+
+  it('names the SELL that completed the holding only when no other SELL shares its instant', async () => {
+    const earlier = fakeTx({
+      spot: [spotPosition],
+      spotRows: spotRows({ previousSellAt: at('2026-11-05T12:00:00.000Z') }),
+    });
+    const [item] = (await read(earlier.tx)).items;
+    expect(item.kind === 'spot' && item.lastSellOrderId).toBe('order-sell-1');
+    const query = earlier.queries.find((q) => q.text.includes('FROM orders'));
+    expect(query?.text).toContain(
+      '(ARRAY_AGG(o.id ORDER BY o.executed_at DESC NULLS LAST, o.id DESC))[1]',
+    );
+
+    const tie = fakeTx({
+      spot: [spotPosition],
+      spotRows: spotRows({ previousSellAt: at('2026-11-05T12:44:04.000Z') }),
+    });
+    const [tied] = (await read(tie.tx)).items;
+    expect(tied.kind === 'spot' && tied.lastSellOrderId).toBeNull();
+    expect(tied.realizedPnl).toBe('62815.00000005');
   });
 
   it('a side with an order lacking its gross amount shows no price for that side', async () => {

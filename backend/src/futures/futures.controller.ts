@@ -98,6 +98,22 @@ export class FuturesController {
   ) {
     return this.futures.executions(req.user?.userId, id, query);
   }
+  /** 거래 내역 › 선물: 포지션 진입 (entry) or 포지션 종료 (exit) records. */
+  @Get('position-history')
+  positionHistory(
+    @Req() req: AuthenticatedRequest,
+    @Param('accountId') id: string,
+    @Query(
+      new ScalarQueryPipe({
+        phase: 'INVALID_FUTURES_HISTORY_PHASE',
+        limit: 'INVALID_PAGINATION',
+        offset: 'INVALID_PAGINATION',
+      }),
+    )
+    query: { phase?: string; limit?: string; offset?: string },
+  ) {
+    return this.futures.positionHistory(req.user?.userId, id, query);
+  }
   @Get('final-settlement')
   finalSettlement(
     @Req() req: AuthenticatedRequest,

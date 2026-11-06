@@ -1,4 +1,12 @@
 export function marketResult(kind = "quantity") {
+  // `sell`: the full market fill as a SELL (its 공유하기 is checked on the account).
+  if (kind === "sell") {
+    const result = marketResult("full");
+    return {
+      ...result,
+      order: { ...result.order, id: "sell-fixture", orderId: "sell-fixture", assetId: "asset", side: "sell", netAmount: "99900" },
+    };
+  }
   const amount = kind === "amount";
   const full = kind === "full";
   const limit = kind === "limit";
@@ -58,4 +66,26 @@ export function marketResult(kind = "quantity") {
     },
   };
   return result;
+}
+
+/** The completed trade the `sell` fixture closed (거래 완료 policy figures, as the server lists it). */
+export function completedSellTrade() {
+  return {
+    kind: "spot",
+    key: "spot:asset",
+    assetId: "asset",
+    symbol: "EXAMPLE",
+    name: "아주 긴 이름을 가진 거래 대상 자산",
+    market: "KRX",
+    assetType: "domestic_stock",
+    currencyCode: "KRW",
+    buyAmount: "90090.00000000",
+    realizedPnl: "9810.00000000",
+    returnRate: "10.88911089",
+    completedAt: "2026-10-02T01:00:00.000Z",
+    lastSellOrderId: "sell-fixture",
+    averageBuyPrice: "90.00000000",
+    averageSellPrice: "100.00000000",
+    displayPriceDecimals: null,
+  };
 }

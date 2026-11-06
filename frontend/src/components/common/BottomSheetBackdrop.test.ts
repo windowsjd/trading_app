@@ -20,4 +20,16 @@ describe('BottomSheetBackdrop (Modal sheet)', () => {
       assert.deepEqual([sheet.paddingBottom, sheet.padding], [padding, 20], `${bottom}dp inset`);
     }
   });
+
+  it('adds the caller\'s sheet style on top of its own (a height bound for a tall result)', (t) => {
+    const h = interactionHarness('android');
+    const Backdrop = h.load('src/components/common/BottomSheetBackdrop.tsx', {
+      'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }) },
+    }).default;
+    const renderer = h.render(React.createElement(Backdrop, { visible: true, onClose() {}, sheetStyle: { maxHeight: 500 } },
+      React.createElement('Text', null, '확인')));
+    t.after(() => act(() => renderer.unmount()));
+    const sheet = flatten(renderer.root.findByType('Text').parent.props.style);
+    assert.deepEqual([sheet.maxHeight, sheet.paddingBottom, sheet.padding], [500, 42, 20]);
+  });
 });

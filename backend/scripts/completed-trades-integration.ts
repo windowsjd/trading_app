@@ -90,7 +90,7 @@ async function spotOrder(
       capturedAt: at,
     },
   });
-  await db.order.create({
+  const order = await db.order.create({
     data: {
       tradingAccountId,
       assetId,
@@ -109,10 +109,11 @@ async function spotOrder(
       executedAt: at,
     },
   });
+  return order.id;
 }
 
 async function run() {
-  for (const name of ['owner', 'stranger']) {
+  for (const name of ['owner', 'stranger', 'twin']) {
     const user = await db.user.create({
       data: {
         email: `${tag}-${name}@example.invalid`,
@@ -122,7 +123,7 @@ async function run() {
     });
     userIds.push(user.id);
   }
-  const [owner, stranger] = userIds;
+  const [owner, stranger, twin] = userIds;
   const season = await db.season.create({
     data: {
       name: `share-${tag}`,
@@ -166,12 +167,13 @@ async function run() {
     },
   });
   assetIds.push(krx.id);
+  const seasonOrders: string[] = [];
   for (const row of [
     ['buy', '70000', '10', '700000', '700', '700700', hoursAgo(30)],
     ['buy', '72000', '5', '360000', '360', '360360', hoursAgo(29)],
     ['sell', '75000', '15', '1125000', '1125', '1123875', hoursAgo(28)],
   ] as const)
-    await spotOrder(seasonAccount, krx.id, row);
+    seasonOrders.push(await spotOrder(seasonAccount, krx.id, row));
   await db.position.create({
     data: {
       tradingAccountId: seasonAccount,
@@ -281,13 +283,14 @@ async function run() {
 
   // General account: a round before its reset (re-based to 0 by the reset) and one after.
   const resetAt = hoursAgo(10);
+  const generalOrders: string[] = [];
   for (const row of [
     ['buy', '100', '1', '100', '0.1', '100.1', hoursAgo(12)],
     ['sell', '110', '1', '110', '0.11', '109.89', hoursAgo(11)],
     ['buy', '200', '2', '400', '0.4', '400.4', hoursAgo(5)],
     ['sell', '190', '2', '380', '0.38', '379.62', hoursAgo(4)],
   ] as const)
-    await spotOrder(generalAccount, krx.id, row);
+    generalOrders.push(await spotOrder(generalAccount, krx.id, row));
   await db.position.create({
     data: {
       tradingAccountId: generalAccount,
@@ -330,6 +333,26 @@ async function run() {
     },
   });
 
+  // Two SELLs at the same instant closed this holding: which one closed it is not known.
+  const tieAccount = await account(twin, 'general');
+  for (const row of [
+    ['buy', '100', '2', '200', '0.2', '200.2', hoursAgo(3)],
+    ['sell', '105', '1', '105', '0.105', '104.895', hoursAgo(2)],
+    ['sell', '105', '1', '105', '0.105', '104.895', hoursAgo(2)],
+  ] as const)
+    await spotOrder(tieAccount, krx.id, row);
+  await db.position.create({
+    data: {
+      tradingAccountId: tieAccount,
+      assetId: krx.id,
+      quantity: '0',
+      averageCost: '100.1',
+      currencyCode: 'KRW',
+      realizedPnl: '9.59',
+      realizedPnlKrw: '9.59',
+    },
+  });
+
   // The raw reads on PostgreSQL: Σ(price × quantity), Σ gross / Σ quantity, the epoch filter.
   const read = (accountId: string, spotSince: Date | null) =>
     db.$transaction(
@@ -355,6 +378,10 @@ async function run() {
       spot.averageSellPrice === '75000.00000000' &&
       spot.completedAt === hoursAgo(28).toISOString(),
     `spot evidence ${JSON.stringify([spot.averageBuyPrice, spot.averageSellPrice, spot.completedAt])}`,
+  );
+  check(
+    spot.lastSellOrderId === seasonOrders[2],
+    `the SELL that closed the holding ${spot.lastSellOrderId}`,
   );
   check(
     futures.averageEntryPrice === '61000.00000000' &&
@@ -412,8 +439,16 @@ async function run() {
       epoch.realizedPnl === '-20.78000000' &&
       epoch.averageBuyPrice === '200.00000000' &&
       epoch.averageSellPrice === '190.00000000' &&
-      epoch.completedAt === hoursAgo(4).toISOString(),
+      epoch.completedAt === hoursAgo(4).toISOString() &&
+      epoch.lastSellOrderId === generalOrders[3],
     `epoch round ${JSON.stringify(epoch)}`,
+  );
+  const [tie] = (await read(tieAccount, null)).items as Array<
+    Extract<OwnCompletedTrade, { kind: 'spot' }>
+  >;
+  check(
+    tie?.realizedPnl === '9.59000000' && tie.lastSellOrderId === null,
+    `two SELLs at the closing instant name neither ${JSON.stringify(tie)}`,
   );
 
   // HTTP: owner only, through the real guard and controller.
@@ -491,7 +526,7 @@ async function run() {
   const orders = await db.order.count({
     where: { tradingAccountId: { in: accountIds } },
   });
-  check(orders === 7, `orders untouched (${orders})`);
+  check(orders === 10, `orders untouched (${orders})`);
   console.log(`completed trades PostgreSQL + HTTP ok (${assertions} checks)`);
 }
 

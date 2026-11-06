@@ -371,6 +371,8 @@ export const QUERY_KEYS = {
     pendingOrderEvents: (id: string) => ['tradingAccount', 'pendingOrderEvents', id] as const,
     /** 거래 완료: the account's confirmed completed trades (수익 공유). */
     completedTrades: (id: string) => ['tradingAccount', 'completedTrades', id] as const,
+    /** One executed SELL's 공유하기 check, read after its success (never an earlier list). */
+    orderShare: (id: string, orderId: string) => ['tradingAccount', 'completedTrades', id, 'order', orderId] as const,
     conditionalBuy: {
       all: (id: string) => ['tradingAccount', 'conditionalBuyOrders', id] as const,
       list: (id: string, filters: { history: boolean; limit: number; assetId?: string }) =>
@@ -407,7 +409,7 @@ export const QUERY_KEYS = {
       instruments: (id: string) => ['tradingAccount', 'futures', id, 'instruments'] as const,
       positions: (id: string) => ['tradingAccount', 'futures', id, 'positions'] as const,
       pending: (id: string) => ['tradingAccount', 'futures', id, 'pending'] as const,
-      history: (id: string, kind: 'executions' | 'liquidations', offset: number) => ['tradingAccount', 'futures', id, kind, offset] as const,
+      history: (id: string, phase: 'entry' | 'exit', offset: number) => ['tradingAccount', 'futures', id, 'position-history', phase, offset] as const,
       finalSettlement: (id: string) => ['tradingAccount', 'futures', id, 'final-settlement'] as const,
       conditionalEntries: (id: string, state: 'open' | 'ended') => ['tradingAccount', 'futures', id, 'conditional-entries', state] as const,
       /** Independent 손절가/익절가 settings on open lifetimes. */

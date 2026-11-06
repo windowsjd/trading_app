@@ -101,12 +101,19 @@ describe('order screen asset sheet', () => {
     assert.equal(h.requests[0].body.side, 'sell');
   });
 
-  it('returns to the traded asset detail: back for the entry asset, popTo after an in-place change', async (t) => {
+  it('주문으로 돌아가기 keeps the order screen; 종목으로 돌아가기 returns to the traded asset detail (back, popTo after an in-place change)', async (t) => {
     const h = inlineTradingHarness();
     await h.mount(); t.after(h.close);
+    // The order screen's own return (its blocked-state 종목으로 돌아가기), as the panel receives it.
+    const returnToAsset = () => h.renderer.root
+      .findAll((node: any) => typeof node.type === 'function' && typeof node.props.onReturnToAsset === 'function')
+      .at(-1).props.onReturnToAsset();
     await h.input(qty, '1');
     await h.press(submit); await h.flush();
-    await act(async () => h.success().onGoAssetDetail());
+    await act(async () => h.success().onClose());
+    assert.equal(h.success().visible, false);
+    assert.deepEqual(h.navigation, [], 'the result closes over the same order screen');
+    await act(async () => returnToAsset());
     assert.deepEqual(h.navigation, [['back']]);
     await h.press('asset-change-pair'); await h.flush();
     await h.press(row('btc'));
@@ -115,7 +122,10 @@ describe('order screen asset sheet', () => {
     await h.input(qty, '1');
     await h.press(submit); await h.flush();
     assert.equal(h.success().visible, true);
-    await act(async () => h.success().onGoAssetDetail());
+    const moves = h.navigation.length;
+    await act(async () => h.success().onClose());
+    assert.equal(h.navigation.length, moves, 'still no navigation from the result');
+    await act(async () => returnToAsset());
     // Merged: a detail opened from another tab keeps where its back returns.
     assert.deepEqual(h.navigation.at(-1), ['popTo', 'AssetDetail', { assetId: 'btc' }, { merge: true }]);
   });

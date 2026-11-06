@@ -28,6 +28,32 @@ has 공유, which opens the 수익 공유 sheet: card preview, 수익금액 | �
 | Meta App ID | `src/features/share/shareConfig.ts` (`EXPO_PUBLIC_META_APP_ID`) |
 | API | `getCompletedTrades` in `src/features/tradingAccount/api.ts` |
 
+## From an order's success screen (2026-11-06)
+
+The 주문이 완료되었습니다 sheet of an **executed SELL** (market fill or an idempotent
+replay of one) shows 공유하기 above 주문으로 돌아가기 | 홈으로 가기. A BUY, an open
+limit or LOC registration, or a result without an account never shows it.
+
+| Piece | File |
+| --- | --- |
+| who may offer it, the check, the notes | `src/features/share/orderShare.ts` |
+| sheet + check + share hand-off | `src/screens/order/OrderSuccessBottomSheet.tsx` |
+
+- When the result shows, the app reads the account's completed trades and the asset's
+  position once (`QUERY_KEYS.tradingAccount.orderShare(account, order)`). 공유하기 is
+  enabled only when the completed trade of that asset on that account names **this order**
+  as its `lastSellOrderId` (the SELL that closed the holding; backend contract above). It
+  then opens this same 수익 공유 sheet with that trade — the 거래 완료 card, nothing new.
+- Otherwise the button is disabled with the reason: holding left (`보유 수량을 모두
+  매도해 …`), or no completed trade provably closed by this SELL (an earlier/later round,
+  two SELLs at one instant, an older server: `… 거래 완료에서 확인해 주세요`). A failed
+  read keeps it enabled; pressing asks again.
+- The success sheet (an RN `Modal`) steps aside while the share sheet is open and comes
+  back when it closes. Sharing never re-sends, repeats or changes the order; 주문으로
+  돌아가기 only closes the sheet (the order screen stays).
+- The card shows the completed trade's own figures: the holding's realized PnL since the
+  account's epoch (re-entries included, the 거래 완료 policy), not only this order's part.
+
 ## Figures (never computed on the device)
 
 - 수익금액 = the server's realized PnL in the trade's currency (`USD` to the cent, `원` to the

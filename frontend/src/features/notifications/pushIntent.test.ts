@@ -52,6 +52,14 @@ describe('push payloads', () => {
       (parsePushData({ ...fill, market: 'futures' }) as { futuresView?: string }).futuresView,
       'executions',
     );
+    // A reduce/close fill opens 포지션 종료 (2026-11-06); an unknown view stays the fill list.
+    for (const [view, expected] of [['exits', 'exits'], ['executions', 'executions'], ['bogus', 'executions'], ['liquidations', 'liquidations']])
+      assert.equal(
+        (parsePushData({ ...fill, market: 'futures', futuresView: view }) as { futuresView?: string }).futuresView,
+        expected,
+        view,
+      );
+    assert.equal('futuresView' in (parsePushData({ ...fill, futuresView: 'exits' }) as object), false, 'a Spot fill has no futures view');
     // A failure opens its own row, never the fill history.
     assert.deepEqual(parsePushData(failure), {
       kind: 'order_failure',

@@ -90,11 +90,13 @@ describe('발동·체결 알림 copy', () => {
       assert.doesNotMatch(said(notice), /체결/, title);
       assert.equal(notice?.detail, `${term} 70000 도달 · 처리 결과는 거래 내역에서 확인할 수 있어요`);
       assert.equal(notice?.orderId, overrides.key, 'a trigger never claims its order id');
-      assert.deepEqual(notice?.history, overrides.market === 'futures' ? { market: 'futures', futuresView: 'executions' } : undefined);
+      // A Futures stop-loss/take-profit closes a position (포지션 종료); an entry condition is 포지션 진입.
+      const futuresView = overrides.origin === 'futures_stop_loss' ? 'exits' : 'executions';
+      assert.deepEqual(notice?.history, overrides.market === 'futures' ? { market: 'futures', futuresView } : undefined);
     }
   });
 
-  it('a Futures fill names its side and entry or close, and opens the Futures executions', () => {
+  it('a Futures fill names its side and entry or close, and opens 포지션 진입 or 포지션 종료', () => {
     const entry = buildPendingEventNotice('season', event({ key: 'fill:futures_execution:e1', market: 'futures', origin: 'futures_limit', side: null,
       direction: 'long', asset: btc, quantity: '0.00500000', currencyCode: 'USD' }), '시즌 계정');
     assert.deepEqual(entry, { id: 'season:fill:futures_execution:e1', accountId: 'season', orderId: 'fill:futures_execution:e1',
@@ -102,6 +104,7 @@ describe('발동·체결 알림 copy', () => {
     const close = buildPendingEventNotice('season', event({ key: 'fill:futures_execution:e2', market: 'futures', origin: 'futures_take_profit', side: null,
       direction: 'short', asset: btc, quantity: '1.00000000' }));
     assert.equal(said(close), 'Bitcoin 숏 익절 체결 완료 체결 수량 1');
+    assert.deepEqual(close?.history, { market: 'futures', futuresView: 'exits' });
   });
 
   it('a shape this app does not know is not announced', () => {

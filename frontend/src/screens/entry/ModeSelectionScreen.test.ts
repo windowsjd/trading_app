@@ -90,8 +90,13 @@ it('beginner entry is always available and creation requires an explicit press',
 });
 it('existing beginner selection changes accounts without creating or moving data', () => {
   const h = harness();
+  // ModeEntryCard draws the real CTAButton: its label is the button's accessibility label.
+  assert.equal(find(h.render(), 'beginner-account-start').props.accessibilityLabel, '초보모드 계정만들기');
   h.accounts.push({ ...general, id: 'beginner', mode: 'beginner' });
   const tree = h.render();
+  // An existing beginner account is entered with 초보모드 (초보모드 계속하기 before 2026-11-06).
+  assert.equal(find(tree, 'beginner-account-start').props.accessibilityLabel, '초보모드');
+  assert.doesNotMatch(text(tree), /계속하기/);
   find(tree, 'beginner-account-start').props.onPress();
   assert.deepEqual(h.selections, ['beginner']);
   assert.equal(h.beginnerOpens, 0);

@@ -18,7 +18,8 @@ export type PushIntent =
       uid: string;
       accountId: string;
       market: 'spot' | 'futures';
-      futuresView?: 'executions' | 'liquidations';
+      /** 포지션 종료 for `exits` (a reduce/close fill) and liquidations; 포지션 진입 otherwise. */
+      futuresView?: 'executions' | 'exits' | 'liquidations';
       /** A liquidation's event id: its in-app notice is shown once. */
       liquidationId?: string;
     }
@@ -60,7 +61,9 @@ export function parsePushData(data: unknown): PushIntent | null {
         market === 'futures'
           ? value.type === 'futures_liquidation' || value.futuresView === 'liquidations'
             ? ('liquidations' as const)
-            : ('executions' as const)
+            : value.futuresView === 'exits'
+              ? ('exits' as const)
+              : ('executions' as const)
           : undefined;
       const liquidationId = value.type === 'futures_liquidation' ? id(value.liquidationId) : null;
       return {

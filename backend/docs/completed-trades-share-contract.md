@@ -49,6 +49,7 @@ account (general, season or beginner) is ever mixed in.
         "realizedPnl": "62815.00000005",
         "returnRate": "5.92002337",
         "completedAt": "2026-11-05T12:44:04.000Z",
+        "lastSellOrderId": "…",
         "averageBuyPrice": "70666.66666667",
         "averageSellPrice": "75000.00000000",
         "displayPriceDecimals": null
@@ -103,9 +104,16 @@ trade:
 | --- | --- | --- |
 | `key` | `spot:<assetId>` | `futures:<positionId>` |
 | `completedAt` | last executed SELL of the position (in the epoch) | lifetime `closedAt` |
+| `lastSellOrderId` | that SELL's order id; null when another executed SELL of the epoch has the same `executed_at` (which one closed the holding is then not known) | — |
 | prices | `averageBuyPrice` / `averageSellPrice` = Σ gross amount / Σ executed quantity of that side's executed orders | `averageEntryPrice` = Σ(price × quantity) / Σ quantity of open/increase executions; `averageExitPrice` = the same over reduce/close executions plus a liquidation or season-final close row |
 | other | `assetType` | `positionId`, `leverage` (the lifetime's stored leverage, i.e. after an approved change), `marginMode`, `closeKind` (`closed` / `liquidated` / `season_closed`) |
 | `displayPriceDecimals` | Binance symbol tick decimals, else null (KRW/USD defaults) | the instrument's display decimals (futures catalog) |
+
+`lastSellOrderId` (2026-11-06, additive) lets the app's order success screen
+offer 공유하기 only for the SELL that completed this trade: the success
+response's order id must equal it on the same account and asset. A partial
+sell leaves the holding open (no item), a later round completes with another
+order id, and an older app ignores the field.
 
 Prices are quantity-weighted averages of stored executions, 8 dp half up,
 display only — they are not the realized PnL basis (that is the policy above,

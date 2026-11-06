@@ -1,5 +1,6 @@
 import { semantic } from '../../theme/tokens';
-import React from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   View,
   Text,
@@ -8,20 +9,35 @@ import {
   useWindowDimensions,
 } from '../../theme/native';
 
+import { useSafeAreaInsets } from '../../theme/safeArea';
 import BottomSheetBackdrop from '../../components/common/BottomSheetBackdrop';
 import CTAButton from '../../components/common/CTAButton';
+import { QUERY_KEYS } from '../../constants/queryKeys';
 import type { CreateOrderDto, OrderQuoteDto } from '../../features/order/api';
 import {
   getLimitQuoteEstimateDisplay,
   getLimitOrderSuccessMessage,
   getOrderSuccessDisplay,
 } from '../../features/order/mapper';
+import {
+  ORDER_SHARE_NOTE,
+  getOrderShareTarget,
+  resolveOrderShare,
+  type OrderShareCheck,
+} from '../../features/share/orderShare';
+import {
+  getAccountPositionQuantity,
+  getCompletedTrades,
+  getTradingAccountPositions,
+  type CompletedTrade,
+} from '../../features/tradingAccount/api';
 import { formatDisplayDecimal, formatKstDateTime } from '../../utils/format';
+import TradeShareSheet from '../history/TradeShareSheet';
 
 interface OrderSuccessBottomSheetProps {
   visible: boolean;
+  /** Closes the result; 주문으로 돌아가기 does only this (the order screen stays). */
   onClose: () => void;
-  onGoAssetDetail: () => void;
   onGoHome: () => void;
   onGoOrderHistory?: () => void;
   payload: CreateOrderDto | null;
@@ -33,19 +49,71 @@ interface OrderSuccessBottomSheetProps {
   quote?: OrderQuoteDto | null;
   /** Asset unit-price decimals; totals keep the currency default. */
   displayPriceDecimals?: number | null;
+  /** The order's own account: an executed SELL there may share the trade it completed. */
+  accountId?: string;
 }
 
-export default function OrderSuccessBottomSheet({
+/** 공유하기 under an executed SELL's result, as the share check answered. */
+export type OrderSuccessShare = {
+  state: 'checking' | 'failed' | OrderShareCheck['state'];
+  onPress: () => void;
+};
+
+/**
+ * The order's result. An executed SELL also offers 공유하기 with the completed
+ * trade it closed (features/share/orderShare.ts): the account's completed
+ * trades are read once this result shows, and the 수익 공유 sheet opens over
+ * the order screen in its place — closing that sheet brings this result back.
+ * Sharing never re-sends, repeats or changes the order.
+ */
+export default function OrderSuccessBottomSheet({ accountId, ...props }: OrderSuccessBottomSheetProps) {
+  const target = accountId ? getOrderShareTarget(accountId, props.payload) : null;
+  const check = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.orderShare(target?.accountId ?? '', target?.orderId ?? ''),
+    queryFn: async ({ signal }): Promise<OrderShareCheck> => {
+      if (!target) throw new Error('No executed SELL to check.');
+      const [trades, positions] = await Promise.all([
+        getCompletedTrades(target.accountId, signal),
+        // Only names why a SELL cannot share yet; a failed read never decides it.
+        getTradingAccountPositions(target.accountId, { assetId: target.assetId, limit: 20, offset: 0 }).catch(() => null),
+      ]);
+      return resolveOrderShare(target, trades, positions ? getAccountPositionQuantity(positions, target.assetId) : null);
+    },
+    enabled: props.visible && !!target,
+    retry: false,
+    // One answer per executed order; only a failed check is asked again (on press).
+    staleTime: Infinity,
+  });
+  const [sharing, setSharing] = useState<{ orderId: string; trade: CompletedTrade } | null>(null);
+  const trade = props.visible && sharing && sharing.orderId === target?.orderId ? sharing.trade : null;
+  const result = check.data;
+  const share: OrderSuccessShare | null = target ? {
+    state: check.isFetching ? 'checking' : check.isError ? 'failed' : result?.state ?? 'checking',
+    onPress: () => {
+      if (result?.state === 'ready') setSharing({ orderId: target.orderId, trade: result.trade });
+      else if (check.isError && !check.isFetching) void check.refetch();
+    },
+  } : null;
+  return (
+    <>
+      <OrderSuccessSheet {...props} visible={props.visible && !trade} share={share} />
+      {accountId ? <TradeShareSheet accountId={accountId} trade={trade} onClose={() => setSharing(null)} /> : null}
+    </>
+  );
+}
+
+export function OrderSuccessSheet({
   visible,
   onClose,
-  onGoAssetDetail,
   onGoHome,
   onGoOrderHistory,
   payload,
   quote,
   displayPriceDecimals,
-}: OrderSuccessBottomSheetProps) {
+  share = null,
+}: Omit<OrderSuccessBottomSheetProps, 'accountId'> & { share?: OrderSuccessShare | null }) {
   const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const display = payload
     ? getOrderSuccessDisplay(payload, displayPriceDecimals)
     : null;
@@ -65,9 +133,16 @@ export default function OrderSuccessBottomSheet({
     (loc as { requestedQuantity?: string | null } | null)?.requestedQuantity ?? null;
 
   return (
-    <BottomSheetBackdrop visible={visible} onClose={onClose}>
+    <BottomSheetBackdrop
+      visible={visible}
+      onClose={onClose}
+      // The whole sheet stays below the status bar: when large text makes the
+      // actions tall, the result's scroll area gives way first.
+      sheetStyle={{ maxHeight: height - insets.top - SHEET_TOP_GAP }}
+    >
       <ScrollView
-        style={{ maxHeight: height * 0.65 }}
+        // 공유하기 adds a row under the result: the result scrolls a little sooner.
+        style={[styles.scroll, { maxHeight: height * (share ? 0.55 : 0.65) }]}
         contentContainerStyle={styles.content}
       >
         <View style={styles.iconCircle}>
@@ -254,26 +329,49 @@ export default function OrderSuccessBottomSheet({
           </View>
         ) : null}
       </ScrollView>
-      <View testID="order-success-actions" style={styles.buttonRow}>
-        {(isSubmittedLimit || display?.isPartialExecution) &&
-        onGoOrderHistory ? (
-          <CTAButton
-            label="주문내역 보기"
-            variant="secondary"
-            onPress={onGoOrderHistory}
-            style={styles.flex}
-          />
-        ) : (
-          <CTAButton
-            variant="neutral"
-            label={
-              display?.isPartialExecution ? '종목 상세' : '종목 상세로 돌아가기'
-            }
-            onPress={onGoAssetDetail}
-            style={styles.flex}
-          />
-        )}
-        <CTAButton label="홈으로 가기" onPress={onGoHome} style={styles.flex} />
+      <View testID="order-success-actions" style={styles.actions}>
+        {share ? (
+          <View style={styles.share}>
+            <CTAButton
+              testID="order-success-share"
+              label="공유하기"
+              variant="secondary"
+              state={
+                share.state === 'checking'
+                  ? 'loading'
+                  : share.state === 'ready' || share.state === 'failed'
+                    ? 'enabled'
+                    : 'disabled'
+              }
+              onPress={share.onPress}
+            />
+            {share.state === 'holding' || share.state === 'unverified' || share.state === 'failed' ? (
+              <Text testID="order-success-share-note" accessibilityLiveRegion="polite" style={styles.shareNote}>
+                {ORDER_SHARE_NOTE[share.state]}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+        <View style={styles.buttonRow}>
+          {(isSubmittedLimit || display?.isPartialExecution) &&
+          onGoOrderHistory ? (
+            <CTAButton
+              label="주문내역 보기"
+              variant="secondary"
+              onPress={onGoOrderHistory}
+              style={styles.flex}
+            />
+          ) : (
+            // Back to the same order screen: the sheet closes, nothing navigates.
+            <CTAButton
+              variant="neutral"
+              label="주문으로 돌아가기"
+              onPress={onClose}
+              style={styles.flex}
+            />
+          )}
+          <CTAButton label="홈으로 가기" onPress={onGoHome} style={styles.flex} />
+        </View>
       </View>
     </BottomSheetBackdrop>
   );
@@ -288,7 +386,11 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Room kept between the status bar and the sheet's top edge. */
+const SHEET_TOP_GAP = 24;
+
 const styles = StyleSheet.create({
+  scroll: { flexShrink: 1 },
   content: { gap: 12 },
   iconCircle: {
     width: 52,
@@ -345,10 +447,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: semantic.success,
   },
+  actions: {
+    gap: 10,
+    marginTop: 4,
+  },
+  share: { gap: 6 },
+  shareNote: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: semantic.secondary,
+  },
   buttonRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 4,
   },
   flex: { flex: 1 },
 });

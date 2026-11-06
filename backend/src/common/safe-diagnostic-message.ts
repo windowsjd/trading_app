@@ -207,6 +207,7 @@ const SAFE_MESSAGES = new Set<string>([
   'Season participant is excluded.',
   'The current Mark Price is unavailable for risk evaluation. Please try again.',
   'The current execution price is unavailable. Please try again.',
+  'The history phase must be entry or exit.',
   'The intended open position was not found.',
   'The position would not meet maintenance requirements.',
   'The requested trade exceeds the supported amount range.',

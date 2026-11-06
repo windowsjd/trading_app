@@ -62,9 +62,9 @@ export default function FuturesDetailScreen(props: FuturesDetailScreenProps) {
  * the current Futures Last large with its won conversion and the $ | 원
  * switch, its 전일대비 (against its own settled 1d close of the previous UTC
  * day, never the rolling 24h ticker), its chart with the 봉 시간
- * selector at the lower left, and 매도하기 / 매수하기 at the bottom. 매수하기
- * opens the order screen on a new 롱(Long) entry and 매도하기 on a new 숏(Short)
- * entry — never a reduce or close; with a position held, the order screen keeps
+ * selector at the lower left, and 숏 / 롱 at the bottom (2026-11-06; 매도하기 /
+ * 매수하기 before). 롱 opens the order screen on a new 롱(Long) entry and 숏 on a
+ * new 숏(Short) entry — never a reduce or close; with a position held, the order screen keeps
  * that position's terms (one-way) and says why the other side waits. The full-
  * screen chart is opened from the order screen's chart button, as for stocks.
  *
@@ -74,7 +74,7 @@ export default function FuturesDetailScreen(props: FuturesDetailScreenProps) {
  *
  * Guest browsing (2026-10-30) shows the same market data with no account: the
  * contract list's market-data route (same Last, polled the same way), the same
- * chart, 전일대비 and won rate; 매수하기/매도하기 open the sign-in sheet, never
+ * chart, 전일대비 and won rate; 롱/숏 open the sign-in sheet, never
  * the order screen, a position or a learning gate.
  */
 function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
@@ -269,14 +269,14 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
         </ScrollView>
         <View style={{ ...styles.footer, paddingBottom: styles.footer.paddingBottom + insets.bottom }} testID="futures-detail-actions">
           <View style={styles.action}>
-            <CTAButton testID="futures-detail-short" label="매도하기" state={tradable ? 'enabled' : 'disabled'}
+            <CTAButton testID="futures-detail-short" label="숏" state={tradable ? 'enabled' : 'disabled'}
               accessibilityHint="숏(Short) 신규 진입 주문을 엽니다."
               learningHint={shortGate?.locked ? shortGate.message : null}
               onPress={() => (shortGate ? shortGate.guard(() => open('short')) : open('short'))}
               style={{ ...styles.actionButton, backgroundColor: SELL_COLOR }} />
           </View>
           <View style={styles.action}>
-            <CTAButton testID="futures-detail-long" label="매수하기" state={tradable ? 'enabled' : 'disabled'}
+            <CTAButton testID="futures-detail-long" label="롱" state={tradable ? 'enabled' : 'disabled'}
               accessibilityHint="롱(Long) 신규 진입 주문을 엽니다."
               learningHint={longGate?.locked ? longGate.message : null}
               onPress={() => (longGate ? longGate.guard(() => open('long')) : open('long'))}

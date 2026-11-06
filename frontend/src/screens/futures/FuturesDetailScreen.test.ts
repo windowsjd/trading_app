@@ -58,7 +58,15 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     assert.equal(chart(h).props.currentPrice, '102');
     assert.equal(h.node('asset-timeframe-selector') === undefined, false, 'the shared 봉 시간 selector');
     const actions = h.renderer.root.findAll((n: any) => n.type === 'CTAButton').map((n: any) => [n.props.label, n.props.state]);
-    assert.deepEqual(actions, [['매도하기', 'enabled'], ['매수하기', 'enabled']]);
+    assert.deepEqual(actions, [['숏', 'enabled'], ['롱', 'enabled']]);
+    // 숏 left, 롱 right (2026-11-06; 매도하기/매수하기 before): the same ids, hints and entries.
+    const buttons = h.renderer.root.findAll((n: any) => n.type === 'CTAButton')
+      .map((n: any) => [n.props.testID, n.props.accessibilityHint]);
+    assert.deepEqual(buttons, [
+      ['futures-detail-short', '숏(Short) 신규 진입 주문을 엽니다.'],
+      ['futures-detail-long', '롱(Long) 신규 진입 주문을 엽니다.'],
+    ]);
+    assert.equal(/매수하기|매도하기/.test(h.text()), false);
   });
 
   it('says no more than the asset detail: the basis, provisional-candle, Mark and entry notes and the chart icon are gone', async (t) => {
@@ -83,7 +91,7 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     assert.equal(words(h.node('futures-detail-secondary-price')), '$102');
     assert.equal(h.node('futures-currency-krw').props.accessibilityState.selected, true);
     // The order still opens on the contract (USD), nothing else changes.
-    const button = h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '매수하기')[0];
+    const button = h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '롱')[0];
     button.props.onPress();
     assert.deepEqual(h.navigation, [['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'long' }]]);
     await h.press('futures-currency-usd');
@@ -285,29 +293,29 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     const h = beginnerOn();
     await h.start(); t.after(h.close);
     const button = (label: string) => h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === label)[0];
-    assert.equal(typeof button('매도하기').props.learningHint, 'string');
-    assert.equal(button('매수하기').props.learningHint, null, 'the long practice is open');
-    button('매도하기').props.onPress();
+    assert.equal(typeof button('숏').props.learningHint, 'string');
+    assert.equal(button('롱').props.learningHint, null, 'the long practice is open');
+    button('숏').props.onPress();
     assert.deepEqual(h.navigation, [], 'the lock stays on the detail');
     assert.equal(h.alerts.length, 1);
-    button('매수하기').props.onPress();
+    button('롱').props.onPress();
     assert.deepEqual(h.navigation, [['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'long' }]]);
 
     // A position on the contract: the order screen shows its terms and decides.
     const held = beginnerOn({ position: true });
     await held.start(); t.after(held.close);
-    const heldButton = held.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '매도하기')[0];
+    const heldButton = held.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '숏')[0];
     assert.equal(heldButton.props.learningHint, null);
     heldButton.props.onPress();
     assert.deepEqual(held.navigation, [['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'short' }]]);
   });
 
-  it('매수하기 opens a new long entry and 매도하기 a new short entry on the order screen', async (t) => {
+  it('롱 opens a new long entry and 숏 a new short entry on the order screen', async (t) => {
     const h = futuresHarness({ screen: 'detail' });
     await h.start(); t.after(h.close);
     const button = (label: string) => h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === label)[0];
-    button('매수하기').props.onPress();
-    button('매도하기').props.onPress();
+    button('롱').props.onPress();
+    button('숏').props.onPress();
     assert.deepEqual(h.navigation, [
       ['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'long' }],
       ['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'short' }],
@@ -319,7 +327,7 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     moved.accountId = 'B';
     await moved.start(); t.after(moved.close);
     assert.match(moved.text(), /선택한 계정이 변경되었습니다/);
-    assert.equal(moved.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '매수하기').length, 0);
+    assert.equal(moved.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '롱').length, 0);
 
     const missing = futuresHarness({ screen: 'detail', instrumentId: 'not-listed' });
     await missing.start(); t.after(missing.close);
@@ -393,13 +401,13 @@ describe('futures contract detail in guest browsing (2026-10-30)', () => {
     assert.equal(h.fxReads > 0, true, 'the won figure reads the display rate');
   });
 
-  it('매수하기/매도하기 open the sign-in sheet; no order screen, position or learning read', async (t) => {
+  it('롱/숏 open the sign-in sheet; no order screen, position or learning read', async (t) => {
     guestState.setGuestBrowsing(true);
     t.after(() => guestState.setGuestBrowsing(false));
     const h = guestDetail();
     await h.start(); t.after(h.close);
     const actions = h.renderer.root.findAll((n: any) => n.type === 'CTAButton').map((n: any) => [n.props.label, n.props.state]);
-    assert.deepEqual(actions, [['매도하기', 'enabled'], ['매수하기', 'enabled']]);
+    assert.deepEqual(actions, [['숏', 'enabled'], ['롱', 'enabled']]);
     for (const id of ['futures-detail-long', 'futures-detail-short']) {
       await h.press(id);
       assert.equal(h.text().includes('선물 매수·매도 주문은 로그인한 뒤 나의 가상투자 계정으로 할 수 있습니다.'), true, id);

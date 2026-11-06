@@ -25,25 +25,60 @@ const { elements } = require('../../../test/ledgerTestHarness.cjs');
 const { marketResult } = require('../../../test/browser/marketExecutionFixtures.js');
 
 describe('order completion display contract', () => {
-  it('history stays conditional and secondary; home remains primary and asset return remains neutral', () => {
+  it('history stays conditional and secondary; home remains primary and 주문으로 돌아가기 stays neutral and only closes', () => {
+    const h = interactionHarness();
+    // The result itself (no hooks); the default export adds the 공유하기 check around it.
+    const Sheet = h.load('src/screens/order/OrderSuccessBottomSheet.tsx', {
+      '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
+      '../../components/common/BottomSheetBackdrop': { default: 'BottomSheetBackdrop', __esModule: true },
+      '../history/TradeShareSheet': { default: 'TradeShareSheet', __esModule: true },
+      '../../features/tradingAccount/api': {},
+    }).OrderSuccessSheet;
+    for (const kind of ['quantity', 'limit', 'full']) for (const historyAvailable of [true, false]) {
+      const calls: string[] = [];
+      const tree = Sheet({ visible: true, payload: marketResult(kind), onClose: () => calls.push('close'),
+        onGoHome: () => calls.push('home'),
+        onGoOrderHistory: historyAvailable ? () => calls.push('history') : undefined });
+      const [first, home, ...rest] = elements(tree, 'CTAButton');
+      assert.equal(rest.length, 0, 'a BUY result has no 공유하기');
+      const history = historyAvailable && kind !== 'full';
+      assert.equal(first.props.variant, history ? 'secondary' : 'neutral');
+      assert.equal(first.props.label, history ? '주문내역 보기' : '주문으로 돌아가기');
+      assert.equal(home.props.label, '홈으로 가기');
+      assert.equal(home.props.variant, undefined, 'default primary');
+      first.props.onPress(); home.props.onPress();
+      assert.deepEqual(calls, [history ? 'history' : 'close', 'home']);
+    }
+  });
+
+  it('공유하기 sits above the two actions with the check’s state, and says why it is unavailable', () => {
     const h = interactionHarness();
     const Sheet = h.load('src/screens/order/OrderSuccessBottomSheet.tsx', {
       '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
       '../../components/common/BottomSheetBackdrop': { default: 'BottomSheetBackdrop', __esModule: true },
-    }).default;
-    for (const kind of ['quantity', 'limit', 'full']) for (const historyAvailable of [true, false]) {
-      const calls: string[] = [];
-      const tree = Sheet({ visible: true, payload: marketResult(kind), onClose() {},
-        onGoHome: () => calls.push('home'), onGoAssetDetail: () => calls.push('asset'),
-        onGoOrderHistory: historyAvailable ? () => calls.push('history') : undefined });
-      const [first, home] = elements(tree, 'CTAButton');
-      const history = historyAvailable && kind !== 'full';
-      assert.equal(first.props.variant, history ? 'secondary' : 'neutral');
-      assert.equal(first.props.label === '주문내역 보기', history);
-      assert.equal(home.props.label, '홈으로 가기');
-      assert.equal(home.props.variant, undefined, 'default primary');
-      first.props.onPress(); home.props.onPress();
-      assert.deepEqual(calls, [history ? 'history' : 'asset', 'home']);
+      '../history/TradeShareSheet': { default: 'TradeShareSheet', __esModule: true },
+      '../../features/tradingAccount/api': {},
+    }).OrderSuccessSheet;
+    const { ORDER_SHARE_NOTE } = require('../share/orderShare.ts');
+    for (const [state, button, note] of [
+      ['checking', 'loading', null],
+      ['ready', 'enabled', null],
+      ['holding', 'disabled', ORDER_SHARE_NOTE.holding],
+      ['unverified', 'disabled', ORDER_SHARE_NOTE.unverified],
+      ['failed', 'enabled', ORDER_SHARE_NOTE.failed],
+    ] as const) {
+      let pressed = 0;
+      const tree = Sheet({ visible: true, payload: marketResult('full'), onClose() {}, onGoHome() {},
+        share: { state, onPress: () => { pressed++; } } });
+      const [share, back, home] = elements(tree, 'CTAButton');
+      assert.equal(share.props.label, '공유하기', state);
+      assert.equal(share.props.variant, 'secondary');
+      assert.equal(share.props.state, button, state);
+      assert.deepEqual([back.props.label, home.props.label], ['주문으로 돌아가기', '홈으로 가기']);
+      const shown = elements(tree, 'Text').find((node: any) => node.props.testID === 'order-success-share-note');
+      assert.equal(shown ? shown.props.children : null, note, state);
+      share.props.onPress();
+      assert.equal(pressed, 1);
     }
   });
 

@@ -159,7 +159,7 @@ function accountCandidate(
   eventAt: Date,
   route: {
     market: PushMarket;
-    futuresView?: 'executions' | 'liquidations';
+    futuresView?: PushData['futuresView'];
     extra?: Pick<PushData, 'failureKind' | 'failureId' | 'liquidationId'>;
   },
 ): PushCandidate {
@@ -312,7 +312,14 @@ export async function readFuturesFills(
         origin,
       }),
       row.executedAt,
-      { market: 'futures', futuresView: 'executions' },
+      {
+        market: 'futures',
+        // A fill that reduced or closed a position opens 포지션 종료.
+        futuresView:
+          row.operation === 'reduce' || row.operation === 'close'
+            ? 'exits'
+            : 'executions',
+      },
     );
   });
   return page(

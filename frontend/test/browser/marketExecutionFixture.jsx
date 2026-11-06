@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppearanceProvider } from "../../src/theme/appearance";
 import Sheet from "../../src/screens/order/OrderSuccessBottomSheet";
+import { ScreenSheetHost } from "../../src/components/common/ScreenSheetHost";
+import { View } from "react-native";
 import History from "../../src/screens/history/TradeHistoryScreen";
 import { marketResult } from "./marketExecutionFixtures";
 const params = new URLSearchParams(location.search);
@@ -30,15 +32,21 @@ function App() {
           {kind === "history" ? (
             <History route={{ params: { accountId: "account-fixture" } }} />
           ) : (
-            <Sheet
-              visible={visible}
-              onClose={close}
-              onGoAssetDetail={close}
-              onGoHome={close}
-              onGoOrderHistory={close}
-              payload={marketResult(kind)}
-              displayPriceDecimals={4}
-            />
+            // A numeric height: the 수익 공유 sheet draws in this host over the screen.
+            <View style={{ height: window.innerHeight }}>
+              <ScreenSheetHost>
+                <Sheet
+                  visible={visible}
+                  onClose={close}
+                  onGoHome={close}
+                  onGoOrderHistory={close}
+                  payload={marketResult(kind)}
+                  displayPriceDecimals={4}
+                  // Only the SELL fixture names its account: a BUY never offers 공유하기.
+                  accountId={kind === "sell" ? "account-fixture" : undefined}
+                />
+              </ScreenSheetHost>
+            </View>
           )}
         </SafeAreaProvider>
       </AppearanceProvider>

@@ -4,31 +4,44 @@ import ledger from '../../../backend/docs/fixtures/wallet-ledger.json';
 export { transport };
 const params = new URLSearchParams(location.search), long = params.get('long') === '1';
 
-// 거래내역 > 선물 reads the existing executions/liquidations API (20 a page) and,
-// for liquidation closes, the contract catalog; 지갑 원장 reads the ledger.
+// 거래내역 > 선물 reads one paged position history per tab (포지션 진입 / 포지션 종료,
+// 20 a page) and, for liquidation closes, the contract catalog; 지갑 원장 reads the ledger.
 const at = '2026-09-01T00:00:00Z';
-function futuresHistory(accountId, kind, offset) {
+function positionHistory(accountId, phase, offset) {
   const base = futuresFixture(accountId).catalog.instruments[0];
   const contract = (symbol, decimals) => ({ ...base, underlying: { ...base.underlying, symbol, displayPriceDecimals: decimals } });
-  const page = (rows, nextOffset) => ({ tradingAccountId: accountId, pagination: { limit: 20, offset, total: offset + rows.length + (nextOffset ? 1 : 0), returned: rows.length, nextOffset }, [kind]: rows });
+  const page = (records, nextOffset) => ({ tradingAccountId: accountId, phase, pagination: { limit: 20, offset, total: offset + records.length + (nextOffset ? 1 : 0), returned: records.length, nextOffset }, records });
+  const execution = (row) => ({ kind: 'execution', id: row.id, executedAt: row.executedAt, execution: row });
   if (params.get('futuresHistory') === 'empty') return page([], null);
-  if (kind === 'executions') {
-    if (offset > 0) return page([{ id: 'execution-old', instrument: contract('SOLUSDT', 3), operation: 'increase', direction: 'long', quantity: '1', executionPrice: '99.123', realizedPnl: '0', feeAmount: '0.1', executedAt: at }], null);
+  if (phase === 'entry') {
+    if (offset > 0) return page([execution({ id: 'execution-old', instrument: contract('SOLUSDT', 3), operation: 'increase', direction: 'long', quantity: '1', executionPrice: '99.123', realizedPnl: '0', feeAmount: '0.1', executedAt: at })], null);
     return page([
-      { id: 'execution-1', instrument: contract(long ? '1000000MOGUSDT' : 'BTCUSDT', long ? 7 : 2), operation: 'open', direction: 'long',
+      execution({ id: 'execution-1', instrument: contract(long ? '1000000MOGUSDT' : 'BTCUSDT', long ? 7 : 2), operation: 'open', direction: 'long',
         quantity: long ? '123456789.12345678' : '2', executionPrice: long ? '1234567890123456.12345678' : '100', realizedPnl: '0',
-        feeAmount: long ? '12345678901.12345678' : '0.2', executedAt: at, priceEvidence: { priceBasis: 'futures_last' } },
-      { id: 'execution-2', instrument: contract(long ? '1000000MOGUSDT' : 'ETHUSDT', long ? 7 : 2), operation: 'close', direction: 'short',
-        quantity: long ? '123456789.12345678' : '0.5', executionPrice: long ? '1234567890123456.12345678' : '2500.5',
-        realizedPnl: long ? '-9876543210123.12345678' : '-2.5', feeAmount: long ? '12345678901.12345678' : '0.62', executedAt: at, priceEvidence: { priceBasis: 'spot_last' } },
+        feeAmount: long ? '12345678901.12345678' : '0.2', executedAt: at, priceEvidence: { priceBasis: 'futures_last' } }),
+      execution({ id: 'execution-3', instrument: contract(long ? '1000000MOGUSDT' : 'ETHUSDT', long ? 7 : 2), operation: 'increase', direction: 'short',
+        quantity: long ? '123456789.12345678' : '0.5', executionPrice: long ? '1234567890123456.12345678' : '2500.5', realizedPnl: '0',
+        feeAmount: long ? '12345678901.12345678' : '0.62', executedAt: at, priceEvidence: { priceBasis: 'spot_last' } }),
     ], 20);
   }
-  return page([{ id: 'liquidation-1', marginMode: 'cross', realizedPnl: long ? '-9876543210123456.12345678' : '-200', feeAmount: long ? '12345678901.12345678' : '0.2',
-    settledFee: long ? '12345678901.12345678' : '0.1', settledCash: long ? '-1234567890123.12345678' : '-2', bankruptcyShortfall: long ? '9876543210123.12345678' : '198.2', executedAt: at,
-    closes: [
-      { positionId: 'old-1', instrumentId: 'btc', direction: 'long', quantity: long ? '123456789.12345678' : '2', executionPrice: long ? '1234567890123456.12' : '0.1', markSnapshot: { symbol: 'BTCUSDT' } },
-      { positionId: 'old-2', instrumentId: 'unknown', direction: 'short', quantity: '1', executionPrice: '0.12345678', markSnapshot: { symbol: long ? '1000000MOGUSDT' : 'ETHUSDT' } },
-    ] }], null);
+  return page([
+    { kind: 'season_settlement', id: 'season-exit-1', executedAt: at, settlement: { id: 'season-exit-1', seasonId: 'season-1', endAt: at,
+      realizedPnl: long ? '-9876543210123456.12345678' : '-200', feeAmount: long ? '12345678901.12345678' : '12.4',
+      settledFee: long ? '12345678901.12345678' : '12.4', settledCash: long ? '-1234567890123.12345678' : '-212.4',
+      bankruptcyShortfall: long ? '9876543210123.12345678' : '0', executedAt: at,
+      closes: [{ positionId: 'season-1', instrumentId: 'btc', direction: 'short', marginMode: 'isolated', quantity: long ? '123456789.12345678' : '0.2',
+        executionPrice: long ? '1234567890123456.12' : '62000', realizedPnl: '-200', feeAmount: '12.4', priceBasis: 'futures_last',
+        instrument: contract(long ? '1000000MOGUSDT' : 'BTCUSDT', long ? 7 : 2) }] } },
+    execution({ id: 'execution-2', instrument: contract(long ? '1000000MOGUSDT' : 'ETHUSDT', long ? 7 : 2), operation: 'close', direction: 'short',
+      quantity: long ? '123456789.12345678' : '0.5', executionPrice: long ? '1234567890123456.12345678' : '2500.5',
+      realizedPnl: long ? '-9876543210123.12345678' : '-2.5', feeAmount: long ? '12345678901.12345678' : '0.62', executedAt: at, priceEvidence: { priceBasis: 'spot_last' } }),
+    { kind: 'liquidation', id: 'liquidation-1', executedAt: at, liquidation: { id: 'liquidation-1', marginMode: 'cross', realizedPnl: long ? '-9876543210123456.12345678' : '-200', feeAmount: long ? '12345678901.12345678' : '0.2',
+      settledFee: long ? '12345678901.12345678' : '0.1', settledCash: long ? '-1234567890123.12345678' : '-2', bankruptcyShortfall: long ? '9876543210123.12345678' : '198.2', executedAt: at,
+      closes: [
+        { positionId: 'old-1', instrumentId: 'btc', direction: 'long', quantity: long ? '123456789.12345678' : '2', executionPrice: long ? '1234567890123456.12' : '0.1', markSnapshot: { symbol: 'BTCUSDT' } },
+        { positionId: 'old-2', instrumentId: 'unknown', direction: 'short', quantity: '1', executionPrice: '0.12345678', markSnapshot: { symbol: long ? '1000000MOGUSDT' : 'ETHUSDT' } },
+      ] } },
+  ], null);
 }
 function ledgerPage(accountId, query = {}) {
   const data = structuredClone(ledger[query.currency === 'USD' ? 'usd' : 'krw'].data);
@@ -46,12 +59,12 @@ function ledgerPage(accountId, query = {}) {
 export const apiClient = {
   ...rootClient,
   async get(path, config) {
-    const futures = /^\/trading-accounts\/([^/]+)\/futures\/(executions|liquidations|instruments)(?:\?limit=20&offset=(\d+))?$/.exec(path);
+    const futures = /^\/trading-accounts\/([^/]+)\/futures\/(position-history|instruments)(?:\?phase=(entry|exit)&limit=20&offset=(\d+))?$/.exec(path);
     if (futures) {
       transport.requests.push(path);
-      const [, accountId, kind, offset] = futures;
+      const [, accountId, kind, phase, offset] = futures;
       if (params.get('futuresHistory') === 'error' && kind !== 'instruments') throw { response: { status: 503, data: { error: { code: 'SERVICE_UNAVAILABLE', message: 'fixture' } } } };
-      return { data: { success: true, data: kind === 'instruments' ? futuresFixture(decodeURIComponent(accountId)).catalog : futuresHistory(decodeURIComponent(accountId), kind, Number(offset ?? 0)) } };
+      return { data: { success: true, data: kind === 'instruments' ? futuresFixture(decodeURIComponent(accountId)).catalog : positionHistory(decodeURIComponent(accountId), phase, Number(offset ?? 0)) } };
     }
     if (/^\/trading-accounts\/[^/]+\/wallet-transactions$/.test(path)) {
       transport.requests.push(path);

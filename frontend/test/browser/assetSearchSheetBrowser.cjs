@@ -160,7 +160,7 @@ async function run() {
       // The order screen and its inline panel share the id.
       await page.getByTestId('order-screen').first().waitFor();
       assert.deepEqual(await page.evaluate(() => [window.fixture.state.assetId, window.fixture.state.side]), ['BTC', 'buy'], tag);
-      // The futures detail: 매도하기 = new short, 매수하기 = new long, one line each.
+      // The futures detail: 숏 = new short, 롱 = new long, one line each.
       const futuresTag = `${width}/${theme}/${fontScale}/futures`;
       await page.goto(`${base}/?screen=market&asset=SUI&viewport=1&fontScale=${fontScale}`);
       await page.waitForFunction(() => window.tradingAppearance);
@@ -170,7 +170,7 @@ async function run() {
       await page.getByTestId('futures-market-btc').click();
       await page.getByTestId('futures-detail-actions').waitFor();
       const futuresActions = await page.evaluate(buttonLines, ['futures-detail-short', 'futures-detail-long']);
-      assert.deepEqual(futuresActions.map((a) => [a.label, a.lines, a.inside]), [['매도하기', 1, true], ['매수하기', 1, true]], futuresTag);
+      assert.deepEqual(futuresActions.map((a) => [a.label, a.lines, a.inside]), [['숏', 1, true], ['롱', 1, true]], futuresTag);
       problems.push(...(await page.evaluate(textProblems, 'futures-detail-actions')).map((p) => `${futuresTag}: ${p}`));
       if (fontScale === 2) await page.screenshot({ path: path.join(out, `futures-detail-${width}-${theme}-${fontScale}.png`) });
       await page.getByTestId('futures-detail-short').click();

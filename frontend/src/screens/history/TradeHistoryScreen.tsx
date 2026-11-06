@@ -79,7 +79,7 @@ export default function TradeHistoryScreen({ route }: Props) {
   const recordScope = route.params;
   const isAccountScope = 'accountId' in recordScope;
   const [filter, setFilter] = useState<Filter>('all');
-  // 현물 orders and 선물 executions/liquidations: two existing record APIs.
+  // 현물 orders and 선물 position records (포지션 진입 / 포지션 종료).
   // A push tap preselects the view; the user can still switch.
   const requestedMarket = route.params.market;
   const pushAt = route.params.pushAt;
@@ -353,8 +353,8 @@ export default function TradeHistoryScreen({ route }: Props) {
     );
   }
 
-  // 선물: the account's executions and forced liquidations (existing futures
-  // history API, 20 a page). Keyed by account so no other account's page or
+  // 선물: the account's 포지션 진입 / 포지션 종료 records (one paged futures
+  // history read, 20 a page). Keyed by account so no other account's page or
   // view survives a change of the pinned subject.
   if (market === 'futures') {
     return (
@@ -366,7 +366,7 @@ export default function TradeHistoryScreen({ route }: Props) {
             <FuturesHistory
               key={`${accountId}:${route.params.futuresView ?? 'executions'}:${pushAt ?? ''}`}
               accountId={accountId}
-              initialKind={route.params.futuresView}
+              initialView={route.params.futuresView}
             />
           ) : null}
         </ScrollView>
@@ -534,14 +534,20 @@ export default function TradeHistoryScreen({ route }: Props) {
                           지정가 {display.limitPrice}
                         </Text>
                       ) : null}
-                      <Text style={styles.helper}>
-                        총액 {display.grossAmount}
-                      </Text>
+                      {/* A BUY's 총액 is what it actually paid: the server's
+                          net debit, fee included (2026-11-06; 총액·차감액 before).
+                          A SELL keeps its gross 총액 and 수령액: no confirmed
+                          per-order realized PnL exists to show instead. */}
+                      {display.side === 'sell' ? (
+                        <Text style={styles.helper}>
+                          총액 {display.grossAmount}
+                        </Text>
+                      ) : null}
                       <Text style={styles.helper}>
                         수수료 {display.feeAmount}
                       </Text>
                       <Text style={styles.itemTitle}>
-                        {display.side === 'sell' ? '수령액' : '차감액'} {display.netAmount}
+                        {display.side === 'sell' ? '수령액' : '총액'} {display.netAmount}
                       </Text>
                     </>
                   )}

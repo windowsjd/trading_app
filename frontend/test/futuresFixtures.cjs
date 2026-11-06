@@ -28,6 +28,21 @@ function futuresFixture(accountId = 'A', options = {}) {
     executions: { tradingAccountId: accountId, pagination: { limit: 20, offset: 0, total: 1, returned: 1, nextOffset: null }, executions: [{ id: 'execution', instrument, operation: 'open', direction: position.direction, quantity: '2', executionPrice: '100', realizedPnl: '0', feeAmount: '0.2', executedAt: at }] },
     liquidations: { tradingAccountId: accountId, pagination: { limit: 20, offset: 0, total: 1, returned: 1, nextOffset: null }, liquidations: [{ id: 'liquidation', marginMode: position.marginMode, realizedPnl: '-200', feeAmount: '0.2', settledFee: '0.1', settledCash: '-2', bankruptcyShortfall: '198.2', executedAt: at, closes: [{ positionId: 'old-position', instrumentId: 'btc', direction: 'long', quantity: '2', executionPrice: '0.1', markSnapshot: { symbol: 'BTCUSDT' } }] }] },
     final: { tradingAccountId: accountId, settlement: null },
+    // 거래 내역 › 선물 (GET position-history?phase=…): 포지션 진입 = open/increase executions;
+    // 포지션 종료 = the Season exit, a reduce and the Cross liquidation of two positions.
+    entries: { tradingAccountId: accountId, phase: 'entry', pagination: { limit: 20, offset: 0, total: 1, returned: 1, nextOffset: null },
+      records: [{ kind: 'execution', id: 'execution', executedAt: at, execution: { id: 'execution', instrument, operation: 'open', direction: position.direction, quantity: '2', executionPrice: '100', realizedPnl: '0', feeAmount: '0.2', executedAt: at } }] },
+    exits: { tradingAccountId: accountId, phase: 'exit', pagination: { limit: 20, offset: 0, total: 3, returned: 3, nextOffset: null },
+      records: [
+        { kind: 'season_settlement', id: 'season-exit', executedAt: at, settlement: { id: 'season-exit', seasonId: 'season', endAt: at, realizedPnl: '-200', feeAmount: '12.4',
+          settledFee: '12.4', settledCash: '-212.4', bankruptcyShortfall: '0', executedAt: at,
+          closes: [{ positionId: 'season-position', instrumentId: 'btc', direction: 'short', marginMode: 'isolated', quantity: '0.2', executionPrice: '62000',
+            realizedPnl: '-200', feeAmount: '12.4', priceBasis: 'futures_last', instrument }] } },
+        { kind: 'execution', id: 'reduce', executedAt: at, execution: { id: 'reduce', instrument, operation: 'reduce', direction: 'short', quantity: '0.5', executionPrice: '101', realizedPnl: '1.5', feeAmount: '0.05', executedAt: at, priceEvidence: { priceBasis: 'futures_last' } } },
+        { kind: 'liquidation', id: 'liquidation', executedAt: at, liquidation: { id: 'liquidation', marginMode: 'cross', realizedPnl: '-200', feeAmount: '0.2', settledFee: '0.1', settledCash: '-2', bankruptcyShortfall: '198.2', executedAt: at,
+          closes: [{ positionId: 'old-long', instrumentId: 'btc', direction: 'long', quantity: '2', executionPrice: '0.1', markSnapshot: { symbol: 'BTCUSDT' } },
+            { positionId: 'old-short', instrumentId: 'btc', direction: 'short', quantity: '1', executionPrice: '0.1', markSnapshot: { symbol: 'BTCUSDT' } }] } },
+      ] },
   };
 }
 const accounts = [
