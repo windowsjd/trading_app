@@ -212,6 +212,10 @@ jobs:
       # trigger/fill fences, reservation deltas, moved evidence floor,
       # idempotent replay, and change-vs-cancel/fill races.
       PENDING_ORDER_MODIFY_DB_INTEGRATION: "1"
+      # Per-order realized PnL: every Spot SELL fill (market KRW/USD, limit
+      # path A/B) stores exactly the delta its own transaction applied to the
+      # position; replay, races, injected rollbacks, reads, NULL ≠ 0.
+      SELL_REALIZED_PNL_DB_INTEGRATION: "1"
       # TC-D05: one committed account state per valuation while real Spot,
       # FX, transfer and Futures commands commit between its SELECTs.
       VALUATION_CONSISTENCY_DB_INTEGRATION: "1"
@@ -285,6 +289,7 @@ jobs:
           src/orders/limit-order-matching.integration.spec.ts
           src/orders/orders.execute.integration.spec.ts
           src/orders/market-execution.integration.spec.ts
+          src/orders/sell-order-realized-pnl.integration.spec.ts
           src/fx/fx.execute.integration.spec.ts
           src/portfolio/valuation-snapshot-consistency.integration.spec.ts
           src/mvp-flow.integration.spec.ts

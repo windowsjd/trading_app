@@ -163,6 +163,58 @@ history: “부분체결 · 잔량 자동취소”. Amount BUY discloses unused 
 See [execution-realism-system.md](execution-realism-system.md) for the trusted
 adapter boundary, rounding, source provenance and production activation limits.
 
+## Per-order realized PnL (2026-11-06, current)
+
+A Spot SELL fill already computes its realized PnL and adds it to the holding's
+cumulative `positions.realized_pnl` / `realized_pnl_krw`. Since 2026-11-06 the
+order also keeps that figure in `orders.realized_pnl` (`DECIMAL(24,8)`, nullable,
+no default) so the order history can show what each sale actually realized.
+Nothing is calculated anew: the column is storage for the existing result.
+
+- **Value.** Exactly the delta the same fill added to `positions.realized_pnl`,
+  in the order's settlement currency (`currencyCode`: KRW orders in KRW, USD
+  orders in USD). Formulas are the unchanged engine ones: market (create and
+  legacy execute) `round(net − round(averageCost × executedQuantity))`; limit
+  path A/B and Limit-on-Close `round(net − averageCost × quantity)`; 8-place
+  half-up. Partial ERS fills use the executed quantity. Conditional SELL,
+  independent stop-loss/take-profit and OCO exits submit ordinary market/limit
+  orders and are covered by those two paths. There is no per-order KRW figure;
+  the KRW policy stays on the position.
+- **Write.** Only in the guarded statement that flips the order
+  `submitted → executed`, inside the fill transaction: the fill, position,
+  wallet, ledger, the order's figure and its status commit or roll back
+  together, and the figure is written once (a replay, retry or already-executed
+  execute never writes it).
+- **NULL ≠ 0.** `null` = no recorded figure: BUY orders, submitted, canceled
+  (incl. LOC unfilled/expired) and rejected orders, and SELL fills committed
+  before the column existed. Those are not backfilled — an older sale's figure
+  is never reconstructed from current or replayed average costs. A recorded
+  break-even sale is `"0.00000000"`.
+- **Reads.** Every order-history read row carries `realizedPnl` (`string | null`):
+  `GET /trading-accounts/:accountId/orders[/:orderId]`, legacy
+  `GET /orders[/:orderId]`, `GET /records/me/seasons/:seasonId/orders` and the
+  `GET /records` order section. Quote, create, execute, cancel and modify
+  responses — including stored first responses (`responsePayloadJson`) and their
+  replays — do not carry the key and are unchanged.
+- **Authority.** The stored figure is the per-order source of truth. Clients
+  must not recompute it, and the position's cumulative figure is not any single
+  order's. Completed trades (거래 완료) keep their own aggregate policy.
+- **Migration** `20261106180000_add_order_realized_pnl`: one
+  `ADD COLUMN` (catalog-only on PostgreSQL 11+: no rewrite, no scan, no
+  backfill) under `lock_timeout = '5s'`, so it cannot queue indefinitely behind
+  a long transaction and hold every later `orders` query behind it. On a lock
+  timeout nothing is applied, the build fails (the previous deploy keeps
+  serving) and Prisma records the migration as failed: the next deploy stops
+  with P3009 until an operator confirms the column is absent and runs
+  `prisma migrate resolve --rolled-back 20261106180000_add_order_realized_pnl`
+  against that database, then redeploys outside long batch/settlement work.
+- **Deploy order.** Migration (runs in the Render build) → backend → app. The
+  previous backend never reads or writes the column, so it runs on the new
+  schema; SELLs it fills in the switch-over window keep `null` (shown as
+  unknown, like older sales; money, positions and ledgers are unaffected and no
+  trading pause is needed). An older app ignores the new key; a newer app on an
+  older backend shows the figure as unavailable, never 0.
+
 ## Lock order (current contract)
 
 Season authorization locks use Season `FOR SHARE` → TradingAccount `FOR SHARE` →

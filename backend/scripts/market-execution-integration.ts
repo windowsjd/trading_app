@@ -391,6 +391,12 @@ async function fill(
       ? '0'
       : net.sub(new Prisma.Decimal(expected).mul('90')).toFixed(),
   );
+  // Per-order realized PnL: the SELL keeps exactly its fill's delta for the
+  // EXECUTED quantity (the fixture position starts at 0); a BUY records none.
+  assert.equal(
+    row.realizedPnl?.toFixed() ?? null,
+    side === 'buy' ? null : after.positions[0].realizedPnl.toFixed(),
+  );
   if (side === 'buy')
     assert.equal(
       after.positions[0].averageCost.toFixed(8),
@@ -430,6 +436,8 @@ async function fill(
     listed.data.orders[0].marketExecution,
     order.marketExecution,
   );
+  const storedPnl = row.realizedPnl?.toFixed(8) ?? null;
+  assert.equal(listed.data.orders[0].realizedPnl, storedPnl);
   if (f.seasonId) {
     const records = new RecordsService(db);
     const history = await records.getMySeasonOrders(f.userId, f.seasonId, {});
@@ -437,6 +445,7 @@ async function fill(
       history.data.orders[0].marketExecution,
       order.marketExecution,
     );
+    assert.equal(history.data.orders[0].realizedPnl, storedPnl);
     const aggregate = await records.getRecords(f.userId, {
       seasonId: f.seasonId,
       type: 'orders',

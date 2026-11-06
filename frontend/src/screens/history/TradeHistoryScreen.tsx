@@ -534,21 +534,38 @@ export default function TradeHistoryScreen({ route }: Props) {
                           지정가 {display.limitPrice}
                         </Text>
                       ) : null}
-                      {/* A BUY's 총액 is what it actually paid: the server's
-                          net debit, fee included (2026-11-06; 총액·차감액 before).
-                          A SELL keeps its gross 총액 and 수령액: no confirmed
-                          per-order realized PnL exists to show instead. */}
-                      {display.side === 'sell' ? (
-                        <Text style={styles.helper}>
-                          총액 {display.grossAmount}
-                        </Text>
-                      ) : null}
                       <Text style={styles.helper}>
                         수수료 {display.feeAmount}
                       </Text>
-                      <Text style={styles.itemTitle}>
-                        {display.side === 'sell' ? '수령액' : '총액'} {display.netAmount}
-                      </Text>
+                      {/* A BUY's 총액 is what it actually paid: the server's
+                          net debit, fee included (2026-11-06; 총액·차감액 before).
+                          A SELL shows the realized PnL the server stored with
+                          its fill (2026-11-06; 총액·수령액 before), never derived
+                          here; a sell without that figure says so, never 0. */}
+                      {display.realizedPnl ? (
+                        display.realizedPnl.available ? (
+                          <Text
+                            testID={TEST_IDS.record.orderRealizedPnl(display.key)}
+                            style={[styles.itemTitle, { color: display.realizedPnl.color }]}
+                          >
+                            실현손익 {display.realizedPnl.text}
+                          </Text>
+                        ) : (
+                          <>
+                            <Text
+                              testID={TEST_IDS.record.orderRealizedPnl(display.key)}
+                              style={styles.itemTitle}
+                            >
+                              실현손익 확인 불가
+                            </Text>
+                            <Text style={styles.helper}>주문별 손익 기록 전 거래예요</Text>
+                          </>
+                        )
+                      ) : (
+                        <Text style={styles.itemTitle}>
+                          총액 {display.netAmount}
+                        </Text>
+                      )}
                     </>
                   )}
                 </View>
@@ -671,6 +688,8 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 15, fontWeight: '700', lineHeight: 21 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
   // The amount column keeps its own track: it is the figure the row is about.
-  alignEnd: { alignItems: 'flex-end', flexShrink: 0, maxWidth: '100%' },
+  // When it wraps under a long name (or a wide 실현손익 line), it stays on the
+  // right edge like every other row's figures.
+  alignEnd: { alignItems: 'flex-end', flexShrink: 0, maxWidth: '100%', marginLeft: 'auto' },
   footerLoader: { paddingVertical: 16 },
 });

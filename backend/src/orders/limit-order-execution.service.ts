@@ -757,6 +757,9 @@ export class LimitOrderExecutionService {
       }
 
       stage = 'position_settlement';
+      // A SELL's realized PnL exactly as its position settlement applied it,
+      // stored with the status flip below. Buys have none.
+      let realizedPnl: string | undefined;
       // 9) Position (same average-cost policy as market buy), scoped to the
       // order's verified account.
       if (order.side === OrderSide.buy) {
@@ -768,7 +771,7 @@ export class LimitOrderExecutionService {
           netAmount: amounts.netAmount,
         });
       } else {
-        await this.settleSellPosition(tx, {
+        realizedPnl = await this.settleSellPosition(tx, {
           tradingAccountId,
           assetId: order.assetId,
           currencyCode: order.currencyCode,
@@ -850,6 +853,7 @@ export class LimitOrderExecutionService {
           grossAmount: formatDecimalScale(amounts.grossAmount, monetaryScale),
           feeAmount: formatDecimalScale(amounts.feeAmount, monetaryScale),
           netAmount: netAmountText,
+          ...(realizedPnl === undefined ? {} : { realizedPnl }),
           assetPriceSnapshotId,
           fxRateSnapshotId,
           limitOrderCandleEvidenceId,
@@ -985,6 +989,7 @@ export class LimitOrderExecutionService {
     return now;
   }
 
+  /** Settles the sold quantity and returns the realized PnL text it applied. */
   private async settleSellPosition(
     tx: ExecTx,
     input: {
@@ -995,7 +1000,7 @@ export class LimitOrderExecutionService {
       netAmount: Prisma.Decimal;
       fxRate: Prisma.Decimal | null;
     },
-  ): Promise<void> {
+  ): Promise<string> {
     const position = await tx.position.findUnique({
       where: {
         tradingAccountId_assetId: {
@@ -1037,12 +1042,13 @@ export class LimitOrderExecutionService {
             ),
             monetaryScale,
           );
+    const realizedText = formatDecimalScale(realized, monetaryScale);
     const settled = await settleReservedPositionQuantity(tx, {
       positionId: position.id,
       tradingAccountId: input.tradingAccountId,
       assetId: input.assetId,
       quantity: formatDecimalScale(input.quantity, monetaryScale),
-      realizedPnlDelta: formatDecimalScale(realized, monetaryScale),
+      realizedPnlDelta: realizedText,
       realizedPnlKrwDelta: formatDecimalScale(realizedKrw, monetaryScale),
     });
     if (settled !== 1) {
@@ -1051,6 +1057,7 @@ export class LimitOrderExecutionService {
         'Position reservation does not cover the limit-sell fill.',
       );
     }
+    return realizedText;
   }
 
   private async upsertBuyPosition(

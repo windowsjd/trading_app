@@ -1,6 +1,38 @@
 import { financial } from '../../theme/financialColors.ts';
 import { semantic } from '../../theme/tokens.ts';
-import { formatKrwDecimal, formatPercent } from '../../utils/format.ts';
+import {
+  formatKrwDecimal,
+  formatMoneyDecimal,
+  formatPercent,
+  normalizeCurrencyCode,
+} from '../../utils/format.ts';
+
+export type OrderRealizedPnlDisplay =
+  | { available: true; text: string; color: string }
+  | { available: false };
+
+/**
+ * A SELL fill's realized PnL in the order history (2026-11-06): the server's
+ * stored per-order figure in the order's currency, never derived here. A
+ * missing figure (a sell from before it was recorded, or a server that does
+ * not send it) is unavailable — never 0. As in getRecordFinancialDisplay, a
+ * figure that rounds to 0 for display takes the neutral color.
+ */
+export function getOrderRealizedPnlDisplay(
+  value: string | null | undefined,
+  currencyCode: string | null | undefined,
+): OrderRealizedPnlDisplay {
+  const code = normalizeCurrencyCode(currencyCode);
+  if (!code || typeof value !== 'string' || !/^[+-]?\d+(\.\d+)?$/u.test(value)) {
+    return { available: false };
+  }
+  const text = formatMoneyDecimal(value, code, true);
+  return {
+    available: true,
+    text,
+    color: text.startsWith('+') ? financial.rise : text.startsWith('-') ? financial.fall : semantic.text,
+  };
+}
 
 /** Presentation only. API rates are already percentages; never rescale them. */
 export function getRecordFinancialDisplay(

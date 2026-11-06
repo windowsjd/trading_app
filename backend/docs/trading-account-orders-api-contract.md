@@ -7,6 +7,15 @@
 > `20261006160000_pin_order_wallet_and_add_transfers` migration은 기존 order Quotes/Orders를 Securities로 backfill한다. 기존 잔액/예약금/Position은 이동하지 않는다.
 > 기존 account scope·replay·예약·fee pinning은 유지한다. [Wallet provenance/Transfer 계약](wallet-transfers-api-contract.md)을 함께 읽는다.
 
+## Per-order realized PnL extension (2026-11-06)
+
+Account order list and detail rows add `realizedPnl: string | null` — a Spot
+SELL fill's realized PnL in the order's `currencyCode`, stored with the fill
+(`orders.realized_pnl`). `null` = not recorded (buys, unfilled/canceled orders,
+sales from before the column), never 0. Create/cancel/modify responses and
+committed replays are unchanged. Contract:
+[Per-order realized PnL](orders-api-contract.md#per-order-realized-pnl-2026-11-06-current).
+
 ## SELL settings and LOC SELL extension (2026-10-13)
 
 Account order rows add `conditionalSell: { id, kind } | null` (the SELL

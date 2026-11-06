@@ -2961,6 +2961,71 @@ describe('OrdersService', () => {
     expectNoOrderWrites(prisma);
   });
 
+  it('order history reads present each row’s stored realized PnL: a value, an exact 0, or null', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    const row = (
+      id: string,
+      side: OrderSide,
+      realizedPnl: Prisma.Decimal | null,
+    ) => ({
+      id,
+      side,
+      orderType: OrderType.market,
+      status: OrderStatus.executed,
+      quantity: new Prisma.Decimal('1.00000000'),
+      limitPrice: null,
+      executedPrice: new Prisma.Decimal('100.00000000'),
+      currencyCode: CurrencyCode.KRW,
+      grossAmount: new Prisma.Decimal('100.00000000'),
+      feeAmount: new Prisma.Decimal('0.10000000'),
+      netAmount: new Prisma.Decimal('99.90000000'),
+      realizedPnl,
+      assetPriceSnapshotId: 'aps-1',
+      fxRateSnapshotId: null,
+      submittedAt,
+      executedAt,
+      canceledAt: null,
+      rejectedAt: null,
+      rejectReason: null,
+      createdAt,
+      updatedAt,
+      asset: {
+        id: 'asset-1',
+        symbol: '005930',
+        name: '삼성전자',
+        market: 'KRX',
+        currencyCode: CurrencyCode.KRW,
+      },
+    });
+    prisma.order.count.mockResolvedValueOnce(4);
+    prisma.order.findMany.mockResolvedValueOnce([
+      row('sell-gain', OrderSide.sell, new Prisma.Decimal('19.9')),
+      row('sell-loss', OrderSide.sell, new Prisma.Decimal('-20.14')),
+      row('sell-zero', OrderSide.sell, new Prisma.Decimal('0')),
+      // A buy, or a sell committed before the column existed: unknown.
+      row('sell-legacy', OrderSide.sell, null),
+    ]);
+
+    const response = await service.getOrders('user-1', {});
+
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ realizedPnl: true }),
+      }),
+    );
+    expect(
+      response.data.orders.map((order) => [order.orderId, order.realizedPnl]),
+    ).toEqual([
+      ['sell-gain', '19.90000000'],
+      ['sell-loss', '-20.14000000'],
+      ['sell-zero', '0.00000000'],
+      ['sell-legacy', null],
+    ]);
+    expectNoOrderWrites(prisma);
+  });
+
   it('returns a single owned order detail with public execution metadata', async () => {
     const { prisma, service } = createService();
     prisma.order.findFirst.mockResolvedValueOnce({
@@ -2979,6 +3044,8 @@ describe('OrdersService', () => {
       grossAmount: new Prisma.Decimal('303.75000000'),
       feeAmount: new Prisma.Decimal('0.30375000'),
       netAmount: new Prisma.Decimal('304.05375000'),
+      // A BUY has no realized PnL.
+      realizedPnl: null,
       assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: 'fx-1',
       submittedAt,
@@ -3022,8 +3089,10 @@ describe('OrdersService', () => {
             mode: 'season',
           },
         },
+        select: expect.objectContaining({ realizedPnl: true }),
       }),
     );
+    expect(response.data.order.realizedPnl).toBeNull();
     expect(response.data).toMatchObject({
       order: {
         orderId: 'order-1',
@@ -3827,6 +3896,7 @@ describe('OrdersService', () => {
           id: true,
         },
       });
+      // Exact data: a BUY fill never writes realizedPnl (it stays null).
       expect(prisma.order.updateMany).toHaveBeenCalledWith({
         where: {
           id: 'order-execute-1',
@@ -4463,6 +4533,19 @@ describe('OrdersService', () => {
           },
         },
       });
+      // The order keeps exactly the realized PnL the position just received,
+      // in the guarded statement that marks it executed.
+      expect(prisma.order.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: OrderStatus.submitted }),
+          data: expect.objectContaining({
+            status: OrderStatus.executed,
+            realizedPnl: '39.80000000',
+          }),
+        }),
+      );
+      // The execute response (and the stored replay payload) keeps its shape.
+      expect('realizedPnl' in response.data.order).toBe(false);
       expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
         where: {
           walletScope: 'securities',
@@ -4553,6 +4636,61 @@ describe('OrdersService', () => {
               decrement: '20.14000000',
             },
           }),
+        }),
+      );
+      // A loss is stored signed on the order (the position got a decrement).
+      expect(prisma.order.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ realizedPnl: '-20.14000000' }),
+        }),
+      );
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('stores an exactly zero realized PnL as 0, never as missing', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValue(
+        orderExecutionRecord({
+          side: OrderSide.sell,
+          orderType: OrderType.market,
+          limitPrice: null,
+        }),
+      );
+      mockExecutionPrice(prisma);
+      // net 199.8 (2 × 100 − 0.2 fee) equals the cost basis round(99.9 × 2).
+      prisma.position.findUnique.mockResolvedValueOnce({
+        id: 'position-1',
+        tradingAccountId: 'trading-account-1',
+        quantity: new Prisma.Decimal('5.00000000'),
+        averageCost: new Prisma.Decimal('99.90000000'),
+        currencyCode: CurrencyCode.KRW,
+      });
+      prisma.position.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockExecutionWallet(prisma, '100.00000000', '299.80000000');
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-sell-zero-1',
+      });
+      mockOrderFinalization(
+        prisma,
+        executedOrderExecutionRecord({
+          side: OrderSide.sell,
+          netAmount: new Prisma.Decimal('199.80000000'),
+          feeAmount: new Prisma.Decimal('0.20000000'),
+        }),
+      );
+
+      await service.executeOrder('user-1', 'order-execute-1');
+
+      expect(prisma.position.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            realizedPnl: { increment: '0.00000000' },
+          }),
+        }),
+      );
+      expect(prisma.order.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ realizedPnl: '0.00000000' }),
         }),
       );
       expectNoForbiddenExecuteSideEffects(prisma);
@@ -4648,6 +4786,12 @@ describe('OrdersService', () => {
           },
         },
       });
+      // The order's figure is in its settlement currency (USD), not KRW.
+      expect(prisma.order.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ realizedPnl: '99.50000000' }),
+        }),
+      );
       expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
         where: {
           walletScope: 'securities',

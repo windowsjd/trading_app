@@ -280,6 +280,9 @@ geometry assertions and is only for a documented baseline comparison.
 
 The existing `recordBrowser.cjs` can target the changed chart screens with
 `RECORD_BROWSER_SCREENS=detail,profit`; its default still checks history as well.
+Since 2026-11-06 `history` also checks the SELL rows: no 총액·수령액, the stored
+`실현손익` signed and in the rise/fall color (the `long` row is a 16-digit loss),
+an exact 0 neutral, and a sell without the figure `실현손익 확인 불가` (never 0).
 It checks the secondary history CTAs and primary profit CTA at font scales 1/1.5/2
 in both appearances and financial palettes.
 The motion handover records the pre-existing 320px/2×-font history amount overflow

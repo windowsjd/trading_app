@@ -12,7 +12,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/data-retention.md` — 2026-10-21: automatic deletion of refresh sessions (90 days after they end), operator audit logs (1 year) and support inquiries (3 years after the answer or filing); settings, batching, first-deploy irreversible deletion, retention already enforced elsewhere
    - `docs/friends-api-contract.md`
    - `docs/fx-api-contract.md`
-   - `docs/orders-api-contract.md`
+   - `docs/orders-api-contract.md` — includes the per-order realized PnL of Spot SELL fills (`orders.realized_pnl`, 2026-11-06): stored with the fill, NULL ≠ 0, no backfill, migration lock_timeout/P3009 recovery
    - `docs/assets-api-contract.md`
    - `docs/home-api-contract.md`
    - `docs/ranking-api-contract.md`

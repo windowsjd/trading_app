@@ -449,6 +449,24 @@ async function invariants(s: Sell, bought = D(0)) {
       .toFixed(8),
     'wallet moved by exactly the executed net amounts',
   );
+  // Per-order realized PnL: only executed SELLs carry it, and together they
+  // are exactly the holding's cumulative realized PnL (it starts at 0).
+  const allOrders = await db.order.findMany({
+    where: { tradingAccountId: s.accountId, assetId: s.assetId },
+  });
+  for (const row of allOrders)
+    assert.equal(
+      row.realizedPnl !== null,
+      row.side === 'sell' && row.status === 'executed',
+      'realized PnL only on SELL fills',
+    );
+  const realized = executed.reduce(
+    (sum, row) => sum.add(row.realizedPnl ?? 0),
+    D(0),
+  );
+  assert.equal(realized.toFixed(8), p.realizedPnl.toFixed(8));
+  if (p.currencyCode === 'KRW')
+    assert.equal(realized.toFixed(8), p.realizedPnlKrw.toFixed(8));
   const intents = await db.conditionalSellOrder.findMany({
     where: { tradingAccountId: s.accountId },
     include: { order: true },

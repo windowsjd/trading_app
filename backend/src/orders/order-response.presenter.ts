@@ -37,6 +37,12 @@ export type OrderResponseRecord = {
   grossAmount: Prisma.Decimal | null;
   feeAmount: Prisma.Decimal | null;
   netAmount: Prisma.Decimal | null;
+  /**
+   * Order-history reads only: a SELL fill's confirmed realized PnL (settlement
+   * currency); null when none was recorded. Call sites that do not select it
+   * (quote/create/execute/cancel/modify, stored first responses) omit the key.
+   */
+  realizedPnl?: Prisma.Decimal | null;
   assetPriceSnapshotId: string | null;
   fxRateSnapshotId: string | null;
   reservedAmount?: Prisma.Decimal | null;
@@ -82,6 +88,9 @@ export function formatOrderResponse(order: OrderResponseRecord) {
     grossAmount: formatNullableDecimal(order.grossAmount),
     feeAmount: formatNullableDecimal(order.feeAmount),
     netAmount: formatNullableDecimal(order.netAmount),
+    ...(order.realizedPnl !== undefined
+      ? { realizedPnl: formatNullableDecimal(order.realizedPnl) }
+      : {}),
     assetPriceSnapshotId: order.assetPriceSnapshotId,
     fxRateSnapshotId: order.fxRateSnapshotId,
     reservedAmount: formatNullableDecimal(order.reservedAmount ?? null),

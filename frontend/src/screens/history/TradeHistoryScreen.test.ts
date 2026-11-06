@@ -4,6 +4,8 @@ import type { InfiniteData } from '@tanstack/react-query';
 import { createRecordScreenHarness, act } from '../../../test/recordScreenHarness.cjs';
 import type { RootStackParamList } from '../../app/navigation/types';
 import type { TradingAccountOrdersDto } from '../../features/tradingAccount/api';
+import { financial } from '../../theme/financialColors.ts';
+import { semantic } from '../../theme/tokens.ts';
 
 const scopes: RootStackParamList['TradeHistory'][] = [{ accountId: 'historical' }, { seasonId: 'record-0' }];
 for (const scope of scopes) {
@@ -68,7 +70,9 @@ it('현물 | 선물: 선물 reads the pinned account\'s 포지션 진입 / 포�
   await act(async () => h.renderer.root.findByType('FlatList').props.onEndReached()); await h.settle();
   assert.equal(has(h, /체결가 70,000/), true, '현물 labels lose the 실제 prefix');
   assert.equal(has(h, /실제 /), false);
-  assert.equal(has(h, /총액 70,000/) && has(h, /수수료 70/) && has(h, /수령액 69,930/), true);
+  // The fixture SELL carries no per-order figure: it says so, never 0.
+  assert.equal(has(h, /수수료 70/) && has(h, /실현손익 확인 불가/), true);
+  assert.equal(has(h, /수령액|총액 70,000/), false);
   assert.equal(has(h, /예약금 100,000/), true, 'a reservation stays a reservation');
 
   await h.press('trade-history-futures');
@@ -107,32 +111,61 @@ it('현물 | 선물: 선물 reads the pinned account\'s 포지션 진입 / 포�
   assert.equal(h.orderOptions.enabled, true);
 });
 
-it('현물 rows: a BUY ends with 총액 = what it paid (fee included); a SELL keeps 총액·수수료·수령액; unfilled rows keep their reservation', async t => {
+it('현물 rows: a BUY ends with 총액 = what it paid (fee included); a SELL ends with its stored 실현손익; unfilled rows keep their reservation', async t => {
   const h = createRecordScreenHarness('history', { accountId: 'historical' }); t.after(h.close); await h.settle();
-  h.pageLimit = 10;
+  h.pageLimit = 20;
+  const sell = (id: string, extra: Record<string, unknown>) => ({ id, assetId: `asset-${id}`, asset: { name: '삼성전자', symbol: '005930' },
+    side: 'sell', orderType: 'market', status: 'executed', quantity: '1', executedPrice: '70000', grossAmount: '70000', feeAmount: '70',
+    netAmount: '69930', currencyCode: 'KRW', submittedAt: '2026-09-04T00:00:00Z', executedAt: '2026-09-04T00:00:00Z', ...extra });
   (h.orders as any[]).push(
     { id: 'buy-1', assetId: 'asset-3', asset: { name: 'SK하이닉스', symbol: '000660' }, side: 'buy', orderType: 'market', status: 'executed', quantity: '2',
-      executedPrice: '100000', grossAmount: '200000', feeAmount: '200', netAmount: '200200', currencyCode: 'KRW',
+      executedPrice: '100000', grossAmount: '200000', feeAmount: '200', netAmount: '200200', currencyCode: 'KRW', realizedPnl: null,
       submittedAt: '2026-09-02T00:00:00Z', executedAt: '2026-09-02T00:00:00Z' },
     { id: 'buy-partial', assetId: 'asset-4', asset: { name: '비트코인', symbol: 'BTC' }, side: 'buy', orderType: 'market', status: 'executed', quantity: '0.6',
       executedPrice: '100.03333333', grossAmount: '60.02', feeAmount: '0.06002', netAmount: '60.08002', currencyCode: 'USD',
       submittedAt: '2026-09-03T00:00:00Z', executedAt: '2026-09-03T00:00:00Z',
       marketExecution: { status: 'partial', requestedQuantity: null, executedQuantity: '0.6', canceledQuantity: null, requestedAmount: '100',
         unspentAmount: '39.98', remainderCancelReason: 'insufficient_market_liquidity', remainderCanceledAt: '2026-09-03T00:00:00Z' } },
+    sell('sell-gain', { realizedPnl: '12345.50000000' }),
+    sell('sell-loss', { currencyCode: 'USD', executedPrice: '120', grossAmount: '120', feeAmount: '0.12', netAmount: '119.88', realizedPnl: '-20.14000000' }),
+    sell('sell-zero', { realizedPnl: '0.00000000' }),
+    sell('sell-null', { realizedPnl: null }),
+    sell('sell-limit', { orderType: 'limit', limitPrice: '69000', realizedPnl: '930.00000000' }),
+    { id: 'sell-open', assetId: 'asset-open', asset: { name: '삼성전자', symbol: '005930' }, side: 'sell', orderType: 'limit', status: 'submitted',
+      quantity: '2', limitPrice: '80000', reservedQuantity: '2', realizedPnl: null, currencyCode: 'KRW', submittedAt: '2026-09-05T00:00:00Z' },
   );
   await h.refresh();
   const row = (id: string) => h.text(h.find(`record-order-item-${id}`));
+  const color = (id: string) => Object.assign({}, ...[h.find(`record-order-realized-pnl-${id}`).props.style].flat().filter(Boolean)).color;
   const buy = row('buy-1');
   assert.match(buy, /수량 2[\s\S]*체결가 100,000[\s\S]*수수료 200[\s\S]*총액 200,200$/);
-  assert.equal(/총액 200,000|차감액|수령액/.test(buy), false, 'the gross amount is not a BUY\'s 총액');
+  assert.equal(/총액 200,000|차감액|수령액|실현손익/.test(buy), false, 'the gross amount is not a BUY\'s 총액');
   const partial = row('buy-partial');
   assert.match(partial, /주문 금액[\s\S]*체결 수량 0\.6[\s\S]*사용되지 않은 금액[\s\S]*평균 체결가[\s\S]*수수료[\s\S]*총액/);
   assert.equal(/차감액/.test(partial), false);
-  const sell = row('sell-1');
-  assert.match(sell, /체결가 70,000[\s\S]*총액 70,000[\s\S]*수수료 70[\s\S]*수령액 69,930$/);
+  // A SELL fill: 수량 · 체결가 · 수수료 · 실현손익 (its stored per-order figure); no 총액·수령액.
+  assert.match(row('sell-gain'), /수량 1[\s\S]*체결가 70,000[\s\S]*수수료 70[\s\S]*실현손익 \+12,346원$/);
+  assert.equal(color('sell-gain'), financial.rise);
+  assert.match(row('sell-loss'), /체결가 120[\s\S]*수수료 0\.12[\s\S]*실현손익 -\$20\.14$/);
+  assert.equal(color('sell-loss'), financial.fall);
+  assert.match(row('sell-zero'), /수수료 70[\s\S]*실현손익 0원$/);
+  assert.equal(color('sell-zero'), semantic.text);
+  assert.match(row('sell-limit'), /지정가 69,000[\s\S]*수수료 70[\s\S]*실현손익 \+930원$/);
+  for (const id of ['sell-gain', 'sell-loss', 'sell-zero', 'sell-null', 'sell-1', 'sell-limit']) {
+    assert.equal(/총액|수령액/.test(row(id)), false, `${id}: no 총액·수령액 on a SELL`);
+  }
+  // Not recorded (null, or absent on the fixture's older row): unavailable, never 0.
+  for (const id of ['sell-null', 'sell-1']) {
+    assert.match(row(id), /수수료 70[\s\S]*실현손익 확인 불가[\s\S]*주문별 손익 기록 전 거래예요$/);
+    assert.equal(/0원/.test(row(id)), false);
+    assert.equal(color(id) === undefined, true, 'no rise/fall color without a figure');
+  }
   const open = row('limit-1');
   assert.match(open, /예약금 100,000/);
   assert.equal(/총액|수수료|차감액/.test(open), false, 'an unfilled limit shows no execution amounts');
+  const openSell = row('sell-open');
+  assert.match(openSell, /예약 수량 2/);
+  assert.equal(/수수료|실현손익/.test(openSell), false, 'an unfilled SELL shows no realized PnL');
 });
 
 for (const [futuresView, phase] of [['liquidations', 'exit'], ['exits', 'exit'], ['executions', 'entry'], [undefined, 'entry']] as const) {

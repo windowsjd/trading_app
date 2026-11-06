@@ -41,6 +41,7 @@ export type OrderAvgAggregateOutputType = {
   reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
   revision: number | null
+  realizedPnl: runtime.Decimal | null
 }
 
 export type OrderSumAggregateOutputType = {
@@ -58,6 +59,7 @@ export type OrderSumAggregateOutputType = {
   reservedQuantity: runtime.Decimal | null
   reservationFeeRate: runtime.Decimal | null
   revision: number | null
+  realizedPnl: runtime.Decimal | null
 }
 
 export type OrderMinAggregateOutputType = {
@@ -100,6 +102,7 @@ export type OrderMinAggregateOutputType = {
   revisedAt: Date | null
   revision: number | null
   updatedAt: Date | null
+  realizedPnl: runtime.Decimal | null
 }
 
 export type OrderMaxAggregateOutputType = {
@@ -142,6 +145,7 @@ export type OrderMaxAggregateOutputType = {
   revisedAt: Date | null
   revision: number | null
   updatedAt: Date | null
+  realizedPnl: runtime.Decimal | null
 }
 
 export type OrderCountAggregateOutputType = {
@@ -186,6 +190,7 @@ export type OrderCountAggregateOutputType = {
   revisedAt: number
   revision: number
   updatedAt: number
+  realizedPnl: number
   _all: number
 }
 
@@ -205,6 +210,7 @@ export type OrderAvgAggregateInputType = {
   reservedQuantity?: true
   reservationFeeRate?: true
   revision?: true
+  realizedPnl?: true
 }
 
 export type OrderSumAggregateInputType = {
@@ -222,6 +228,7 @@ export type OrderSumAggregateInputType = {
   reservedQuantity?: true
   reservationFeeRate?: true
   revision?: true
+  realizedPnl?: true
 }
 
 export type OrderMinAggregateInputType = {
@@ -264,6 +271,7 @@ export type OrderMinAggregateInputType = {
   revisedAt?: true
   revision?: true
   updatedAt?: true
+  realizedPnl?: true
 }
 
 export type OrderMaxAggregateInputType = {
@@ -306,6 +314,7 @@ export type OrderMaxAggregateInputType = {
   revisedAt?: true
   revision?: true
   updatedAt?: true
+  realizedPnl?: true
 }
 
 export type OrderCountAggregateInputType = {
@@ -350,6 +359,7 @@ export type OrderCountAggregateInputType = {
   revisedAt?: true
   revision?: true
   updatedAt?: true
+  realizedPnl?: true
   _all?: true
 }
 
@@ -481,6 +491,7 @@ export type OrderGroupByOutputType = {
   revisedAt: Date | null
   revision: number
   updatedAt: Date
+  realizedPnl: runtime.Decimal | null
   _count: OrderCountAggregateOutputType | null
   _avg: OrderAvgAggregateOutputType | null
   _sum: OrderSumAggregateOutputType | null
@@ -548,6 +559,7 @@ export type OrderWhereInput = {
   revisedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   revision?: Prisma.IntFilter<"Order"> | number
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
+  realizedPnl?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   quote?: Prisma.XOR<Prisma.QuoteNullableScalarRelationFilter, Prisma.QuoteWhereInput> | null
@@ -607,6 +619,7 @@ export type OrderOrderByWithRelationInput = {
   revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  realizedPnl?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   asset?: Prisma.AssetOrderByWithRelationInput
   quote?: Prisma.QuoteOrderByWithRelationInput
@@ -671,6 +684,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   revisedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   revision?: Prisma.IntFilter<"Order"> | number
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
+  realizedPnl?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   quote?: Prisma.XOR<Prisma.QuoteNullableScalarRelationFilter, Prisma.QuoteWhereInput> | null
@@ -730,6 +744,7 @@ export type OrderOrderByWithAggregationInput = {
   revisedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  realizedPnl?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.OrderCountOrderByAggregateInput
   _avg?: Prisma.OrderAvgOrderByAggregateInput
   _max?: Prisma.OrderMaxOrderByAggregateInput
@@ -782,6 +797,7 @@ export type OrderScalarWhereWithAggregatesInput = {
   revisedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   revision?: Prisma.IntWithAggregatesFilter<"Order"> | number
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
+  realizedPnl?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderCreateInput = {
@@ -819,6 +835,7 @@ export type OrderCreateInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -878,6 +895,7 @@ export type OrderUncheckedCreateInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -923,6 +941,7 @@ export type OrderUpdateInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -982,6 +1001,7 @@ export type OrderUncheckedUpdateInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -1034,6 +1054,7 @@ export type OrderCreateManyInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUpdateManyMutationInput = {
@@ -1071,6 +1092,7 @@ export type OrderUpdateManyMutationInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUncheckedUpdateManyInput = {
@@ -1115,6 +1137,7 @@ export type OrderUncheckedUpdateManyInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderListRelationFilter = {
@@ -1184,6 +1207,7 @@ export type OrderCountOrderByAggregateInput = {
   revisedAt?: Prisma.SortOrder
   revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  realizedPnl?: Prisma.SortOrder
 }
 
 export type OrderAvgOrderByAggregateInput = {
@@ -1201,6 +1225,7 @@ export type OrderAvgOrderByAggregateInput = {
   reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
   revision?: Prisma.SortOrder
+  realizedPnl?: Prisma.SortOrder
 }
 
 export type OrderMaxOrderByAggregateInput = {
@@ -1243,6 +1268,7 @@ export type OrderMaxOrderByAggregateInput = {
   revisedAt?: Prisma.SortOrder
   revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  realizedPnl?: Prisma.SortOrder
 }
 
 export type OrderMinOrderByAggregateInput = {
@@ -1285,6 +1311,7 @@ export type OrderMinOrderByAggregateInput = {
   revisedAt?: Prisma.SortOrder
   revision?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  realizedPnl?: Prisma.SortOrder
 }
 
 export type OrderSumOrderByAggregateInput = {
@@ -1302,6 +1329,7 @@ export type OrderSumOrderByAggregateInput = {
   reservedQuantity?: Prisma.SortOrder
   reservationFeeRate?: Prisma.SortOrder
   revision?: Prisma.SortOrder
+  realizedPnl?: Prisma.SortOrder
 }
 
 export type OrderScalarRelationFilter = {
@@ -1770,6 +1798,7 @@ export type OrderCreateWithoutTradingAccountInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -1827,6 +1856,7 @@ export type OrderUncheckedCreateWithoutTradingAccountInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1908,6 +1938,7 @@ export type OrderScalarWhereInput = {
   revisedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   revision?: Prisma.IntFilter<"Order"> | number
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
+  realizedPnl?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderCreateWithoutAssetInput = {
@@ -1945,6 +1976,7 @@ export type OrderCreateWithoutAssetInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -2002,6 +2034,7 @@ export type OrderUncheckedCreateWithoutAssetInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2073,6 +2106,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -2130,6 +2164,7 @@ export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2201,6 +2236,7 @@ export type OrderCreateWithoutAttachedProtectionInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -2259,6 +2295,7 @@ export type OrderUncheckedCreateWithoutAttachedProtectionInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
   conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2319,6 +2356,7 @@ export type OrderUpdateWithoutAttachedProtectionInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -2377,6 +2415,7 @@ export type OrderUncheckedUpdateWithoutAttachedProtectionInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
   conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2421,6 +2460,7 @@ export type OrderCreateWithoutProtectionChildInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -2479,6 +2519,7 @@ export type OrderUncheckedCreateWithoutProtectionChildInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
   conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2539,6 +2580,7 @@ export type OrderUpdateWithoutProtectionChildInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -2597,6 +2639,7 @@ export type OrderUncheckedUpdateWithoutProtectionChildInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
   conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2641,6 +2684,7 @@ export type OrderCreateWithoutConditionalBuyInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -2699,6 +2743,7 @@ export type OrderUncheckedCreateWithoutConditionalBuyInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2759,6 +2804,7 @@ export type OrderUpdateWithoutConditionalBuyInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -2817,6 +2863,7 @@ export type OrderUncheckedUpdateWithoutConditionalBuyInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2861,6 +2908,7 @@ export type OrderCreateWithoutConditionalSellInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -2919,6 +2967,7 @@ export type OrderUncheckedCreateWithoutConditionalSellInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2979,6 +3028,7 @@ export type OrderUpdateWithoutConditionalSellInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -3037,6 +3087,7 @@ export type OrderUncheckedUpdateWithoutConditionalSellInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3081,6 +3132,7 @@ export type OrderCreateWithoutEntryTpSlPlansInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -3139,6 +3191,7 @@ export type OrderUncheckedCreateWithoutEntryTpSlPlansInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -3188,6 +3241,7 @@ export type OrderCreateWithoutEntryTpSlPlanFillsInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -3246,6 +3300,7 @@ export type OrderUncheckedCreateWithoutEntryTpSlPlanFillsInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -3306,6 +3361,7 @@ export type OrderUpdateWithoutEntryTpSlPlansInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -3364,6 +3420,7 @@ export type OrderUncheckedUpdateWithoutEntryTpSlPlansInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3419,6 +3476,7 @@ export type OrderUpdateWithoutEntryTpSlPlanFillsInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -3477,6 +3535,7 @@ export type OrderUncheckedUpdateWithoutEntryTpSlPlanFillsInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3521,6 +3580,7 @@ export type OrderCreateWithoutLimitOnCloseInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -3579,6 +3639,7 @@ export type OrderUncheckedCreateWithoutLimitOnCloseInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -3639,6 +3700,7 @@ export type OrderUpdateWithoutLimitOnCloseInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -3697,6 +3759,7 @@ export type OrderUncheckedUpdateWithoutLimitOnCloseInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3741,6 +3804,7 @@ export type OrderCreateWithoutSessionCloseEvidenceInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -3798,6 +3862,7 @@ export type OrderUncheckedCreateWithoutSessionCloseEvidenceInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -3869,6 +3934,7 @@ export type OrderCreateWithoutBeginnerQuestAcknowledgementsInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -3927,6 +3993,7 @@ export type OrderUncheckedCreateWithoutBeginnerQuestAcknowledgementsInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -3987,6 +4054,7 @@ export type OrderUpdateWithoutBeginnerQuestAcknowledgementsInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -4045,6 +4113,7 @@ export type OrderUncheckedUpdateWithoutBeginnerQuestAcknowledgementsInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -4089,6 +4158,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -4146,6 +4216,7 @@ export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -4217,6 +4288,7 @@ export type OrderCreateWithoutQuoteInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
@@ -4274,6 +4346,7 @@ export type OrderUncheckedCreateWithoutQuoteInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -4345,6 +4418,7 @@ export type OrderCreateWithoutCandleEvidenceInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
@@ -4402,6 +4476,7 @@ export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -4479,6 +4554,7 @@ export type OrderCreateManyTradingAccountInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUpdateWithoutTradingAccountInput = {
@@ -4516,6 +4592,7 @@ export type OrderUpdateWithoutTradingAccountInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -4573,6 +4650,7 @@ export type OrderUncheckedUpdateWithoutTradingAccountInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -4624,6 +4702,7 @@ export type OrderUncheckedUpdateManyWithoutTradingAccountInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderCreateManyAssetInput = {
@@ -4667,6 +4746,7 @@ export type OrderCreateManyAssetInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUpdateWithoutAssetInput = {
@@ -4704,6 +4784,7 @@ export type OrderUpdateWithoutAssetInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -4761,6 +4842,7 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -4812,6 +4894,7 @@ export type OrderUncheckedUpdateManyWithoutAssetInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderCreateManyAssetPriceSnapshotInput = {
@@ -4855,6 +4938,7 @@ export type OrderCreateManyAssetPriceSnapshotInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUpdateWithoutAssetPriceSnapshotInput = {
@@ -4892,6 +4976,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -4949,6 +5034,7 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -5000,6 +5086,7 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderCreateManySessionCloseEvidenceInput = {
@@ -5043,6 +5130,7 @@ export type OrderCreateManySessionCloseEvidenceInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUpdateWithoutSessionCloseEvidenceInput = {
@@ -5080,6 +5168,7 @@ export type OrderUpdateWithoutSessionCloseEvidenceInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -5137,6 +5226,7 @@ export type OrderUncheckedUpdateWithoutSessionCloseEvidenceInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -5188,6 +5278,7 @@ export type OrderUncheckedUpdateManyWithoutSessionCloseEvidenceInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderCreateManyFxRateSnapshotInput = {
@@ -5231,6 +5322,7 @@ export type OrderCreateManyFxRateSnapshotInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUpdateWithoutFxRateSnapshotInput = {
@@ -5268,6 +5360,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -5325,6 +5418,7 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -5376,6 +5470,7 @@ export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderCreateManyQuoteInput = {
@@ -5419,6 +5514,7 @@ export type OrderCreateManyQuoteInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUpdateWithoutQuoteInput = {
@@ -5456,6 +5552,7 @@ export type OrderUpdateWithoutQuoteInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
@@ -5513,6 +5610,7 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -5564,6 +5662,7 @@ export type OrderUncheckedUpdateManyWithoutQuoteInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderCreateManyCandleEvidenceInput = {
@@ -5607,6 +5706,7 @@ export type OrderCreateManyCandleEvidenceInput = {
   revisedAt?: Date | string | null
   revision?: number
   updatedAt?: Date | string
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 export type OrderUpdateWithoutCandleEvidenceInput = {
@@ -5644,6 +5744,7 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
@@ -5701,6 +5802,7 @@ export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -5752,6 +5854,7 @@ export type OrderUncheckedUpdateManyWithoutCandleEvidenceInput = {
   revisedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  realizedPnl?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
 
@@ -5845,6 +5948,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   revisedAt?: boolean
   revision?: boolean
   updatedAt?: boolean
+  realizedPnl?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -5905,6 +6009,7 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   revisedAt?: boolean
   revision?: boolean
   updatedAt?: boolean
+  realizedPnl?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -5956,6 +6061,7 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   revisedAt?: boolean
   revision?: boolean
   updatedAt?: boolean
+  realizedPnl?: boolean
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
@@ -6007,9 +6113,10 @@ export type OrderSelectScalar = {
   revisedAt?: boolean
   revision?: boolean
   updatedAt?: boolean
+  realizedPnl?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "executedQuantity" | "canceledQuantity" | "requestedAmount" | "unspentAmount" | "executionEvidence" | "limitPrice" | "executedPrice" | "currencyCode" | "cashWalletScope" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservedQuantity" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "sessionCloseEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "revisedAt" | "revision" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "tradingAccountId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "executedQuantity" | "canceledQuantity" | "requestedAmount" | "unspentAmount" | "executionEvidence" | "limitPrice" | "executedPrice" | "currencyCode" | "cashWalletScope" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservedQuantity" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "limitOrderCandleEvidenceId" | "sessionCloseEvidenceId" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "revisedAt" | "revision" | "updatedAt" | "realizedPnl", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -6108,6 +6215,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     revisedAt: Date | null
     revision: number
     updatedAt: Date
+    realizedPnl: runtime.Decimal | null
   }, ExtArgs["result"]["order"]>
   composites: {}
 }
@@ -6587,6 +6695,7 @@ export interface OrderFieldRefs {
   readonly revisedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly revision: Prisma.FieldRef<"Order", 'Int'>
   readonly updatedAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly realizedPnl: Prisma.FieldRef<"Order", 'Decimal'>
 }
     
 

@@ -400,6 +400,7 @@ Authenticated user's order history for one season.
         "grossAmount": "190.00000000",
         "feeAmount": "0.19000000",
         "netAmount": "190.19000000",
+        "realizedPnl": null,
         "reservedAmount": null,
         "reservationReleasedAt": null,
         "cancelReason": null,
@@ -420,6 +421,12 @@ Authenticated user's order history for one season.
   }
 }
 ```
+
+- `realizedPnl` (2026-11-06): a SELL fill's stored realized PnL in the order's
+  `currencyCode`; `null` for buys, unfilled/canceled orders and sales from
+  before the figure was recorded (never 0). The `GET /api/v1/records` order
+  section carries the same field. See
+  [Per-order realized PnL](orders-api-contract.md#per-order-realized-pnl-2026-11-06-current).
 
 ### Error Codes
 

@@ -67,6 +67,18 @@ describe('account-scoped order rows adapt to the record row shape', () => {
     assert.equal(isOpenLimitBuyOrder(item), true);
   });
 
+  it('carries a SELL fill’s stored realized PnL and keeps null/absent apart from 0', () => {
+    const fill = { side: 'sell', orderType: 'market', status: 'executed' };
+    const pnl = (extra: Record<string, unknown>) =>
+      toRecordOrderItem(accountOrderRow({ ...fill, ...extra })).realizedPnl;
+
+    assert.equal(pnl({ realizedPnl: '-20.14000000' }), '-20.14000000');
+    assert.equal(pnl({ realizedPnl: '0.00000000' }), '0.00000000');
+    assert.equal(pnl({ realizedPnl: null }), null);
+    // An older server does not send the field at all.
+    assert.equal(pnl({}), undefined);
+  });
+
   it('handles a filled market row', () => {
     const item = toRecordOrderItem(
       accountOrderRow({

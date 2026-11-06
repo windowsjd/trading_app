@@ -26,6 +26,7 @@ import {
   isOpenLimitBuyOrder,
   type LimitOnCloseFields,
 } from './openOrder';
+import { getOrderRealizedPnlDisplay } from './financialDisplay';
 
 export interface RecordSeasonListItemDto {
   seasonId: string;
@@ -237,6 +238,12 @@ export interface RecordOrderItemDto {
   netAmountLocal?: MoneyString;
   grossAmount?: MoneyString | null;
   feeAmount?: MoneyString | null;
+  /**
+   * A SELL fill's confirmed realized PnL in `currencyCode`, stored by the
+   * server with the fill (2026-11-06). null/absent = not recorded (buys,
+   * unfilled orders, sells from before the field, an older server) — never 0.
+   */
+  realizedPnl?: MoneyString | null;
   // Limit-order additive fields.
   reservedAmount?: MoneyString | null;
   reservedQuantity?: QuantityString | null;
@@ -389,12 +396,14 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     netAmount: noExecutionResult
       ? null
       : money(item.netAmount ?? item.netAmountLocal, currencyCode),
-    grossAmount: noExecutionResult
-      ? null
-      : money(item.grossAmount, currencyCode),
     feeAmount: noExecutionResult
       ? null
       : money(item.feeAmount, currencyCode),
+    // A SELL fill shows its stored realized PnL instead of 총액·수령액.
+    realizedPnl:
+      item.side === 'sell' && !noExecutionResult
+        ? getOrderRealizedPnlDisplay(item.realizedPnl, currencyCode)
+        : null,
   };
 }
 

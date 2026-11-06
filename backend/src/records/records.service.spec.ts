@@ -1521,6 +1521,60 @@ describe('RecordsService', () => {
     expectNoRecordWrites(prisma);
   });
 
+  it('season order records carry each SELL fill’s stored realized PnL; null stays unknown', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    mockJoined(prisma);
+    const sell = (id: string, realizedPnl: Prisma.Decimal | null) => ({
+      id,
+      assetId: 'asset-1',
+      submittedAt: occurredAt,
+      executedAt: occurredAt,
+      canceledAt: null,
+      rejectedAt: null,
+      rejectReason: null,
+      side: OrderSide.sell,
+      orderType: OrderType.market,
+      status: OrderStatus.executed,
+      quantity: new Prisma.Decimal('1.00000000'),
+      limitPrice: null,
+      executedPrice: new Prisma.Decimal('200.00000000'),
+      currencyCode: CurrencyCode.USD,
+      grossAmount: new Prisma.Decimal('200.00000000'),
+      feeAmount: new Prisma.Decimal('0.20000000'),
+      netAmount: new Prisma.Decimal('199.80000000'),
+      realizedPnl,
+      asset: {
+        symbol: 'AAPL',
+        name: 'Apple Inc.',
+        market: 'NASDAQ',
+        assetType: AssetType.us_stock,
+      },
+    });
+    prisma.order.count.mockResolvedValueOnce(3);
+    prisma.order.findMany.mockResolvedValueOnce([
+      sell('sell-gain', new Prisma.Decimal('9.61')),
+      sell('sell-zero', new Prisma.Decimal('0')),
+      sell('sell-legacy', null),
+    ]);
+
+    const response = await service.getMySeasonOrders('user-1', 'season-1', {});
+
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ realizedPnl: true }),
+      }),
+    );
+    expect(
+      response.data.orders.map((order) => [order.orderId, order.realizedPnl]),
+    ).toEqual([
+      ['sell-gain', '9.61000000'],
+      ['sell-zero', '0.00000000'],
+      ['sell-legacy', null],
+    ]);
+    expectNoRecordWrites(prisma);
+  });
+
   it('returns not_joined with empty order records for an unjoined season', async () => {
     const { prisma, service } = createService();
     prisma.season.findUnique.mockResolvedValueOnce(season);

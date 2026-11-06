@@ -75,6 +75,7 @@ export function toRecordOrderItem(row: AccountOrderRow): RecordOrderItemDto {
     grossAmount: strOrNull(row.grossAmount),
     feeAmount: strOrNull(row.feeAmount),
     netAmount: str(row.netAmount),
+    realizedPnl: strOrNull(row.realizedPnl),
     reservedAmount: strOrNull(row.reservedAmount),
     reservedQuantity: strOrNull(row.reservedQuantity),
     reservationReleasedAt: strOrNull(row.reservationReleasedAt),

@@ -504,7 +504,13 @@ async function run() {
   );
 
   await price(asset, '110');
-  await marketOrder(ownerB, accountB, asset, 'sell', held.quantity.toFixed(8));
+  const closingSell = await marketOrder(
+    ownerB,
+    accountB,
+    asset,
+    'sell',
+    held.quantity.toFixed(8),
+  );
   const closedPosition = await db.position.findFirstOrThrow({
     where: { tradingAccountId: accountB, assetId: asset },
   });
@@ -932,6 +938,18 @@ async function run() {
   assert.equal(closedPosition.realizedPnl.gt(0), true, 'after a winning one');
   assert.equal(reclosed.realizedPnl.toFixed(8), money(epochRealized));
   assert.equal(reclosed.realizedPnlKrw.toFixed(8), money(epochRealizedKrw));
+  // Per-order realized PnL: the epoch's SELL stores exactly that result, and
+  // the reset (which re-based the row to 0) never rewrote the ended epoch's
+  // SELL, whose figure is still that whole first round trip.
+  assert.equal(epochSell.realizedPnl?.toFixed(8), money(epochRealized));
+  assert.equal(
+    (
+      await db.order.findUniqueOrThrow({
+        where: { id: closingSell.data.order.orderId },
+      })
+    ).realizedPnl?.toFixed(8),
+    closedPosition.realizedPnl.toFixed(8),
+  );
   const traded2 = await summary(ownerB, accountB);
   assert.equal(traded2.realizedPnlKrw, money(epochRealizedKrw));
   assert.equal(traded2.performanceEpoch.sequence, 1);

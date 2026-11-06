@@ -6961,7 +6961,8 @@ export const OrderScalarFieldEnum = {
   createdAt: 'createdAt',
   revisedAt: 'revisedAt',
   revision: 'revision',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  realizedPnl: 'realizedPnl'
 } as const
 
 export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]

@@ -3,7 +3,9 @@
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), assert = require('node:assert/strict');
 const esbuild = require('esbuild'), { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..'), out = process.env.RECORD_BROWSER_OUTPUT ?? '/tmp/trading-record-browser';
-const palette = { light: { red_blue: ['rgb(161, 62, 59)', 'rgb(49, 95, 155)'], green_red: ['rgb(22, 128, 58)', 'rgb(161, 62, 59)'] }, dark: { red_blue: ['rgb(255, 139, 134)', 'rgb(140, 186, 255)'], green_red: ['rgb(121, 214, 139)', 'rgb(255, 139, 134)'] } };
+// [rise, fall] direction text of src/theme/financialColors.ts FINANCIAL_PALETTES
+// (re-tuned 2026-10-12; this copy was the older palette until 2026-11-06).
+const palette = { light: { red_blue: ['rgb(200, 36, 30)', 'rgb(27, 94, 201)'], green_red: ['rgb(17, 128, 56)', 'rgb(200, 36, 30)'] }, dark: { red_blue: ['rgb(255, 107, 100)', 'rgb(100, 162, 255)'], green_red: ['rgb(78, 212, 114)', 'rgb(255, 107, 100)'] } };
 async function run() {
   fs.mkdirSync(out, { recursive: true });
   await esbuild.build({ entryPoints: [path.join(__dirname, 'recordFixture.jsx')], outfile: path.join(out, 'record.js'), bundle: true, minify: true, platform: 'browser', format: 'iife', nodePaths: [path.join(root, 'node_modules')], resolveExtensions: ['.web.tsx', '.tsx', '.web.ts', '.ts', '.web.js', '.js', '.jsx', '.json'], mainFields: ['browser', 'module', 'main'], define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' }, loader: { '.png': 'dataurl' }, plugins: [{ name: 'record-fixtures', setup(b) {
@@ -106,8 +108,18 @@ async function run() {
         // A BUY ends with 총액 = what it paid, fee included (2026-11-06; 총액·차감액 before).
         const buyRow = await id('record-order-item-order-1').innerText();
         assert.match(buyRow, /체결가[\s\S]*수수료[\s\S]*총액/);
-        assert.doesNotMatch(buyRow, /차감액|총액[\s\S]*수수료/);
+        assert.doesNotMatch(buyRow, /차감액|총액[\s\S]*수수료|실현손익/);
         assert.doesNotMatch(await page.locator('body').innerText(), /실제/);
+        // A SELL ends with its stored 실현손익 (2026-11-06; 총액·수령액 before): signed
+        // and colored, an exact 0 neutral, a sell without the figure 확인 불가 (never 0).
+        const sellRows = await Promise.all([2, 3, 4].map(i => id(`record-order-item-order-${i}`).innerText()));
+        for (const row of sellRows) assert.doesNotMatch(row, /총액|수령액/, `${tag}: a SELL has no 총액·수령액`);
+        assert.match(sellRows[0], long ? /수수료[\s\S]*실현손익\s+-1,234,567,890,123,456원/ : /수수료[\s\S]*실현손익\s+\+12,346원/);
+        assert.equal(await color(id('record-order-realized-pnl-order-2')), palette[appearance][preference][long ? 1 : 0]);
+        assert.match(sellRows[1], /수수료[\s\S]*실현손익\s+0원/);
+        assert.ok(!palette[appearance][preference].includes(await color(id('record-order-realized-pnl-order-3'))), `${tag}: 0 is neutral`);
+        assert.match(sellRows[2], /수수료[\s\S]*실현손익\s+확인 불가[\s\S]*주문별 손익 기록 전 거래예요/);
+        assert.doesNotMatch(sellRows[2], /0원/);
       }
       if (screen === 'futures') await futuresHistoryChecks(tag, width === 320 && fontScale === 2 && preference === 'red_blue' ? `${appearance}-${long ? 'long' : 'normal'}` : null);
       if (screen === 'ledger') await ledgerChecks(tag, fontScale === 1 && !long);

@@ -168,6 +168,7 @@ export const TEST_IDS = {
     orderFilterBuy: 'record-order-filter-buy',
     orderFilterSell: 'record-order-filter-sell',
     orderItem: (key: string) => `record-order-item-${key}`,
+    orderRealizedPnl: (key: string) => `record-order-realized-pnl-${key}`,
     orderCancel: (key: string) => `record-order-cancel-${key}`,
 
     exchangeListRetry: 'record-exchange-list-retry',

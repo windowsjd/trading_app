@@ -1495,6 +1495,11 @@ model Order {
   revisedAt                  DateTime?    @map("revised_at")
   revision                   Int          @default(0)
   updatedAt                  DateTime     @updatedAt @map("updated_at")
+  // Confirmed realized PnL of THIS SELL fill in the order's settlement currency:
+  // the exact delta the fill transaction added to positions.realized_pnl. Null =
+  // not a SELL fill (buy, unfilled, canceled) or one committed before the column
+  // existed (no backfill). docs/orders-api-contract.md 「Per-order realized PnL」.
+  realizedPnl                Decimal?     @map("realized_pnl") @db.Decimal(24, 8)
 
   tradingAccount       TradingAccount             @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset                Asset                      @relation(fields: [assetId], references: [id], onDelete: Restrict)

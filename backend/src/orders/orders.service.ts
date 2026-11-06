@@ -2941,6 +2941,7 @@ export class OrdersService {
           grossAmount: true,
           feeAmount: true,
           netAmount: true,
+          realizedPnl: true,
           assetPriceSnapshotId: true,
           fxRateSnapshotId: true,
           reservedAmount: true,
@@ -3003,6 +3004,7 @@ export class OrdersService {
       },
       select: {
         ...ORDER_EXECUTION_SELECT,
+        realizedPnl: true,
         assetPriceSnapshot: {
           select: {
             sourceType: true,
@@ -3111,6 +3113,7 @@ export class OrdersService {
           grossAmount: true,
           feeAmount: true,
           netAmount: true,
+          realizedPnl: true,
           assetPriceSnapshotId: true,
           fxRateSnapshotId: true,
           reservedAmount: true,
@@ -3200,6 +3203,7 @@ export class OrdersService {
       },
       select: {
         ...ORDER_EXECUTION_SELECT,
+        realizedPnl: true,
         assetPriceSnapshot: {
           select: {
             sourceType: true,
@@ -4689,7 +4693,12 @@ export class OrdersService {
         id: true,
       },
     });
-    const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+    const finalizedOrder = await this.finalizeExecutedOrder(
+      tx,
+      order,
+      plan,
+      realizedPnlDelta,
+    );
     await reconcileSpotProtection(
       tx,
       tradingAccountId,
@@ -5835,6 +5844,10 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     order: OrderExecutionRecord,
     plan: OrderExecutionPlan,
+    // A SELL passes the realized PnL its position update just applied, so the
+    // order keeps that exact figure in the statement that marks it executed.
+    // Buys pass nothing and realized_pnl stays null.
+    realizedPnl?: Prisma.Decimal,
   ): Promise<OrderExecutionRecord> {
     setAdminDiagnosticContext({
       failureStage: 'order_finalization',
@@ -5872,6 +5885,9 @@ export class OrdersService {
         grossAmount: this.formatDecimal(plan.grossAmount, monetaryScale),
         feeAmount: this.formatDecimal(plan.feeAmount, monetaryScale),
         netAmount: this.formatDecimal(plan.netAmount, monetaryScale),
+        ...(realizedPnl === undefined
+          ? {}
+          : { realizedPnl: this.formatDecimal(realizedPnl, monetaryScale) }),
         assetPriceSnapshotId: plan.assetPriceSnapshotId,
         fxRateSnapshotId: plan.fxRateSnapshotId,
         executedAt: plan.executedAt,

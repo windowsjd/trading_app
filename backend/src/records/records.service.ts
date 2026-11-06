@@ -339,6 +339,7 @@ type RecordsResponse = {
         grossAmount: string | null;
         feeAmount: string | null;
         netAmount: string | null;
+        realizedPnl: string | null;
         assetPriceSnapshotId: string | null;
         fxRateSnapshotId: string | null;
         createdAt: string;
@@ -458,6 +459,7 @@ type MySeasonOrdersResponse = {
       grossAmount: string | null;
       feeAmount: string | null;
       netAmount: string | null;
+      realizedPnl: string | null;
       reservedAmount: string | null;
       reservationReleasedAt: string | null;
       cancelReason: string | null;
@@ -1127,6 +1129,7 @@ export class RecordsService {
           grossAmount: true,
           feeAmount: true,
           netAmount: true,
+          realizedPnl: true,
           reservedAmount: true,
           reservationReleasedAt: true,
           submittedAt: true,
@@ -1174,6 +1177,7 @@ export class RecordsService {
           grossAmount: this.formatNullableDecimal(order.grossAmount, 8),
           feeAmount: this.formatNullableDecimal(order.feeAmount, 8),
           netAmount: this.formatNullableDecimal(order.netAmount, 8),
+          realizedPnl: this.formatNullableDecimal(order.realizedPnl, 8),
           reservedAmount: this.formatNullableDecimal(order.reservedAmount, 8),
           reservationReleasedAt: this.formatNullableDate(
             order.reservationReleasedAt,
@@ -2539,6 +2543,7 @@ export class RecordsService {
           grossAmount: true,
           feeAmount: true,
           netAmount: true,
+          realizedPnl: true,
           assetPriceSnapshotId: true,
           fxRateSnapshotId: true,
           createdAt: true,
@@ -2576,6 +2581,7 @@ export class RecordsService {
         grossAmount: this.formatNullableDecimal(record.grossAmount, 8),
         feeAmount: this.formatNullableDecimal(record.feeAmount, 8),
         netAmount: this.formatNullableDecimal(record.netAmount, 8),
+        realizedPnl: this.formatNullableDecimal(record.realizedPnl, 8),
         assetPriceSnapshotId: record.assetPriceSnapshotId,
         fxRateSnapshotId: record.fxRateSnapshotId,
         createdAt: record.createdAt.toISOString(),
