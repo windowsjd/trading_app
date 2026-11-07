@@ -15,7 +15,9 @@ import type { AssetType } from '../../features/market/api';
 import AccountSetupPanel from '../../components/tradingAccount/AccountSetupPanel';
 import GeneralAccountHome from './GeneralAccountHome';
 import SeasonAccountHome from './SeasonAccountHome';
-import GeneralRewardSheet, { HomeRewardButton } from './GeneralRewardSheet';
+import GeneralRewardSheet from './GeneralRewardSheet';
+import { HomeHeaderActions, HomeHeaderTitle } from './HomeHeader';
+import { useHomeCommunityHot } from './HomeCommunityTicker';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -57,19 +59,30 @@ export default function HomeScreen({ navigation }: Props) {
   } = useTradingAccount();
   const accountContext = useHomeAccountContext(selectedAccount);
   const hot = useHomeHotMarket(!!selectedAccount);
+  const communityHot = useHomeCommunityHot(!!selectedAccount);
   const { mode } = useAppearance();
   const focused = useIsFocused();
   // 보상 (2026-10-20): general accounts only — never season or beginner.
   const rewardAccount = selectedAccount?.mode === 'general' ? selectedAccount : null;
   const rewardAccountId = rewardAccount?.id ?? null;
   const [rewardOpen, setRewardOpen] = useState(false);
+  // Header (2026-11-07): the mode title at the left (it opens the account
+  // sheet) and the mode's buttons at the right — 퀘스트 (beginner), 가이드 +
+  // 보상 (general), none (season). Without a usable account (none, loading,
+  // a failed read) only the 홈 title stays. Keyed by account: a switch
+  // remounts the title control like the body.
+  const headerAccount = !accountsLoading && !accountsError && selectedAccount ? selectedAccount : null;
+  const headerAccountId = headerAccount?.id ?? null;
+  const headerMode = headerAccount ? (headerAccount.mode === 'beginner' || headerAccount.mode === 'general' ? headerAccount.mode : 'season') : null;
   useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: rewardAccountId
-        ? () => <HomeRewardButton onPress={() => setRewardOpen(true)} />
-        : undefined,
-    });
-  }, [navigation, rewardAccountId]);
+    navigation.setOptions(headerMode && headerAccountId ? {
+      headerTitle: () => null,
+      headerLeft: () => <HomeHeaderTitle key={headerAccountId} mode={headerMode} />,
+      headerRight: headerMode === 'season' ? undefined : () => (
+        <HomeHeaderActions mode={headerMode} onReward={rewardAccountId ? () => setRewardOpen(true) : undefined} />
+      ),
+    } : { headerTitle: undefined, headerLeft: undefined, headerRight: undefined });
+  }, [headerAccountId, headerMode, navigation, rewardAccountId]);
   // The sheet never stays over another tab, and belongs to one account.
   useEffect(() => {
     if (!focused) setRewardOpen(false);
@@ -140,6 +153,7 @@ export default function HomeScreen({ navigation }: Props) {
             onOpenAsset={openAsset}
             accountContext={accountContext}
             hot={hot}
+            communityHot={communityHot}
             onOpenMarket={openMarket}
           />
         ) : (
@@ -149,6 +163,7 @@ export default function HomeScreen({ navigation }: Props) {
             capabilities={capabilities}
             accountContext={accountContext}
             hot={hot}
+            communityHot={communityHot}
             onOpenMarket={openMarket}
             onOpenFinalResult={(seasonId) =>
               rootNavigation.navigate('SeasonFinalResult', { seasonId })

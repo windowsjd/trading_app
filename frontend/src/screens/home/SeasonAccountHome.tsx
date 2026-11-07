@@ -30,6 +30,7 @@ import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
 import HomeHoldings, { useHomeHoldings } from './HomeHoldings';
 import HomeHotMarket, { type HomeHotMarketData } from './HomeHotMarket';
+import HomeCommunityTicker, { type HomeCommunityHotData } from './HomeCommunityTicker';
 import HomeAccountContext, { HomeTierBadge, HomeTierName, type HomeAccountContextData } from './HomeAccountContext';
 import type { AssetType } from '../../features/market/api';
 
@@ -66,6 +67,8 @@ type Props = {
   onOpenMarket: (assetType: AssetType) => void;
   accountContext: HomeAccountContextData;
   hot: HomeHotMarketData;
+  /** The HOT community card under the total assets (2026-11-07). */
+  communityHot: HomeCommunityHotData;
 };
 
 export default function SeasonAccountHome({
@@ -76,6 +79,7 @@ export default function SeasonAccountHome({
   onOpenMarket,
   accountContext,
   hot,
+  communityHot,
 }: Props) {
   const accountId = account.id;
   const [trendExpanded, setTrendExpanded] = useState(false);
@@ -111,6 +115,7 @@ export default function SeasonAccountHome({
     { ...holdings.fullQuery, enabled: holdings.expanded },
     ...accountContext.refreshQueries,
     hot.refreshQuery,
+    communityHot.refreshQuery,
     { ...equityQuery, enabled: trendExpanded },
   ]);
 
@@ -235,9 +240,9 @@ export default function SeasonAccountHome({
           general={false}
           trailing={<HomeTierName context={accountContext} />}
         />
-
-        <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
       </View>
+      <HomeCommunityTicker hot={communityHot} season />
+      <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
       <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
 
       {/* Results, not rewards: 내 뱃지 and the reward history stay on MY. */}

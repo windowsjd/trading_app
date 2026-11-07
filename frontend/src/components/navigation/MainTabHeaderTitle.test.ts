@@ -10,7 +10,7 @@ const navigationTheme = { useTheme: () => ({ fonts: { heavy: { fontFamily: 'Syst
 
 for (const [stack, root, label, icon] of [
   ['Home', 'Home', '홈', 'home'], ['Market', 'Market', '마켓', 'market'],
-  ['Guide', 'Guide', '가이드', 'guide'], ['Ranking', 'Ranking', '랭킹', 'ranking'],
+  ['Guide', 'Guide', '가이드', 'guide'], ['Community', 'Community', '커뮤니티', 'community'],
   ['Wallet', 'Wallet', '지갑', 'wallet'], ['My', 'Overall', '전체', 'menu'],
 ]) {
   test(`${stack}: only the root title reuses its tab icon; detail headers and transitions stay native`, () => {
@@ -103,6 +103,82 @@ test('Quest: the beginner root reuses the shared tab title with its own quest ic
   // General accounts keep the guide book on the same stack.
   const general = elements(stack.default(), 'Screen').find(screen => screen.props.name === 'Guide');
   assert.equal(general.props.options.headerTitle({ children: '가이드' }).props.icon, 'guide');
+});
+
+test('Quest and member Guide roots go back to Home; the guest Guide tab root has no back button', () => {
+  const file = resolve('src/app/navigation/GuideStack.tsx');
+  const stack = load(file, {
+    'react-native': native,
+    '@react-navigation/native-stack': { createNativeStackNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
+    '@react-navigation/elements': { HeaderTitle: 'HeaderTitle' },
+    '@react-navigation/native': navigationTheme,
+    'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
+    '../../theme/useReducedMotion': { useReducedMotion: () => true },
+    '../../components/navigation/HeaderHomeBackButton': { default: 'HeaderHomeBackButton', __esModule: true },
+    '../../components/states/ScreenErrorBoundary': { default: ({ children }: { children: unknown }) => children, __esModule: true },
+    ...Object.fromEntries([...readFileSync(file, 'utf8').matchAll(/import (\w+) from '(\.\.\/\.\.\/screens\/[^']+)'/g)]
+      .map(match => [match[2], { default: match[1], __esModule: true }])),
+  });
+  assert.deepEqual([stack.QuestStack().props.beginner, stack.QuestStack().props.homeBack], [true, true]);
+  assert.deepEqual([stack.MemberGuideStack().props.beginner, stack.MemberGuideStack().props.homeBack], [undefined, true]);
+  for (const props of [{ beginner: true, homeBack: true }, { homeBack: true }]) {
+    const screens = elements(stack.default(props), 'Screen');
+    const root = screens.find(screen => screen.props.name === 'Guide');
+    const back = root.props.options.headerLeft({ tintColor: '#f2f5f7' });
+    assert.equal(back.type, 'HeaderHomeBackButton');
+    assert.equal(back.props.tintColor, '#f2f5f7');
+    // Only the first screen: lessons keep the stack's own back button.
+    for (const screen of screens) if (screen !== root) assert.equal(screen.props.options.headerLeft, undefined, screen.props.name);
+  }
+  const guest = elements(stack.default(), 'Screen').find(screen => screen.props.name === 'Guide');
+  assert.equal(guest.props.options.headerLeft, undefined);
+});
+
+test('리그: the root header shows 랭킹 | 커뮤니티 at the left from the section param; pushed screens stay native', () => {
+  const file = resolve('src/app/navigation/RankingStack.tsx');
+  const stack = load(file, {
+    'react-native': native,
+    '@react-navigation/native-stack': { createNativeStackNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
+    '../../theme/useReducedMotion': { useReducedMotion: () => true },
+    '@react-navigation/native': navigationTheme,
+    '@react-navigation/elements': { HeaderTitle: 'HeaderTitle' },
+    '../../components/navigation/LeagueSectionTabs': { default: 'LeagueSectionTabs', __esModule: true },
+    '../../components/states/ScreenErrorBoundary': { default: ({ children }: { children: unknown }) => children, __esModule: true },
+    ...Object.fromEntries([...readFileSync(file, 'utf8').matchAll(/import (\w+) from '(\.\.\/\.\.\/screens\/[^']+)'/g)]
+      .map(match => [match[2], { default: match[1], __esModule: true }])),
+  });
+  const screens = elements(stack.default(), 'Screen');
+  assert.deepEqual(screens.map(screen => [screen.props.name, screen.props.component]), [
+    ['Ranking', 'LeagueScreen'], ['UserSeasonSummary', 'UserSeasonSummaryScreen'],
+    ['PostDetail', 'PostDetailScreen'], ['PostCompose', 'PostComposeScreen'],
+  ]);
+  const params: unknown[] = [];
+  const navigation = { setParams: (value: unknown) => params.push(value) };
+  for (const [section, expected] of [[undefined, 'ranking'], ['ranking', 'ranking'], ['community', 'community']]) {
+    const options = screens[0].props.options({ route: { name: 'Ranking', params: section ? { section } : undefined }, navigation });
+    assert.equal(options.title, '리그');
+    assert.equal(options.headerTitle(), null, 'the tabs take the title place at the left (both platforms)');
+    const tabs = options.headerLeft();
+    assert.equal(tabs.type, 'LeagueSectionTabs');
+    assert.equal(tabs.props.section, expected);
+    tabs.props.onChange('community');
+  }
+  assert.deepEqual(params, [{ section: 'community' }, { section: 'community' }, { section: 'community' }]);
+  assert.deepEqual(screens.slice(1).map(screen => screen.props.options.title), ['유저 시즌 요약', '커뮤니티', '글쓰기']);
+  for (const screen of screens.slice(1)) {
+    assert.equal(screen.props.options.headerLeft, undefined);
+    assert.equal(screen.props.options.headerTitle, undefined);
+  }
+});
+
+test('the community stack registers the same post screens and 유저 시즌 요약 title as the 리그 stack', () => {
+  const community = readFileSync(resolve('src/app/navigation/CommunityStack.tsx'), 'utf8');
+  const ranking = readFileSync(resolve('src/app/navigation/RankingStack.tsx'), 'utf8');
+  for (const source of [community, ranking]) {
+    assert.match(source, /name="PostDetail" component=\{PostDetailScreen\} options=\{\{ title: '커뮤니티' \}\}/);
+    assert.match(source, /name="PostCompose" component=\{PostComposeScreen\} options=\{\{ title: '글쓰기' \}\}/);
+    assert.match(source, /name="UserSeasonSummary"\s+component=\{UserSeasonSummaryScreen\}\s+options=\{\{ title: '유저 시즌 요약' \}\}/);
+  }
 });
 
 function MainTabTitle(stack) {

@@ -140,7 +140,7 @@ function createHomeHarness(mode = 'general') {
     ...Object.fromEntries(
       ['AccountSwitcher', 'AccountSetupPanel'].map((name) => [
         '../../components/tradingAccount/' + name,
-        { default: name, __esModule: true },
+        { default: name, ...(name === 'AccountSwitcher' ? { HomeAccountNotices: () => null } : {}), __esModule: true },
       ]),
     ),
     '../../components/common/CTAButton': {
@@ -151,6 +151,9 @@ function createHomeHarness(mode = 'general') {
     // The 보상 sheet and header button have their own harness (GeneralRewardSheet.test.ts).
     './GeneralRewardSheet': { default: 'GeneralRewardSheet', HomeRewardButton: 'HomeRewardButton', __esModule: true },
     './SeasonAccountHome': { default: 'SeasonAccountHome', __esModule: true },
+    // Home's header controls and the HOT community card have their own tests.
+    './HomeHeader': { __esModule: true, HomeHeaderTitle: 'HomeHeaderTitle', HomeHeaderActions: 'HomeHeaderActions' },
+    './HomeCommunityTicker': { __esModule: true, default: 'HomeCommunityTicker', useHomeCommunityHot: () => ({ query: { isLoading: false }, refreshQuery: { isFetching: false, refetch: async () => {}, enabled: false } }) },
   };
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
   let observers = [];

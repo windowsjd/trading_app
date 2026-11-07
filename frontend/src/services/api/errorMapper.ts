@@ -640,6 +640,60 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.FINAL_RESULTS_INTEGRITY:
     case ERROR_CODE.AD_REWARD_CLAIM_INTEGRITY:
       return '계정 데이터에 문제가 발견되어 안전하게 조회를 중단했습니다. 잠시 후 다시 시도하고, 계속되면 고객센터에 문의해주세요.';
+    // 커뮤니티 (2026-11-07).
+    case ERROR_CODE.INVALID_COMMUNITY_CATEGORY:
+    case ERROR_CODE.INVALID_COMMUNITY_SORT:
+      return '목록을 불러오지 못했습니다. 다시 시도해주세요.';
+    case ERROR_CODE.INVALID_COMMUNITY_POST:
+      return '글 내용을 다시 확인해주세요. 본문은 1~500자로 입력할 수 있어요.';
+    case ERROR_CODE.INVALID_COMMUNITY_COMMENT:
+      return '댓글 내용을 다시 확인해주세요. 댓글은 1~300자로 입력할 수 있어요.';
+    case ERROR_CODE.COMMUNITY_LINK_NOT_ALLOWED:
+      return '링크나 오픈채팅·메신저 주소는 올릴 수 없어요.';
+    case ERROR_CODE.INVALID_COMMUNITY_PHOTO:
+      return '올릴 수 없는 사진이에요. 다른 사진을 선택해주세요.';
+    case ERROR_CODE.COMMUNITY_TOO_MANY_PHOTOS:
+      return '사진은 최대 4장까지 올릴 수 있어요.';
+    case ERROR_CODE.COMMUNITY_PHOTO_TOO_LARGE:
+      return '사진 용량이 너무 커요. 다른 사진을 선택해주세요.';
+    case ERROR_CODE.INVALID_COMMUNITY_REPORT:
+      return '신고 사유를 다시 선택해주세요.';
+    case ERROR_CODE.INVALID_COMMUNITY_RULES_VERSION:
+      return '이용규칙이 바뀌었어요. 다시 확인해주세요.';
+    case ERROR_CODE.INVALID_COMMUNITY_MODERATION:
+      return '처리 사유를 선택해주세요. 기타 사유는 메모가 필요해요.';
+    case ERROR_CODE.COMMUNITY_RULES_NOT_ACCEPTED:
+      return '커뮤니티 이용규칙에 동의한 뒤 이용할 수 있어요.';
+    case ERROR_CODE.COMMUNITY_RESTRICTED:
+      return '커뮤니티 이용이 제한되어 글·댓글·좋아요·신고를 할 수 없어요.';
+    case ERROR_CODE.OPERATOR_FORBIDDEN:
+      return '운영자만 할 수 있는 작업이에요.';
+    case ERROR_CODE.COMMUNITY_SANCTION_TARGET_FORBIDDEN:
+      return '운영자·관리자 계정이나 내 계정은 제한할 수 없어요.';
+    case ERROR_CODE.COMMUNITY_POST_NOT_FOUND:
+      return '삭제되었거나 볼 수 없는 글이에요.';
+    case ERROR_CODE.COMMUNITY_COMMENT_NOT_FOUND:
+      return '삭제되었거나 볼 수 없는 댓글이에요.';
+    case ERROR_CODE.COMMUNITY_SANCTION_NOT_FOUND:
+      return '이용 제한 정보를 찾을 수 없어요.';
+    case ERROR_CODE.TARGET_USER_NOT_FOUND:
+      return '계정을 찾을 수 없어요.';
+    case ERROR_CODE.COMMUNITY_SELF_REACTION:
+      return '내 글이나 댓글에는 좋아요를 누를 수 없어요.';
+    case ERROR_CODE.COMMUNITY_SELF_REPORT:
+      return '내 글이나 댓글은 신고할 수 없어요.';
+    case ERROR_CODE.COMMUNITY_IDEMPOTENCY_CONFLICT:
+      return '이전 요청과 내용이 달라 등록하지 못했어요. 다시 등록해주세요.';
+    case ERROR_CODE.COMMUNITY_DUPLICATE_CONTENT:
+      return '같은 내용을 방금 올렸어요. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.COMMUNITY_SANCTION_ALREADY_ACTIVE:
+      return '이미 커뮤니티 이용이 제한된 계정이에요.';
+    case ERROR_CODE.COMMUNITY_RATE_LIMITED:
+      return '짧은 시간에 너무 많이 올렸어요. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.COMMUNITY_PHOTO_STORAGE_UNAVAILABLE:
+      return '지금은 사진을 올릴 수 없어요. 사진 없이 올리거나 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.COMMUNITY_PHOTO_UPLOAD_FAILED:
+      return '사진을 올리지 못했어요. 잠시 후 다시 등록해주세요.';
     default:
       return options?.fallbackToGeneric === false
         ? null

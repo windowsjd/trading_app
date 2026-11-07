@@ -52,8 +52,8 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
     },
     '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
     '../../components/common/ScreenSheetHost': { ScreenSheetHost: 'ScreenSheetHost' },
-    ...Object.fromEntries(['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My', 'Modes'].map((name) => [
-      `./${name}Stack`, { default: `${name}Stack`, __esModule: true },
+    ...Object.fromEntries(['Home', 'Market', 'Guide', 'Ranking', 'Community', 'Wallet', 'My', 'Modes'].map((name) => [
+      `./${name}Stack`, { default: `${name}Stack`, MemberGuideStack: 'MemberGuideStack', QuestStack: 'QuestStack', __esModule: true },
     ])),
   }).default;
   // The navigator renders inside the tab screens' bottom-sheet host (beside the 앱 업데이트 안내).
@@ -70,14 +70,23 @@ describe('bottom tab touch feedback', () => {
         const policy = tabTransition(false, platform);
         assert.equal(tree.props.screenOptions.animation, policy.animation);
         assert.deepEqual(tree.props.screenOptions.transitionSpec, policy.transitionSpec);
-        const screens = elements(tree, 'Screen');
-        assert.deepEqual(screens.map((node: any) => node.props.name), [
+        // The general member's 가이드 is a hidden route after the five (no button: tabBarButton returns null).
+        const all = elements(tree, 'Screen');
+        const screens = all.filter((node: any) => node.props.name !== 'GuideTab' || mode !== 'general');
+        assert.deepEqual(all.map((node: any) => node.props.name), [
           'HomeTab',
           'MarketTab',
-          mode === 'general' ? 'GuideTab' : 'RankingTab',
+          mode === 'general' ? 'CommunityTab' : 'RankingTab',
           'WalletTab',
           'MyTab',
+          ...(mode === 'general' ? ['GuideTab'] : []),
         ]);
+        // iOS announces each visible tab's place among the five, not among every route.
+        screens.forEach((screen: any, index: number) => {
+          const options = typeof screen.props.options === 'function'
+            ? screen.props.options({ route: { name: screen.props.name } }) : screen.props.options;
+          assert.equal(options.tabBarAccessibilityLabel, platform === 'ios' ? `${options.title}, tab, ${index + 1} of 5` : undefined);
+        });
         for (const screen of screens) {
           const options = typeof screen.props.options === 'function'
             ? screen.props.options({ route: { name: screen.props.name, params: { screen: 'Market' } } })

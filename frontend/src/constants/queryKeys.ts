@@ -18,6 +18,22 @@ export const QUERY_KEYS = {
      * session can never read them, independent of the teardown clear. */
     preferences: (userId: string) => ['notifications', 'preferences', userId] as const,
   },
+  /**
+   * 커뮤니티 (2026-11-07). Every read is the signed-in member's view (`mine`,
+   * `likedByMe`, an operator's fields), so each key carries that user. The
+   * feed and comment lists are infinite; the post, bootstrap and Home's HOT
+   * preview are single reads with their own factories.
+   */
+  community: {
+    all: ['community'] as const,
+    bootstrap: (userId: string) => ['community', 'bootstrap', userId] as const,
+    feed: (userId: string, category: string) => ['community', 'feed', userId, category, 'infinite'] as const,
+    hotPreview: (userId: string) => ['community', 'hot-preview', userId] as const,
+    post: (userId: string, postId: string) => ['community', 'post', userId, postId] as const,
+    comments: (userId: string, postId: string, sort: string) => ['community', 'comments', userId, postId, sort, 'infinite'] as const,
+    /** Operator account management (계정 관리) of one member. */
+    operatorUser: (userId: string, targetUserId: string) => ['community', 'operator-user', userId, targetUserId] as const,
+  },
   /** Operator-published important notices (공지사항, alongside the app's own). */
   notices: { important: ['notices', 'important'] as const },
   /** 앱 업데이트 안내: the store-published latest version per platform (public). */

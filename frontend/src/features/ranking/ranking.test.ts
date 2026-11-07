@@ -463,7 +463,10 @@ function prepareAccountScreens(h: ReturnType<typeof createHarness>) {
     season: { seasonId: 'season-1', seasonName: 'Season 1', seasonStatus: 'active', participantStatus: 'active' },
   };
   h.mockLocal('features/tradingAccount/TradingAccountContext', { useTradingAccount: () => ({ selectedAccount: account, isLoading: false }) });
-  h.mockLocal('components/tradingAccount/AccountSwitcher', { __esModule: true, default: ({ children, homeVisual, homeVisualCaption }: any) => React.createElement(React.Fragment, null, children, homeVisual, homeVisualCaption) });
+  h.mockLocal('components/tradingAccount/AccountSwitcher', { __esModule: true, default: ({ children, homeVisual, homeVisualCaption }: any) => React.createElement(React.Fragment, null, children, homeVisual, homeVisualCaption), HomeAccountNotices: () => null });
+  // Home's header controls and HOT community card (their own tests).
+  h.mockLocal('screens/home/HomeHeader', { __esModule: true, HomeHeaderTitle: 'HomeHeaderTitle', HomeHeaderActions: 'HomeHeaderActions' });
+  h.mockLocal('screens/home/HomeCommunityTicker', { __esModule: true, default: 'HomeCommunityTicker', useHomeCommunityHot: () => ({ query: { isLoading: false }, refreshQuery: { isFetching: false, refetch: async () => {}, enabled: false } }) });
   h.mockLocal('components/tradingAccount/AccountSetupPanel', { __esModule: true, default: () => null });
   h.mockLocal('features/auth/useLogout', { useLogout: () => () => Promise.resolve() });
   h.mockLocal('components/charts', { DonutChart: () => null, LineChart: () => null });

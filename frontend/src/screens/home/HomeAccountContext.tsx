@@ -7,7 +7,7 @@ import { TEST_IDS } from '../../constants/testIds';
 import type { TradingAccountDto } from '../../features/tradingAccount/api';
 import { getMe } from '../../features/me/api';
 import { getRankings, getRankingTier } from '../../features/ranking/api';
-import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
+import { HomeAccountNotices } from '../../components/tradingAccount/AccountSwitcher';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
@@ -54,25 +54,27 @@ function readSeasonStanding(context: HomeAccountContextData, mode: 'light' | 'da
 }
 
 /**
- * One account box for general, beginner and season accounts: the mode or
- * season title and the change action on top, the profile right below. The
- * rank lives on the Ranking tab; the season tier is shown next to the total
- * assets (HomeTierBadge).
+ * The profile row under Home's header (2026-11-07): the mode or season title
+ * and the change action moved to the header (AccountSwitcher homeHeader), so
+ * this is the avatar and nickname on the canvas, then any account or season
+ * notice and the ranking read's failure. The rank lives on the 리그 tab; the
+ * season tier is shown next to the total assets (HomeTierBadge).
  */
 export default function HomeAccountContext({ context }: { context: HomeAccountContextData }) {
   const { meQuery, rankingQuery, hasSeason } = context;
   return (
-    <AccountSwitcher home>
+    <View style={styles.context} testID={TEST_IDS.home.accountContext}>
       <View style={styles.identity}>
         {meQuery.isLoading ? <View style={styles.flex}><SectionSkeleton lines={1} /></View> : meQuery.data ? <>
           <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={32} testID="home-profile-avatar" />
           <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
         </> : <View style={styles.flex}><InlineEmptyState message="사용자 정보를 불러오지 못했습니다." /></View>}
       </View>
+      <HomeAccountNotices />
       {/* The tier still reads this ranking row; its failure keeps its own diagnostic. */}
       {hasSeason && rankingQuery.isError
         ? <ErrorNotice error={rankingQuery.error} message="랭킹 정보를 불러오지 못했습니다." style={styles.notice} /> : null}
-    </AccountSwitcher>
+    </View>
   );
 }
 
@@ -132,9 +134,11 @@ export function HomeTierName({ context }: { context: HomeAccountContextData }) {
 }
 
 const styles = StyleSheet.create({
+  // No card: one row on the canvas, 20 below the header (the content's 16 + 4).
+  context: { marginTop: 4, gap: 8 },
   flex: { flex: 1, minWidth: 0 },
-  identity: { flexDirection: 'row', alignItems: 'center', columnGap: 10, minWidth: 0 },
-  nickname: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 16, fontWeight: '600', lineHeight: 24 },
+  identity: { flexDirection: 'row', alignItems: 'center', columnGap: 10, minWidth: 0, minHeight: 32 },
+  nickname: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 16, fontWeight: '700', lineHeight: 24 },
   tier: { alignItems: 'center', flexShrink: 0 },
   tierNameColumn: { maxWidth: '100%', flexShrink: 1, alignItems: 'center' },
   // The same size and weight as the 보유종목 및 포지션 heading (HomeHoldings).

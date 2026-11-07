@@ -61,15 +61,38 @@ type Props = {
   /** Compact trigger for headers; the sheet is identical either way. */
   compact?: boolean;
   /**
-   * Home's account box, identical for general, beginner and season accounts:
-   * title and change action on top, the caller's profile row below, sized to
-   * its content. The season tier lives beside Home's total assets instead.
+   * Home's header title (2026-11-07), identical for general, beginner and
+   * season accounts: one 44dp control with the mode or season title (20/700,
+   * a season's beta pill kept) and a 28×28 change chip; it opens the same
+   * account sheet. The title stays on one line (the header has one); the
+   * sheet shows every name in full. Status notices are HomeAccountNotices.
    */
-  home?: boolean;
-  children?: React.ReactNode;
+  homeHeader?: boolean;
+  /** Home header only: the width the title may take beside the header's actions. */
+  maxWidth?: number;
 };
 
-export default function AccountSwitcher({ compact = false, home = false, children }: Props) {
+/**
+ * The selected account's state Home must not hide (2026-11-07: under the
+ * profile row, since the header keeps one line): a paused or closed account,
+ * a season not running or a participation not active.
+ */
+export function HomeAccountNotices() {
+  const { selectedAccount } = useTradingAccount();
+  if (!selectedAccount) return null;
+  const display = getAccountDisplay(selectedAccount);
+  const season = selectedAccount.season;
+  const seasonNotice = selectedAccount.mode === 'season' && (!season || season.seasonStatus !== 'active' || season.participantStatus !== 'active');
+  if (selectedAccount.status === 'active' && !seasonNotice) return null;
+  return (
+    <View testID="home-account-notices" style={styles.homeNotices}>
+      {selectedAccount.status !== 'active' ? <Text style={styles.homeNotice}>계정 {display.statusLabel}</Text> : null}
+      {seasonNotice ? <Text style={styles.homeNotice}>{display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}</Text> : null}
+    </View>
+  );
+}
+
+export default function AccountSwitcher({ compact = false, homeHeader = false, maxWidth }: Props) {
   const { colors } = useAppearance();
   const {
     accounts,
@@ -157,41 +180,24 @@ export default function AccountSwitcher({ compact = false, home = false, childre
 
   return (
     <>
-      {home ? (
-        <View style={styles.homeContext} testID={TEST_IDS.home.accountContext}>
-          <View style={styles.homeContextRow}>
-            <SeasonTitle testID="home-account-title" containerStyle={{ flex: 1 }} style={styles.homeTitle} name={display.title} displayBadge={selectedAccount.mode === 'season' ? selectedAccount.season?.displayBadge : undefined} />
-            <ActionPressable
-              style={styles.homeChange}
-              // A compact 36dp mark keeps the 44dp touch target.
-              hitSlop={4}
-              onPress={() => setOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
-              testID={TEST_IDS.tradingAccount.switcherTrigger}
-            >
-              <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
-                  strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
-                  <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
-                </Svg>
-              </View>
-            </ActionPressable>
+      {homeHeader ? (
+        <ActionPressable
+          style={[styles.homeHeader, maxWidth ? { maxWidth } : null]}
+          onPress={() => setOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
+          testID={TEST_IDS.tradingAccount.switcherTrigger}
+        >
+          <SeasonTitle testID="home-account-title" numberOfLines={1} containerStyle={styles.homeHeaderTitleBox}
+            style={styles.homeTitle} maxFontSizeMultiplier={1.6} name={display.title}
+            displayBadge={selectedAccount.mode === 'season' ? selectedAccount.season?.displayBadge : undefined} />
+          <View style={styles.homeChange} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+              <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
+            </Svg>
           </View>
-          {selectedAccount.status !== 'active' ? (
-            <Text style={styles.homeNotice}>계정 {display.statusLabel}</Text>
-          ) : null}
-          {selectedAccount.mode === 'season' && (
-            !selectedAccount.season ||
-            selectedAccount.season.seasonStatus !== 'active' ||
-            selectedAccount.season.participantStatus !== 'active'
-          ) ? (
-            <Text style={styles.homeNotice}>
-              {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
-            </Text>
-          ) : null}
-          {children}
-        </View>
+        </ActionPressable>
       ) : (
         <ActionPressable
           style={styles.trigger}
@@ -352,30 +358,21 @@ const BADGE_TEXT_TONE = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  // Content-sized: the title row sits at the top inset, the profile right below.
-  homeContext: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 14,
-    borderRadius: 14,
-    // No outline: the transparent 1px border keeps the content inset unchanged.
-    borderWidth: 1,
-    borderColor: 'transparent',
-    backgroundColor: semantic.surface,
-    gap: 8,
-  },
-  homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  // A long season name wraps beside the fixed change mark; nothing truncates.
-  homeTitle: { minWidth: 0, fontSize: 18, fontWeight: '700', lineHeight: 26 },
+  // One 44dp target: the title and the change chip beside it, left-aligned.
+  homeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, minWidth: 0, flexShrink: 1 },
+  homeHeaderTitleBox: { flexWrap: 'nowrap', flexShrink: 1 },
+  // One line in the header; the full name is in the label and the sheet.
+  homeTitle: { minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
   homeChange: {
     flexShrink: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: semantic.raised,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: semantic.input,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  homeNotices: { gap: 2 },
   homeNotice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
   trigger: {
     flexDirection: 'row',

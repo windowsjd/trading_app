@@ -59,9 +59,32 @@ export type MarketStackParamList = {
   Order: { assetId: string; accountId: string; side?: 'buy' | 'sell' };
 };
 
-export type RankingStackParamList = {
-  Ranking: undefined;
+/**
+ * A community feed's entry (2026-11-07): `category` preselects a chip (Home's
+ * HOT card opens `hot`); `at` changes per entry so the same category applies
+ * again after the member chose another chip.
+ */
+export type CommunityFeedRouteParams = {
+  category?: import('../../features/community/api').CommunityFeedCategory;
+  at?: number;
+};
+
+/** The post screens both community stacks register under the same names. */
+export type CommunityPostRoutes = {
+  PostDetail: { postId: string };
+  PostCompose: { category?: import('../../features/community/api').CommunityCategory } | undefined;
   UserSeasonSummary: { userId: string };
+};
+
+/** 커뮤니티 tab (초보·일반 모드). */
+export type CommunityStackParamList = CommunityPostRoutes & {
+  Community: CommunityFeedRouteParams | undefined;
+};
+
+/** 리그 tab (시즌 모드): `section` switches 랭킹 | 커뮤니티 on the same root. */
+export type LeagueSection = 'ranking' | 'community';
+export type RankingStackParamList = CommunityPostRoutes & {
+  Ranking: (CommunityFeedRouteParams & { section?: LeagueSection }) | undefined;
 };
 
 export type GuideStackParamList = {
@@ -109,11 +132,16 @@ export type ModesStackParamList = {
 };
 
 export type MainTabParamList = {
+  /** Beginner mode: kept as a route (the quest guide is bound to it) but hidden from the tab bar; Home's 퀘스트 opens it. */
   QuestTab: NavigatorScreenParams<GuideStackParamList>;
   HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
   MarketTab: NavigatorScreenParams<MarketStackParamList> | undefined;
+  /** Guests see it in the tab bar; general mode hides it there and opens it from Home's 가이드. */
   GuideTab: NavigatorScreenParams<GuideStackParamList> | undefined;
+  /** Season mode's 리그 (랭킹 | 커뮤니티). */
   RankingTab: NavigatorScreenParams<RankingStackParamList> | undefined;
+  /** 커뮤니티 (beginner and general modes). */
+  CommunityTab: NavigatorScreenParams<CommunityStackParamList> | undefined;
   WalletTab: NavigatorScreenParams<WalletStackParamList> | undefined;
   MyTab: NavigatorScreenParams<MyStackParamList> | undefined;
   /** Guest browsing only: it takes MY's place (no account to show there). */

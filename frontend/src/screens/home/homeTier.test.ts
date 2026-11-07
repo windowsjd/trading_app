@@ -11,7 +11,9 @@ function setup() {
   const module = h.load('src/screens/home/HomeAccountContext.tsx', {
     '../../features/ranking/api': rankingApi,
     '../../features/me/api': { getMe() {} },
-    '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children, ...props }) => React.createElement('AccountSwitcher', props, children) },
+    // The mode title moved to Home's header (2026-11-07); the box keeps the account notices.
+    '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children, ...props }) => React.createElement('AccountSwitcher', props, children),
+      HomeAccountNotices: () => React.createElement('AccountNotices') },
     '../../components/states/SectionSkeleton': { __esModule: true, default: 'Skeleton' },
     '../../components/states/InlineEmptyState': { __esModule: true, default: 'Empty' },
     './AdminDiagnosticPanel': { __esModule: true, default: () => null },
@@ -30,7 +32,9 @@ function setup() {
     React.createElement('Trend', null, React.createElement(Name, { context })));
   const renderer = h.render(tree());
   const node = id => renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === id)[0];
-  return { h, context, renderer, node, update: () => act(() => renderer.update(tree())), close: () => act(() => renderer.unmount()) };
+  // Home's profile row (the account box under the header): avatar, nickname and notices.
+  const box = () => renderer.root.findAll(n => n.type === 'View' && n.props.testID === 'home-account-context')[0];
+  return { h, context, renderer, node, box, update: () => act(() => renderer.update(tree())), close: () => act(() => renderer.unmount()) };
 }
 
 for (const [canonical, name, id] of [
@@ -50,12 +54,14 @@ for (const [canonical, name, id] of [
   assert.equal(h.node('home-whale-wave') === undefined, true);
   // The emblem sits beside the total assets; Home's account box carries no tier art.
   assert.ok(h.renderer.root.findByType('Hero').findAll((n: any) => n.props.testID === `home-emblem-${id}`).length === 1);
-  assert.equal(h.renderer.root.findByType('AccountSwitcher').findAll((n: any) => n.props.testID === `home-emblem-${id}`).length, 0);
+  assert.equal(h.box().findAll((n: any) => n.props.testID === `home-emblem-${id}`).length, 0);
   // Its name sits on the asset trend disclosure's line, not inside the hero.
   assert.equal(h.renderer.root.findByType('Trend').findAll((n: any) => n.props.testID === 'home-tier').length > 0, true);
   assert.equal(h.renderer.root.findByType('Hero').findAll((n: any) => n.props.testID === 'home-tier').length, 0);
   assert.equal(h.node(`home-tier-background-${id}-light`) === undefined, true);
-  assert.deepEqual(Object.keys(h.renderer.root.findByType('AccountSwitcher').props).sort(), ['children', 'home']);
+  // The box no longer draws the account switcher (its title and change chip are the header's) but keeps the notices.
+  assert.equal(h.renderer.root.findAllByType('AccountSwitcher').length, 0);
+  assert.equal(h.box().findAllByType('AccountNotices').length, 1);
 });
 
 it('daily/final selection preserves the existing getRankingTier policy', t => {
@@ -92,7 +98,7 @@ for (const state of ['loading', 'error', 'null', 'unknown', 'response-unavailabl
     if (state === 'error') assert.equal(h.node('home-tier').props.children, '티어 확인 실패');
     assert.equal(h.node('home-rank') === undefined, true);
     // Only a failed read keeps a notice (with its own diagnostic) in the account box.
-    assert.equal(h.renderer.root.findByType('AccountSwitcher').findAll((n: any) => n.props.message === '랭킹 정보를 불러오지 못했습니다.').length > 0, state === 'error');
+    assert.equal(h.box().findAll((n: any) => n.props.message === '랭킹 정보를 불러오지 못했습니다.').length > 0, state === 'error');
   });
 }
 
@@ -132,7 +138,7 @@ it('general account has no tier, frame, background or rank; missing me does not 
 it('keeps the emblem out of the account box and leaves all text untruncated', t => {
   const h = setup(); t.after(h.close);
   assert.ok(h.node('home-tier-badge'));
-  assert.equal(h.renderer.root.findByType('AccountSwitcher').findAll((n: any) => n.props.testID === 'home-tier-badge').length, 0);
+  assert.equal(h.box().findAll((n: any) => n.props.testID === 'home-tier-badge').length, 0);
   assert.equal(h.node('home-nickname').props.numberOfLines, undefined);
   assert.ok(flatten(h.node('home-nickname').props.style).fontSize > 15);
 });

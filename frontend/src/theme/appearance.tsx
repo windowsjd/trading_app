@@ -23,6 +23,10 @@ export const PALETTES = {
     warningSurface: '#fff8e1', info: '#245b76', infoSurface: '#e3f2fd',
     onAccent: '#ffffff', infoAction: '#245b76',
     secondaryActionSurface: '#EAF4FC', secondaryActionForeground: '#285B85',
+    // Community (2026-11-07): the strong chip/FAB/pill pair (inverted in dark),
+    // the count badge, the HOT flame and the scrim over photos.
+    inverse: '#202a35', onInverse: '#ffffff', alert: '#D92D20', onAlert: '#ffffff',
+    hot: '#EA580C', scrim: '#0F1217A3', onScrim: '#ffffff',
   },
   dark: {
     screen: '#15171c', surface: '#1c1d21', raised: '#292a2f',
@@ -36,6 +40,8 @@ export const PALETTES = {
     warningSurface: '#3a3020', info: '#9acbe2', infoSurface: '#1c3045',
     onAccent: '#ffffff', infoAction: '#245b76',
     secondaryActionSurface: '#20364A', secondaryActionForeground: '#70AFFF',
+    inverse: '#f2f5f7', onInverse: '#15171c', alert: '#D92D20', onAlert: '#ffffff',
+    hot: '#FB923C', scrim: '#0F1217A3', onScrim: '#ffffff',
   },
 } as const;
 

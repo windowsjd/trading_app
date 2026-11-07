@@ -5,6 +5,7 @@ import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { stackTransition } from './transitionPolicy';
 import { stackScreenLayout } from './stackScreenLayout';
+import HeaderHomeBackButton from '../../components/navigation/HeaderHomeBackButton';
 
 import type { GuideStackParamList } from './types';
 import GuideScreen from '../../screens/guide/GuideScreen';
@@ -20,11 +21,23 @@ import GuideChapterScreen from '../../screens/guide/GuideChapterScreen';
 
 const Stack = createNativeStackNavigator<GuideStackParamList>();
 
+/**
+ * The beginner's 퀘스트 and the general member's 가이드 (2026-11-07): routes
+ * kept under their tab names (the quest guide is bound to QuestTab) but
+ * hidden from the tab bar; Home's header opens them and their first screen
+ * goes back to Home. Guests keep 가이드 as a visible tab without that button.
+ */
 export function QuestStack() {
-  return <GuideStack beginner />;
+  return <GuideStack beginner homeBack />;
 }
 
-export default function GuideStack({ beginner = false }: { beginner?: boolean } = {}) {
+export function MemberGuideStack() {
+  return <GuideStack homeBack />;
+}
+
+const homeBackOptions = { headerLeft: ({ tintColor }: { tintColor?: string }) => <HeaderHomeBackButton tintColor={tintColor} /> };
+
+export default function GuideStack({ beginner = false, homeBack = false }: { beginner?: boolean; homeBack?: boolean } = {}) {
   const reducedMotion = useReducedMotion();
   return (
     // Lesson titles (시장기초, 호가창과 체결…) use the tab headers' 700-weight
@@ -35,9 +48,12 @@ export default function GuideStack({ beginner = false }: { beginner?: boolean } 
       <Stack.Screen
         name="Guide"
         component={beginner ? BeginnerLearningScreen : GuideScreen}
-        options={beginner
-          ? { title: '퀘스트', headerTitle: mainTabHeaderTitle('quest') }
-          : { title: '가이드', headerTitle: mainTabHeaderTitle('guide') }}
+        options={{
+          ...(beginner
+            ? { title: '퀘스트', headerTitle: mainTabHeaderTitle('quest') }
+            : { title: '가이드', headerTitle: mainTabHeaderTitle('guide') }),
+          ...(homeBack ? homeBackOptions : {}),
+        }}
       />
       <Stack.Screen
         name="MarketBasics"

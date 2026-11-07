@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ScrollView, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
-import ActionPressable from '../../components/common/ActionPressable';
+import HomeHeaderButton from './HomeHeaderButton';
 import CTAButton from '../../components/common/CTAButton';
 import InlineBottomSheet from '../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../components/common/ScreenSheetHost';
@@ -37,19 +37,20 @@ import { createIdempotencyKey } from '../../utils/idempotency';
 import RewardedTestPanel from './RewardedTestPanel';
 
 /** The general home's header entry to the 보상 sheet (gift icon + 보상). */
-export function HomeRewardButton({ onPress }: { onPress: () => void }) {
+/** 보상 in Home's header (general accounts): the shared header button look (2026-11-07); the sheet is unchanged. */
+export function HomeRewardButton({ onPress, iconOnly = false }: { onPress: () => void; iconOnly?: boolean }) {
   const { colors } = useAppearance();
   return (
-    <ActionPressable testID="home-reward-button" style={buttonStyles.button} onPress={onPress}
-      accessibilityRole="button" accessibilityLabel="보상, 가상자금 추가와 일반계정 초기화">
-      <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.text}
-          strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
-          <Path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z" />
-        </Svg>
-      </View>
-      <Text style={buttonStyles.label} maxFontSizeMultiplier={1.6}>보상</Text>
-    </ActionPressable>
+    <HomeHeaderButton testID="home-reward-button" label="보상" accessibilityLabel="보상, 가상자금 추가와 일반계정 초기화"
+      iconOnly={iconOnly} onPress={onPress}
+      icon={(
+        <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.secondaryActionForeground}
+            strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+            <Path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z" />
+          </Svg>
+        </View>
+      )} />
   );
 }
 
@@ -294,12 +295,6 @@ export default function GeneralRewardSheet({
 }
 
 // Plain objects: screen harnesses load this with minimal react-native mocks.
-const buttonStyles = {
-  button: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4, minHeight: 44, minWidth: 44,
-    paddingHorizontal: 10, borderRadius: 999, justifyContent: 'center' as const },
-  label: { fontSize: 14, fontWeight: '700' as const, color: semantic.text },
-};
-
 const styles = {
   scroll: { flexGrow: 0, flexShrink: 1 },
   body: { gap: 12, paddingBottom: 8 },

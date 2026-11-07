@@ -51,6 +51,13 @@ export const semantic = {
   infoAction: '#0f001b',
   secondaryActionSurface: '#0f001c',
   secondaryActionForeground: '#0f001d',
+  inverse: '#0f001e',
+  onInverse: '#0f001f',
+  alert: '#0f0020',
+  onAlert: '#0f0021',
+  hot: '#0f0022',
+  scrim: '#0f0023',
+  onScrim: '#0f0024',
 } as const;
 
 type Role = keyof typeof semantic;

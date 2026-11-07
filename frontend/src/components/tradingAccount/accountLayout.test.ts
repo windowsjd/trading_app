@@ -118,10 +118,12 @@ describe('the styles long text depends on are present', () => {
     assert.match(source, /rowBadgeColumn:\s*\{[^}]*flexShrink:\s*0/s);
     // A cap, not the overflow strategy.
     assert.match(source, /numberOfLines=\{3\}/);
-    assert.ok(
-      !/numberOfLines=\{1\}/.test(source),
-      'one ellipsised line would hide which account is selected',
-    );
+    // The one exception (2026-11-07): Home's header has one line, so its title
+    // is one line; the full name stays in its label and in the sheet's rows.
+    const oneLine = [...source.matchAll(/numberOfLines=\{1\}/g)];
+    assert.equal(oneLine.length, 1, 'one ellipsised line would hide which account is selected');
+    assert.match(source, /<SeasonTitle testID="home-account-title" numberOfLines=\{1\}/);
+    assert.match(source, /accessibilityLabel=\{`계정 변경\. 현재 \$\{display\.title\}/);
   });
 
   it('AccountSwitcher: the 일반모드 offer is the 초보모드 card, its copy and error wrapping whole', () => {

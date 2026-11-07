@@ -12,7 +12,8 @@ export type TabIconName =
   | 'wallet'
   | 'profile'
   | 'menu'
-  | 'modes';
+  | 'modes'
+  | 'community';
 
 type Props = {
   name: TabIconName;
@@ -31,6 +32,10 @@ const QUEST_FLAG_FILLED = 'M4 3h2v18H4z M6 4h13.5l-3.3 4.5 3.3 4.5H6z';
 // The guest browsing modes tab: three stacked layers, one per investment mode.
 const MODES_LAYERS_OUTLINE = 'M12 3l9 4.5-9 4.5-9-4.5z M3 12l9 4.5 9-4.5 M3 16.5l9 4.5 9-4.5';
 const MODES_LAYERS_FILLED = 'M12 2l10 5-10 5L2 7z M2 11l10 5 10-5v2.2l-10 5-10-5z M2 15.6l10 5 10-5v2.2l-10 5-10-5z';
+// The community tab: a speech bubble with its tail at the lower left and two
+// lines of text; the filled bubble cuts the same lines out of its body.
+const COMMUNITY_BUBBLE_OUTLINE = 'M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z M8 9h8 M8 12.5h5';
+const COMMUNITY_BUBBLE_FILLED = 'M5 3h14a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-7.6L6 22.2V18H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Z M7.5 8.2v1.7h9V8.2Z M7.5 11.7v1.7h5.5v-1.7Z';
 
 export default function TabBarIcon({ name, color, size, focused = false }: Props) {
   let drawing: React.ReactNode;
@@ -49,6 +54,7 @@ export default function TabBarIcon({ name, color, size, focused = false }: Props
       case 'record': drawing = <Path d="M8 2h8v3h3v17H5V5h3V2Zm2 2v2h4V4h-4Zm-2 6v2h8v-2H8Zm0 4v2h8v-2H8Zm0 4v2h6v-2H8Z" fillRule="evenodd" />; break;
       case 'menu': drawing = <Path d="M4 5h16v3H4zM4 11h16v3H4zM4 17h16v3H4z" />; break;
       case 'modes': drawing = <Path d={MODES_LAYERS_FILLED} />; break;
+      case 'community': drawing = <Path d={COMMUNITY_BUBBLE_FILLED} fillRule="evenodd" />; break;
       case 'profile': drawing = <><Circle cx={12} cy={7} r={4} /><Path d="M3 21v-2c0-3 3-5 6-5h6c3 0 6 2 6 5v2H3Z" /></>; break;
     }
   } else switch (name) {
@@ -83,6 +89,9 @@ export default function TabBarIcon({ name, color, size, focused = false }: Props
       break;
     case 'modes':
       drawing = <Path d={MODES_LAYERS_OUTLINE} />;
+      break;
+    case 'community':
+      drawing = <Path d={COMMUNITY_BUBBLE_OUTLINE} />;
       break;
     case 'profile':
       drawing = (

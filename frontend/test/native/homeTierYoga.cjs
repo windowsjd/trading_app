@@ -21,7 +21,7 @@ const { interactionHarness, React, act, flatten } = require('../interactionTestH
     './AdminDiagnosticPanel': { default: () => null, __esModule: true },
     '../common/BottomSheetBackdrop': { default: () => null, __esModule: true },
   }).default;
-  const tree = h.render(React.createElement(Switcher, { home: true, homeVisual: React.createElement('View') }));
+  const tree = h.render(React.createElement(Switcher, { homeHeader: true }));
   try {
     const title = tree.root.findByProps({ testID: 'home-account-title' });
     const titleStyle = flatten(title.props.style), rowStyle = flatten(title.parent.props.style);

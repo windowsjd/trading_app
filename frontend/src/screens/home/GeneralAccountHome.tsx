@@ -27,6 +27,7 @@ import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
 import HomeHoldings, { useHomeHoldings } from './HomeHoldings';
 import HomeHotMarket, { type HomeHotMarketData } from './HomeHotMarket';
+import HomeCommunityTicker, { type HomeCommunityHotData } from './HomeCommunityTicker';
 import HomeAccountContext, { type HomeAccountContextData } from './HomeAccountContext';
 import type { AssetType } from '../../features/market/api';
 
@@ -52,6 +53,8 @@ type Props = {
   onOpenMarket: (assetType: AssetType) => void;
   accountContext: HomeAccountContextData;
   hot: HomeHotMarketData;
+  /** The HOT community card under the total assets (2026-11-07). */
+  communityHot: HomeCommunityHotData;
 };
 
 export default function GeneralAccountHome({
@@ -60,6 +63,7 @@ export default function GeneralAccountHome({
   onOpenMarket,
   accountContext,
   hot,
+  communityHot,
 }: Props) {
   const accountId = account.id;
   const [trendExpanded, setTrendExpanded] = useState(false);
@@ -87,6 +91,7 @@ export default function GeneralAccountHome({
     { ...holdings.fullQuery, enabled: holdings.expanded },
     ...accountContext.refreshQueries,
     hot.refreshQuery,
+    communityHot.refreshQuery,
     { ...equityQuery, enabled: trendExpanded },
   ]);
 
@@ -187,9 +192,9 @@ export default function GeneralAccountHome({
           error={equityQuery.error}
           general
         />
-
-        <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
       </View>
+      <HomeCommunityTicker hot={communityHot} season={false} />
+      <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />
       <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
 
     </ScrollView>

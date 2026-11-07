@@ -35,3 +35,20 @@ export function getHomeTier(tier: string | null | undefined, mode: AppearanceMod
 export function getHomeTierName(tier: string | null | undefined) {
   return getHomeTier(tier, 'light')?.name ?? null;
 }
+
+// The small diamond beside a community author's tier name (2026-11-07): a
+// stronger shade of each card color, readable on the surface of either mode.
+const TIER_ACCENTS: Record<HomeTier, { light: string; dark: string }> = {
+  bronze: { light: '#A8683C', dark: '#D9A27A' },
+  silver: { light: '#7D8794', dark: '#B4BEC9' },
+  gold: { light: '#C29A2E', dark: '#E2C16A' },
+  platinum: { light: '#2F9C8C', dark: '#6FD1C2' },
+  diamond: { light: '#3F7FD9', dark: '#8DB8F2' },
+  whale: { light: '#12396A', dark: '#9DB7E8' },
+};
+
+/** The tier mark color, or null for no or an unknown tier. */
+export function getTierAccent(tier: string | null | undefined, mode: AppearanceMode) {
+  const entry = getHomeTier(tier, mode);
+  return entry ? TIER_ACCENTS[entry.id][mode] : null;
+}

@@ -80,9 +80,9 @@ function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearanc
     '../../features/appRelease/AppUpdateNotice': { default: 'AppUpdateNotice', __esModule: true },
     '../../features/auth/guestBrowsing': { isGuestBrowsing: () => guest },
     ...Object.fromEntries(
-      ['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My', 'Modes'].map((name) => [
+      ['Home', 'Market', 'Guide', 'Ranking', 'Community', 'Wallet', 'My', 'Modes'].map((name) => [
         `./${name}Stack`,
-        { default: `${name}Stack`, QuestStack: 'QuestStack', GuestHomeStack: 'GuestHomeStack', GuestWalletStack: 'GuestWalletStack', __esModule: true },
+        { default: `${name}Stack`, QuestStack: 'QuestStack', MemberGuideStack: 'MemberGuideStack', GuestHomeStack: 'GuestHomeStack', GuestWalletStack: 'GuestWalletStack', __esModule: true },
       ]),
     ),
   }).default;
@@ -96,8 +96,14 @@ function screenOptions(screen: any, route = {}) {
     : screen.props.options;
 }
 
-function tabContract(tree: unknown) {
-  return elements(tree, 'Screen').map((screen: any) => {
+/** A route kept for navigation but left out of the tab bar (no button, no room). */
+function hidden(screen: any) {
+  const options = screenOptions(screen);
+  return typeof options.tabBarButton === 'function' && options.tabBarButton({}) === null && options.tabBarItemStyle?.display === 'none';
+}
+
+function tabContract(tree: unknown, which: 'visible' | 'hidden' = 'visible') {
+  return elements(tree, 'Screen').filter((screen: any) => hidden(screen) === (which === 'hidden')).map((screen: any) => {
     const options = screenOptions(screen);
     const icon = options.tabBarIcon({
       color: '#123456',
@@ -114,25 +120,40 @@ function tabContract(tree: unknown) {
 }
 
 describe('mode-aware bottom tabs', () => {
-  it('shows Guide as the third of five tabs for a general account', () => {
-    assert.deepEqual(tabContract(renderTabs('general')), [
+  it('shows 커뮤니티 as the third of exactly five tabs for a general account, 가이드 kept as a hidden route', () => {
+    const tree = renderTabs('general');
+    assert.deepEqual(tabContract(tree), [
       ['HomeTab', 'HomeStack', '홈', 'home'],
       ['MarketTab', 'MarketStack', '마켓', 'market'],
-      ['GuideTab', 'GuideStack', '가이드', 'guide'],
+      ['CommunityTab', 'CommunityStack', '커뮤니티', 'community'],
       ['WalletTab', 'WalletStack', '지갑', 'wallet'],
       ['MyTab', 'MyStack', 'MY', 'menu'],
     ]);
+    // Home's 가이드 opens it; its first screen goes back to Home (MemberGuideStack).
+    assert.deepEqual(tabContract(tree, 'hidden'), [['GuideTab', 'MemberGuideStack', '가이드', 'guide']]);
   });
 
-  it('keeps Ranking as the third of five tabs for a season account', () => {
-    assert.deepEqual(tabContract(renderTabs('season')), [
+  it('keeps Ranking third of exactly five tabs for a season account, labelled 리그', () => {
+    const tree = renderTabs('season');
+    assert.deepEqual(tabContract(tree), [
       ['HomeTab', 'HomeStack', '홈', 'home'],
       ['MarketTab', 'MarketStack', '마켓', 'market'],
-      ['RankingTab', 'RankingStack', '랭킹', 'ranking'],
+      ['RankingTab', 'RankingStack', '리그', 'ranking'],
       ['WalletTab', 'WalletStack', '지갑', 'wallet'],
       ['MyTab', 'MyStack', 'MY', 'menu'],
     ]);
+    assert.deepEqual(tabContract(tree, 'hidden'), []);
   });
+
+  for (const mode of ['beginner', 'general', 'season'] as const) {
+    it(`${mode}: community post screens own the bottom edge (the tab bar hides there only)`, () => {
+      const tab = elements(renderTabs(mode), 'Screen').find((screen: any) => screen.props.name === (mode === 'season' ? 'RankingTab' : 'CommunityTab'));
+      for (const name of [undefined, 'Community', 'Ranking', 'UserSeasonSummary', 'PostDetail', 'PostCompose']) {
+        const options = screenOptions(tab, { name: tab.props.name, params: name ? { screen: name } : undefined });
+        assert.equal(options.tabBarStyle?.display === 'none', name === 'PostDetail' || name === 'PostCompose', String(name));
+      }
+    });
+  }
 
   for (const mode of ['general', 'season'] as const) {
     it(`${mode}: hides the tab bar only for the detail screens (AssetDetail, FuturesDetail) and restores it on Market routes`, () => {
@@ -218,9 +239,10 @@ describe('mode-aware bottom tabs', () => {
       assert.ok(guideStack.includes(`name="${route}"`));
     }
     assert.match(guideStack, /title: '시장기초'/);
-    assert.equal([...rankingStack.matchAll(/<Stack\.Screen\b/g)].length, 2);
-    assert.match(rankingStack, /name="Ranking"/);
-    assert.match(rankingStack, /name="UserSeasonSummary"/);
+    // 리그: the ranking root (랭킹 | 커뮤니티 sections), 유저 시즌 요약 and the community post screens.
+    assert.equal([...rankingStack.matchAll(/<Stack\.Screen\b/g)].length, 4);
+    for (const route of ['Ranking', 'UserSeasonSummary', 'PostDetail', 'PostCompose']) assert.ok(rankingStack.includes(`name="${route}"`), route);
+    assert.match(rankingStack, /component=\{LeagueScreen\}/);
   });
 });
 
@@ -229,7 +251,7 @@ describe('bottom tab icon contract', () => {
     assert.match(icons, /import Svg, \{ Circle, Path \} from 'react-native-svg'/);
     assert.deepEqual(
       [...new Set([...icons.matchAll(/case '(\w+)':/g)].map((match) => match[1]))],
-      ['market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu', 'modes', 'profile'],
+      ['market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu', 'modes', 'community', 'profile'],
     );
     assert.match(icons, /width=\{size\}\s+height=\{size\}/);
     assert.match(icons, /viewBox="0 0 24 24"/);
@@ -273,7 +295,7 @@ describe('bottom tab visual states', () => {
       'react-native': { View: 'View' },
       'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
     }).default;
-    for (const name of ['home', 'market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu', 'modes']) {
+    for (const name of ['home', 'market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu', 'modes', 'community']) {
       const active = elements(Icon({ name, color: '#ffffff', size: 25, focused: true }), 'Svg')[0];
       const inactive = elements(Icon({ name, color: '#aebbc8', size: 25, focused: false }), 'Svg')[0];
       assert.equal(active.props.fill, '#ffffff'); assert.equal(active.props.stroke, 'none');
@@ -323,12 +345,26 @@ describe('bottom tab visual states', () => {
 });
 
 
-it('beginner has five tabs with Quest third and MY last', () => {
-  assert.deepEqual(tabContract(renderTabs('beginner')), [
+it('beginner has exactly five tabs with 커뮤니티 third and MY last; 퀘스트 stays a hidden route', () => {
+  const tree = renderTabs('beginner');
+  assert.deepEqual(tabContract(tree), [
     ['HomeTab', 'HomeStack', '홈', 'home'], ['MarketTab', 'MarketStack', '마켓', 'market'],
-    ['QuestTab', 'QuestStack', '퀘스트', 'quest'], ['WalletTab', 'WalletStack', '지갑', 'wallet'],
+    ['CommunityTab', 'CommunityStack', '커뮤니티', 'community'], ['WalletTab', 'WalletStack', '지갑', 'wallet'],
     ['MyTab', 'MyStack', 'MY', 'menu'],
   ]);
+  // The quest guide is bound to the QuestTab name: kept under it, opened from Home's 퀘스트.
+  assert.deepEqual(tabContract(tree, 'hidden'), [['QuestTab', 'QuestStack', '퀘스트', 'quest']]);
+});
+
+it('every mode shows exactly five tabs; hidden routes come after them', () => {
+  for (const [mode, guest] of [['beginner', false], ['general', false], ['season', false], [null, true]] as const) {
+    const screens = elements(renderTabs(mode, false, 'light', false, undefined, guest), 'Screen');
+    const visible = screens.filter((screen: any) => !hidden(screen));
+    assert.equal(visible.length, 5, String(mode));
+    assert.equal(screens.findIndex((screen: any) => hidden(screen)) === -1 || screens.findIndex((screen: any) => hidden(screen)) >= 5, true, String(mode));
+  }
+  // The four-character 커뮤니티 gets 투자모드's allowance at larger text sizes.
+  assert.match(tabs, /title: '커뮤니티',[\s\S]*?tabBarItemStyle: fontScale > 1 \? \{ flex: 1\.8 \} : undefined/);
 });
 it('beginner tabs run inside one quest guide keyed by the account, unlike other modes', () => {
   const beginner = renderTabs('beginner', false, 'light', false, 'beginner-one');
@@ -379,7 +415,7 @@ describe('guest browsing tabs (로그인 없이 둘러보기)', () => {
 
   it('keeps the members\' MY tab and mode tabs unchanged', () => {
     for (const mode of ['general', 'season', 'beginner'] as const) {
-      const names = elements(renderTabs(mode), 'Screen').map((screen: any) => screen.props.name);
+      const names = elements(renderTabs(mode), 'Screen').filter((screen: any) => !hidden(screen)).map((screen: any) => screen.props.name);
       assert.equal(names.at(-1), 'MyTab', mode);
       assert.ok(!names.includes('ModesTab'), mode);
     }
@@ -392,8 +428,8 @@ describe('guest browsing tabs (로그인 없이 둘러보기)', () => {
     assert.equal(Object.values(guest).every((style) => style === undefined), true, 'fontScale 1: equal tabs');
     assert.match(tabs, /title: '투자모드',[\s\S]*?tabBarItemStyle: fontScale > 1 \? \{ flex: 1\.8 \} : undefined/);
     assert.match(tabs, /title: '가이드',[\s\S]*?tabBarItemStyle: mode === 'guest' && fontScale > 1 \? \{ flex: 1\.4 \} : undefined/);
-    // Members' 가이드 keeps its equal share at every text size.
-    assert.equal(items(renderTabs('general')).GuideTab, undefined);
+    // Members' 가이드 is a hidden route: it takes no room at any text size.
+    assert.deepEqual(items(renderTabs('general')).GuideTab, { display: 'none' });
   });
 
   it('offers 로그인 and 회원가입 from any tab through its own root navigation', () => {

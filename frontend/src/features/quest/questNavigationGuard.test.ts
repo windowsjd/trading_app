@@ -74,6 +74,22 @@ describe('quest navigation guard', () => {
     assert.equal(await heard(), 0, 'the practice tab itself is never held');
   });
 
+  it('holds the 커뮤니티 tab (and Home\'s community card and 퀘스트 button) during a practice, as any other tab', async () => {
+    // The beginner bar since 2026-11-07: 커뮤니티 third, 퀘스트 kept as a hidden route after MY.
+    const n = navigator(TabRouter, ['HomeTab', 'MarketTab', 'CommunityTab', 'WalletTab', 'MyTab', 'QuestTab'], 'HomeTab');
+    n.dispatch(CommonActions.navigate('MarketTab'));
+    guide('marketBuy');
+    holds(n, CommonActions.navigate('CommunityTab'), 'the community tab is held');
+    holds(n, CommonActions.navigate('CommunityTab', { screen: 'Community', params: { category: 'hot', at: 1 }, pop: true }), 'Home\'s HOT card is held');
+    holds(n, CommonActions.navigate('CommunityTab', { screen: 'PostDetail', params: { postId: 'p' } }), 'a post is held');
+    holds(n, CommonActions.navigate('QuestTab', { screen: 'Guide', pop: true }), 'Home\'s 퀘스트 is held like the quest list');
+    assert.equal(await heard(), 4);
+    guide(null);
+    n.dispatch(CommonActions.navigate('CommunityTab'));
+    assert.equal(n.focused(), 'CommunityTab', 'free between quests');
+    assert.equal(await heard(), 0);
+  });
+
   it('lets futures funding use the Wallet tab, never an unrelated screen behind an allowed tab', async () => {
     const n = tabs();
     n.dispatch(CommonActions.navigate('MarketTab', { screen: 'Futures', params: { accountId: 'a' } }));

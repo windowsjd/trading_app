@@ -46,7 +46,7 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
       await read('fx', { base, quote });
       return h.usdKrw ?? { state: 'available', baseCurrency: 'USD', quoteCurrency: 'KRW', rate: '1350', validUntil: new Date(Date.now() + 60_000).toISOString() };
     } },
-    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.account, selectedAccountId: h.account.id, capabilities: { canTrade: true, canExchange: true } }) },
+    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.account, selectedAccountId: h.account?.id ?? null, isEmpty: !h.account, capabilities: { canTrade: true, canExchange: true } }) },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate: (...args) => h.navigation.push(args) }) },
     '../../features/tradingAccount/api': {
       getTradingAccountPortfolio: async id => { await read('portfolio', { account: id }); return options.portfolios?.[id] ?? { state: 'available', sectionErrors: [], summary: { totalAssetKrw: id } }; },
@@ -70,7 +70,10 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
     '../home/HomeAssetTrend': { __esModule: true, default: 'Trend' },
     '../../components/common/CTAButton': { __esModule: true, default: 'CTA' },
     '../../components/charts': { DonutChart: 'DonutChart', LineChart: 'LineChart' },
-    '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children }) => React.createElement('AccountSwitcher', {}, children) },
+    '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children }) => React.createElement('AccountSwitcher', {}, children), HomeAccountNotices: () => null },
+    // Home's header controls and the HOT community card have their own tests.
+    './HomeHeader': { __esModule: true, HomeHeaderTitle: 'HomeHeaderTitle', HomeHeaderActions: 'HomeHeaderActions' },
+    './HomeCommunityTicker': { __esModule: true, default: 'HomeCommunityTicker', useHomeCommunityHot: () => ({ query: { isLoading: false }, refreshQuery: { isFetching: false, refetch: async () => {}, enabled: false } }) },
     '../../components/tradingAccount/AccountSetupPanel': { __esModule: true, default: 'AccountSetupPanel' },
     '../../components/states/FullPageLoading': { __esModule: true, default: 'FullPageLoading' },
     // The Wallet's 환전 panel (its own harness covers it); refresh tests never open it.
