@@ -62,9 +62,10 @@ export default function FuturesDetailScreen(props: FuturesDetailScreenProps) {
  * the current Futures Last large with its won conversion and the $ | 원
  * switch, its 전일대비 (against its own settled 1d close of the previous UTC
  * day, never the rolling 24h ticker), its chart with the 봉 시간
- * selector at the lower left, and 숏 / 롱 at the bottom (2026-11-06; 매도하기 /
- * 매수하기 before). 롱 opens the order screen on a 롱(Long) entry and 숏 on a
- * 숏(Short) entry — never a reduce or close; a held position of that direction
+ * selector at the lower left, and 숏(Short) / 롱(Long) at the bottom
+ * (2026-11-07; 숏 / 롱 on 11-06, 매도하기 / 매수하기 before; the button wraps
+ * rather than cut a label). 롱 opens the order screen on a 롱(Long) entry and
+ * 숏 on a 숏(Short) entry — never a reduce or close; a held position of that direction
  * is added to (two-way: the other direction is independent). The full-
  * screen chart is opened from the order screen's chart button, as for stocks.
  *
@@ -269,14 +270,14 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
         </ScrollView>
         <View style={{ ...styles.footer, paddingBottom: styles.footer.paddingBottom + insets.bottom }} testID="futures-detail-actions">
           <View style={styles.action}>
-            <CTAButton testID="futures-detail-short" label="숏" state={tradable ? 'enabled' : 'disabled'}
+            <CTAButton testID="futures-detail-short" label="숏(Short)" state={tradable ? 'enabled' : 'disabled'}
               accessibilityHint="숏(Short) 주문 화면을 엽니다."
               learningHint={shortGate?.locked ? shortGate.message : null}
               onPress={() => (shortGate ? shortGate.guard(() => open('short')) : open('short'))}
               style={{ ...styles.actionButton, backgroundColor: SELL_COLOR }} />
           </View>
           <View style={styles.action}>
-            <CTAButton testID="futures-detail-long" label="롱" state={tradable ? 'enabled' : 'disabled'}
+            <CTAButton testID="futures-detail-long" label="롱(Long)" state={tradable ? 'enabled' : 'disabled'}
               accessibilityHint="롱(Long) 주문 화면을 엽니다."
               learningHint={longGate?.locked ? longGate.message : null}
               onPress={() => (longGate ? longGate.guard(() => open('long')) : open('long'))}

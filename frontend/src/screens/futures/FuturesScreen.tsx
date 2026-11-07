@@ -894,7 +894,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const amountLabel = selectedOperation === "increase" ? "추가 금액 (USD)" : "주문 금액 (USD)";
   const stackedControls = width / fontScale < 360;
   // "(Short)" cannot fit half the column at large fonts: the segment shows 롱/숏
-  // (the spoken names keep Long/Short).
+  // (the spoken names keep Long/Short). This estimate only decides until the
+  // segment has measured the full names in the device's font (OrderSideSegment).
   const compactSides = width < 220 * fontScale + 80;
   const compact = width < 600;
   return (
@@ -1017,7 +1018,9 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                   <OrderSideSegment
                     testID="futures-direction"
                     side={direction === 'long' ? 'buy' : 'sell'}
-                    labels={compactSides ? { buy: '롱', sell: '숏' } : { buy: directionLabel.long, sell: directionLabel.short }}
+                    labels={{ buy: directionLabel.long, sell: directionLabel.short }}
+                    compactLabels={{ buy: '롱', sell: '숏' }}
+                    compactAtFirst={compactSides}
                     accessibilityLabels={{ buy: directionLabel.long, sell: directionLabel.short }}
                     testIDs={{ buy: 'futures-direction-long', sell: 'futures-direction-short' }}
                     disabled={locked}

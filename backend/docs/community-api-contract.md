@@ -164,7 +164,7 @@ DB에는 항상 작성자 `user_id`를 저장한다. 그러나 **회원에게 �
 ### 5.2 피드
 
 - `all`·`free`·`theory`: 보이는 글, `created_at desc, id desc`, `total` = 보이는 글 수.
-- `hot`: §7 목록(최대 30개) 안에서 `limit`·`offset`, `total` ≤ 30, 모든 항목 `isHot: true`. 홈 롤링 카드는 `?category=hot&limit=3`을 그대로 쓴다(별도 계산 없음).
+- `hot`: §7 목록(최대 30개) 안에서 `limit`·`offset`, `total` ≤ 30, 모든 항목 `isHot: true`. 홈 롤링 카드는 `?category=hot&limit=3`을 그대로 쓴다(별도 계산 없음). HOT 목록이 비어 있을 때만 앱이 `?category=all&limit=3`(보이는 최신 글)을 대신 보여준다 — HOT로 표시하지 않으며 서버 HOT 기준·목록은 그대로다(2026-11-07 보완, 앱 전용).
 - offset 페이지 사이에 새 글이 들어오면 항목이 밀려 겹칠 수 있다. 앱은 id로 중복을 제거한다.
 - 한 페이지의 좋아요 수·내 좋아요·댓글 수·HOT 점수·사진·종목·공개 작성자·등급·(운영자) 신고 수는 페이지 단위 일괄 조회로 채우며 한 RepeatableRead 읽기 트랜잭션 안에서 읽는다.
 
@@ -266,7 +266,7 @@ DB에는 항상 작성자 `user_id`를 저장한다. 그러나 **회원에게 �
 - 쿼리 시점에 SQL 한 번으로 계산한다(스케줄러·Redis·카운터 열 없음). 창은 `community_posts_feed_idx`, 좋아요는 `(post_id, user_id)` unique 인덱스, 댓글은 `community_comments_visible_post_idx`(`post_id, user_id`, 보이는 행)로 처리한다.
 - 본인 글 좋아요는 409로 막으므로 좋아요는 모두 남의 것이지만, 점수 식은 작성자 좋아요를 방어적으로 한 번 더 뺀다.
 - `isHot` = 그 글이 창 안에 있고 점수가 최소 점수 이상인지(모든 피드·상세 항목). 기준을 통과한 글이 30개를 넘으면 HOT 목록에는 상위 30개만 보이므로 `isHot: true`인데 HOT 목록에 없는 글이 있을 수 있다.
-- 홈 롤링 카드 = HOT 목록 상위 3개(`?category=hot&limit=3`).
+- 홈 롤링 카드 = HOT 목록 상위 3개(`?category=hot&limit=3`). HOT 목록이 비면 앱이 전체 최신 글 3개(`?category=all&limit=3`)를 HOT 표시 없이 보여주고, 글이 하나도 없으면 첫 글 안내를 보여준다(2026-11-07, 서버 변경 없음).
 
 ## 8. 삭제·제재 기준 (단일 목록)
 

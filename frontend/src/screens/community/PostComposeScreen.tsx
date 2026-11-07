@@ -52,7 +52,8 @@ export default function PostComposeScreen({ route }: { route: { params?: { categ
   const client = useQueryClient();
   const { colors } = useAppearance();
   const headerHeight = useHeaderHeight();
-  const { userId } = useCommunityViewer();
+  const viewer = useCommunityViewer();
+  const { userId } = viewer;
   const write = useCommunityWrite(userId);
   const bootstrap = write.bootstrap.data;
   const maxLength = bootstrap?.postBodyMaxLength ?? COMMUNITY_LIMITS.postBody;
@@ -100,9 +101,10 @@ export default function PostComposeScreen({ route }: { route: { params?: { categ
 
   const restricted = write.gate.kind === 'restricted' ? write.gate.message : null;
   const busy = post.isPending || picking;
+  // The server's count (JS trim, then code points): blank lines and spaces alone never enable 등록.
   const length = communityTextLength(body);
   const trimmed = body.trim();
-  const valid = length >= 1 && length <= maxLength && !restricted;
+  const valid = length >= 1 && length <= maxLength && !restricted && !!userId;
   const edit = (update: () => void) => { if (busy) return; update(); setNotice(null); };
 
   const submit = () => {
@@ -160,6 +162,9 @@ export default function PostComposeScreen({ route }: { route: { params?: { categ
   }, [busy, navigation, post.isPending, valid]);
 
   const preview = bootstrap ? describePostAuthor(anonymous ? { kind: 'anonymous', label: '익명' } : bootstrap.me) : null;
+  // The author line cannot be read (the member or the bootstrap): offer a retry, not an endless loader.
+  const authorFailed = viewer.failed || (!bootstrap && write.bootstrap.isError);
+  const retryAuthor = () => { if (viewer.failed) viewer.retry(); else void write.bootstrap.refetch(); };
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={{ flex: 1, backgroundColor: semantic.surface }}>
       <KeyboardAvoidingView style={{ flex: 1 }} keyboardVerticalOffset={headerHeight} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -174,6 +179,12 @@ export default function PostComposeScreen({ route }: { route: { params?: { categ
                   <TierMark tier={preview.tier} name={preview.tierName} />
                 </View>
               </>
+            ) : authorFailed ? (
+              <ActionPressable testID="community-compose-author-retry" accessibilityRole="button" onPress={retryAuthor}
+                style={{ minHeight: 44, justifyContent: 'center', flexShrink: 1 }}>
+                <Text style={{ fontSize: 13, lineHeight: 19, color: semantic.secondaryActionForeground, fontWeight: '600' }}>
+                  작성자 정보를 불러오지 못했어요. 다시 시도</Text>
+              </ActionPressable>
             ) : <WhaleLoader size={22} accessibilityLabel="작성자 정보를 불러오는 중" />}
             <View style={{ flex: 1 }} />
             <Text style={{ fontSize: 12, color: semantic.muted }}>이렇게 표시돼요</Text>

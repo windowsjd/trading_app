@@ -22,13 +22,15 @@ export const QUERY_KEYS = {
    * 커뮤니티 (2026-11-07). Every read is the signed-in member's view (`mine`,
    * `likedByMe`, an operator's fields), so each key carries that user. The
    * feed and comment lists are infinite; the post, bootstrap and Home's HOT
-   * preview are single reads with their own factories.
+   * and latest previews are single reads with their own factories.
    */
   community: {
     all: ['community'] as const,
     bootstrap: (userId: string) => ['community', 'bootstrap', userId] as const,
     feed: (userId: string, category: string) => ['community', 'feed', userId, category, 'infinite'] as const,
     hotPreview: (userId: string) => ['community', 'hot-preview', userId] as const,
+    /** Home's fallback while the HOT list is empty: 전체's first posts. */
+    latestPreview: (userId: string) => ['community', 'latest-preview', userId] as const,
     post: (userId: string, postId: string) => ['community', 'post', userId, postId] as const,
     comments: (userId: string, postId: string, sort: string) => ['community', 'comments', userId, postId, sort, 'infinite'] as const,
     /** Operator account management (계정 관리) of one member. */

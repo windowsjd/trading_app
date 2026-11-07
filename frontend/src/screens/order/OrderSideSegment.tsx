@@ -14,6 +14,7 @@ const LABEL: Record<OrderSide, string> = { buy: '매수', sell: '매도' };
 const TEST_ID: Record<OrderSide, string> = { buy: TEST_IDS.assetDetail.buyButton, sell: TEST_IDS.assetDetail.sellButton };
 const COLOR = { buy: BUY_COLOR, sell: SELL_COLOR } as const;
 const INSET = 3;
+const SEGMENT_PADDING = 4;
 
 /**
  * One track for 매수/매도. The selected side is owned by the caller and changes
@@ -21,13 +22,21 @@ const INSET = 3;
  * the same selection motion as every segmented control. The sliding thumb is
  * the feedback, so a press only tints the target (no ink over the thumb).
  * Colors stay in themed Views (BUY_COLOR/SELL_COLOR), Animated wrappers carry
- * only transform and opacity. Futures reuses the track for 롱/숏 (`labels`),
- * which take the same BUY/SELL colors as their positions.
+ * only transform and opacity. Futures reuses the track for 롱(Long)/숏(Short)
+ * (`labels`), which take the same BUY/SELL colors as their positions, and
+ * passes `compactLabels` (롱/숏): the full names are measured on one line in
+ * the device's own font and shown whenever both fit their half of the track,
+ * the short ones otherwise — a name never wraps. Until both are measured the
+ * caller's estimate (`compactAtFirst`) decides.
  */
-export default function OrderSideSegment({ side, onChange, labels = LABEL, accessibilityLabels = labels, testIDs = TEST_ID, testID = 'order-side-segment', disabled = false }: {
+export default function OrderSideSegment({ side, onChange, labels = LABEL, compactLabels, compactAtFirst = false, accessibilityLabels = labels, testIDs = TEST_ID, testID = 'order-side-segment', disabled = false }: {
   side: OrderSide;
   onChange: (side: OrderSide) => void;
   labels?: Record<OrderSide, string>;
+  /** Shorter names for when `labels` do not fit their segment on one line. */
+  compactLabels?: Record<OrderSide, string>;
+  /** Whether to start with `compactLabels` before anything is measured. */
+  compactAtFirst?: boolean;
   /** Spoken names when the visible labels are shortened (defaults to `labels`). */
   accessibilityLabels?: Record<OrderSide, string>;
   testIDs?: Record<OrderSide, string>;
@@ -37,9 +46,15 @@ export default function OrderSideSegment({ side, onChange, labels = LABEL, acces
 }) {
   const reduced = useReducedMotion();
   const [trackWidth, setTrackWidth] = useState(0);
+  const [fullWidths, setFullWidths] = useState<Record<OrderSide, number>>({ buy: 0, sell: 0 });
   const progress = useSelectionMotion(side === 'sell' ? 1 : 0, reduced);
 
   const thumbWidth = Math.max(0, (trackWidth - INSET * 2) / 2);
+  // A segment is the thumb's width; its label has the segment's padding on both sides.
+  const room = thumbWidth - SEGMENT_PADDING * 2;
+  const measured = room > 0 && fullWidths.buy > 0 && fullWidths.sell > 0;
+  const compact = !!compactLabels && (measured ? Math.max(fullWidths.buy, fullWidths.sell) > room + 0.5 : compactAtFirst);
+  const shown = compact && compactLabels ? compactLabels : labels;
   const translateX = useMemo(
     () => progress.interpolate({ inputRange: [0, 1], outputRange: [0, thumbWidth] }),
     [progress, thumbWidth],
@@ -60,6 +75,20 @@ export default function OrderSideSegment({ side, onChange, labels = LABEL, acces
         setTrackWidth((previous) => (Math.abs(previous - width) < 0.5 ? previous : width));
       }}
     >
+      {compactLabels ? (
+        // The full names' one-line widths, never drawn or spoken: they decide which names fit.
+        <View testID={`${testID}-measure`} pointerEvents="none" accessible={false} accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants" aria-hidden style={styles.measureClip}>
+          <View style={styles.measureRow}>
+            {SIDES.map((value) => (
+              <Text key={value} style={styles.label} onLayout={(event) => {
+                const width = event.nativeEvent.layout.width;
+                setFullWidths((previous) => (Math.abs(previous[value] - width) < 0.5 ? previous : { ...previous, [value]: width }));
+              }}>{labels[value]}</Text>
+            ))}
+          </View>
+        </View>
+      ) : null}
       {thumbWidth > 0 ? (
         <Animated.View
           pointerEvents="none"
@@ -96,14 +125,14 @@ export default function OrderSideSegment({ side, onChange, labels = LABEL, acces
           >
             <View style={styles.labelStack}>
               <Animated.View style={{ opacity: opacity(value, false) }}>
-                <Text style={styles.label}>{labels[value]}</Text>
+                <Text style={styles.label}>{shown[value]}</Text>
               </Animated.View>
               <Animated.View
                 style={[styles.activeLabel, { opacity: opacity(value, true) }]}
                 accessible={false}
                 importantForAccessibility="no-hide-descendants"
               >
-                <Text style={[styles.label, styles.labelActive]}>{labels[value]}</Text>
+                <Text style={[styles.label, styles.labelActive]}>{shown[value]}</Text>
               </Animated.View>
             </View>
           </ActionPressable>
@@ -138,11 +167,14 @@ const styles = StyleSheet.create({
     minHeight: 44,
     marginVertical: -INSET,
     paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: SEGMENT_PADDING,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // A zero-size clip holding a wide row: the full names lay out on one line, unseen.
+  measureClip: { position: 'absolute', left: 0, top: 0, width: 0, height: 0, overflow: 'hidden' },
+  measureRow: { position: 'absolute', left: 0, top: 0, width: 2000, flexDirection: 'row', alignItems: 'flex-start' },
   labelStack: { minWidth: 0, maxWidth: '100%' },
   activeLabel: { ...StyleSheet.absoluteFillObject },
   label: {

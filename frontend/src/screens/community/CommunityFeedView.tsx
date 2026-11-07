@@ -23,7 +23,7 @@ import WhaleLoader from '../../components/states/WhaleLoader';
 import CommunityPostCard from './CommunityPostCard';
 import { CategoryChip } from './CommunityParts';
 import { CommunityNoticeText, type CommunityNotice } from './CommunityNotice';
-import { useCommunityViewer, useCommunityWrite } from './useCommunityWrite';
+import { CommunityViewerError, useCommunityViewer, useCommunityWrite } from './useCommunityWrite';
 import { useCommunityPostLike } from './useCommunityLikes';
 
 /** A feed older than this is read again when the screen is focused (back from a post). */
@@ -39,7 +39,8 @@ const HOT_CAPTION = '최근 24시간 동안 반응이 많은 글';
 export default function CommunityFeedView({ request, testID = 'community-feed' }: { request?: CommunityFeedRouteParams; testID?: string }) {
   const navigation = useCommunityNavigation();
   const { colors } = useAppearance();
-  const { userId, canModerate } = useCommunityViewer();
+  const viewer = useCommunityViewer();
+  const { userId, canModerate } = viewer;
   const write = useCommunityWrite(userId);
   const [category, setCategory] = useState<CommunityFeedCategory>(request?.category ?? 'all');
   // A failed like, kept whole for the admin diagnostic.
@@ -73,6 +74,15 @@ export default function CommunityFeedView({ request, testID = 'community-feed' }
   const compose = () => write.requireWrite(() => navigation.navigate('PostCompose', category === 'theory' ? { category: 'theory' } : undefined));
   const empty = category === 'hot' ? '최근 24시간 동안 반응이 많은 글이 아직 없어요.'
     : category === 'all' ? '아직 글이 없어요. 첫 글을 남겨보세요.' : '이 카테고리에는 아직 글이 없어요.';
+
+  // Every community read is keyed by the member: without one, 다시 시도 (never an endless loader).
+  if (viewer.failed) {
+    return (
+      <View testID={testID} style={{ flex: 1, backgroundColor: semantic.screen }}>
+        <CommunityViewerError error={viewer.error} onRetry={viewer.retry} />
+      </View>
+    );
+  }
 
   return (
     <View testID={testID} style={{ flex: 1, backgroundColor: semantic.screen }}>

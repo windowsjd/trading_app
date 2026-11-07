@@ -40,7 +40,7 @@ export const COMMUNITY_POST_CATEGORIES: readonly { key: CommunityCategory; label
 export const COMMUNITY_LIMITS = { postBody: 500, commentBody: 300, photos: 4, note: 200 } as const;
 export const COMMUNITY_PAGE_SIZE = 20;
 export const COMMUNITY_COMMENT_PAGE_SIZE = 50;
-/** Home's rolling card: the top of the HOT list as the feed returns it. */
+/** Home's rolling card: the top of the HOT list as the feed returns it (or, while it is empty, 전체's first posts). */
 export const COMMUNITY_HOT_PREVIEW_LIMIT = 3;
 
 export type CommunityPublicAuthor = {

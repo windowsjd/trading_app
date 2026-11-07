@@ -10,7 +10,8 @@ import { formatSignedPercent, getAssetNameDisplay, getFinancialDirection } from 
 import type { CommunityAssetTag } from '../../features/community/api';
 import type { CommunityAuthorDisplay } from '../../features/community/authorDisplay';
 import { formatCommunityCount } from '../../features/community/format';
-import { getTierAccent } from '../home/tierPresentation';
+import { getHomeTier } from '../home/tierPresentation';
+import TierEmblem from '../home/TierEmblem';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import ActionPressable from '../../components/common/ActionPressable';
 import CommunityIcon from '../../components/community/CommunityIcon';
@@ -38,15 +39,28 @@ export function CommunityAvatar({ display, size, testID }: { display: Pick<Commu
   );
 }
 
-/** ◆ Gold: an 8px diamond in the tier's color and its 11px name; nothing without a tier. */
-export function TierMark({ tier, name }: { tier: string | null; name: string | null }) {
-  const { mode } = useAppearance();
-  const accent = getTierAccent(tier, mode);
-  if (!accent || !name) return null;
+/** The ranking rows' emblem size: the community shows the same small emblem. */
+export const COMMUNITY_TIER_EMBLEM = 18;
+
+/**
+ * [emblem] Whale: the ranking's own emblem image for the tier (TierEmblem,
+ * the same table that maps `master` to Whale) and its 11px name. Nothing
+ * without a known tier — never a made-up one. Anonymous, 탈퇴계정 and deleted
+ * authors carry no tier (authorDisplay), so they never show one.
+ */
+export function TierMark({ tier, name, maxFontSizeMultiplier = 1.6 }: {
+  tier: string | null; name: string | null;
+  /** The row's own cap where its texts stop growing sooner (Home's card). */
+  maxFontSizeMultiplier?: number;
+}) {
+  const entry = getHomeTier(tier, 'light');
+  if (!entry || !name) return null;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 }} accessible={false}>
-      <View style={{ width: 7, height: 7, backgroundColor: accent, transform: [{ rotate: '45deg' }] }} />
-      <Text style={{ fontSize: 11, lineHeight: 15, color: semantic.secondary }} maxFontSizeMultiplier={1.6}>{name}</Text>
+    <View testID={`community-tier-${entry.id}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 }} accessible={false}>
+      {/* Own ids: Home's emblem ids (`home-emblem-*`, `home-tier-image`) stay unique on Home. */}
+      <TierEmblem tier={entry.id} size={COMMUNITY_TIER_EMBLEM} testID={`community-tier-emblem-${entry.id}`}
+        imageTestID={`community-tier-emblem-image-${entry.id}`} />
+      <Text style={{ fontSize: 11, lineHeight: 15, color: semantic.secondary }} maxFontSizeMultiplier={maxFontSizeMultiplier}>{name}</Text>
     </View>
   );
 }
@@ -123,13 +137,19 @@ export function CategoryChip({ category, label, selected, onPress, testID }: {
   );
 }
 
-/** A like or comment count button (40dp, icon 18 + count 13). */
+/**
+ * A like or comment count button (40dp, icon 18 + count 13). The icon is
+ * drawn in every state: a like fills it in the count's color.
+ */
 export function CountButton({ icon, count, active = false, label, onPress, disabled, testID, height = 40 }: {
   icon: 'heart' | 'comment'; count: number; active?: boolean; label: string; onPress?: () => void;
   disabled?: boolean; testID?: string; height?: number;
 }) {
-  const { colors, financialColors, mode } = useAppearance();
-  const tint = active ? financialColors.rise[mode] : colors.secondary;
+  const { colors, financialColors } = useAppearance();
+  // `financialColors` is already resolved for the appearance mode (a color
+  // string per role); indexing it by mode again gave `undefined`, and an SVG
+  // with no stroke and no fill drew nothing — the liked heart vanished.
+  const tint = active ? financialColors.rise : colors.secondary;
   const content = (
     <>
       <CommunityIcon name={icon} size={18} color={tint} filled={active} />

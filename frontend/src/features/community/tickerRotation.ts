@@ -36,3 +36,17 @@ export function clampTickerIndex(index: number, count: number): number {
 export function tickerDisplayIndex(index: number, count: number, reducedMotion: boolean): number {
   return reducedMotion ? 0 : clampTickerIndex(index, count);
 }
+
+/** The card's texts grow with the system font size up to this (their maxFontSizeMultiplier). */
+export const TICKER_FONT_CAP = 1.3;
+
+/**
+ * One slide's box: the author row (20dp, or its 18dp-line name once that
+ * grows taller), 6dp, then two 21dp body lines — all at the system font scale
+ * up to the cap. A fixed 68dp clipped the second body line at large fonts.
+ */
+export function tickerSlideLayout(fontScale: number): { row: number; height: number } {
+  const scale = Math.min(Math.max(Number.isFinite(fontScale) ? fontScale : 1, 1), TICKER_FONT_CAP);
+  const row = Math.max(20, Math.ceil(18 * scale));
+  return { row, height: row + 6 + Math.ceil(2 * 21 * scale) };
+}

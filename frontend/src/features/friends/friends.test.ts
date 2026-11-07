@@ -5,6 +5,7 @@ import { describe, it, type TestContext } from 'node:test';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 import { clearSessionCache } from '../auth/sessionCache.ts';
 import type { FriendUser } from './api.ts';
+import { semantic } from '../../theme/tokens.ts';
 const require = createRequire(import.meta.url);
 const React = require('react');
 const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
@@ -15,7 +16,7 @@ function screenHarness() {
   const slots: unknown[] = []; let index = 0;
   const mutations: any[] = [], navigations: any[] = [], alerts: any[] = [];
   const query: any = { data: { pages: [{ users: [user], pagination: { nextOffset: null } }] }, refetch: async () => {}, hasNextPage: false };
-  const h: any = { mutations, navigations, alerts, query, option: null, mutationOption: null };
+  const h: any = { mutations, navigations, alerts, query, option: null, mutationOption: null, refreshes: [] as unknown[] };
   const Screen = load(resolve('src/screens/friends/FriendsScreen.tsx'), {
     react: { ...React, useRef: (value: any) => ({ current: value }), useEffect() {}, useCallback: (fn: any) => fn, useState: (initial: any) => { const i = index++; if (!(i in slots)) slots[i] = initial; return [slots[i], (value: any) => { slots[i] = value; }]; } },
     '../../components/states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
@@ -24,7 +25,7 @@ function screenHarness() {
     '@react-navigation/native': { useFocusEffect: () => {} },
     '@tanstack/react-query': { useQueryClient: () => ({}), useInfiniteQuery: (option: any) => { h.option = option; return query; }, useMutation: (option: any) => { h.mutationOption = option; return { reset() {}, mutate: (value: any) => mutations.push(value) }; } },
     '../../features/friends/api': { getFriends: (...args: any[]) => args, changeFriendship: () => {} },
-    '../../features/friends/cache': { refreshFriendship: async () => {} },
+    '../../features/friends/cache': { refreshFriendship: async (_client: unknown, change: unknown) => { h.refreshes.push(change); } },
     '../../components/states/InlineEmptyState': { __esModule: true, default: 'InlineEmptyState' },
   }).default;
   h.render = (route?: unknown) => { index = 0; return Screen({ navigation: { navigate: (...args: any[]) => navigations.push(args) }, route }); };
@@ -61,7 +62,7 @@ describe('friends user flow', () => {
     const h = screenHarness();
     pressText(h.render().props.ListHeaderComponent, '친구 찾기');
     let tree = h.render();
-    assert.equal(tree.props.ListEmptyComponent, null);
+    assert.equal(tree.props.ListEmptyComponent === null, true);
     const input = () => elements(tree.props.ListHeaderComponent, 'TextInput')[0];
     const search = () => elements(tree.props.ListHeaderComponent, 'Pressable').find(node => node.props.accessibilityLabel === '친구 검색');
     assert.equal(input().props.returnKeyType, 'search');
@@ -101,13 +102,78 @@ describe('friends user flow', () => {
     assert.ok(elements(row, 'Text').some((node: any) => node.props.children === user.nickname));
     assert.ok(elements(row, 'Text').every((node: any) => node.props.numberOfLines === undefined));
   });
+  it('a friend row offers only 친구 삭제 (red), without the redundant 친구 label; other rows keep their wording', () => {
+    const h = screenHarness(), tree = h.render();
+    const row = tree.props.renderItem({ item: user });
+    assert.equal(elements(row, 'Text').some((node: any) => node.props.children === '친구'), false);
+    const buttons = elements(row).filter((node: any) => node.props.label);
+    assert.deepEqual(buttons.map((node: any) => `${node.props.label}/${node.props.tone ?? 'plain'}`), ['친구 삭제/danger']);
+    const sent = tree.props.renderItem({ item: { ...user, relationship: 'sent' } });
+    assert.ok(elements(sent, 'Text').some((node: any) => node.props.children === '요청 보냄 · 수락 대기 중'));
+    const inactive = tree.props.renderItem({ item: { ...user, active: false } });
+    assert.ok(elements(inactive, 'Text').some((node: any) => node.props.children === '현재 이용할 수 없는 사용자입니다.'));
+  });
+  it('친구 삭제 alone is drawn in the error colors; request, accept, reject and 더 보기 keep the plain button', () => {
+    const h = screenHarness();
+    h.query.hasNextPage = true;
+    const tree = h.render();
+    const look = (node: any) => {
+      const pressable = node.type(node.props);
+      const box = Object.assign({}, ...[pressable.props.style].flat().filter(Boolean));
+      const text = Object.assign({}, ...[elements(pressable, 'Text')[0].props.style].flat().filter(Boolean));
+      return { box, text };
+    };
+    const button = (item: any, label: string) => elements(tree.props.renderItem({ item })).find((node: any) => node.props.label === label);
+    const remove = look(button(user, '친구 삭제'));
+    assert.deepEqual([remove.box.backgroundColor, remove.text.color, remove.text.fontWeight], [semantic.errorSurface, semantic.error, '600']);
+    for (const [relationship, label] of [['none', '친구 요청'], ['received', '수락'], ['received', '거절']] as const) {
+      const plain = look(button({ ...user, relationship }, label));
+      assert.deepEqual([plain.box.backgroundColor, plain.text.color], [semantic.raised, undefined], label);
+    }
+    const more = look(tree.props.ListFooterComponent);
+    assert.deepEqual([more.box.backgroundColor, more.text.color], [semantic.raised, undefined]);
+  });
+  it('the three tabs are semibold; the selected one keeps its surface and color', () => {
+    const h = screenHarness(), tree = h.render({ params: { tab: 'requests' } });
+    const tabs = elements(tree.props.ListHeaderComponent, 'Pressable').filter((node: any) => node.props.accessibilityRole === 'tab');
+    const rows = tabs.map((node: any) => {
+      const box = Object.assign({}, ...[node.props.style].flat().filter(Boolean));
+      const text = Object.assign({}, ...[elements(node, 'Text')[0].props.style].flat().filter(Boolean));
+      return [elements(node, 'Text')[0].props.children, text.fontWeight, text.color ?? '-', box.backgroundColor].join('/');
+    });
+    assert.deepEqual(rows, [
+      `친구 목록/600/-/${semantic.raised}`,
+      `받은 요청/600/${semantic.secondaryActionForeground}/${semantic.secondaryActionSurface}`,
+      `친구 찾기/600/-/${semantic.raised}`,
+    ]);
+  });
+  it('취소 keeps the friend; a refused removal re-reads the relationship and keeps the row the server still lists', async () => {
+    const h = screenHarness(), tree = h.render(), row = tree.props.renderItem({ item: user });
+    elements(row).find((node: any) => node.props.label === '친구 삭제').props.onPress();
+    const [title, message, buttons] = h.alerts[0];
+    assert.equal(`${title}/${message}`, `친구 삭제/${user.nickname}님을 친구에서 삭제할까요?`);
+    const cancel = buttons.find((button: any) => button.text === '취소');
+    assert.equal(cancel.style, 'cancel');
+    cancel.onPress?.();
+    assert.equal(h.mutations.length, 0, 'cancel removes nothing');
+    buttons.find((button: any) => button.text === '삭제').onPress();
+    assert.equal(h.mutations.length, 1);
+    await h.mutationOption.onError(new Error('offline'), { action: 'remove', user });
+    assert.deepEqual(h.refreshes, [{ action: 'remove', user }]);
+    assert.equal(h.alerts.at(-1)[0], '친구 관계 확인');
+    // Nothing is removed on the app's own: the list is the server's answer.
+    const again = h.render();
+    assert.deepEqual(again.props.data.map((item: any) => item.userId), ['target']);
+    await h.mutationOption.onSuccess({}, { action: 'remove', user });
+    assert.equal(h.refreshes.length, 2, 'a success refreshes the friend list, ranking and portfolio access');
+  });
   it('uses separate incoming/list keys and distinguishes error from empty', () => {
     const h = screenHarness(); let tree = h.render();
     assert.deepEqual(h.option.queryKey, QUERY_KEYS.friends.list);
     pressText(tree.props.ListHeaderComponent, '받은 요청'); tree = h.render();
     assert.deepEqual(h.option.queryKey, QUERY_KEYS.friends.requests);
     h.query.isError = true; tree = h.render();
-    assert.equal(tree.props.ListEmptyComponent, null);
+    assert.equal(tree.props.ListEmptyComponent === null, true);
   });
 });
 describe('friend API and targeted cache updates', () => {

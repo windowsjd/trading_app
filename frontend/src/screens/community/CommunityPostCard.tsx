@@ -53,7 +53,8 @@ export default function CommunityPostCard({ post, now, canModerate, onOpen, onOp
         )}
         <View style={{ flex: 1 }} />
         {post.isHot ? <CommunityIcon name="flame" size={14} color={colors.hot} /> : null}
-        <Text style={{ fontSize: 12, lineHeight: 16, color: semantic.muted }} maxFontSizeMultiplier={1.6}>{time}</Text>
+        {/* One line: a tight row (long nickname, large fonts) shortens the nickname, never wraps the time. */}
+        <Text numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, color: semantic.muted, flexShrink: 0 }} maxFontSizeMultiplier={1.6}>{time}</Text>
       </View>
       <ActionPressable testID={`community-post-${post.id}-open`} accessibilityRole="button"
         accessibilityLabel={`${author.name}의 글${post.isHot ? ', HOT' : ''}, ${time}. ${post.body}`}

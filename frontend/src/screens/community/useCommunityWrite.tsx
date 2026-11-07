@@ -16,11 +16,33 @@ import InlineBottomSheet from '../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../components/common/ScreenSheetHost';
 import CTAButton from '../../components/common/CTAButton';
 import ErrorNotice from '../../components/states/ErrorNotice';
+import ErrorState from '../../components/states/ErrorState';
 
-/** The signed-in member: every community key is theirs (mine, likedByMe, operator fields). */
+/**
+ * The signed-in member: every community key is theirs (mine, likedByMe,
+ * operator fields). `failed`: the member could not be read at all (no answer,
+ * a server error) — the screens offer 다시 시도 instead of waiting forever.
+ * A refresh that fails after a successful read keeps that member (the shared
+ * `me` entry belongs to this session; sign-out clears it). A dead session is
+ * not this hook's call: the API client ends it and opens the login screen.
+ */
 export function useCommunityViewer() {
-  const me = useQuery<MeDto>({ queryKey: QUERY_KEYS.me, queryFn: getMe, staleTime: 60_000 }).data;
-  return { userId: me?.id ?? null, canModerate: canManageCommunity(me?.role) };
+  const query = useQuery<MeDto>({ queryKey: QUERY_KEYS.me, queryFn: getMe, staleTime: 60_000 });
+  const me = query.data;
+  const { refetch } = query;
+  const retry = useCallback(() => { void refetch(); }, [refetch]);
+  return { userId: me?.id ?? null, canModerate: canManageCommunity(me?.role), failed: !me && query.isError, error: query.error, retry };
+}
+
+/** The community's screen while its member cannot be read (useCommunityViewer `failed`). */
+export function CommunityViewerError({ error, onRetry, testID = 'community-viewer-error' }: {
+  error: unknown; onRetry: () => void; testID?: string;
+}) {
+  return (
+    <View testID={testID} style={{ flex: 1, backgroundColor: semantic.screen }}>
+      <ErrorState error={error} title="커뮤니티 정보를 불러오지 못했어요." message="잠시 후 다시 시도해주세요." onRetry={onRetry} />
+    </View>
+  );
 }
 
 export function useCommunityBootstrap(userId: string | null) {

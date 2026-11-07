@@ -49,7 +49,7 @@ import CTAButton from '../../components/common/CTAButton';
 import { AssetTagChip, CommunityAvatar, CountButton, PostAuthorTag, TierMark } from './CommunityParts';
 import { CommunityNoticeText, type CommunityNotice } from './CommunityNotice';
 import { AccountManageSheet, ActionList, CommunitySheet, ModerationSheet, ReportSheet, type SheetAction } from './CommunitySheets';
-import { useCommunityViewer, useCommunityWrite } from './useCommunityWrite';
+import { CommunityViewerError, useCommunityViewer, useCommunityWrite } from './useCommunityWrite';
 import { useCommunityPostLike } from './useCommunityLikes';
 
 type CommentPages = InfiniteData<CommunityPage<CommunityCommentDto>, number>;
@@ -82,7 +82,8 @@ export default function PostDetailScreen({ route }: { route: { params: { postId:
   const client = useQueryClient();
   const { colors } = useAppearance();
   const headerHeight = useHeaderHeight();
-  const { userId, canModerate } = useCommunityViewer();
+  const member = useCommunityViewer();
+  const { userId, canModerate } = member;
   const viewer = userId ?? '';
   const write = useCommunityWrite(userId);
   const reasons = write.bootstrap.data?.reasons ?? [];
@@ -282,6 +283,7 @@ export default function PostDetailScreen({ route }: { route: { params: { postId:
     ];
   };
 
+  if (member.failed) return <CommunityViewerError error={member.error} onRetry={member.retry} />;
   if (!userId || postQuery.isLoading) {
     return <View style={{ flex: 1, backgroundColor: semantic.screen, justifyContent: 'center' }}><WhaleLoader size={36} accessibilityLabel="글을 불러오는 중" /></View>;
   }
@@ -549,7 +551,7 @@ function CommentRow({ comment, now, canModerate, busy, onLike, onReply, onMore, 
             {canModerate && comment.adminAuthor ? <AdminAuthorPill nickname={comment.adminAuthor.nickname}
               onPress={() => onOpenAccount(comment.adminAuthor?.userId ?? '')} /> : null}
             <View style={{ flex: 1 }} />
-            <Text style={{ fontSize: 12, color: semantic.muted }}>{formatCommunityTime(comment.createdAt, now)}</Text>
+            <Text numberOfLines={1} style={{ fontSize: 12, color: semantic.muted, flexShrink: 0 }}>{formatCommunityTime(comment.createdAt, now)}</Text>
           </View>
           <Text selectable style={{ fontSize: 14, lineHeight: 21, marginLeft: 36, marginTop: 2 }}>{comment.body}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 36, gap: 12 }}>

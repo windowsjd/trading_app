@@ -131,7 +131,7 @@ export default function FriendsScreen({ navigation, route }: Props) {
                 style={[styles.button, tab === item.key && styles.selected]}
                 onPress={() => { mutation.reset(); setTab(item.key); }}
               >
-                <Text style={[styles.buttonText, tab === item.key && styles.selectedText]}>{item.label}</Text>
+                <Text style={[styles.buttonText, styles.tabText, tab === item.key && styles.selectedText]}>{item.label}</Text>
               </ActionPressable>
             ))}
           </View>
@@ -234,15 +234,14 @@ export default function FriendsScreen({ navigation, route }: Props) {
                 />
               </>
             ) : null}
+            {/* 친구 목록 itself says they are friends; only the (confirmed) removal is offered. */}
             {item.relationship === 'friend' ? (
-              <>
-                <Text style={styles.helper}>친구</Text>
-                <FriendButton
-                  label="친구 삭제"
-                  disabled={mutation.isPending}
-                  onPress={() => act('remove', item)}
-                />
-              </>
+              <FriendButton
+                label="친구 삭제"
+                tone="danger"
+                disabled={mutation.isPending}
+                onPress={() => act('remove', item)}
+              />
             ) : null}
           </View>
         </View>
@@ -259,23 +258,27 @@ export default function FriendsScreen({ navigation, route }: Props) {
     />
   );
 }
+/** `danger`: a destructive action (친구 삭제) in the error colors; every other action keeps the plain button. */
 function FriendButton({
   label,
   disabled,
   onPress,
+  tone = 'plain',
 }: {
   label: string;
   disabled: boolean;
   onPress: () => void;
+  tone?: 'plain' | 'danger';
 }) {
+  const danger = tone === 'danger';
   return (
     <ActionPressable
       accessibilityRole="button"
-      style={styles.button}
+      style={[styles.button, danger && styles.dangerButton]}
       disabled={disabled}
       onPress={onPress}
     >
-      <Text style={styles.buttonText}>{label}</Text>
+      <Text style={[styles.buttonText, danger && styles.dangerText]}>{label}</Text>
     </ActionPressable>
   );
 }
@@ -310,6 +313,11 @@ const styles = StyleSheet.create({
   selected: { backgroundColor: semantic.secondaryActionSurface, borderColor: semantic.secondaryActionSurface },
   selectedText: { color: semantic.secondaryActionForeground },
   buttonText: { fontSize: 15, flexShrink: 1 },
+  // 친구 목록 · 받은 요청 · 친구 찾기: a little stronger than the action labels.
+  tabText: { fontWeight: '600' },
+  // Error text on its own surface: 8.9:1 light, 6.2:1 dark.
+  dangerButton: { backgroundColor: semantic.errorSurface, borderColor: semantic.errorSurface },
+  dangerText: { color: semantic.error, fontWeight: '600' },
   nickname: { fontSize: 18, fontWeight: '700', flex: 1, minWidth: 0 },
   helper: { fontSize: 14, color: semantic.secondary, flexShrink: 1 },
   searchField: {

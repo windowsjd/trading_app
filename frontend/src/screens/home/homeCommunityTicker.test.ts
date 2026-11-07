@@ -1,18 +1,27 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
+import { homeCommunityCard } from '../../features/community/homeCommunityCard.ts';
+import { patchCommunityPost, refreshCommunityLists } from '../../features/community/communityCache.ts';
 
 const require = createRequire(import.meta.url);
 const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
+const { communityHarness } = require('../../../test/communityTestHarness.cjs');
 
 const post = (id: string, patch: Record<string, unknown> = {}) => ({
   id, category: 'free', body: `${id} 본문`, createdAt: '2026-11-07T03:00:00.000Z', author: { kind: 'anonymous', label: '익명' },
   asset: null, photos: [], likeCount: 4, commentCount: 18, likedByMe: false, mine: false, isHot: true, ...patch,
 });
+const page = (items: readonly unknown[]) => ({ items, nextOffset: null, total: items.length });
 
-function setup(posts: readonly unknown[] | 'loading' | 'error', { season = false, reduced = false } = {}) {
+/**
+ * The card alone, fed what the hook would give it: HOT posts, else the latest
+ * posts (`latest`), else the invitation; `loading`/`error` for the HOT read.
+ */
+function setup(posts: readonly unknown[] | 'loading' | 'error', { season = false, reduced = false, latest = undefined as readonly unknown[] | 'error' | undefined, fontScale = 1 } = {}) {
   const h = interactionHarness('android');
   h.reduced = reduced;
+  h.dimensions = { width: 360, height: 760, fontScale };
   const appListeners: Array<(state: string) => void> = [];
   h.native.AppState = { currentState: 'active', addEventListener: (_type: string, listener: (state: string) => void) => {
     appListeners.push(listener); return { remove: () => appListeners.splice(appListeners.indexOf(listener), 1) };
@@ -28,12 +37,17 @@ function setup(posts: readonly unknown[] | 'loading' | 'error', { season = false
     '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
     '../community/CommunityParts': { TierMark: () => null },
   }).default;
-  const hot = {
-    query: posts === 'loading' ? { isLoading: true } : posts === 'error' ? { isLoading: false, isError: true, refetch() {} }
-      : { isLoading: false, data: { items: posts }, dataUpdatedAt: Date.now(), refetch() {} },
+  const query = (value: readonly unknown[] | 'loading' | 'error' | undefined) => ({
+    data: Array.isArray(value) ? page(value) : undefined, isError: value === 'error',
+    dataUpdatedAt: Array.isArray(value) ? Date.now() : 0, errorUpdatedAt: value === 'error' ? Date.now() : 0, refetch: async () => ({}),
+  });
+  const hot = query(posts), next = query(latest);
+  const data = {
+    card: homeCommunityCard({ page: hot.data as never, failed: hot.isError }, { page: next.data as never, failed: next.isError }),
+    hot, latest: next, latestActive: Array.isArray(posts) && !posts.length,
     refreshQuery: { isFetching: false, refetch: async () => {}, enabled: true },
   };
-  const tree = () => React.createElement(Ticker, { hot, season });
+  const tree = () => React.createElement(Ticker, { hot: data, season });
   const renderer = h.render(tree());
   const find = (id: string) => renderer.root.findAll((node: any) => typeof node.type === 'string' && node.props.testID === id)[0];
   const slide = () => renderer.root.findAll((node: any) => /^home-community-ticker-slide-/.test(node.props?.testID ?? ''))[0]?.props.testID;
@@ -43,31 +57,101 @@ function setup(posts: readonly unknown[] | 'loading' | 'error', { season = false
     close: () => act(() => renderer.unmount()),
   };
 }
+const press = (h: ReturnType<typeof setup>, id: string) => act(() => h.renderer.root.findAll((node: any) => node.type === 'Pressable' && node.props.testID === id)[0].props.onPress());
+const route = (h: ReturnType<typeof setup>) => {
+  const [name, params] = h.navigations.at(-1) as [string, any];
+  return name === 'MainTabs' && params.screen === 'RankingTab'
+    ? `리그:${params.params.screen}:${params.params.params.section}:${params.params.params.category}:${params.params.pop}`
+    : `${params.screen}:${params.params.screen}:${params.params.params.category}:${params.params.pop}`;
+};
 
-describe('Home HOT community card', () => {
-  it('is hidden with no HOT post or a failed read, and holds its height while first loading', t => {
-    for (const posts of [[], 'error'] as const) {
-      const h = setup(posts); t.after(h.close);
-      assert.equal(h.renderer.toJSON() === null, true, String(posts));
+describe('Home community card: the four states', () => {
+  it('a placeholder of the card height while HOT is first read; the card grows with the system font up to its cap', t => {
+    const heights: string[] = [];
+    for (const fontScale of [1, 1.3, 2]) {
+      const loading = setup('loading', { fontScale }); t.after(loading.close);
+      const placeholder = loading.find('home-community-ticker-loading');
+      assert.ok(placeholder);
+      const slot = flatten(placeholder.props.children.props.style).height;
+      // The nearest sized box above a node: the slide's clipping slot, the invitation's box.
+      const sized = (node: any) => { let n = node.parent; while (n && !(typeof n.type === 'string' && flatten(n.props.style).height)) n = n.parent; return flatten(n.props.style); };
+      const hot = setup([post('a')], { fontScale }); t.after(hot.close);
+      const box = sized(hot.renderer.root.findAll((node: any) => node.props?.testID === 'home-community-ticker-slide-a')[0]);
+      const empty = setup([], { latest: [], fontScale }); t.after(empty.close);
+      const message = empty.renderer.root.findAll((node: any) => node.type === 'Text' && node.props.numberOfLines === 2)[0];
+      const invitation = sized(message).height;
+      heights.push(`${fontScale}:${slot}/${box.height}/${invitation}/${box.overflow}`);
     }
-    const loading = setup('loading'); t.after(loading.close);
-    const placeholder = loading.find('home-community-ticker-loading');
-    assert.ok(placeholder);
-    const slot = flatten(placeholder.props.children.props.style);
-    assert.equal(slot.height, 68);
+    assert.deepEqual(heights, ['1:68/68/68/hidden', '1.3:85/85/85/hidden', '2:85/85/85/hidden']);
   });
 
-  it('one button: the card style, the current post summary, no live region; one post has no dots', t => {
+  it('HOT: one button with the card style and the post summary; one post has no dots', t => {
     const h = setup([post('a', { author: { kind: 'public', userId: 'u', nickname: 'bluechip', profileImageUrl: null, tier: 'gold' } })]); t.after(h.close);
     const card = h.find('home-community-ticker');
     const style = flatten(card.props.style);
     assert.equal([style.borderRadius, style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].join('/'), '16/14/36/14/16');
     assert.equal(card.props.accessibilityRole, 'button');
-    assert.match(card.props.accessibilityLabel, /bluechip, 댓글 18\. a 본문/);
+    assert.match(card.props.accessibilityLabel, /^커뮤니티 HOT 글, bluechip, 댓글 18\. a 본문/);
+    assert.equal(card.props.accessibilityHint, '커뮤니티 HOT 글 목록을 엽니다.');
     assert.equal(h.renderer.root.findAll((node: any) => node.props?.accessibilityLiveRegion !== undefined).length, 0);
     assert.equal(h.find('home-community-ticker-dots') === undefined, true);
   });
 
+  it('no HOT post: the latest posts in the same card, never called HOT, rotating like HOT', t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const items = ['n1', 'n2', 'n3'].map((id) => post(id, { isHot: false }));
+    const h = setup([], { latest: items }); t.after(h.close);
+    const card = h.find('home-community-ticker');
+    assert.equal(flatten(card.props.style).paddingRight, 36, 'the same card box');
+    assert.match(card.props.accessibilityLabel, /^커뮤니티 최신 글, 익명, 댓글 18\. n1 본문/);
+    assert.equal(/HOT/.test(card.props.accessibilityLabel + card.props.accessibilityHint), false);
+    assert.equal(card.props.accessibilityHint, '커뮤니티 전체 글 목록을 엽니다.');
+    assert.ok(h.find('home-community-ticker-dots'));
+    assert.equal(h.slide(), 'home-community-ticker-slide-n1');
+    act(() => t.mock.timers.tick(4000));
+    assert.equal(h.slide(), 'home-community-ticker-slide-n2');
+  });
+
+  it('no post at all: the first-post invitation, a button into the community', t => {
+    const h = setup([], { latest: [] }); t.after(h.close);
+    const card = h.find('home-community-empty');
+    assert.equal(card.props.accessibilityRole, 'button');
+    assert.equal(card.props.accessibilityLabel, '커뮤니티에서 첫 이야기를 시작해 보세요.');
+    assert.match(JSON.stringify(h.renderer.toJSON()), /커뮤니티에서 첫 이야기를 시작해 보세요\./);
+    assert.equal(flatten(card.props.style).borderRadius, 16);
+  });
+
+  it('a failed read: only the way in, never "no posts"', t => {
+    for (const [posts, latest] of [['error', undefined], [[], 'error']] as const) {
+      const h = setup(posts, { latest }); t.after(h.close);
+      assert.equal(h.find('home-community-empty') === undefined, true, String(posts));
+      const card = h.find('home-community-unavailable');
+      assert.equal(card.props.accessibilityLabel, '커뮤니티에서 투자 이야기를 확인해 보세요.');
+      assert.equal(/첫 이야기|없/.test(JSON.stringify(h.renderer.toJSON())), false);
+    }
+  });
+});
+
+describe('Home community card: where a tap goes', () => {
+  for (const season of [false, true]) {
+    const where = season ? '리그:Ranking:community' : 'CommunityTab:Community';
+    it(`${season ? 'season' : 'beginner/general'}: HOT → the HOT chip; latest, invitation and unavailable → 전체`, t => {
+      const hot = setup([post('a')], { season }); t.after(hot.close);
+      press(hot, 'home-community-ticker');
+      assert.equal(route(hot), `${where}:hot:true`);
+      const [, params] = hot.navigations[0] as [string, any];
+      assert.equal(typeof params.params.params.at, 'number');
+      for (const [id, options] of [['home-community-ticker', { latest: [post('n', { isHot: false })] }], ['home-community-empty', { latest: [] }],
+        ['home-community-unavailable', { latest: 'error' }]] as const) {
+        const h = setup([], { season, ...options }); t.after(h.close);
+        press(h, id);
+        assert.equal(route(h), `${where}:all:true`, id);
+      }
+    });
+  }
+});
+
+describe('Home community card: rotation', () => {
   it('advances every 4 s while shown, and stops for focus, background, a press and Reduce Motion', t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = setup([post('a'), post('b'), post('c')]); t.after(h.close);
@@ -103,29 +187,135 @@ describe('Home HOT community card', () => {
 
   it('Reduce Motion pins the first post without a timer or an animation; unmounting clears the timer', t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const h = setup([post('a'), post('b')], { reduced: true });
-    act(() => t.mock.timers.tick(20_000));
-    assert.equal(h.slide(), 'home-community-ticker-slide-a');
-    assert.equal(h.h.animations.length, 0);
-    h.close();
+    for (const latest of [undefined, [post('n1', { isHot: false }), post('n2', { isHot: false })]]) {
+      const h = setup(latest ? [] : [post('a'), post('b')], { reduced: true, latest });
+      act(() => t.mock.timers.tick(20_000));
+      assert.equal(h.slide(), latest ? 'home-community-ticker-slide-n1' : 'home-community-ticker-slide-a');
+      assert.equal(h.h.animations.length, 0);
+      h.close();
+    }
     const live = setup([post('a'), post('b')]); live.close();
     // An unmounted card leaves no pending advance behind.
     act(() => t.mock.timers.tick(20_000));
   });
+});
 
-  for (const season of [false, true]) {
-    it(`${season ? 'season' : 'beginner/general'}: tapping opens the community with HOT selected`, t => {
-      const h = setup([post('a')], { season }); t.after(h.close);
-      const card = h.renderer.root.findAll((node: any) => node.type === 'Pressable' && node.props.testID === 'home-community-ticker')[0];
-      act(() => card.props.onPress());
-      const [route, params] = h.navigations[0] as [string, any];
-      assert.equal(route, 'MainTabs');
-      if (season) {
-        assert.equal([params.screen, params.params.screen, params.params.params.section, params.params.params.category, params.params.pop].join('|'), 'RankingTab|Ranking|community|hot|true');
-      } else {
-        assert.equal([params.screen, params.params.screen, params.params.params.category, params.params.pop].join('|'), 'CommunityTab|Community|hot|true');
-      }
-      assert.equal(typeof params.params.params.at, 'number');
-    });
+/** The hook and the card on a real query cache over the in-memory community server. */
+async function home(setup?: (h: any) => void, { season = false } = {}) {
+  const h = communityHarness();
+  setup?.(h);
+  const module = h.screen('src/screens/home/HomeCommunityTicker.tsx');
+  function Home() {
+    const data = module.useHomeCommunityHot(true);
+    h.data = data;
+    return React.createElement(module.default, { hot: data, season });
   }
+  h.tree = () => React.createElement(Home);
+  await h.mount(h.tree());
+  await h.flush(3);
+  h.reads = () => h.server.requests.filter((request: any) => request.path.startsWith('/community/posts?')).map((request: any) => request.path);
+  h.reshow = async () => {
+    h.focused = false;
+    await act(async () => h.renderer.update(React.createElement(require('@tanstack/react-query').QueryClientProvider, { client: h.client }, h.tree())));
+    h.focused = true;
+    await act(async () => h.renderer.update(React.createElement(require('@tanstack/react-query').QueryClientProvider, { client: h.client }, h.tree())));
+    await h.flush(3);
+  };
+  return h;
+}
+const HOT_LIKES = ['u3', 'me', 'x9'];
+const HOT_READ = '/community/posts?category=hot&limit=3&offset=0';
+const LATEST_READ = '/community/posts?category=all&limit=3&offset=0';
+
+describe('Home community card over the community API', () => {
+  it('HOT posts: only the HOT list is read', async (t) => {
+    const h = await home((x) => { x.server.addPost({ id: 'h1', likes: HOT_LIKES }); x.server.addPost({ id: 'plain', ageMinutes: 1 }); });
+    t.after(h.close);
+    assert.deepEqual(h.reads(), [HOT_READ]);
+    assert.match(h.node('home-community-ticker').props.accessibilityLabel, /^커뮤니티 HOT 글/);
+  });
+
+  it('no HOT post: then the three newest visible posts of 전체, newest first, as plain posts', async (t) => {
+    const h = await home((x) => {
+      for (const [id, age] of [['n4', 40], ['n1', 1], ['n3', 30], ['n2', 20]] as const) x.server.addPost({ id, ageMinutes: age, likes: ['u3'] });
+      x.server.posts.push({ ...x.server.posts[0], id: 'gone', createdAt: x.server.now, deleted: true });
+    });
+    t.after(h.close);
+    assert.deepEqual(h.reads(), [HOT_READ, LATEST_READ]);
+    assert.equal(h.data.card.kind, 'latest');
+    assert.deepEqual(h.data.card.posts.map((item: any) => item.id), ['n1', 'n2', 'n3'], 'deleted posts never reach Home');
+    assert.equal(h.data.card.posts.some((item: any) => item.isHot), false);
+    assert.match(h.node('home-community-ticker').props.accessibilityLabel, /^커뮤니티 최신 글, bluechip/);
+  });
+
+  it('no post at all: the invitation; a failed HOT read: the way in, and the latest posts are not read for it', async (t) => {
+    const empty = await home();
+    t.after(empty.close);
+    assert.equal(empty.exists('home-community-empty'), true);
+    const failed = await home((x) => { x.server.addPost({ id: 'n1' }); x.server.fail('get', '/community/posts?category=hot', new Error('offline')); });
+    t.after(failed.close);
+    assert.equal(failed.exists('home-community-unavailable'), true);
+    assert.deepEqual(failed.reads(), [HOT_READ]);
+  });
+
+  it('a failed member read: the way in, with no community read at all', async (t) => {
+    const h = communityHarness({ seedMe: false });
+    h.server.meFailures.push(new Error('offline'));
+    const module = h.screen('src/screens/home/HomeCommunityTicker.tsx');
+    function Home() { return React.createElement(module.default, { hot: module.useHomeCommunityHot(true), season: false }); }
+    await h.mount(React.createElement(Home));
+    await h.flush(3);
+    t.after(h.close);
+    assert.equal(h.exists('home-community-unavailable'), true);
+    assert.equal(h.server.requests.some((request: any) => request.path.startsWith('/community')), false);
+  });
+
+  it('back on Home within a minute nothing is read; after a minute the lists in use are read again and HOT takes over', async (t) => {
+    let clock = Date.parse('2026-11-07T12:00:00.000Z');
+    t.mock.method(Date, 'now', () => clock);
+    const h = await home((x) => { x.server.addPost({ id: 'p1', likes: ['u3'] }); });
+    t.after(h.close);
+    assert.equal(h.data.card.kind, 'latest');
+    assert.equal(h.reads().length, 2);
+    clock += 30_000;
+    await h.reshow();
+    assert.equal(h.reads().length, 2, 'fresh: no request');
+    // Others' likes and a comment make it HOT (score 1 + 1 + 2 = 4).
+    h.server.posts[0].likes.add('me');
+    h.server.addComment({ postId: 'p1', userId: 'u3' });
+    clock += 31_000;
+    await h.reshow();
+    assert.deepEqual(h.reads().slice(2), [HOT_READ, LATEST_READ]);
+    assert.equal(h.data.card.kind, 'hot');
+    assert.match(h.node('home-community-ticker').props.accessibilityLabel, /^커뮤니티 HOT 글/);
+    // HOT in use: the latest posts are no longer read.
+    clock += 61_000;
+    await h.reshow();
+    assert.deepEqual(h.reads().slice(4), [HOT_READ]);
+  });
+
+  it('pull to refresh: HOT again, then the latest posts only while HOT is empty', async (t) => {
+    const h = await home((x) => { x.server.addPost({ id: 'p1' }); });
+    t.after(h.close);
+    await act(async () => { await h.data.refreshQuery.refetch({ cancelRefetch: false }); });
+    await h.flush(2);
+    assert.deepEqual(h.reads().slice(2), [HOT_READ, LATEST_READ]);
+    h.server.posts[0].likes = new Set(HOT_LIKES);
+    await act(async () => { await h.data.refreshQuery.refetch({ cancelRefetch: false }); });
+    await h.flush(2);
+    assert.deepEqual(h.reads().slice(4), [HOT_READ]);
+    assert.equal(h.data.card.kind, 'hot');
+  });
+
+  it('a like shows on the card at once; a new post refreshes it', async (t) => {
+    const h = await home((x) => { x.server.addPost({ id: 'p1' }); });
+    t.after(h.close);
+    await act(async () => patchCommunityPost(h.client, 'me', 'p1', (item: any) => ({ ...item, commentCount: item.commentCount + 1 })));
+    await h.flush(1);
+    assert.match(h.node('home-community-ticker').props.accessibilityLabel, /댓글 1\./);
+    h.server.addPost({ id: 'fresh', ageMinutes: 0, body: '방금 쓴 글' });
+    await act(async () => refreshCommunityLists(h.client, 'me'));
+    await h.flush(3);
+    assert.deepEqual(h.data.card.posts.map((item: any) => item.id), ['fresh', 'p1']);
+  });
 });

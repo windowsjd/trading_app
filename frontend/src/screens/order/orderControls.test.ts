@@ -105,6 +105,65 @@ describe('buy/sell segmented control', () => {
   });
 });
 
+describe('futures 롱/숏 segment: the full names whenever they fit', () => {
+  const FULL = { buy: '롱(Long)', sell: '숏(Short)' };
+  function futuresSegment(compactAtFirst: boolean) {
+    const h = interactionHarness('android');
+    const Segment = h.load('src/screens/order/OrderSideSegment.tsx').default;
+    const renderer = h.render(React.createElement(Segment, { side: 'buy', onChange() {}, labels: FULL, compactLabels: { buy: '롱', sell: '숏' },
+      compactAtFirst, accessibilityLabels: FULL, testID: 'futures-direction', testIDs: { buy: 'futures-direction-long', sell: 'futures-direction-short' } }));
+    const host = (id: string) => renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === id)[0];
+    const sides = ['futures-direction-long', 'futures-direction-short'];
+    return {
+      host,
+      shown: () => sides.map((id) => host(id).findAll((n: any) => n.type === 'Text').map((n: any) => n.props.children).join('|')).join(' / '),
+      spoken: () => sides.map((id) => host(id).props.accessibilityLabel).join(' / '),
+      layout: (width: number) => act(() => host('futures-direction').props.onLayout({ nativeEvent: { layout: { width } } })),
+      measure: (long: number, short: number) => act(() => {
+        const [a, b] = host('futures-direction-measure').findAll((n: any) => n.type === 'Text');
+        a.props.onLayout({ nativeEvent: { layout: { width: long } } });
+        b.props.onLayout({ nativeEvent: { layout: { width: short } } });
+      }),
+    };
+  }
+
+  it("starts from the caller's estimate, then follows the measured names: full when both fit their half, else 롱/숏", () => {
+    const s = futuresSegment(false);
+    assert.equal(s.shown(), '롱(Long)|롱(Long) / 숏(Short)|숏(Short)');
+    // Track 206 → each half 100, less 4 + 4 padding: 92 for a name.
+    s.layout(206);
+    s.measure(60, 69);
+    assert.equal(s.shown(), '롱(Long)|롱(Long) / 숏(Short)|숏(Short)');
+    s.measure(60, 93);
+    assert.equal(s.shown(), '롱|롱 / 숏|숏', 'one name too wide: both short, never a wrapped name');
+    s.measure(60, 92.4);
+    assert.equal(s.shown(), '롱(Long)|롱(Long) / 숏(Short)|숏(Short)', 'within half a point fits');
+    s.layout(150);
+    assert.equal(s.shown(), '롱|롱 / 숏|숏', 'a narrower track: 64 is too little');
+    assert.equal(s.spoken(), '롱(Long) / 숏(Short)', 'the spoken names stay whole');
+  });
+
+  it('an estimate of "too narrow" is overruled once the names are measured to fit', () => {
+    const s = futuresSegment(true);
+    assert.equal(s.shown(), '롱|롱 / 숏|숏');
+    s.layout(206);
+    assert.equal(s.shown(), '롱|롱 / 숏|숏', 'the track alone decides nothing');
+    s.measure(60, 69);
+    assert.equal(s.shown(), '롱(Long)|롱(Long) / 숏(Short)|숏(Short)');
+  });
+
+  it('the measurer is never seen, touched or read aloud; 매수/매도 has none', () => {
+    const s = futuresSegment(false);
+    const measurer = s.host('futures-direction-measure');
+    assert.deepEqual([measurer.props.pointerEvents, measurer.props.accessible, measurer.props['aria-hidden'], measurer.props.importantForAccessibility],
+      ['none', false, true, 'no-hide-descendants']);
+    const clip = flatten(measurer.props.style);
+    assert.deepEqual([clip.position, clip.width, clip.height, clip.overflow], ['absolute', 0, 0, 'hidden']);
+    const spot = segmentHarness();
+    assert.equal(spot.node('order-side-segment-measure') === undefined, true);
+  });
+});
+
 describe('order panel side change', () => {
   it('remounts a clean form for the new side behind a short fade, without motion under Reduced Motion', async (t) => {
     const h = inlineTradingHarness();
