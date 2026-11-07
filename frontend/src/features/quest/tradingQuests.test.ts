@@ -4,6 +4,7 @@ import { questProgress, questPayload, questProgressInProgress } from '../../../t
 import { BEGINNER_QUEST_KEYS, canStartQuest, parseBeginnerQuests } from './questProgress.ts';
 import { startGuideSession, followGuideFocus, claimGuideCommand, settleGuideVerification, observeGuideProgress, resolveGuideView } from './questGuideModel.ts';
 import { TRADING_GUIDE_STEPS } from './tradingGuideSteps.ts';
+import { QUEST_CARDS } from './questContent.ts';
 const account='beginner-1';
 const spot={kind:'spot' as const,accountId:account,assetId:'crypto-1',assetType:'crypto',side:'buy',orderType:'market',orderId:'new-fill',summary:'실제 체결'};
 // A pending quest follows the order; a completed one (다시하기) starts only while
@@ -149,6 +150,49 @@ test('futures close step: the card is pointed at, and the guide steps aside whil
   // 포지션 종료 (or 손절가/익절가) over the screen is the user's: no card covers its controls.
   assert.equal(view({positionSheetOpen:true}).kind,'none');
   assert.equal(view({positionSheetOpen:false}).kind,'spotlight');
+});
+// Two-way positions (2026-11-06): a contract holds its LONG and SHORT apart and
+// a same-direction entry adds to the open one. The guide says so, and keeps the
+// quest's own rule (a NEW position from entry to close) apart from it (2026-11-07).
+test('futures guide copy is two-way: no One-way rule; long and short held apart, a same-direction entry adds up',()=>{
+  for(const quest of ['futuresLong','futuresShort'] as const){
+    const step=TRADING_GUIDE_STEPS[quest][1];
+    assert.equal(step.target,'futures-instrument');
+    assert.equal(step.body,'거래 가능한 선물 상품을 선택해 주세요. 같은 종목에서 롱과 숏 포지션을 각각 보유할 수 있어요. 같은 방향으로 추가 진입하면 기존 포지션에 합산돼요.');
+  }
+  assert.doesNotMatch(JSON.stringify([TRADING_GUIDE_STEPS,QUEST_CARDS]),/One-way|one-way|단방향|반대 포지션|먼저 종료해야/);
+});
+test('futures entry steps: only a position in the quest direction asks for a new practice position; the other direction never does',()=>{
+  const hints={
+    futuresLong:{first:'이 종목에는 롱 포지션이 이미 있어요. 이 퀘스트는 새 포지션의 진입부터 종료까지 연습해야 해요. 이 포지션을 먼저 전량 종료해 주세요.',
+      replay:'이 종목에는 롱 포지션이 이미 있어요. 이 퀘스트는 새 포지션의 진입부터 종료까지 연습해야 해요. 이 포지션을 전량 종료하거나 다른 종목을 선택해 주세요.'},
+    futuresShort:{first:'이 종목에는 숏 포지션이 이미 있어요. 이 퀘스트는 새 포지션의 진입부터 종료까지 연습해야 해요. 이 포지션을 먼저 전량 종료해 주세요.',
+      replay:'이 종목에는 숏 포지션이 이미 있어요. 이 퀘스트는 새 포지션의 진입부터 종료까지 연습해야 해요. 이 포지션을 전량 종료하거나 다른 종목을 선택해 주세요.'},
+  };
+  for(const quest of ['futuresLong','futuresShort'] as const)for(const replay of [false,true]){
+    // A first run (QUEST 06 done) or a replay (all ten done, full trading).
+    const started=startGuideSession(3,account,quest,questProgress(replay?10:6))!;
+    assert.equal(started.replay,replay);
+    const own=quest==='futuresLong'?'long':'short';const other=own==='long'?'short':'long';
+    const card=(step:number,form:Record<string,unknown>)=>{
+      const view=resolveGuideView({...started,step},'futures',{wallet:null,fx:null,transfer:null,
+        practice:{futures:{screen:'futures' as const,accountId:account,direction:own,marginMode:'isolated',leverage:2,...form}}});
+      if(view.kind!=='spotlight')return assert.fail(`step ${step} is pointed at`);
+      return view.card;
+    };
+    const label=`${quest} ${replay?'replay':'first'}`;
+    for(const step of [1,2,3,4]){
+      assert.equal(card(step,{}).hint,null,`${label} ${step}: nothing open`);
+      assert.equal(card(step,{positionId:'p-other',positionDirection:other}).hint,null,`${label} ${step}: the other direction only`);
+      assert.equal(card(step,{positionId:'p-own',positionDirection:own}).hint,hints[quest][replay?'replay':'first'],`${label} ${step}`);
+      // Whichever direction the form shows now, the quest's direction decides.
+      assert.equal(card(step,{direction:other,positionId:'p-own',positionDirection:own}).hint,hints[quest][replay?'replay':'first'],`${label} ${step}: form on ${other}`);
+    }
+    // Guidance only: the instrument step's 다음 stays as it was, with or without the hint.
+    assert.equal(card(1,{positionId:'p-own',positionDirection:own}).next,'enabled');
+    // The close step is the practice's own position: no hint there.
+    assert.equal(card(5,{positionId:'p-own',positionDirection:own}).hint,null,`${label} close step`);
+  }
 });
 test('replay preserves completion and returns without fireworks only after new practice',()=>{
   // A passed practice cannot be replayed before every quest is complete.

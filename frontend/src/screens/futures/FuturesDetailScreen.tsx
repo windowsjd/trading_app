@@ -270,14 +270,14 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
         <View style={{ ...styles.footer, paddingBottom: styles.footer.paddingBottom + insets.bottom }} testID="futures-detail-actions">
           <View style={styles.action}>
             <CTAButton testID="futures-detail-short" label="숏" state={tradable ? 'enabled' : 'disabled'}
-              accessibilityHint="숏(Short) 신규 진입 주문을 엽니다."
+              accessibilityHint="숏(Short) 주문 화면을 엽니다."
               learningHint={shortGate?.locked ? shortGate.message : null}
               onPress={() => (shortGate ? shortGate.guard(() => open('short')) : open('short'))}
               style={{ ...styles.actionButton, backgroundColor: SELL_COLOR }} />
           </View>
           <View style={styles.action}>
             <CTAButton testID="futures-detail-long" label="롱" state={tradable ? 'enabled' : 'disabled'}
-              accessibilityHint="롱(Long) 신규 진입 주문을 엽니다."
+              accessibilityHint="롱(Long) 주문 화면을 엽니다."
               learningHint={longGate?.locked ? longGate.message : null}
               onPress={() => (longGate ? longGate.guard(() => open('long')) : open('long'))}
               style={{ ...styles.actionButton, backgroundColor: BUY_COLOR }} />

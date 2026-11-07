@@ -198,6 +198,10 @@ const BUY_FEE_BUFFER = 0.002;
 const RATIO_BUTTONS = [0.25, 0.5, 0.75, 1] as const;
 const STOCK_LIMIT_WHOLE_SHARE_MESSAGE =
   '지정가 주문은 1주 단위로 가능해요. 현재 주문 가능 금액으로는 1주를 매수할 수 없어요.';
+const STOCK_LIMIT_RATIO_SHARE_MESSAGE =
+  '선택한 비율로는 1주를 계산할 수 없어요. 주식 지정가 주문은 1주 단위예요.';
+const STOCK_LIMIT_RATIO_UNKNOWN_MESSAGE =
+  `${STOCK_LIMIT_RATIO_SHARE_MESSAGE} 수량을 직접 입력해 확인해 주세요.`;
 
 function getOrderDomainErrorMessage(
   code?: string | null,
@@ -248,6 +252,22 @@ function exceedsAvailable(total: string | null | undefined, available: string | 
   } catch {
     return false;
   }
+}
+
+/**
+ * Why a stock limit/LOC BUY ratio came to 0 shares. The ratio keeps its fee
+ * buffer (never below 0.2%) and floors to whole shares, so it can reach 0
+ * while one share still fits. Whether ONE share fits is the live balance
+ * check's own sum — the server's reservation for one share at the limit
+ * price, the account's fee included, with the same rounding — against the
+ * same available cash. Without a usable fee or price it claims neither.
+ */
+function stockLimitZeroShareMessage(limitPrice: string, feeRate: string | null | undefined, available: string | null) {
+  const oneShare = orderPreview({ side: 'buy', quantity: '1', price: limitPrice, feeRate });
+  if (!oneShare || available === null) return STOCK_LIMIT_RATIO_UNKNOWN_MESSAGE;
+  return exceedsAvailable(oneShare.totalAmount, available)
+    ? STOCK_LIMIT_WHOLE_SHARE_MESSAGE
+    : STOCK_LIMIT_RATIO_SHARE_MESSAGE;
 }
 
 /** a − b on decimal strings; null when either is not a number. */
@@ -1032,16 +1052,14 @@ export function OrderForm({
     const nextQuantity = inputAtRatio(ratio);
 
     if (!nextQuantity || Number(nextQuantity) <= 0) {
-      // A stock limit/LOC BUY takes whole shares only: when even 100% (the
-      // same capacity as 최대 수량) floors to 0, say why. A smaller ratio of
-      // an amount that does buy a share keeps the general message.
-      const wholeShareUnaffordable =
-        side === 'buy' && isStock && orderType === 'limit' && inputAtRatio(1) === null;
+      // A stock limit/LOC BUY takes whole shares only: "cannot buy one share"
+      // only when one share really does not fit (the ratio's buffer alone
+      // never says so); the ratio itself is unchanged.
       setFieldError(
         isAmountBuy
           ? '계산된 매수 금액이 너무 작습니다.'
-          : wholeShareUnaffordable
-            ? STOCK_LIMIT_WHOLE_SHARE_MESSAGE
+          : side === 'buy' && isStock && orderType === 'limit'
+            ? stockLimitZeroShareMessage(limitPrice.trim(), tradeFeeRate, buyAvailable)
             : '계산된 수량이 너무 작습니다.',
       );
       return;

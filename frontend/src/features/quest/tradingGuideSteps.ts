@@ -18,7 +18,7 @@ const stock = (us: boolean): TradingGuideStep[] => [market, { ...price, body: us
   : '국내 주식은 한국 시장 운영시간에 KRW로 거래해요. 휴장 중에는 다른 심화 퀘스트를 진행할 수 있어요.' }, buy, marketType, amount, preview, submit, stockHoldings];
 const futures = (short: boolean): TradingGuideStep[] => [
   { screen: 'futures', target: 'futures-funding', title: '선물 지갑 준비', body: '주문가능 USD에서 선물 지갑으로 주문할 수 있는 금액을 확인해 주세요. 부족하면 지갑 탭에서 USD를 이체한 뒤 마켓 탭의 선물 화면으로 돌아와 진행해 주세요.', next: true },
-  { screen: 'futures', target: 'futures-instrument', title: '선물 종목', body: '거래 가능한 선물 상품을 선택해 주세요. 같은 종목은 One-way 방식이에요. 반대 포지션이 열려 있다면 먼저 종료해야 해요.', next: true },
+  { screen: 'futures', target: 'futures-instrument', title: '선물 종목', body: '거래 가능한 선물 상품을 선택해 주세요. 같은 종목에서 롱과 숏 포지션을 각각 보유할 수 있어요. 같은 방향으로 추가 진입하면 기존 포지션에 합산돼요.', next: true },
   { screen: 'futures', target: 'futures-direction', title: short ? 'Short · 숏' : 'Long · 롱', body: short ? '숏은 가격이 하락하면 이익, 상승하면 손실이 발생해요. Short를 선택해 주세요.' : '롱은 가격이 상승하면 이익, 하락하면 손실이 발생해요. Long을 선택해 주세요.', next: true },
   { screen: 'futures', target: 'futures-margin', title: '레버리지와 격리마진', body: '낮은 레버리지(예: 2배)와 Isolated 격리마진을 권장해요. 적은 증거금으로 큰 포지션을 만들 수 있지만 손실과 청산 위험도 커져요.', next: true },
   { screen: 'futures', target: 'futures-submit', title: '포지션 진입', body: '수량·증거금·수수료를 확인한 뒤 진입해 주세요. 이 실습은 1배보다 높은 레버리지로 진입해야 해요.' },

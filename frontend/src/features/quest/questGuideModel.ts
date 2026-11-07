@@ -376,8 +376,15 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
     if (view.kind === 'spotlight') view.card.stepLabel = `${index + 1}/${steps.length}`;
     return view;
   }
-  if (screen === 'futures' && session.step < 5 && form.positionId) {
-    hint = '이 종목에는 포지션이 이미 있어요. 기존 포지션을 전량 종료하거나 다른 종목을 선택한 뒤 새 포지션으로 실습해 주세요. One-way 정책은 그대로 적용돼요.';
+  // The practice adopts only a NEW position in its quest's direction; an entry
+  // into an open one of that direction adds to it. Two-way: the other
+  // direction never stands in the way. Before every quest is complete (a
+  // first run) the server holds any second open in that direction until the
+  // open one is closed; a replay (all complete) may use another contract.
+  const practiceDirection = session.quest === 'futuresShort' ? 'short' : 'long';
+  if (screen === 'futures' && session.step < 5 && form.positionId && form.positionDirection === practiceDirection) {
+    hint = `이 종목에는 ${practiceDirection === 'short' ? '숏' : '롱'} 포지션이 이미 있어요. 이 퀘스트는 새 포지션의 진입부터 종료까지 연습해야 해요. ${session.replay
+      ? '이 포지션을 전량 종료하거나 다른 종목을 선택해 주세요.' : '이 포지션을 먼저 전량 종료해 주세요.'}`;
   }
   const view = spotlight(session, screen, index, `${ready ? 'ready' : 'practice'}${notice ? ':short' : ''}`, [step.target],
     card(step, { next: step.next ? ready ? 'enabled' : 'disabled' : null, hint, notice, actions }));

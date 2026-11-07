@@ -59,12 +59,14 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     assert.equal(h.node('asset-timeframe-selector') === undefined, false, 'the shared 봉 시간 selector');
     const actions = h.renderer.root.findAll((n: any) => n.type === 'CTAButton').map((n: any) => [n.props.label, n.props.state]);
     assert.deepEqual(actions, [['숏', 'enabled'], ['롱', 'enabled']]);
-    // 숏 left, 롱 right (2026-11-06; 매도하기/매수하기 before): the same ids, hints and entries.
+    // 숏 left, 롱 right (2026-11-06; 매도하기/매수하기 before): the same ids and entries.
+    // Two-way positions: the order screen may open or add to that direction's
+    // position, so the hints name the screen, not a "new entry" (2026-11-07).
     const buttons = h.renderer.root.findAll((n: any) => n.type === 'CTAButton')
       .map((n: any) => [n.props.testID, n.props.accessibilityHint]);
     assert.deepEqual(buttons, [
-      ['futures-detail-short', '숏(Short) 신규 진입 주문을 엽니다.'],
-      ['futures-detail-long', '롱(Long) 신규 진입 주문을 엽니다.'],
+      ['futures-detail-short', '숏(Short) 주문 화면을 엽니다.'],
+      ['futures-detail-long', '롱(Long) 주문 화면을 엽니다.'],
     ]);
     assert.equal(/매수하기|매도하기/.test(h.text()), false);
   });

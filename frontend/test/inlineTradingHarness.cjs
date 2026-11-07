@@ -451,8 +451,9 @@ function inlineTradingHarness() {
         if (resource === 'orderCapabilities') return { ...base, data: h.orderCapabilities ?? { tradingAccountId: id,
           limitOrder: { enabled: true, autoExecutionEnabled: false }, limitOnClose: { enabled: false, markets: ['KRX'], sides: ['buy'], attachedProtection: false } } };
         if (resource === 'protections') return { ...base, data: h.protections ?? { tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { total: 0, limit: 30, offset: 0, hasNext: false } } };
+        // The account's fee policy; a test may make the read pending or failed.
         if (resource === 'detail')
-          return { ...base, data: { feePolicy: { tradeFeeRate: h.feeRate ?? '0.001' } } };
+          return { ...base, data: { feePolicy: { tradeFeeRate: h.feeRate ?? '0.001' } }, ...h.accountDetailState };
         if (resource === 'wallets')
           return {
             ...base,

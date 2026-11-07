@@ -62,7 +62,7 @@ export const QUEST_CARDS = {
   },
   futuresShort: {
     number: 'QUEST 10', title: '암호화폐 선물 숏', summary: '하락 방향의 손익 구조를 배우고 숏 포지션을 직접 종료해요. 롱 실습과 독립적이에요.',
-    topics: ['Short', '하락과 손익', '증거금', '청산 위험', 'One-way'], condition: '1배보다 높은 레버리지로 진입한 같은 숏 포지션을 직접 전량 종료하면 완료돼요.', completed: '선물 숏 퀘스트 완료!', result: '숏 포지션 종료',
+    topics: ['Short', '하락과 손익', '증거금', '청산 위험', '롱·숏 각각 보유'], condition: '1배보다 높은 레버리지로 진입한 같은 숏 포지션을 직접 전량 종료하면 완료돼요.', completed: '선물 숏 퀘스트 완료!', result: '숏 포지션 종료',
   },
 } as const;
 
