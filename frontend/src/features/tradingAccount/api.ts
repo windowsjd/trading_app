@@ -325,8 +325,9 @@ export interface AdRewardEligibilityDto {
   rewardAmountKrw: MoneyString | null;
   grantedCountToday: number;
   grantedAmountTodayKrw: MoneyString;
-  remainingCountToday: number;
-  remainingAmountTodayKrw: MoneyString;
+  /** null: that daily cap is configured `unlimited` (2026-11-07), never "0 left". */
+  remainingCountToday: number | null;
+  remainingAmountTodayKrw: MoneyString | null;
   nextEligibleAt: string | null;
 }
 
@@ -876,6 +877,38 @@ export async function claimAdReward(
 
   return assertAccountScope(
     'POST /trading-accounts/:accountId/ad-rewards/claim',
+    accountId,
+    response.data.data,
+  );
+}
+
+/**
+ * POST .../ad-rewards/sessions (2026-11-07): the server opens the 광고 시청
+ * 시도 for ONE command before the ad is shown — its purpose and idempotency
+ * key, on this platform's rewarded unit. `ssv` goes on the rewarded ad; the
+ * command later sends `proof: sessionId` with the same key. Moves no money.
+ */
+export interface AdRewardSessionDto {
+  sessionId: string;
+  tradingAccountId: string;
+  provider: string;
+  purpose: 'funding' | 'account_reset';
+  platform: 'android' | 'ios';
+  created: boolean;
+  expiresAt: string;
+  ssv: { userId: string; customData: string };
+}
+
+export async function createAdRewardSession(
+  accountId: string,
+  payload: { purpose: 'funding' | 'account_reset'; platform: 'android' | 'ios'; idempotencyKey: string },
+) {
+  const response = await apiClient.post<ApiSuccessResponse<AdRewardSessionDto>>(
+    accountPath(accountId, '/ad-rewards/sessions'),
+    payload,
+  );
+  return assertAccountScope(
+    'POST /trading-accounts/:accountId/ad-rewards/sessions',
     accountId,
     response.data.data,
   );

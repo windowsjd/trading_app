@@ -94,6 +94,12 @@ describe('routes reachable without an access token', () => {
     // account-scoped futures, FX quote/execute, record, ranking and operator
     // route keeps requiring a token: adding one here is a review.
     expect(tokenlessRoutes()).toEqual([
+      // AdMob's server-side verification callback (2026-11-07): called by
+      // Google, not a member. Google's ECDSA signature over the query is its
+      // authentication; it only records a reward event on a server-issued
+      // ad session (member, account and purpose fixed before the ad) and
+      // redeems that session's own command. Returns nothing about anyone.
+      { access: 'public', route: 'GET /api/v1/ad-rewards/admob/ssv' },
       // 앱 업데이트 안내 (2026-11-05): the store-published version per
       // platform from operator config; no account or user data.
       { access: 'public', route: 'GET /api/v1/app-release' },

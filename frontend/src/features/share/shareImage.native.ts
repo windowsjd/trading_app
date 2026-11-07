@@ -6,7 +6,7 @@ import type { InstalledAppCheck, ShareOutcome } from './shareTargets';
  * Device side of 수익 공유: capture the card view to a 1080 × 1920 PNG and hand
  * it to Instagram Stories, a messenger, the system share sheet or the photo
  * library. Native modules are imported on use, so a build without them fails
- * only the action, never the screen (same idiom as rewardedTestSdk.native.ts).
+ * only the action, never the screen (same idiom as features/ads/adsRuntime.native.ts).
  */
 export type CapturedShareImage = { uri: string };
 

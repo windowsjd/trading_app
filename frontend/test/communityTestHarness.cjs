@@ -259,6 +259,8 @@ function communityHarness({ platform = 'android', mode = 'light', financialPrefe
   const navigation = {
     navigate: (...args) => h.navigations.push(args),
     goBack: () => h.navigations.push(['goBack']),
+    // false once the member has left the screen (e.g. the composer's native back while posting).
+    isFocused: () => h.screenFocused !== false,
     setOptions: (options) => { h.options = { ...h.options, ...options }; },
     getParent: () => ({ getState: () => ({ index: 0, routes: [{ name: 'CommunityTab' }] }) }),
   };

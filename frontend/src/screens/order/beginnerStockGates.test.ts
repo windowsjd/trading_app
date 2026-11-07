@@ -60,14 +60,22 @@ describe('beginner staged access on a Korean stock (B차)', () => {
     assert.deepEqual(h.alerts.map((alert: unknown[]) => alert[1]), [ALL]);
   });
 
-  it('a SELL: market stays risk reduction, 조건주문 and LOC wait for every quest; no SELL 지정가 is offered', async (t) => {
+  it('a SELL: market stays risk reduction; 지정가 (restored 2026-11-07 (3)), 조건주문 and LOC wait for every quest', async (t) => {
     const h = beginner(6);
     await h.mount(); t.after(h.close);
     await h.press(sell);
     assert.equal(h.node(submit).props.learningHint ?? null, null);
     await h.press('order-type-select');
-    assert.deepEqual([learningLocked(h, 'market'), learningLocked(h, 'conditional'), learningLocked(h, 'loc')], [false, true, true]);
-    assert.equal(h.node('order-method-limit') === undefined, true);
+    // A user's own limit SELL is not risk reduction on the server (allTrading), so it waits like the others.
+    assert.deepEqual([learningLocked(h, 'market'), learningLocked(h, 'limit'), learningLocked(h, 'conditional'), learningLocked(h, 'loc')],
+      [false, true, true, true]);
+    await h.press('order-method-limit');
+    assert.equal(h.orderType(), '시장가', 'a locked method is not selected');
+    const all = beginner(10);
+    await all.mount(); t.after(all.close);
+    await all.press(sell);
+    await all.press('order-type-select');
+    assert.equal(learningLocked(all, 'limit'), false, 'every quest done opens the SELL 지정가');
   });
 
   it('QUEST 07 done: the Korean market BUY waits for every quest; all ten done opens it again', async (t) => {

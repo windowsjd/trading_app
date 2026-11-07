@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { it } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
-import { homeHeaderLayout, questBadgeCount } from './homeHeaderLayout.ts';
+import { homeAccountChangeWidth, homeHeaderLayout, homeTitleMinWidth, questBadgeCount } from './homeHeaderLayout.ts';
 
 const require = createRequire(import.meta.url);
 const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
@@ -38,17 +38,21 @@ function setup({ width = 390, fontScale = 1, seasonName = 'Season 1' } = {}) {
   });
   const Switcher = module.default;
   const Notices = module.HomeAccountNotices;
-  const maxWidth = homeHeaderLayout(width, fontScale, 'general').titleMaxWidth;
+  const layout = homeHeaderLayout(width, fontScale, 'general');
+  const maxWidth = layout.titleMaxWidth;
   const render = () => React.createElement(React.Fragment, null,
-    React.createElement(Switcher, { homeHeader: true, maxWidth }), React.createElement(Notices));
+    React.createElement(Switcher, { homeHeader: true, maxWidth, titleFontCap: layout.titleFontCap, changeFontCap: layout.changeFontCap }),
+    React.createElement(Notices));
   const renderer = h.render(render());
-  const text = () => renderer.root.findAllByType('Text').map((node: any) => node.props.children).flat().join(' ');
-  return { renderer, context, general, selected, render, text, maxWidth };
+  // Every text but the 계정변경 chip's own label (asserted on its own below).
+  const text = () => renderer.root.findAllByType('Text').map((node: any) => node.props.children).flat()
+    .filter((child: unknown) => child !== '계정변경').join(' ');
+  return { renderer, context, general, selected, render, text, maxWidth, layout };
 }
 
 const LONG_SEASON = '2026 하반기 정규 시즌 프리미엄 리그 결승 라운드 (확장 이벤트)';
 for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 1.5, 2]) for (const mode of ['general', 'season']) {
-  it(`${mode} Home header title at ${width}px × ${fontScale}: one 44dp control, one line inside its width, 28dp change chip`, t => {
+  it(`${mode} Home header title at ${width}px × ${fontScale}: one 44dp control, one line inside its width, 계정변경 text chip`, t => {
     const h = setup({ width, fontScale, seasonName: LONG_SEASON });
     t.after(() => act(() => h.renderer.unmount()));
     if (mode === 'general') {
@@ -66,17 +70,42 @@ for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 1.5, 2]) f
     const titles = h.renderer.root.findAllByType('Text').filter((node: any) => node.props.testID === 'home-account-title');
     assert.equal(titles.length, 1);
     assert.equal(titles[0].props.numberOfLines, 1, 'the header has one line');
-    assert.equal(titles[0].props.maxFontSizeMultiplier, 1.6);
+    assert.equal(titles[0].props.maxFontSizeMultiplier, h.layout.titleFontCap);
     const titleStyle = flatten(titles[0].props.style);
     assert.equal([titleStyle.fontSize, titleStyle.fontWeight].join('/'), '20/700');
     assert.equal(titles[0].props.children, mode === 'general' ? '일반모드' : LONG_SEASON);
     // The full name is announced even when the line is cut.
     assert.match(buttons[0].props.accessibilityLabel, mode === 'general' ? /현재 일반모드/ : /현재 2026 하반기/);
-    const chip = h.renderer.root.findAll((node: any) => node.type === 'View' && flatten(node.props.style).width === 28)[0];
+    // 계정변경 (2026-11-07 (3)) replaces the ⇄ icon: a 28dp text chip inside the same target, never shrinking.
+    const chip = h.renderer.root.findAll((node: any) => node.type === 'View' && node.props.testID === 'home-account-change')[0];
     const chipStyle = flatten(chip.props.style);
-    assert.equal([chipStyle.width, chipStyle.height, chipStyle.borderRadius].join('/'), '28/28/8');
+    assert.equal([chipStyle.minHeight, chipStyle.borderRadius, chipStyle.paddingHorizontal, chipStyle.flexShrink].join('/'), '28/8/8/0');
+    const label = chip.findAllByType('Text')[0];
+    assert.equal(label.props.children, '계정변경');
+    assert.equal(label.props.numberOfLines === undefined, true, 'never cut to one ellipsised line');
+    assert.equal(label.props.maxFontSizeMultiplier, h.layout.changeFontCap);
+    const labelStyle = flatten(label.props.style);
+    assert.equal([labelStyle.fontSize, labelStyle.fontWeight].join('/'), '13/600');
+    assert.equal(h.renderer.root.findAll((node: any) => node.type === 'Svg').length, 0, 'the ⇄ icon is gone');
   });
 }
+
+it('the four-character mode title and 계정변경 always fit whole beside the header buttons (320–430dp, 1–2x)', () => {
+  for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 1.15, 1.3, 1.5, 1.6, 2]) {
+    for (const mode of ['beginner', 'general'] as const) {
+      const layout = homeHeaderLayout(width, fontScale, mode);
+      const title = homeTitleMinWidth(Math.min(fontScale, layout.titleFontCap));
+      const chip = homeAccountChangeWidth(Math.min(fontScale, layout.changeFontCap));
+      assert.equal(title + chip <= layout.titleMaxWidth, true, `${mode} ${width}/${fontScale}: ${title}+${chip} > ${layout.titleMaxWidth}`);
+      assert.equal(layout.titleFontCap >= 1 && layout.titleFontCap <= 1.6, true);
+    }
+  }
+  // Room to spare keeps the usual caps; only a narrow screen with large text gives way.
+  assert.deepEqual([homeHeaderLayout(390, 1.6, 'general').titleFontCap, homeHeaderLayout(390, 1.6, 'general').changeFontCap], [1.6, 1.3]);
+  const narrow = homeHeaderLayout(320, 1.6, 'general');
+  assert.equal(narrow.changeFontCap, 1);
+  assert.equal(narrow.titleFontCap < 1.6, true);
+});
 
 it('the header title opens the existing account selection sheet and follows the selection', () => {
   const h = setup();
@@ -207,9 +236,12 @@ it('the header layout fits 320–430dp up to 1.6x text for every mode', () => {
       if (mode === 'season') assert.equal(layout.iconOnly, false);
     }
   }
-  // 360dp at 1x keeps the labels for both modes; 1.3x on 360dp drops general's.
-  assert.equal(homeHeaderLayout(360, 1, 'general').iconOnly, false);
+  // The 계정변경 chip is wider than the old ⇄ icon (2026-11-07 (3)): general's
+  // 가이드·보상 keep their labels from 390dp at 1x, beginner's 퀘스트 even at 320dp.
+  assert.equal(homeHeaderLayout(390, 1, 'general').iconOnly, false);
+  assert.equal(homeHeaderLayout(360, 1, 'general').iconOnly, true);
   assert.equal(homeHeaderLayout(360, 1, 'beginner').iconOnly, false);
+  assert.equal(homeHeaderLayout(320, 1, 'beginner').iconOnly, false);
   assert.equal(homeHeaderLayout(360, 1.3, 'general').iconOnly, true);
   assert.equal(homeHeaderLayout(320, 1, 'general').iconOnly, true);
   assert.deepEqual([questBadgeCount(10, 3), questBadgeCount(10, 10), questBadgeCount(10, null), questBadgeCount(10, 12)], [7, null, null, null]);

@@ -330,6 +330,7 @@ export type UserWhereInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionListRelationFilter
   communityRuleConsent?: Prisma.XOR<Prisma.CommunityRuleConsentNullableScalarRelationFilter, Prisma.CommunityRuleConsentWhereInput> | null
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupListRelationFilter
+  adRewardSessions?: Prisma.AdRewardSessionListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -382,6 +383,7 @@ export type UserOrderByWithRelationInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionOrderByRelationAggregateInput
   communityRuleConsent?: Prisma.CommunityRuleConsentOrderByWithRelationInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupOrderByRelationAggregateInput
+  adRewardSessions?: Prisma.AdRewardSessionOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -437,6 +439,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   communitySanctionsRevoked?: Prisma.CommunitySanctionListRelationFilter
   communityRuleConsent?: Prisma.XOR<Prisma.CommunityRuleConsentNullableScalarRelationFilter, Prisma.CommunityRuleConsentWhereInput> | null
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupListRelationFilter
+  adRewardSessions?: Prisma.AdRewardSessionListRelationFilter
 }, "id" | "email" | "nickname">
 
 export type UserOrderByWithAggregationInput = {
@@ -533,6 +536,7 @@ export type UserCreateInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -585,6 +589,7 @@ export type UserUncheckedCreateInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -637,6 +642,7 @@ export type UserUpdateInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -689,6 +695,7 @@ export type UserUncheckedUpdateInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -1067,6 +1074,20 @@ export type UserUpdateOneRequiredWithoutAdRewardClaimsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAdRewardClaimsInput, Prisma.UserUpdateWithoutAdRewardClaimsInput>, Prisma.UserUncheckedUpdateWithoutAdRewardClaimsInput>
 }
 
+export type UserCreateNestedOneWithoutAdRewardSessionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAdRewardSessionsInput, Prisma.UserUncheckedCreateWithoutAdRewardSessionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAdRewardSessionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutAdRewardSessionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAdRewardSessionsInput, Prisma.UserUncheckedCreateWithoutAdRewardSessionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAdRewardSessionsInput
+  upsert?: Prisma.UserUpsertWithoutAdRewardSessionsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAdRewardSessionsInput, Prisma.UserUpdateWithoutAdRewardSessionsInput>, Prisma.UserUncheckedUpdateWithoutAdRewardSessionsInput>
+}
+
 export type UserCreateNestedOneWithoutGeneralAccountResetsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutGeneralAccountResetsInput, Prisma.UserUncheckedCreateWithoutGeneralAccountResetsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutGeneralAccountResetsInput
@@ -1394,6 +1415,7 @@ export type UserCreateWithoutInquiriesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutInquiriesInput = {
@@ -1445,6 +1467,7 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutInquiriesInput = {
@@ -1512,6 +1535,7 @@ export type UserUpdateWithoutInquiriesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutInquiriesInput = {
@@ -1563,6 +1587,7 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutInquiryAnswersInput = {
@@ -1614,6 +1639,7 @@ export type UserCreateWithoutInquiryAnswersInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutInquiryAnswersInput = {
@@ -1665,6 +1691,7 @@ export type UserUncheckedCreateWithoutInquiryAnswersInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutInquiryAnswersInput = {
@@ -1732,6 +1759,7 @@ export type UserUpdateWithoutInquiryAnswersInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
@@ -1783,6 +1811,7 @@ export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFriendshipsLowInput = {
@@ -1834,6 +1863,7 @@ export type UserCreateWithoutFriendshipsLowInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFriendshipsLowInput = {
@@ -1885,6 +1915,7 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFriendshipsLowInput = {
@@ -1941,6 +1972,7 @@ export type UserCreateWithoutFriendshipsHighInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFriendshipsHighInput = {
@@ -1992,6 +2024,7 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFriendshipsHighInput = {
@@ -2059,6 +2092,7 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
@@ -2110,6 +2144,7 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutFriendshipsHighInput = {
@@ -2172,6 +2207,7 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
@@ -2223,6 +2259,7 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutOperatorAuditLogsInput = {
@@ -2274,6 +2311,7 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
@@ -2325,6 +2363,7 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutOperatorAuditLogsInput = {
@@ -2392,6 +2431,7 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
@@ -2443,6 +2483,7 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRefreshTokenSessionsInput = {
@@ -2494,6 +2535,7 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
@@ -2545,6 +2587,7 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRefreshTokenSessionsInput = {
@@ -2612,6 +2655,7 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
@@ -2663,6 +2707,7 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTradingAccountsInput = {
@@ -2714,6 +2759,7 @@ export type UserCreateWithoutTradingAccountsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTradingAccountsInput = {
@@ -2765,6 +2811,7 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTradingAccountsInput = {
@@ -2832,6 +2879,7 @@ export type UserUpdateWithoutTradingAccountsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTradingAccountsInput = {
@@ -2883,6 +2931,7 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSeasonParticipantsInput = {
@@ -2934,6 +2983,7 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
@@ -2985,6 +3035,7 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonParticipantsInput = {
@@ -3052,6 +3103,7 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
@@ -3103,6 +3155,7 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutUserBadgesInput = {
@@ -3154,6 +3207,7 @@ export type UserCreateWithoutUserBadgesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutUserBadgesInput = {
@@ -3205,6 +3259,7 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutUserBadgesInput = {
@@ -3272,6 +3327,7 @@ export type UserUpdateWithoutUserBadgesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutUserBadgesInput = {
@@ -3323,6 +3379,7 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSeasonRewardsInput = {
@@ -3374,6 +3431,7 @@ export type UserCreateWithoutSeasonRewardsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonRewardsInput = {
@@ -3425,6 +3483,7 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonRewardsInput = {
@@ -3492,6 +3551,7 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
@@ -3543,6 +3603,7 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRewardFulfillmentTargetsInput = {
@@ -3594,6 +3655,7 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
@@ -3645,6 +3707,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentTargetsInput = {
@@ -3701,6 +3764,7 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
@@ -3752,6 +3816,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsRequestedInput = {
@@ -3808,6 +3873,7 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
@@ -3859,6 +3925,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsProcessedInput = {
@@ -3915,6 +3982,7 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
@@ -3966,6 +4034,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsCanceledInput = {
@@ -4033,6 +4102,7 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
@@ -4084,6 +4154,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsRequestedInput = {
@@ -4146,6 +4217,7 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
@@ -4197,6 +4269,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsProcessedInput = {
@@ -4259,6 +4332,7 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
@@ -4310,6 +4384,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsCanceledInput = {
@@ -4372,6 +4447,7 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
@@ -4423,6 +4499,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAdRewardClaimsInput = {
@@ -4474,6 +4551,7 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
@@ -4525,6 +4603,7 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAdRewardClaimsInput = {
@@ -4592,6 +4671,7 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
@@ -4620,6 +4700,231 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutAdRewardSessionsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutAdRewardSessionsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutAdRewardSessionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutAdRewardSessionsInput, Prisma.UserUncheckedCreateWithoutAdRewardSessionsInput>
+}
+
+export type UserUpsertWithoutAdRewardSessionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutAdRewardSessionsInput, Prisma.UserUncheckedUpdateWithoutAdRewardSessionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutAdRewardSessionsInput, Prisma.UserUncheckedCreateWithoutAdRewardSessionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutAdRewardSessionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutAdRewardSessionsInput, Prisma.UserUncheckedUpdateWithoutAdRewardSessionsInput>
+}
+
+export type UserUpdateWithoutAdRewardSessionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutAdRewardSessionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
   generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
@@ -4694,6 +4999,7 @@ export type UserCreateWithoutGeneralAccountResetsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
@@ -4745,6 +5051,7 @@ export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutGeneralAccountResetsInput = {
@@ -4812,6 +5119,7 @@ export type UserUpdateWithoutGeneralAccountResetsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
@@ -4863,6 +5171,7 @@ export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutQuotesInput = {
@@ -4914,6 +5223,7 @@ export type UserCreateWithoutQuotesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutQuotesInput = {
@@ -4965,6 +5275,7 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutQuotesInput = {
@@ -5032,6 +5343,7 @@ export type UserUpdateWithoutQuotesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutQuotesInput = {
@@ -5083,6 +5395,7 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFxExecuteRequestsInput = {
@@ -5134,6 +5447,7 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -5185,6 +5499,7 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -5252,6 +5567,7 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -5303,6 +5619,7 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPushDevicesInput = {
@@ -5354,6 +5671,7 @@ export type UserCreateWithoutPushDevicesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPushDevicesInput = {
@@ -5405,6 +5723,7 @@ export type UserUncheckedCreateWithoutPushDevicesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPushDevicesInput = {
@@ -5472,6 +5791,7 @@ export type UserUpdateWithoutPushDevicesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPushDevicesInput = {
@@ -5523,6 +5843,7 @@ export type UserUncheckedUpdateWithoutPushDevicesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutNotificationPreferenceInput = {
@@ -5574,6 +5895,7 @@ export type UserCreateWithoutNotificationPreferenceInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
@@ -5625,6 +5947,7 @@ export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutNotificationPreferenceInput = {
@@ -5692,6 +6015,7 @@ export type UserUpdateWithoutNotificationPreferenceInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
@@ -5743,6 +6067,7 @@ export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPushNotificationsInput = {
@@ -5794,6 +6119,7 @@ export type UserCreateWithoutPushNotificationsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPushNotificationsInput = {
@@ -5845,6 +6171,7 @@ export type UserUncheckedCreateWithoutPushNotificationsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPushNotificationsInput = {
@@ -5912,6 +6239,7 @@ export type UserUpdateWithoutPushNotificationsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPushNotificationsInput = {
@@ -5963,6 +6291,7 @@ export type UserUncheckedUpdateWithoutPushNotificationsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityPostsInput = {
@@ -6014,6 +6343,7 @@ export type UserCreateWithoutCommunityPostsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPostsInput = {
@@ -6065,6 +6395,7 @@ export type UserUncheckedCreateWithoutCommunityPostsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPostsInput = {
@@ -6121,6 +6452,7 @@ export type UserCreateWithoutCommunityPostsRemovedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPostsRemovedInput = {
@@ -6172,6 +6504,7 @@ export type UserUncheckedCreateWithoutCommunityPostsRemovedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPostsRemovedInput = {
@@ -6239,6 +6572,7 @@ export type UserUpdateWithoutCommunityPostsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPostsInput = {
@@ -6290,6 +6624,7 @@ export type UserUncheckedUpdateWithoutCommunityPostsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutCommunityPostsRemovedInput = {
@@ -6352,6 +6687,7 @@ export type UserUpdateWithoutCommunityPostsRemovedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPostsRemovedInput = {
@@ -6403,6 +6739,7 @@ export type UserUncheckedUpdateWithoutCommunityPostsRemovedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityCommentsInput = {
@@ -6454,6 +6791,7 @@ export type UserCreateWithoutCommunityCommentsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityCommentsInput = {
@@ -6505,6 +6843,7 @@ export type UserUncheckedCreateWithoutCommunityCommentsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityCommentsInput = {
@@ -6561,6 +6900,7 @@ export type UserCreateWithoutCommunityCommentsRemovedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityCommentsRemovedInput = {
@@ -6612,6 +6952,7 @@ export type UserUncheckedCreateWithoutCommunityCommentsRemovedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityCommentsRemovedInput = {
@@ -6679,6 +7020,7 @@ export type UserUpdateWithoutCommunityCommentsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityCommentsInput = {
@@ -6730,6 +7072,7 @@ export type UserUncheckedUpdateWithoutCommunityCommentsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutCommunityCommentsRemovedInput = {
@@ -6792,6 +7135,7 @@ export type UserUpdateWithoutCommunityCommentsRemovedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityCommentsRemovedInput = {
@@ -6843,6 +7187,7 @@ export type UserUncheckedUpdateWithoutCommunityCommentsRemovedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityPostLikesInput = {
@@ -6894,6 +7239,7 @@ export type UserCreateWithoutCommunityPostLikesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPostLikesInput = {
@@ -6945,6 +7291,7 @@ export type UserUncheckedCreateWithoutCommunityPostLikesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPostLikesInput = {
@@ -7012,6 +7359,7 @@ export type UserUpdateWithoutCommunityPostLikesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPostLikesInput = {
@@ -7063,6 +7411,7 @@ export type UserUncheckedUpdateWithoutCommunityPostLikesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityCommentLikesInput = {
@@ -7114,6 +7463,7 @@ export type UserCreateWithoutCommunityCommentLikesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityCommentLikesInput = {
@@ -7165,6 +7515,7 @@ export type UserUncheckedCreateWithoutCommunityCommentLikesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityCommentLikesInput = {
@@ -7232,6 +7583,7 @@ export type UserUpdateWithoutCommunityCommentLikesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityCommentLikesInput = {
@@ -7283,6 +7635,7 @@ export type UserUncheckedUpdateWithoutCommunityCommentLikesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityPostAliasesInput = {
@@ -7334,6 +7687,7 @@ export type UserCreateWithoutCommunityPostAliasesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPostAliasesInput = {
@@ -7385,6 +7739,7 @@ export type UserUncheckedCreateWithoutCommunityPostAliasesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPostAliasesInput = {
@@ -7452,6 +7807,7 @@ export type UserUpdateWithoutCommunityPostAliasesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPostAliasesInput = {
@@ -7503,6 +7859,7 @@ export type UserUncheckedUpdateWithoutCommunityPostAliasesInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityReportsInput = {
@@ -7554,6 +7911,7 @@ export type UserCreateWithoutCommunityReportsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityReportsInput = {
@@ -7605,6 +7963,7 @@ export type UserUncheckedCreateWithoutCommunityReportsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityReportsInput = {
@@ -7672,6 +8031,7 @@ export type UserUpdateWithoutCommunityReportsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityReportsInput = {
@@ -7723,6 +8083,7 @@ export type UserUncheckedUpdateWithoutCommunityReportsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunitySanctionsInput = {
@@ -7774,6 +8135,7 @@ export type UserCreateWithoutCommunitySanctionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunitySanctionsInput = {
@@ -7825,6 +8187,7 @@ export type UserUncheckedCreateWithoutCommunitySanctionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunitySanctionsInput = {
@@ -7881,6 +8244,7 @@ export type UserCreateWithoutCommunitySanctionsCreatedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunitySanctionsCreatedInput = {
@@ -7932,6 +8296,7 @@ export type UserUncheckedCreateWithoutCommunitySanctionsCreatedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunitySanctionsCreatedInput = {
@@ -7988,6 +8353,7 @@ export type UserCreateWithoutCommunitySanctionsRevokedInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunitySanctionsRevokedInput = {
@@ -8039,6 +8405,7 @@ export type UserUncheckedCreateWithoutCommunitySanctionsRevokedInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunitySanctionsRevokedInput = {
@@ -8106,6 +8473,7 @@ export type UserUpdateWithoutCommunitySanctionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunitySanctionsInput = {
@@ -8157,6 +8525,7 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutCommunitySanctionsCreatedInput = {
@@ -8219,6 +8588,7 @@ export type UserUpdateWithoutCommunitySanctionsCreatedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput = {
@@ -8270,6 +8640,7 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutCommunitySanctionsRevokedInput = {
@@ -8332,6 +8703,7 @@ export type UserUpdateWithoutCommunitySanctionsRevokedInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput = {
@@ -8383,6 +8755,7 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityRuleConsentInput = {
@@ -8434,6 +8807,7 @@ export type UserCreateWithoutCommunityRuleConsentInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityRuleConsentInput = {
@@ -8485,6 +8859,7 @@ export type UserUncheckedCreateWithoutCommunityRuleConsentInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityRuleConsentInput = {
@@ -8552,6 +8927,7 @@ export type UserUpdateWithoutCommunityRuleConsentInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityRuleConsentInput = {
@@ -8603,6 +8979,7 @@ export type UserUncheckedUpdateWithoutCommunityRuleConsentInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityPhotoCleanupsInput = {
@@ -8654,6 +9031,7 @@ export type UserCreateWithoutCommunityPhotoCleanupsInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPhotoCleanupsInput = {
@@ -8705,6 +9083,7 @@ export type UserUncheckedCreateWithoutCommunityPhotoCleanupsInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPhotoCleanupsInput = {
@@ -8772,6 +9151,7 @@ export type UserUpdateWithoutCommunityPhotoCleanupsInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput = {
@@ -8823,6 +9203,7 @@ export type UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput = {
   communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -8863,6 +9244,7 @@ export type UserCountOutputType = {
   communitySanctionsCreated: number
   communitySanctionsRevoked: number
   communityPhotoCleanups: number
+  adRewardSessions: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -8898,6 +9280,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   communitySanctionsCreated?: boolean | UserCountOutputTypeCountCommunitySanctionsCreatedArgs
   communitySanctionsRevoked?: boolean | UserCountOutputTypeCountCommunitySanctionsRevokedArgs
   communityPhotoCleanups?: boolean | UserCountOutputTypeCountCommunityPhotoCleanupsArgs
+  adRewardSessions?: boolean | UserCountOutputTypeCountAdRewardSessionsArgs
 }
 
 /**
@@ -9134,6 +9517,13 @@ export type UserCountOutputTypeCountCommunityPhotoCleanupsArgs<ExtArgs extends r
   where?: Prisma.CommunityPhotoCleanupWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountAdRewardSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AdRewardSessionWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -9185,6 +9575,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   communitySanctionsRevoked?: boolean | Prisma.User$communitySanctionsRevokedArgs<ExtArgs>
   communityRuleConsent?: boolean | Prisma.User$communityRuleConsentArgs<ExtArgs>
   communityPhotoCleanups?: boolean | Prisma.User$communityPhotoCleanupsArgs<ExtArgs>
+  adRewardSessions?: boolean | Prisma.User$adRewardSessionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -9278,6 +9669,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   communitySanctionsRevoked?: boolean | Prisma.User$communitySanctionsRevokedArgs<ExtArgs>
   communityRuleConsent?: boolean | Prisma.User$communityRuleConsentArgs<ExtArgs>
   communityPhotoCleanups?: boolean | Prisma.User$communityPhotoCleanupsArgs<ExtArgs>
+  adRewardSessions?: boolean | Prisma.User$adRewardSessionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -9320,6 +9712,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     communitySanctionsRevoked: Prisma.$CommunitySanctionPayload<ExtArgs>[]
     communityRuleConsent: Prisma.$CommunityRuleConsentPayload<ExtArgs> | null
     communityPhotoCleanups: Prisma.$CommunityPhotoCleanupPayload<ExtArgs>[]
+    adRewardSessions: Prisma.$AdRewardSessionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -9774,6 +10167,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   communitySanctionsRevoked<T extends Prisma.User$communitySanctionsRevokedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communitySanctionsRevokedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunitySanctionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   communityRuleConsent<T extends Prisma.User$communityRuleConsentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityRuleConsentArgs<ExtArgs>>): Prisma.Prisma__CommunityRuleConsentClient<runtime.Types.Result.GetResult<Prisma.$CommunityRuleConsentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   communityPhotoCleanups<T extends Prisma.User$communityPhotoCleanupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityPhotoCleanupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityPhotoCleanupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  adRewardSessions<T extends Prisma.User$adRewardSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$adRewardSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdRewardSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -11014,6 +11408,30 @@ export type User$communityPhotoCleanupsArgs<ExtArgs extends runtime.Types.Extens
   take?: number
   skip?: number
   distinct?: Prisma.CommunityPhotoCleanupScalarFieldEnum | Prisma.CommunityPhotoCleanupScalarFieldEnum[]
+}
+
+/**
+ * User.adRewardSessions
+ */
+export type User$adRewardSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AdRewardSession
+   */
+  select?: Prisma.AdRewardSessionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AdRewardSession
+   */
+  omit?: Prisma.AdRewardSessionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AdRewardSessionInclude<ExtArgs> | null
+  where?: Prisma.AdRewardSessionWhereInput
+  orderBy?: Prisma.AdRewardSessionOrderByWithRelationInput | Prisma.AdRewardSessionOrderByWithRelationInput[]
+  cursor?: Prisma.AdRewardSessionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AdRewardSessionScalarFieldEnum | Prisma.AdRewardSessionScalarFieldEnum[]
 }
 
 /**

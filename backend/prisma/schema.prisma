@@ -402,6 +402,7 @@ model User {
   communitySanctionsRevoked   CommunitySanction[]        @relation("CommunitySanctionRevokedBy")
   communityRuleConsent        CommunityRuleConsent?
   communityPhotoCleanups      CommunityPhotoCleanup[]
+  adRewardSessions            AdRewardSession[]
 
   @@map("users")
 }
@@ -580,6 +581,7 @@ model TradingAccount {
   // violation, never a supported ranking scope (작업 8).
   seasonRankings                SeasonRanking[]
   beginnerQuestAcknowledgements BeginnerQuestAcknowledgement[]
+  adRewardSessions              AdRewardSession[]
 
   @@index([userId, mode])
   @@index([mode, status])
@@ -2156,6 +2158,45 @@ model AdRewardClaim {
   @@index([userId, grantedAt])
   @@index([status, createdAt])
   @@map("ad_reward_claims")
+}
+
+/// 광고 시청 시도 (2026-11-07): the server-issued attempt one AdMob rewarded ad
+/// is shown for. Created BEFORE the ad, it binds the member, the general
+/// account, the purpose (funding | account_reset) and the claim/reset command
+/// key; its id is the SSV custom data. Google's signed SSV callback records
+/// its reward event here once (transaction_id, unique), and the EXISTING
+/// claim/reset command (same key, proof = this id) redeems it once through
+/// the registry's AdMob verifier. No money moves on this row.
+model AdRewardSession {
+  id               String          @id @default(uuid())
+  userId           String          @map("user_id")
+  tradingAccountId String          @map("trading_account_id")
+  provider         String
+  purpose          AdRewardPurpose
+  /// android | ios (SQL CHECK): which configured rewarded ad unit may verify it.
+  platform         String
+  /// The claim/reset command key this ad redeems, on the app's and the
+  /// callback's path alike.
+  idempotencyKey   String          @map("idempotency_key")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  /// A callback after this is never recorded; an unverified attempt ends here.
+  expiresAt        DateTime        @map("expires_at")
+  /// Google's reward event id (SSV transaction_id); set once, with the rest.
+  ssvTransactionId String?         @unique @map("ssv_transaction_id")
+  ssvVerifiedAt    DateTime?       @map("ssv_verified_at")
+  ssvRewardedAt    DateTime?       @map("ssv_rewarded_at")
+  ssvAdUnit        String?         @map("ssv_ad_unit")
+  ssvKeyId         String?         @map("ssv_key_id")
+  ssvRewardItem    String?         @map("ssv_reward_item")
+  ssvRewardAmount  String?         @map("ssv_reward_amount")
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([tradingAccountId, idempotencyKey])
+  @@index([tradingAccountId, createdAt])
+  @@index([userId])
+  @@map("ad_reward_sessions")
 }
 
 /// A general-account reset (2026-10-20): the account, its id, its opening

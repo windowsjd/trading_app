@@ -124,16 +124,27 @@ per-family total and distinct price (`CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING`,
 (`CONDITIONAL_PRICE_UNAVAILABLE`) and a condition not already met
 (`CONDITIONAL_SELL_ALREADY_MET`).
 
-Off-session registration (2026-10-18), **user conditions only**: on a stock
-market that is confirmed closed (`MARKET_CLOSED` at the post-lock DB clock) a
-`kind: "condition"` registers without a price (`registrationSnapshotId = null`)
-and with its `triggerCondition` exactly as sent; nothing is reserved and every
-other rule above still applies. It is evaluated from the next regular session
-with that session's evidence after registration only (an opening gap past the
-watch price triggers at once; off-hours trades and the previous close never
-do). An undecidable session → `409 MARKET_CALENDAR_UNAVAILABLE`.
-Stop-loss/take-profit settings keep requiring fresh evidence while closed
-(`CONDITIONAL_PRICE_UNAVAILABLE`).
+Off-session registration (2026-10-18 for user conditions; **2026-11-07 also
+for KRX/US stock stop-loss/take-profit**): on a stock market that is confirmed
+closed (`MARKET_CLOSED` at the post-lock DB clock) a `kind: "condition"` — and
+a stock `kind: "protection"` leg — registers without a price
+(`registrationSnapshotId = null`); a condition keeps its `triggerCondition`
+exactly as sent, a stop-loss its fixed `at_or_below` and a take-profit its
+fixed `at_or_above`. The user's price and quantity are stored as sent;
+nothing is reserved and every other rule above still applies (per-family
+totals, distinct prices, OCO exclusion, account/season gates, idempotency).
+It is evaluated from the next regular session with that session's evidence
+after registration — or after its last change — only: an opening gap past the
+trigger fires at once (a take-profit at or above, a stop-loss at or below its
+price) and then sells through the ordinary market SELL at that session's
+price, sized by the unreserved holding at that moment; off-hours trades and
+the previous close never fire it. The trigger price is not a fill price. A
+change (`…/modify`) while closed follows the same rule. An undecidable session
+→ `409 MARKET_CALENDAR_UNAVAILABLE`; a price failure during an open session is
+never taken for a closure (`409 CONDITIONAL_PRICE_UNAVAILABLE`). Crypto Spot
+stop-loss/take-profit (24/7), Futures settings and entry plans keep requiring
+fresh evidence. PostgreSQL coverage: `scripts/conditional-sell-orders-
+integration.ts` `offSessionRegistration`, `offSessionTpSl`, `usOnTiingo`.
 
 Each row returns money as strings: `kind`, `triggerCondition`, `triggerPrice`,
 `executionType`, `limitPrice`, `quantity` (target), `status`, `state`
@@ -142,8 +153,10 @@ Each row returns money as strings: `kind`, `triggerCondition`, `triggerPrice`,
 `holdingQuantity`, `reservedQuantity`, `availableQuantity`,
 `executableQuantity` — what a trigger now would sell; informational),
 `executionAvailableQuantity` (unreserved holding when the order was sized),
-`registeredOffSession` (2026-10-18, additive: a condition registered while its
-stock market was closed),
+`registeredOffSession` (2026-10-18, additive: a condition — since 2026-11-07
+also a stock stop-loss/take-profit — registered or last changed while its
+stock market was closed; a setting an entry plan activated at its fill has
+no registration price either and counts only once changed off-session),
 `quantityLimited` (`order.quantity < quantity`), `trigger` (time + copied
 evidence), `order` (`orderId`, `orderType`, `status`, `quantity` = submitted,
 `executedQuantity`, `reservedQuantity`, executed price/gross/fee/net,
@@ -151,10 +164,12 @@ evidence), `order` (`orderId`, `orderType`, `status`, `quantity` = submitted,
 `filled` means the linked Order executed — never that a price was reached.
 
 `capabilities`: `{ enabled, condition: { enabled, canCreate, canUseLimit,
-offSessionMarkets }, protection: { enabled, canCreate, canUseLimit },
-canCancel: true, markets: ['KRX','CRYPTO_SPOT'], maxLivePerAccount: 30 }`
-(`condition.offSessionMarkets`, 2026-10-18, additive: the listed stock markets
-where a condition may also register while closed).
+offSessionMarkets }, protection: { enabled, canCreate, canUseLimit,
+offSessionMarkets }, canCancel: true, markets: ['KRX','CRYPTO_SPOT'],
+maxLivePerAccount: 30 }` (`condition.offSessionMarkets`, 2026-10-18, and
+`protection.offSessionMarkets`, 2026-11-07, both additive: the listed stock
+markets where that family may also register while closed; an older server
+without the protection list refuses closed-market stop-loss/take-profit).
 
 The account order list adds `conditionalSell: { id, kind } | null` to each
 order (the setting that submitted it).

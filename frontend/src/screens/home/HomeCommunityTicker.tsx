@@ -7,6 +7,7 @@ import { useAppearance } from '../../theme/appearance';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { openCommunityPostFromHome } from '../../app/navigation/communityPostEntry';
 import { getMe, type MeDto } from '../../features/me/api';
 import { COMMUNITY_HOT_PREVIEW_LIMIT, getCommunityPosts, type CommunityPostDto } from '../../features/community/api';
 import { describePostAuthor } from '../../features/community/authorDisplay';
@@ -82,9 +83,10 @@ export type HomeCommunityHotData = ReturnType<typeof useHomeCommunityHot>;
  * else the latest posts (same layout, no HOT mark), else an invitation to
  * write the first post. A failed read shows only the way into the community
  * (never "no posts"; Home never breaks for it); a same-height placeholder
- * while it is first read. Tapping opens the community — on HOT for HOT
- * posts, on 전체 otherwise: the 커뮤니티 tab, or 리그 › 커뮤니티 for a
- * season account.
+ * while it is first read. Tapping a post opens THAT post's detail
+ * (2026-11-07 (3)) on the member's community stack — the 커뮤니티 tab, or
+ * 리그 for a season account — and back returns to Home; the invitation and
+ * the way-in still open the list (전체).
  */
 export default function HomeCommunityTicker({ hot: data, season }: { hot: HomeCommunityHotData; season: boolean }) {
   const { card, hot, latest, latestActive } = data;
@@ -115,27 +117,28 @@ export default function HomeCommunityTicker({ hot: data, season }: { hot: HomeCo
       </View>
     );
   }
+  if (card.kind === 'hot' || card.kind === 'latest') {
+    // Keyed by kind: HOT replacing the latest posts (or back) starts at its own first post.
+    return <TickerCard key={card.kind} kind={card.kind} posts={card.posts} focused={focused} layout={layout}
+      onOpenPost={(postId) => rootNavigation.navigate('MainTabs', openCommunityPostFromHome(postId, season))} />;
+  }
   const category = homeCommunityCategory(card);
   const open = () => rootNavigation.navigate('MainTabs', season
     ? { screen: 'RankingTab', params: { screen: 'Ranking', params: { section: 'community', category, at: Date.now() }, pop: true } }
     : { screen: 'CommunityTab', params: { screen: 'Community', params: { category, at: Date.now() }, pop: true } });
-  if (card.kind === 'hot' || card.kind === 'latest') {
-    // Keyed by kind: HOT replacing the latest posts (or back) starts at its own first post.
-    return <TickerCard key={card.kind} kind={card.kind} posts={card.posts} focused={focused} layout={layout} onOpen={open} />;
-  }
   return <InvitationCard kind={card.kind} layout={layout} onOpen={open} />;
 }
 
 const CARD = { backgroundColor: semantic.surface, borderRadius: 16, paddingTop: 14, paddingRight: 36, paddingBottom: 14, paddingLeft: 16 } as const;
 const SPOKEN = {
-  hot: { name: '커뮤니티 HOT 글', hint: '커뮤니티 HOT 글 목록을 엽니다.' },
-  latest: { name: '커뮤니티 최신 글', hint: '커뮤니티 전체 글 목록을 엽니다.' },
+  hot: { name: '커뮤니티 HOT 글', hint: '이 글의 본문과 댓글을 엽니다.' },
+  latest: { name: '커뮤니티 최신 글', hint: '이 글의 본문과 댓글을 엽니다.' },
 } as const;
 
 type SlideLayout = ReturnType<typeof tickerSlideLayout>;
 
-function TickerCard({ kind, posts, focused, layout, onOpen }: {
-  kind: 'hot' | 'latest'; posts: CommunityPostDto[]; focused: boolean; layout: SlideLayout; onOpen: () => void;
+function TickerCard({ kind, posts, focused, layout, onOpenPost }: {
+  kind: 'hot' | 'latest'; posts: CommunityPostDto[]; focused: boolean; layout: SlideLayout; onOpenPost: (postId: string) => void;
 }) {
   const reduced = useReducedMotion();
   const [appActive, setAppActive] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
@@ -162,8 +165,10 @@ function TickerCard({ kind, posts, focused, layout, onOpen }: {
   }, [count, index, rotate]);
 
   // The outgoing post fades while rising; the next one rises in from below.
+  const transitionStartedAt = useRef(0);
   useEffect(() => {
     if (previous === null) return undefined;
+    transitionStartedAt.current = performance.now();
     progress.setValue(0);
     const animation = Animated.timing(progress, {
       toValue: 1, duration: TICKER_TRANSITION_MS, easing: easeOutCubic, useNativeDriver: Platform.OS !== 'web', isInteraction: false,
@@ -175,11 +180,43 @@ function TickerCard({ kind, posts, focused, layout, onOpen }: {
   const post = posts[shown];
   const author = describePostAuthor(post.author);
   const outgoing = previous !== null && previous !== shown && previous < count ? posts[previous] : null;
+  // The post a tap opens is the one on screen when the finger went down. A
+  // transition in progress settles at once on whichever post was more
+  // visible, and the press holds the rotation, so the release always opens
+  // the post the card shows — never one that rotated in meanwhile.
+  const target = useRef<string | null>(null);
+  const pressIn = () => {
+    setPressed(true);
+    let id = post.id;
+    if (outgoing && previous !== null) {
+      if (performance.now() - transitionStartedAt.current < TICKER_TRANSITION_MS / 2) {
+        id = outgoing.id;
+        setIndex(previous);
+      }
+      progress.stopAnimation();
+      progress.setValue(1);
+      setPrevious(null);
+    }
+    target.current = id;
+  };
+  // A screen reader's activation has no press-in: it opens the announced post.
+  const press = () => {
+    const id = target.current ?? post.id;
+    target.current = null;
+    onOpenPost(id);
+  };
+  // A release calls onPress right after onPressOut (or before it, for a quick
+  // tap); a touch that became a scroll gets onPressOut only — its target must
+  // not outlive it.
+  const pressOut = () => {
+    setPressed(false);
+    setTimeout(() => { target.current = null; }, 0);
+  };
   return (
     <ActionPressable testID="home-community-ticker" accessibilityRole="button"
       accessibilityLabel={`${SPOKEN[kind].name}, ${author.name}, 댓글 ${post.commentCount}. ${post.body}`}
-      accessibilityHint={SPOKEN[kind].hint} onPress={onOpen}
-      onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)} style={CARD}>
+      accessibilityHint={SPOKEN[kind].hint} onPress={press}
+      onPressIn={pressIn} onPressOut={pressOut} style={CARD}>
       <View style={{ height: layout.height, overflow: 'hidden' }}>
         {outgoing ? (
           <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
@@ -214,10 +251,11 @@ function CommunityPill() {
   );
 }
 
+/** One post, centered vertically in the slide (2026-11-07 (3)); lines still start at the left. */
 function Slide({ post, layout }: { post: CommunityPostDto; layout: SlideLayout }) {
   const author = describePostAuthor(post.author);
   return (
-    <View style={{ height: layout.height, gap: 6 }}>
+    <View style={{ height: layout.height, gap: 6, justifyContent: 'center' }}>
       <View style={{ height: layout.row, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <CommunityPill />
         <Text numberOfLines={1} maxFontSizeMultiplier={TICKER_FONT_CAP} style={{ fontSize: 13, lineHeight: 18, fontWeight: '700', flexShrink: 1,
@@ -239,7 +277,7 @@ function InvitationCard({ kind, layout, onOpen }: { kind: 'empty' | 'unavailable
   return (
     <ActionPressable testID={`home-community-${kind}`} accessibilityRole="button" accessibilityLabel={message}
       accessibilityHint="커뮤니티를 엽니다." onPress={onOpen} style={CARD}>
-      <View style={{ height: layout.height, gap: 6 }}>
+      <View style={{ height: layout.height, gap: 6, justifyContent: 'center' }}>
         <View style={{ height: layout.row, flexDirection: 'row', alignItems: 'center' }}>
           <CommunityPill />
         </View>

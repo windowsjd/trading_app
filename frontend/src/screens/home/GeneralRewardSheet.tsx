@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ScrollView, Text, View } from '../../theme/native';
@@ -12,6 +12,7 @@ import ErrorNotice from '../../components/states/ErrorNotice';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import {
   claimAdReward,
+  createAdRewardSession,
   getAccountResetEligibility,
   getAdRewardEligibility,
   resetGeneralAccount,
@@ -23,18 +24,25 @@ import {
 } from '../../features/tradingAccount/invalidation';
 import {
   getRewardedAdProvider,
+  type RewardedAdPhase,
   type RewardedAdProvider,
   type RewardedAdPurpose,
 } from '../../features/adRewards/rewardedAd';
 import {
   classifyRewardCommandFailure,
+  forgetRewardAttempt,
   formatManwon,
   GENERAL_ACCOUNT_RESET_TARGET_KRW,
+  rememberedRewardAttempt,
+  rememberRewardAttempt,
+  REWARD_CONFIRM_POLL_MS,
+  REWARD_CONFIRM_WAIT_MS,
   rewardSheetState,
   type RewardAttempt,
 } from '../../features/adRewards/rewardFlow';
+import { ensureAdsReady, showAdsPrivacyOptions } from '../../features/ads/adsRuntime';
+import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
 import { createIdempotencyKey } from '../../utils/idempotency';
-import RewardedTestPanel from './RewardedTestPanel';
 
 /** The general home's header entry to the 보상 sheet (gift icon + 보상). */
 /** 보상 in Home's header (general accounts): the shared header button look (2026-11-07); the sheet is unchanged. */
@@ -54,31 +62,52 @@ export function HomeRewardButton({ onPress, iconOnly = false }: { onPress: () =>
   );
 }
 
+type WorkingPhase = 'preparing' | RewardedAdPhase | 'confirming';
+type AdFailure = 'consent' | 'load' | 'show' | 'busy';
 type Step =
   | { kind: 'menu' }
   | { kind: 'confirm-reset' }
-  | { kind: 'working'; purpose: RewardedAdPurpose }
+  | { kind: 'working'; purpose: RewardedAdPurpose; phase: WorkingPhase }
+  /** The ad was watched; Google's signed confirmation has not reached the server yet. */
+  | { kind: 'verifying'; attempt: RewardAttempt }
   | { kind: 'uncertain'; attempt: RewardAttempt; failure: unknown }
   | { kind: 'refused'; purpose: RewardedAdPurpose; failure: unknown }
+  | { kind: 'ad-failed'; reason: AdFailure }
   | { kind: 'dismissed' }
   | { kind: 'done'; purpose: RewardedAdPurpose };
+
+const PHASE_TEXT: Record<WorkingPhase, string> = {
+  preparing: '광고를 준비하고 있어요.',
+  loading: '광고를 불러오고 있어요.',
+  showing: '광고를 시청하고 있어요.',
+  earned: '광고를 시청하고 있어요.',
+  confirming: '광고 시청을 확인하고 있어요.',
+};
+const AD_FAILURE_TEXT: Record<AdFailure, string> = {
+  consent: '광고 개인정보 선택에 따라 지금은 광고를 표시할 수 없어요.',
+  load: '광고를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+  show: '광고를 표시하지 못했어요. 다시 시도해 주세요.',
+  busy: '다른 광고가 표시되고 있어요. 잠시 후 다시 시도해 주세요.',
+};
+const wait = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
 
 /**
  * 자금 관리 — the general account's two ad rewards (2026-10-20): 가상자금 추가
  * (the server's top-up, 5,000,000 KRW) or 일반계정 초기화 (back to 10,000,000
- * KRW after a separate confirmation). One watched ad redeems ONE of them: the
- * purpose is chosen before the ad, the provider's proof is sent with a fresh
- * idempotency key, and an answer that never arrived is re-checked with the
- * same key and proof (never re-paid, never reset twice).
+ * KRW after a separate confirmation). One watched ad redeems ONE of them.
  *
- * The separate development/preview SDK test panel never supplies a provider
- * proof. Both financial actions stay disabled under "광고 기능 준비 중" and
- * nothing is sent — not even eligibility reads. The server also refuses every
- * claim and reset while no verifier is registered.
- *
- * An attempt whose answer never arrived survives closing the sheet (it is
- * re-checked with the same key when reopened, and the caches it may have
- * changed are refreshed); every other step starts over when the sheet hides.
+ * With AdMob (2026-11-07): the server first opens a session for the chosen
+ * command (purpose + a fresh idempotency key) — refusing it when the command
+ * could not succeed now — then the rewarded ad is shown with that session's
+ * server-side verification options. Watching it to the end only lets the app
+ * ASK: the server pays or resets once Google's signed callback confirmed the
+ * session (it also does so by itself when the callback arrives, even if the
+ * app closed). An answer of "not confirmed yet" is asked again with the same
+ * key for a while, then shown as 확인 대기 with a 결과 확인 button; an answer
+ * that never arrived is re-checked the same way. Such an attempt survives
+ * closing the sheet and re-mounting it for the same sign-in and account.
+ * Without a provider (web, Expo Go, an unknown build) or a server that can
+ * verify ads, both actions stay disabled and nothing is sent.
  */
 export default function GeneralRewardSheet({
   visible,
@@ -89,12 +118,25 @@ export default function GeneralRewardSheet({
   visible: boolean;
   account: TradingAccountDto;
   onClose: () => void;
-  /** A server-verifiable provider; null until SSV exists. Never the test SDK. */
+  /** AdMob on a native build; null on web/Expo Go/unknown builds. */
   provider?: RewardedAdProvider | null;
 }) {
   const accountId = account.id;
   const queryClient = useQueryClient();
-  const [step, setStep] = useState<Step>({ kind: 'menu' });
+  // One sign-in and account: an attempt never moves to another account.
+  const [scope] = useState(() => ({ key: `${getSessionGeneration()}:${accountId}`, generation: getSessionGeneration() }));
+  const [step, setStep] = useState<Step>(() => {
+    const open = rememberedRewardAttempt(scope.key);
+    return open ? { kind: 'verifying', attempt: open } : { kind: 'menu' };
+  });
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
+  const current = () => alive.current && isCurrentSession(scope.generation);
+  // Synchronous guard: a second tap before the next render starts nothing.
+  const running = useRef(false);
   const funding = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.adRewardEligibility(accountId),
     queryFn: () => getAdRewardEligibility(accountId),
@@ -107,9 +149,17 @@ export default function GeneralRewardSheet({
     enabled: visible && !!provider,
     retry: false,
   });
+  // Google's privacy options entry, when its consent (UMP) asks for one.
+  const [privacyRequired, setPrivacyRequired] = useState(false);
+  useEffect(() => {
+    if (!visible || !provider) return undefined;
+    let live = true;
+    ensureAdsReady().then((readiness) => { if (live) setPrivacyRequired(readiness.privacyOptionsRequired); }, () => undefined);
+    return () => { live = false; };
+  }, [visible, provider]);
   useEffect(() => {
     if (!visible) {
-      setStep((current) => (current.kind === 'uncertain' || current.kind === 'working' ? current : { kind: 'menu' }));
+      setStep((now) => (now.kind === 'uncertain' || now.kind === 'working' || now.kind === 'verifying' ? now : { kind: 'menu' }));
     }
   }, [visible]);
   const state = rewardSheetState({ providerReady: !!provider, funding: funding.data, reset: reset.data });
@@ -117,68 +167,132 @@ export default function GeneralRewardSheet({
   const amount = state.funding.amountLabel;
   const target = formatManwon(reset.data?.targetKrwBalance ?? GENERAL_ACCOUNT_RESET_TARGET_KRW);
 
+  const refreshMoney = (purpose: RewardedAdPurpose) => (purpose === 'funding'
+    ? invalidateAfterAdRewardClaim(queryClient, accountId)
+    : invalidateAfterAccountReset(queryClient, accountId));
+
   const close = () => {
     if (busy) return;
-    if (step.kind === 'uncertain') {
-      // It may have committed: show what the server holds now, and keep the
+    if (step.kind === 'uncertain' || step.kind === 'verifying') {
+      // It may commit (or has): show what the server holds now, and keep the
       // attempt for the same-key re-check next time.
-      void (step.attempt.purpose === 'funding'
-        ? invalidateAfterAdRewardClaim(queryClient, accountId)
-        : invalidateAfterAccountReset(queryClient, accountId));
+      void refreshMoney(step.attempt.purpose);
     } else {
       setStep({ kind: 'menu' });
     }
     onClose();
   };
 
+  /** The same command (key, proof) until the server answers it. */
   const submit = async (attempt: RewardAttempt) => {
-    setStep({ kind: 'working', purpose: attempt.purpose });
+    if (running.current) return;
+    running.current = true;
+    rememberRewardAttempt(scope.key, attempt);
+    setStep({ kind: 'working', purpose: attempt.purpose, phase: 'confirming' });
     const body = { provider: attempt.providerKey, proof: attempt.proof, idempotencyKey: attempt.idempotencyKey };
+    const deadline = Date.now() + REWARD_CONFIRM_WAIT_MS;
     try {
-      if (attempt.purpose === 'funding') {
-        await claimAdReward(accountId, body);
-        await invalidateAfterAdRewardClaim(queryClient, accountId);
-      } else {
-        await resetGeneralAccount(accountId, body);
-        await invalidateAfterAccountReset(queryClient, accountId);
+      for (;;) {
+        try {
+          if (attempt.purpose === 'funding') await claimAdReward(accountId, body);
+          else await resetGeneralAccount(accountId, body);
+          forgetRewardAttempt(scope.key, attempt);
+          await refreshMoney(attempt.purpose);
+          if (current()) setStep({ kind: 'done', purpose: attempt.purpose });
+          return;
+        } catch (failure) {
+          const outcome = classifyRewardCommandFailure(failure);
+          if (!current()) return;
+          if (outcome === 'pending') {
+            if (Date.now() < deadline) {
+              await wait(REWARD_CONFIRM_POLL_MS);
+              if (!current()) return;
+              continue;
+            }
+            setStep({ kind: 'verifying', attempt });
+            return;
+          }
+          if (outcome === 'uncertain') {
+            setStep({ kind: 'uncertain', attempt, failure });
+            return;
+          }
+          forgetRewardAttempt(scope.key, attempt);
+          setStep({ kind: 'refused', purpose: attempt.purpose, failure });
+          void funding.refetch();
+          void reset.refetch();
+          return;
+        }
       }
-      setStep({ kind: 'done', purpose: attempt.purpose });
-    } catch (failure) {
-      if (classifyRewardCommandFailure(failure) === 'uncertain') {
-        setStep({ kind: 'uncertain', attempt, failure });
-        return;
-      }
-      setStep({ kind: 'refused', purpose: attempt.purpose, failure });
-      void funding.refetch();
-      void reset.refetch();
+    } finally {
+      running.current = false;
     }
   };
 
   const start = async (purpose: RewardedAdPurpose) => {
-    if (!provider) return;
+    if (!provider || running.current) return;
+    running.current = true;
     const idempotencyKey = createIdempotencyKey(purpose === 'funding' ? 'ad_reward_claim' : 'account_reset');
-    setStep({ kind: 'working', purpose });
-    let outcome;
+    let attempt: RewardAttempt | null = null;
+    setStep({ kind: 'working', purpose, phase: 'preparing' });
     try {
-      outcome = await provider.show({ purpose, tradingAccountId: accountId, idempotencyKey });
-    } catch {
-      outcome = { status: 'unavailable' as const };
+      // The server fixes member, account, purpose and command before the ad.
+      let session;
+      try {
+        session = await createAdRewardSession(accountId, { purpose, platform: provider.platform, idempotencyKey });
+      } catch (failure) {
+        // No ad was shown and nothing can have moved: the server's reason (a
+        // blocked reset, a cap, ads off) or a failed request.
+        if (current()) setStep({ kind: 'refused', purpose, failure });
+        void funding.refetch();
+        void reset.refetch();
+        return;
+      }
+      if (!current()) return;
+      const outcome = await provider.show({
+        ssv: session.ssv,
+        onPhase: (phase) => { if (current()) setStep({ kind: 'working', purpose, phase }); },
+      }).catch(() => ({ status: 'unavailable' as const, reason: 'load' as const }));
+      // Watched to the end: kept for this sign-in and account even if Home
+      // re-mounted the sheet during the ad, so the next opening asks again.
+      if (outcome.status === 'earned' && isCurrentSession(scope.generation)) {
+        attempt = { purpose, idempotencyKey, proof: session.sessionId, providerKey: provider.key };
+        rememberRewardAttempt(scope.key, attempt);
+      }
+      if (!current()) return;
+      if (outcome.status === 'dismissed') { setStep({ kind: 'dismissed' }); return; }
+      if (outcome.status === 'unavailable') { setStep({ kind: 'ad-failed', reason: outcome.reason }); return; }
+    } finally {
+      running.current = false;
     }
-    if (outcome.status !== 'completed') {
-      setStep({ kind: 'dismissed' });
-      return;
-    }
-    await submit({ purpose, idempotencyKey, proof: outcome.proof, providerKey: provider.key });
+    if (attempt && current()) await submit(attempt);
+  };
+
+  // Reopened on an attempt still awaiting Google — this sheet's, or one an
+  // earlier mount kept (Home re-mounted it during the ad): ask the server
+  // again, once per opening (never a loop while the sheet stays open).
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  const wasVisible = useRef(visible);
+  useEffect(() => {
+    const opened = visible && !wasVisible.current;
+    wasVisible.current = visible;
+    if (!opened) return;
+    const open = step.kind === 'verifying' ? step.attempt : step.kind === 'menu' ? rememberedRewardAttempt(scope.key) : null;
+    if (open) void submitRef.current(open);
+  }, [visible, step, scope.key]);
+
+  const openPrivacy = () => {
+    void showAdsPrivacyOptions().then((readiness) => { if (current()) setPrivacyRequired(readiness.privacyOptionsRequired); }, () => undefined);
   };
 
   const resetBlocked = state.reset.blockers.length > 0;
+  const working = step.kind === 'working' ? step : null;
   return (
     <SheetPortal>
       <InlineBottomSheet testID="home-reward-sheet" title="자금 관리" visible={visible}
         dismissible={!busy} onClose={close}>
         <ScrollView style={styles.scroll} bounces={false}>
           <View style={styles.body}>
-            {visible && account.mode === 'general' ? <RewardedTestPanel key={accountId} /> : null}
             {step.kind === 'done' ? (
               <View testID="reward-done" style={styles.result}>
                 <Text accessibilityRole="header" style={styles.resultTitle}>
@@ -190,6 +304,16 @@ export default function GeneralRewardSheet({
                     : `가상자금 ${target}으로 다시 시작합니다. 과거 거래 기록은 그대로 남아 있습니다.`}
                 </Text>
                 <CTAButton testID="reward-done-close" label="확인" onPress={close} />
+              </View>
+            ) : step.kind === 'verifying' ? (
+              <View testID="reward-verifying" style={styles.result} accessibilityLiveRegion="polite">
+                <Text accessibilityRole="header" style={styles.resultTitle}>광고 시청 확인을 기다리고 있어요.</Text>
+                <Text style={styles.description}>
+                  {step.attempt.purpose === 'funding'
+                    ? `Google의 시청 확인이 도착하면 가상자금 ${amount}이 자동으로 추가돼요. 같은 광고로 두 번 지급되지 않아요.`
+                    : 'Google의 시청 확인이 도착하면 일반계정이 자동으로 초기화돼요. 같은 광고로 두 번 초기화되지 않아요.'}
+                </Text>
+                <CTAButton testID="reward-verify-check" label="결과 확인" onPress={() => void submit(step.attempt)} />
               </View>
             ) : step.kind === 'uncertain' ? (
               <View testID="reward-uncertain" style={styles.result}>
@@ -236,15 +360,23 @@ export default function GeneralRewardSheet({
                     <Text style={styles.description}>광고 연동이 완료되면 이 화면에서 바로 이용할 수 있습니다.</Text>
                   </View>
                 ) : null}
+                {working ? (
+                  <Text testID="reward-working" style={styles.status} accessibilityLiveRegion="polite">{PHASE_TEXT[working.phase]}</Text>
+                ) : null}
                 {step.kind === 'dismissed' ? (
                   <Text testID="reward-dismissed" style={styles.notice}>광고 시청이 완료되지 않아 아무것도 처리하지 않았습니다.</Text>
+                ) : null}
+                {step.kind === 'ad-failed' ? (
+                  <Text testID="reward-ad-failed" style={styles.notice} accessibilityLiveRegion="polite">
+                    {AD_FAILURE_TEXT[step.reason]} 가상자금과 계정은 그대로예요.
+                  </Text>
                 ) : null}
                 {step.kind === 'refused' ? (
                   <View testID="reward-refused" style={styles.refused}>
                     <Text style={styles.errorTitle}>
                       {step.purpose === 'funding' ? '가상자금을 추가하지 못했습니다.' : '일반계정을 초기화하지 못했습니다.'}
                     </Text>
-                    {/* The server's own reason (limit, cooldown, verification, …). */}
+                    {/* The server's own reason (limit, blocked reset, verification, …). */}
                     <ErrorNotice error={step.failure} style={styles.errorNotice} />
                   </View>
                 ) : null}
@@ -258,7 +390,7 @@ export default function GeneralRewardSheet({
                     <ErrorNotice error={funding.error} message="보상 정보를 불러오지 못했습니다." />
                   ) : null}
                   <CTAButton testID="reward-funding-start" label="광고 보고 받기"
-                    state={busy && step.purpose === 'funding' ? 'loading' : state.funding.canStart && !busy ? 'enabled' : 'disabled'}
+                    state={working?.purpose === 'funding' ? 'loading' : state.funding.canStart && !busy ? 'enabled' : 'disabled'}
                     onPress={() => void start('funding')} />
                 </View>
                 <View testID="reward-reset" style={styles.section}>
@@ -282,9 +414,13 @@ export default function GeneralRewardSheet({
                     <ErrorNotice error={reset.error} message="초기화 가능 여부를 확인하지 못했습니다." />
                   ) : null}
                   <CTAButton testID="reward-reset-start" label="초기화하기"
-                    state={busy && step.purpose === 'account_reset' ? 'loading' : state.reset.canStart && !busy ? 'enabled' : 'disabled'}
+                    state={working?.purpose === 'account_reset' ? 'loading' : state.reset.canStart && !busy ? 'enabled' : 'disabled'}
                     onPress={() => setStep({ kind: 'confirm-reset' })} />
                 </View>
+                {privacyRequired ? (
+                  <CTAButton testID="reward-ads-privacy" label="광고 개인정보 선택" variant="neutral"
+                    state={busy ? 'disabled' : 'enabled'} onPress={openPrivacy} />
+                ) : null}
               </>
             )}
           </View>

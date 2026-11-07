@@ -81,6 +81,29 @@ describe('글쓰기: posting', () => {
     assert.deepEqual(ids, ['community-post-p1', 'community-post-old'], 'the new post leads the refreshed feed');
   });
 
+  it('the header: no 취소 button (the native back stays) and 등록 at the right', async (t) => {
+    const h = await composer();
+    t.after(h.close);
+    assert.equal(h.options.headerLeft === undefined, true, 'the stack keeps its own back button');
+    assert.equal(h.exists('community-compose-cancel'), false);
+    await h.type('community-compose-body', '헤더 확인');
+    assert.equal(h.submit().props.accessibilityLabel, '등록');
+    assert.equal(h.submit().props.disabled, false);
+    await h.send();
+    assert.equal(h.server.posts.length, 1);
+    assert.deepEqual(h.navigations, [['goBack']]);
+  });
+
+  it('a post that finishes after the member went back with the native back sends nobody back a second screen', async (t) => {
+    const h = await composer();
+    t.after(h.close);
+    await h.type('community-compose-body', '뒤로 가도 등록돼요');
+    h.screenFocused = false;
+    await h.send();
+    assert.equal(h.server.posts.length, 1, 'the post is still created');
+    assert.deepEqual(h.navigations, [], 'no goBack from a screen already left');
+  });
+
   it('an unknown result keeps the text and the request id: sending again never posts twice', async (t) => {
     const h = await composer();
     t.after(h.close);

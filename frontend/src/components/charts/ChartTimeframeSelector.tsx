@@ -9,7 +9,8 @@ import BottomSheetBackdrop from '../common/BottomSheetBackdrop';
 const groups = [
   { title: '분', intervals: ASSET_CHART_TIMEFRAMES.filter((item) => item.interval.endsWith('m')) },
   { title: '시간', intervals: ASSET_CHART_TIMEFRAMES.filter((item) => item.interval.endsWith('h')) },
-  { title: '일 / 주', intervals: ASSET_CHART_TIMEFRAMES.filter((item) => /[dw]$/.test(item.interval)) },
+  // 일 (2026-11-07 (3), was 일 / 주): there is no weekly candle to choose.
+  { title: '일', intervals: ASSET_CHART_TIMEFRAMES.filter((item) => /[dw]$/.test(item.interval)) },
 ];
 
 const label = ({ interval }: AssetChartTimeframe) => interval

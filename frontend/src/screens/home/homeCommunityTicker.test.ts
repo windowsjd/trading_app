@@ -92,7 +92,7 @@ describe('Home community card: the four states', () => {
     assert.equal([style.borderRadius, style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].join('/'), '16/14/36/14/16');
     assert.equal(card.props.accessibilityRole, 'button');
     assert.match(card.props.accessibilityLabel, /^커뮤니티 HOT 글, bluechip, 댓글 18\. a 본문/);
-    assert.equal(card.props.accessibilityHint, '커뮤니티 HOT 글 목록을 엽니다.');
+    assert.equal(card.props.accessibilityHint, '이 글의 본문과 댓글을 엽니다.');
     assert.equal(h.renderer.root.findAll((node: any) => node.props?.accessibilityLiveRegion !== undefined).length, 0);
     assert.equal(h.find('home-community-ticker-dots') === undefined, true);
   });
@@ -105,7 +105,7 @@ describe('Home community card: the four states', () => {
     assert.equal(flatten(card.props.style).paddingRight, 36, 'the same card box');
     assert.match(card.props.accessibilityLabel, /^커뮤니티 최신 글, 익명, 댓글 18\. n1 본문/);
     assert.equal(/HOT/.test(card.props.accessibilityLabel + card.props.accessibilityHint), false);
-    assert.equal(card.props.accessibilityHint, '커뮤니티 전체 글 목록을 엽니다.');
+    assert.equal(card.props.accessibilityHint, '이 글의 본문과 댓글을 엽니다.');
     assert.ok(h.find('home-community-ticker-dots'));
     assert.equal(h.slide(), 'home-community-ticker-slide-n1');
     act(() => t.mock.timers.tick(4000));
@@ -132,23 +132,107 @@ describe('Home community card: the four states', () => {
   });
 });
 
+/** The post detail a tap opened: `<tab>:PostDetail:<postId>:<returnTab>:<initial>`. */
+const detail = (h: ReturnType<typeof setup>) => {
+  const [name, params] = h.navigations.at(-1) as [string, any];
+  assert.equal(name, 'MainTabs');
+  return `${params.screen}:${params.params.screen}:${params.params.params.postId}:${params.params.params.returnTab}:${params.params.initial}`;
+};
+const card = (h: ReturnType<typeof setup>) =>
+  h.renderer.root.findAll((node: any) => node.type === 'Pressable' && node.props.testID === 'home-community-ticker')[0];
+
 describe('Home community card: where a tap goes', () => {
   for (const season of [false, true]) {
+    const tab = season ? 'RankingTab' : 'CommunityTab';
     const where = season ? '리그:Ranking:community' : 'CommunityTab:Community';
-    it(`${season ? 'season' : 'beginner/general'}: HOT → the HOT chip; latest, invitation and unavailable → 전체`, t => {
+    it(`${season ? 'season' : 'beginner/general'}: a HOT or latest post opens that post's detail; invitation and unavailable → 전체`, t => {
       const hot = setup([post('a')], { season }); t.after(hot.close);
       press(hot, 'home-community-ticker');
-      assert.equal(route(hot), `${where}:hot:true`);
-      const [, params] = hot.navigations[0] as [string, any];
-      assert.equal(typeof params.params.params.at, 'number');
-      for (const [id, options] of [['home-community-ticker', { latest: [post('n', { isHot: false })] }], ['home-community-empty', { latest: [] }],
-        ['home-community-unavailable', { latest: 'error' }]] as const) {
+      // Pushed onto the community stack's list (initial: false); back returns to Home.
+      assert.equal(detail(hot), `${tab}:PostDetail:a:HomeTab:false`);
+      const latest = setup([], { season, latest: [post('n', { isHot: false })] }); t.after(latest.close);
+      press(latest, 'home-community-ticker');
+      assert.equal(detail(latest), `${tab}:PostDetail:n:HomeTab:false`);
+      for (const [id, options] of [['home-community-empty', { latest: [] }], ['home-community-unavailable', { latest: 'error' }]] as const) {
         const h = setup([], { season, ...options }); t.after(h.close);
         press(h, id);
         assert.equal(route(h), `${where}:all:true`, id);
+        const [, params] = h.navigations[0] as [string, any];
+        assert.equal(typeof params.params.params.at, 'number');
       }
     });
   }
+
+  it('after a rotation the tap opens the post now shown, and a screen reader opens the one it announced', t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = setup([post('a'), post('b'), post('c')]); t.after(h.close);
+    act(() => t.mock.timers.tick(4000));
+    act(() => h.h.animations.at(-1).finish());
+    assert.equal(h.slide(), 'home-community-ticker-slide-b');
+    act(() => card(h).props.onPressIn({}));
+    act(() => card(h).props.onPressOut({}));
+    act(() => card(h).props.onPress());
+    assert.equal(detail(h), 'CommunityTab:PostDetail:b:HomeTab:false');
+    // No press-in (an accessibility activation): the announced post.
+    assert.match(card(h).props.accessibilityLabel, /b 본문/);
+    act(() => card(h).props.onPress());
+    assert.equal(detail(h), 'CommunityTab:PostDetail:b:HomeTab:false');
+  });
+
+  it('a touch that became a scroll leaves no target: a later screen-reader activation opens the post it announces', t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = setup([post('a'), post('b'), post('c')]); t.after(h.close);
+    act(() => card(h).props.onPressIn({}));
+    act(() => card(h).props.onPressOut({}));
+    // No onPress (the finger scrolled); rotation goes on.
+    act(() => t.mock.timers.tick(4000));
+    act(() => h.h.animations.at(-1).finish());
+    assert.equal(h.slide(), 'home-community-ticker-slide-b');
+    assert.match(card(h).props.accessibilityLabel, /b 본문/);
+    act(() => card(h).props.onPress());
+    assert.equal(detail(h), 'CommunityTab:PostDetail:b:HomeTab:false');
+  });
+
+  for (const [elapsed, expected] of [[100, 'a'], [300, 'b']] as const) {
+    it(`a tap ${elapsed} ms into a transition settles on the more visible post (${expected}) and opens exactly it`, t => {
+      t.mock.timers.enable({ apis: ['setTimeout'] });
+      let now = 1_000;
+      t.mock.method(performance, 'now', () => now);
+      const h = setup([post('a'), post('b'), post('c')]); t.after(h.close);
+      act(() => t.mock.timers.tick(4000));
+      const bodies = () => h.renderer.root.findAll((node: any) => node.type === 'Text' && node.props.numberOfLines === 2)
+        .map((node: any) => node.props.children).sort();
+      // a → b has started: both are drawn while it runs.
+      assert.equal(h.slide(), 'home-community-ticker-slide-b');
+      assert.deepEqual(bodies(), ['a 본문', 'b 본문'], 'the outgoing post is still on screen');
+      now += elapsed;
+      act(() => card(h).props.onPressIn({}));
+      // Settled: one post on screen, the one that will open.
+      assert.equal(h.slide(), `home-community-ticker-slide-${expected}`);
+      assert.deepEqual(bodies(), [`${expected} 본문`]);
+      // Held while pressed: no rotation changes what the release opens.
+      act(() => t.mock.timers.tick(8000));
+      assert.equal(h.slide(), `home-community-ticker-slide-${expected}`);
+      act(() => card(h).props.onPressOut({}));
+      act(() => card(h).props.onPress());
+      assert.equal(detail(h), `CommunityTab:PostDetail:${expected}:HomeTab:false`);
+    });
+  }
+});
+
+describe('Home community card: layout', () => {
+  it('a post sits centered vertically in its slide, lines starting at the left; the invitation too', t => {
+    const h = setup([post('a')]); t.after(h.close);
+    const slide = h.renderer.root.findAll((node: any) => node.props?.testID === 'home-community-ticker-slide-a')[0];
+    const box = slide.findAll((node: any) => typeof node.type === 'string' && flatten(node.props.style).height === 68)[0];
+    const style = flatten(box.props.style);
+    assert.equal(style.justifyContent, 'center');
+    assert.equal(style.alignItems === undefined || style.alignItems === 'stretch', true, 'the horizontal start is unchanged');
+    const empty = setup([], { latest: [] }); t.after(empty.close);
+    const message = empty.renderer.root.findAll((node: any) => node.type === 'Text' && node.props.numberOfLines === 2)[0];
+    let n = message.parent; while (n && !(typeof n.type === 'string' && flatten(n.props.style).height)) n = n.parent;
+    assert.equal(flatten(n.props.style).justifyContent, 'center');
+  });
 });
 
 describe('Home community card: rotation', () => {
@@ -163,6 +247,8 @@ describe('Home community card: rotation', () => {
     assert.equal(h.slide(), 'home-community-ticker-slide-b');
     const transition = h.h.animations.at(-1);
     assert.equal(`${transition.type}/${transition.options.duration}`, 'timing/450');
+    // The 450 ms transition ends (the mocked animation finishes only when told).
+    act(() => transition.finish());
     // Another screen on top: no timer runs.
     h.setFocused(false);
     act(() => t.mock.timers.tick(12_000));

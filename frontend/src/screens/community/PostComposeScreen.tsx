@@ -87,7 +87,9 @@ export default function PostComposeScreen({ route }: { route: { params?: { categ
     onSuccess: () => {
       attempt.current = null;
       if (userId) refreshCommunityLists(client, userId);
-      navigation.goBack();
+      // The native back stays available while posting (2026-11-07 (3)): a
+      // member who already left must not be sent back a second screen.
+      if (navigation.isFocused()) navigation.goBack();
     },
     onError: (error) => {
       const info = getApiErrorInfo(error);
@@ -140,14 +142,10 @@ export default function PostComposeScreen({ route }: { route: { params?: { categ
     }
   };
 
+  // The header's left is the stack's own back (2026-11-07 (3): the 취소 text
+  // button is gone); Android back and the iOS swipe stay as they are.
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerLeft: () => (
-        <ActionPressable testID="community-compose-cancel" accessibilityRole="button" accessibilityLabel="취소"
-          disabled={post.isPending} onPress={() => navigation.goBack()} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 16, color: semantic.secondary }}>취소</Text>
-        </ActionPressable>
-      ),
       headerRight: () => (
         <ActionPressable testID="community-compose-submit" accessibilityRole="button" accessibilityLabel="등록"
           accessibilityState={{ disabled: !valid || busy, busy: post.isPending }} aria-disabled={!valid || busy}

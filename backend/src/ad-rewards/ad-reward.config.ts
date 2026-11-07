@@ -11,6 +11,12 @@
  * Disabled (the default) is a complete, valid state: no claim can be granted,
  * and none of the other variables are required.
  *
+ * The daily count and amount caps may each be switched off EXPLICITLY with
+ * the word `unlimited` (2026-11-07: the product runs without a daily cap).
+ * That is a decision written in the environment, never a missing value read
+ * as "no cap", and never a huge number standing in for one. A numeric cap
+ * keeps its exact old meaning.
+ *
  * This is the ONE parser for these variables, reused by startup env
  * validation and by the service at runtime — never a second, more forgiving
  * read inside a method.
@@ -31,10 +37,10 @@ export type AdRewardConfig =
       provider: string;
       /** Canonical scale-8 decimal string, > 0. Server-decided, never client. */
       rewardAmountKrw: string;
-      /** Max granted claims per configured-timezone day, > 0. */
-      dailyMaxCount: number;
-      /** Max granted KRW per day; >= rewardAmountKrw. Scale-8 string. */
-      dailyMaxAmountKrw: string;
+      /** Max granted claims per configured-timezone day, > 0; null = `unlimited`. */
+      dailyMaxCount: number | null;
+      /** Max granted KRW per day; >= rewardAmountKrw. Scale-8 string; null = `unlimited`. */
+      dailyMaxAmountKrw: string | null;
       /** Minimum seconds between two granted claims; >= 0. */
       cooldownSeconds: number;
       /** IANA zone that defines the daily boundary (never the server's TZ). */
@@ -63,13 +69,15 @@ export function readAdRewardConfig(
     env.AD_REWARD_AMOUNT_KRW,
     'AD_REWARD_AMOUNT_KRW',
   );
-  const dailyMaxCount = parsePositiveInteger(
+  const dailyMaxCount = unlimitedOr(
     env.AD_REWARD_DAILY_MAX_COUNT,
     'AD_REWARD_DAILY_MAX_COUNT',
+    parsePositiveInteger,
   );
-  const dailyMaxAmountKrw = parsePositiveDecimal(
+  const dailyMaxAmountKrw = unlimitedOr(
     env.AD_REWARD_DAILY_MAX_AMOUNT_KRW,
     'AD_REWARD_DAILY_MAX_AMOUNT_KRW',
+    parsePositiveDecimal,
   );
   const cooldownSeconds = parseNonNegativeInteger(
     env.AD_REWARD_COOLDOWN_SECONDS,
@@ -82,7 +90,10 @@ export function readAdRewardConfig(
 
   // A daily cap below one reward would make every claim impossible — almost
   // certainly a typo, so refuse rather than silently never paying out.
-  if (compareDecimalStrings(dailyMaxAmountKrw, rewardAmountKrw) < 0) {
+  if (
+    dailyMaxAmountKrw !== null &&
+    compareDecimalStrings(dailyMaxAmountKrw, rewardAmountKrw) < 0
+  ) {
     throw new AdRewardConfigError(
       `AD_REWARD_DAILY_MAX_AMOUNT_KRW (${dailyMaxAmountKrw}) must be greater than or equal to AD_REWARD_AMOUNT_KRW (${rewardAmountKrw}).`,
     );
@@ -107,6 +118,19 @@ function parseStrictBoolean(raw: string | undefined, name: string): boolean {
   throw new AdRewardConfigError(
     `${name} must be one of true, false, 1, 0 (case-insensitive), or be omitted for the default false. Received: ${JSON.stringify(raw)}.`,
   );
+}
+
+/** The exact word that switches a daily cap off; anything else is parsed as the cap. */
+export const AD_REWARD_UNLIMITED = 'unlimited';
+
+function unlimitedOr<T>(
+  raw: string | undefined,
+  name: string,
+  parse: (raw: string | undefined, name: string) => T,
+): T | null {
+  return raw?.trim().toLowerCase() === AD_REWARD_UNLIMITED
+    ? null
+    : parse(raw, name);
 }
 
 function requireNonEmpty(raw: string | undefined, name: string): string {

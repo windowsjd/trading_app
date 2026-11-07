@@ -4,8 +4,13 @@ import ModeEntryCard from './ModeEntryCard';
 import { accountSheetMaxHeight } from './accountSheetLayout';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
-import Svg, { Path } from 'react-native-svg';
-import { useAppearance } from '../../theme/appearance';
+import {
+  HOME_ACCOUNT_CHANGE_FONT_CAP,
+  HOME_ACCOUNT_CHANGE_FONT_SIZE,
+  HOME_ACCOUNT_CHANGE_LABEL,
+  HOME_ACCOUNT_CHANGE_PADDING,
+  HOME_TITLE_FONT_CAP,
+} from '../../screens/home/homeHeaderLayout';
 import { useSafeAreaInsets } from '../../theme/safeArea';
 import {
   ScrollView,
@@ -63,13 +68,17 @@ type Props = {
   /**
    * Home's header title (2026-11-07), identical for general, beginner and
    * season accounts: one 44dp control with the mode or season title (20/700,
-   * a season's beta pill kept) and a 28×28 change chip; it opens the same
-   * account sheet. The title stays on one line (the header has one); the
-   * sheet shows every name in full. Status notices are HomeAccountNotices.
+   * a season's beta pill kept) and a 28dp 계정변경 text chip (2026-11-07 (3),
+   * formerly a ⇄ icon); it opens the same account sheet. The title stays on
+   * one line (the header has one); the sheet shows every name in full.
+   * Status notices are HomeAccountNotices.
    */
   homeHeader?: boolean;
   /** Home header only: the width the title may take beside the header's actions. */
   maxWidth?: number;
+  /** Home header only: text scaling caps that keep the whole mode name and 계정변경 visible (homeHeaderLayout). */
+  titleFontCap?: number;
+  changeFontCap?: number;
 };
 
 /**
@@ -92,8 +101,13 @@ export function HomeAccountNotices() {
   );
 }
 
-export default function AccountSwitcher({ compact = false, homeHeader = false, maxWidth }: Props) {
-  const { colors } = useAppearance();
+export default function AccountSwitcher({
+  compact = false,
+  homeHeader = false,
+  maxWidth,
+  titleFontCap = HOME_TITLE_FONT_CAP,
+  changeFontCap = HOME_ACCOUNT_CHANGE_FONT_CAP,
+}: Props) {
   const {
     accounts,
     selectedAccount,
@@ -189,13 +203,16 @@ export default function AccountSwitcher({ compact = false, homeHeader = false, m
           testID={TEST_IDS.tradingAccount.switcherTrigger}
         >
           <SeasonTitle testID="home-account-title" numberOfLines={1} containerStyle={styles.homeHeaderTitleBox}
-            style={styles.homeTitle} maxFontSizeMultiplier={1.6} name={display.title}
+            style={styles.homeTitle} maxFontSizeMultiplier={titleFontCap} name={display.title}
             displayBadge={selectedAccount.mode === 'season' ? selectedAccount.season?.displayBadge : undefined} />
-          <View style={styles.homeChange} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
-              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
-              <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
-            </Svg>
+          {/* 계정변경 (2026-11-07 (3)): a text chip instead of the ⇄ icon. It
+              never shrinks, so its label is never wrapped or cut; the title
+              beside it gives way (homeHeaderLayout). */}
+          <View testID="home-account-change" style={styles.homeChange} accessible={false} accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants" aria-hidden>
+            <Text maxFontSizeMultiplier={changeFontCap} style={styles.homeChangeText}>
+              {HOME_ACCOUNT_CHANGE_LABEL}
+            </Text>
           </View>
         </ActionPressable>
       ) : (
@@ -365,13 +382,14 @@ const styles = StyleSheet.create({
   homeTitle: { minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
   homeChange: {
     flexShrink: 0,
-    width: 28,
-    height: 28,
+    minHeight: 28,
+    paddingHorizontal: HOME_ACCOUNT_CHANGE_PADDING,
     borderRadius: 8,
     backgroundColor: semantic.input,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  homeChangeText: { fontSize: HOME_ACCOUNT_CHANGE_FONT_SIZE, lineHeight: 18, fontWeight: '600', color: semantic.secondary },
   homeNotices: { gap: 2 },
   homeNotice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
   trigger: {

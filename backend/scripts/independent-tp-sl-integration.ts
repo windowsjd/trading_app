@@ -457,6 +457,15 @@ async function spotLimitEntry(kind: Market) {
     assert.equal(byPrice(110).triggerCondition, 'at_or_above');
     assert.ok(created.every((row) => row.executionType === 'market'));
     assert.ok(created.every((row) => row.status === 'watching'));
+    // Activated at the fill (no registration price, never changed): not an
+    // off-session registration (registeredOffSession, 2026-11-07).
+    const shown = (
+      await conditionalSell.list(s.userId, s.accountId, {})
+    ).data.conditionalOrders.filter((row) =>
+      created.some((setting) => setting.id === row.id),
+    );
+    assert.equal(shown.length, 3);
+    assert.ok(shown.every((row) => row.registeredOffSession === false));
     for (const plan of active) {
       assert.equal(plan.fillOrderId, orderId);
       assert.equal(plan.basisQuantity?.toFixed(8), expected.toFixed(8));

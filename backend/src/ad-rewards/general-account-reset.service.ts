@@ -232,6 +232,18 @@ export class GeneralAccountResetService {
   }
 
   /**
+   * Before an ad for a reset is shown (AdMob session, 2026-11-07): the
+   * account must be resettable now — nothing held or pending, the ended
+   * epoch valuable — so the member never watches an ad for a reset that
+   * would be refused. Write-free; the reset re-checks under the lock.
+   */
+  async assertResettable(account: OwnedTradingAccount): Promise<void> {
+    const pre = await this.preCheck(account);
+    this.assertNotBlocked(pre.blockers);
+    if (!pre.valuable) throwResetUnavailable();
+  }
+
+  /**
    * Everything checked before an ad verification is spent, on ONE
    * RepeatableRead snapshot (as the portfolio reads), so this account's own
    * top-up or reset committing in between cannot look like damage: structure
@@ -348,7 +360,16 @@ export class GeneralAccountResetService {
       expectedUserId: account.userId,
       expectedTradingAccountId: account.id,
       expectedPurpose: AdRewardPurpose.account_reset,
+      commandKey: request.idempotencyKey,
     });
+    if (!verification.ok && verification.retryable) {
+      // Not confirmed by the ad network yet: nothing is written; the same
+      // key may come again (the SSV callback also redeems it on arrival).
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_VERIFICATION_PENDING,
+        'The ad completion has not been confirmed yet. Retry the same request.',
+      );
+    }
     if (
       !verification.ok ||
       verification.purpose !== AdRewardPurpose.account_reset

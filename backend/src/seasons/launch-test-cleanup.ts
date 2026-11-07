@@ -76,6 +76,7 @@ export const LAUNCH_TEST_CLEANUP_STEPS: Step[] = [
     'fx_execute_requests',
     'general_account_resets',
     'ad_reward_claims',
+    'ad_reward_sessions',
     'wallet_transactions',
     'exchange_transactions',
     'orders',
@@ -247,6 +248,7 @@ export async function planLaunchTestCleanup(
   if (
     tables.general_account_resets.count ||
     tables.ad_reward_claims.count ||
+    tables.ad_reward_sessions.count ||
     tables.beginner_quest_acknowledgements.count
   )
     throw /* @diagnosticSurface internal: Operator-only cleanup precondition; CLI aborts the transaction and retains its reviewed plan. */ new Error(

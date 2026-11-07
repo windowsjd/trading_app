@@ -70,6 +70,10 @@ describe('chart timeframe selector', () => {
     const options = h.renderer.root.findAllByType('Pressable').filter((node: any) => node.props.testID?.startsWith('asset-timeframe-option-'));
     // No 1w tab (design v2.1 §5.5).
     assert.deepEqual(options.map((node: any) => node.props.accessibilityLabel), ['5분', '15분', '30분', '1시간', '4시간', '1일']);
+    // The group headings name what is there: 분 · 시간 · 일 (2026-11-07 (3): no "일 / 주").
+    const headings = h.renderer.root.findAllByType('Text').filter((node: any) => node.props.accessibilityRole === 'header')
+      .map((node: any) => node.props.children);
+    assert.deepEqual(headings, ['시간봉', '분', '시간', '일']);
     assert.deepEqual(options.map((node: any) => node.props.testID), ASSET_CHART_TIMEFRAMES.map((item) => `asset-timeframe-option-${item.interval}`));
     const originalPolicies = ASSET_CHART_TIMEFRAMES.map((item) => ({ ...item }));
     for (const timeframe of ASSET_CHART_TIMEFRAMES) {

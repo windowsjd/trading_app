@@ -429,6 +429,7 @@ export const ModelName = {
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
   AdRewardClaim: 'AdRewardClaim',
+  AdRewardSession: 'AdRewardSession',
   GeneralAccountReset: 'GeneralAccountReset',
   ExchangeTransaction: 'ExchangeTransaction',
   FxRateSnapshot: 'FxRateSnapshot',
@@ -488,7 +489,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLeverageChange" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup" | "communityPost" | "communityPostPhoto" | "communityComment" | "communityPostLike" | "communityCommentLike" | "communityPostAlias" | "communityReport" | "communitySanction" | "communitySanctionCarryover" | "communityRuleConsent" | "communityPhotoCleanup"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLeverageChange" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "adRewardSession" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup" | "communityPost" | "communityPostPhoto" | "communityComment" | "communityPostLike" | "communityCommentLike" | "communityPostAlias" | "communityReport" | "communitySanction" | "communitySanctionCarryover" | "communityRuleConsent" | "communityPhotoCleanup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3819,6 +3820,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AdRewardClaimCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AdRewardClaimCountAggregateOutputType> | number
+        }
+      }
+    }
+    AdRewardSession: {
+      payload: Prisma.$AdRewardSessionPayload<ExtArgs>
+      fields: Prisma.AdRewardSessionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AdRewardSessionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AdRewardSessionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>
+        }
+        findFirst: {
+          args: Prisma.AdRewardSessionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AdRewardSessionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>
+        }
+        findMany: {
+          args: Prisma.AdRewardSessionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>[]
+        }
+        create: {
+          args: Prisma.AdRewardSessionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>
+        }
+        createMany: {
+          args: Prisma.AdRewardSessionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AdRewardSessionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>[]
+        }
+        delete: {
+          args: Prisma.AdRewardSessionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>
+        }
+        update: {
+          args: Prisma.AdRewardSessionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>
+        }
+        deleteMany: {
+          args: Prisma.AdRewardSessionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AdRewardSessionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AdRewardSessionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>[]
+        }
+        upsert: {
+          args: Prisma.AdRewardSessionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardSessionPayload>
+        }
+        aggregate: {
+          args: Prisma.AdRewardSessionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAdRewardSession>
+        }
+        groupBy: {
+          args: Prisma.AdRewardSessionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdRewardSessionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AdRewardSessionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdRewardSessionCountAggregateOutputType> | number
         }
       }
     }
@@ -8101,6 +8176,28 @@ export const AdRewardClaimScalarFieldEnum = {
 export type AdRewardClaimScalarFieldEnum = (typeof AdRewardClaimScalarFieldEnum)[keyof typeof AdRewardClaimScalarFieldEnum]
 
 
+export const AdRewardSessionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tradingAccountId: 'tradingAccountId',
+  provider: 'provider',
+  purpose: 'purpose',
+  platform: 'platform',
+  idempotencyKey: 'idempotencyKey',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt',
+  ssvTransactionId: 'ssvTransactionId',
+  ssvVerifiedAt: 'ssvVerifiedAt',
+  ssvRewardedAt: 'ssvRewardedAt',
+  ssvAdUnit: 'ssvAdUnit',
+  ssvKeyId: 'ssvKeyId',
+  ssvRewardItem: 'ssvRewardItem',
+  ssvRewardAmount: 'ssvRewardAmount'
+} as const
+
+export type AdRewardSessionScalarFieldEnum = (typeof AdRewardSessionScalarFieldEnum)[keyof typeof AdRewardSessionScalarFieldEnum]
+
+
 export const GeneralAccountResetScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -10126,6 +10223,7 @@ export type GlobalOmitConfig = {
   cashWallet?: Prisma.CashWalletOmit
   walletTransaction?: Prisma.WalletTransactionOmit
   adRewardClaim?: Prisma.AdRewardClaimOmit
+  adRewardSession?: Prisma.AdRewardSessionOmit
   generalAccountReset?: Prisma.GeneralAccountResetOmit
   exchangeTransaction?: Prisma.ExchangeTransactionOmit
   fxRateSnapshot?: Prisma.FxRateSnapshotOmit

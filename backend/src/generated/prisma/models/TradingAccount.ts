@@ -281,6 +281,7 @@ export type TradingAccountWhereInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotListRelationFilter
   seasonRankings?: Prisma.SeasonRankingListRelationFilter
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementListRelationFilter
+  adRewardSessions?: Prisma.AdRewardSessionListRelationFilter
 }
 
 export type TradingAccountOrderByWithRelationInput = {
@@ -326,6 +327,7 @@ export type TradingAccountOrderByWithRelationInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotOrderByRelationAggregateInput
   seasonRankings?: Prisma.SeasonRankingOrderByRelationAggregateInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementOrderByRelationAggregateInput
+  adRewardSessions?: Prisma.AdRewardSessionOrderByRelationAggregateInput
 }
 
 export type TradingAccountWhereUniqueInput = Prisma.AtLeast<{
@@ -374,6 +376,7 @@ export type TradingAccountWhereUniqueInput = Prisma.AtLeast<{
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotListRelationFilter
   seasonRankings?: Prisma.SeasonRankingListRelationFilter
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementListRelationFilter
+  adRewardSessions?: Prisma.AdRewardSessionListRelationFilter
 }, "id">
 
 export type TradingAccountOrderByWithAggregationInput = {
@@ -450,6 +453,7 @@ export type TradingAccountCreateInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateInput = {
@@ -494,6 +498,7 @@ export type TradingAccountUncheckedCreateInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUpdateInput = {
@@ -538,6 +543,7 @@ export type TradingAccountUpdateInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateInput = {
@@ -582,6 +588,7 @@ export type TradingAccountUncheckedUpdateInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateManyInput = {
@@ -1030,6 +1037,20 @@ export type TradingAccountUpdateOneRequiredWithoutAdRewardClaimsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutAdRewardClaimsInput, Prisma.TradingAccountUpdateWithoutAdRewardClaimsInput>, Prisma.TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput>
 }
 
+export type TradingAccountCreateNestedOneWithoutAdRewardSessionsInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutAdRewardSessionsInput, Prisma.TradingAccountUncheckedCreateWithoutAdRewardSessionsInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutAdRewardSessionsInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+}
+
+export type TradingAccountUpdateOneRequiredWithoutAdRewardSessionsNestedInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutAdRewardSessionsInput, Prisma.TradingAccountUncheckedCreateWithoutAdRewardSessionsInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutAdRewardSessionsInput
+  upsert?: Prisma.TradingAccountUpsertWithoutAdRewardSessionsInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutAdRewardSessionsInput, Prisma.TradingAccountUpdateWithoutAdRewardSessionsInput>, Prisma.TradingAccountUncheckedUpdateWithoutAdRewardSessionsInput>
+}
+
 export type TradingAccountCreateNestedOneWithoutGeneralAccountResetsInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutGeneralAccountResetsInput, Prisma.TradingAccountUncheckedCreateWithoutGeneralAccountResetsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutGeneralAccountResetsInput
@@ -1225,6 +1246,7 @@ export type TradingAccountCreateWithoutUserInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutUserInput = {
@@ -1268,6 +1290,7 @@ export type TradingAccountUncheckedCreateWithoutUserInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutUserInput = {
@@ -1352,6 +1375,7 @@ export type TradingAccountCreateWithoutSeasonParticipantInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutSeasonParticipantInput = {
@@ -1395,6 +1419,7 @@ export type TradingAccountUncheckedCreateWithoutSeasonParticipantInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutSeasonParticipantInput = {
@@ -1454,6 +1479,7 @@ export type TradingAccountUpdateWithoutSeasonParticipantInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutSeasonParticipantInput = {
@@ -1497,6 +1523,7 @@ export type TradingAccountUncheckedUpdateWithoutSeasonParticipantInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesPositionsInput = {
@@ -1540,6 +1567,7 @@ export type TradingAccountCreateWithoutFuturesPositionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesPositionsInput = {
@@ -1583,6 +1611,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesPositionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesPositionsInput = {
@@ -1642,6 +1671,7 @@ export type TradingAccountUpdateWithoutFuturesPositionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesPositionsInput = {
@@ -1685,6 +1715,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesPositionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesExecutionsInput = {
@@ -1728,6 +1759,7 @@ export type TradingAccountCreateWithoutFuturesExecutionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesExecutionsInput = {
@@ -1771,6 +1803,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesExecutionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesExecutionsInput = {
@@ -1830,6 +1863,7 @@ export type TradingAccountUpdateWithoutFuturesExecutionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesExecutionsInput = {
@@ -1873,6 +1907,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesExecutionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesExecuteRequestsInput = {
@@ -1916,6 +1951,7 @@ export type TradingAccountCreateWithoutFuturesExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesExecuteRequestsInput = {
@@ -1959,6 +1995,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesExecuteRequestsInput = {
@@ -2018,6 +2055,7 @@ export type TradingAccountUpdateWithoutFuturesExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesExecuteRequestsInput = {
@@ -2061,6 +2099,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesLeverageChangesInput = {
@@ -2104,6 +2143,7 @@ export type TradingAccountCreateWithoutFuturesLeverageChangesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesLeverageChangesInput = {
@@ -2147,6 +2187,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesLeverageChangesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesLeverageChangesInput = {
@@ -2206,6 +2247,7 @@ export type TradingAccountUpdateWithoutFuturesLeverageChangesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesLeverageChangesInput = {
@@ -2249,6 +2291,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesLeverageChangesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesLimitOrdersInput = {
@@ -2292,6 +2335,7 @@ export type TradingAccountCreateWithoutFuturesLimitOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesLimitOrdersInput = {
@@ -2335,6 +2379,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesLimitOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesLimitOrdersInput = {
@@ -2394,6 +2439,7 @@ export type TradingAccountUpdateWithoutFuturesLimitOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesLimitOrdersInput = {
@@ -2437,6 +2483,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesLimitOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutProtectionGroupsInput = {
@@ -2480,6 +2527,7 @@ export type TradingAccountCreateWithoutProtectionGroupsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutProtectionGroupsInput = {
@@ -2523,6 +2571,7 @@ export type TradingAccountUncheckedCreateWithoutProtectionGroupsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutProtectionGroupsInput = {
@@ -2582,6 +2631,7 @@ export type TradingAccountUpdateWithoutProtectionGroupsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutProtectionGroupsInput = {
@@ -2625,6 +2675,7 @@ export type TradingAccountUncheckedUpdateWithoutProtectionGroupsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutProtectionCommandsInput = {
@@ -2668,6 +2719,7 @@ export type TradingAccountCreateWithoutProtectionCommandsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutProtectionCommandsInput = {
@@ -2711,6 +2763,7 @@ export type TradingAccountUncheckedCreateWithoutProtectionCommandsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutProtectionCommandsInput = {
@@ -2770,6 +2823,7 @@ export type TradingAccountUpdateWithoutProtectionCommandsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutProtectionCommandsInput = {
@@ -2813,6 +2867,7 @@ export type TradingAccountUncheckedUpdateWithoutProtectionCommandsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutPositionsInput = {
@@ -2856,6 +2911,7 @@ export type TradingAccountCreateWithoutPositionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutPositionsInput = {
@@ -2899,6 +2955,7 @@ export type TradingAccountUncheckedCreateWithoutPositionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutPositionsInput = {
@@ -2958,6 +3015,7 @@ export type TradingAccountUpdateWithoutPositionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutPositionsInput = {
@@ -3001,6 +3059,7 @@ export type TradingAccountUncheckedUpdateWithoutPositionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutOrdersInput = {
@@ -3044,6 +3103,7 @@ export type TradingAccountCreateWithoutOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutOrdersInput = {
@@ -3087,6 +3147,7 @@ export type TradingAccountUncheckedCreateWithoutOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutOrdersInput = {
@@ -3146,6 +3207,7 @@ export type TradingAccountUpdateWithoutOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutOrdersInput = {
@@ -3189,6 +3251,7 @@ export type TradingAccountUncheckedUpdateWithoutOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutConditionalBuyOrdersInput = {
@@ -3232,6 +3295,7 @@ export type TradingAccountCreateWithoutConditionalBuyOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutConditionalBuyOrdersInput = {
@@ -3275,6 +3339,7 @@ export type TradingAccountUncheckedCreateWithoutConditionalBuyOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutConditionalBuyOrdersInput = {
@@ -3334,6 +3399,7 @@ export type TradingAccountUpdateWithoutConditionalBuyOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutConditionalBuyOrdersInput = {
@@ -3377,6 +3443,7 @@ export type TradingAccountUncheckedUpdateWithoutConditionalBuyOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesConditionalEntriesInput = {
@@ -3420,6 +3487,7 @@ export type TradingAccountCreateWithoutFuturesConditionalEntriesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesConditionalEntriesInput = {
@@ -3463,6 +3531,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesConditionalEntriesInput =
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesConditionalEntriesInput = {
@@ -3522,6 +3591,7 @@ export type TradingAccountUpdateWithoutFuturesConditionalEntriesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesConditionalEntriesInput = {
@@ -3565,6 +3635,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesConditionalEntriesInput =
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutConditionalSellOrdersInput = {
@@ -3608,6 +3679,7 @@ export type TradingAccountCreateWithoutConditionalSellOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutConditionalSellOrdersInput = {
@@ -3651,6 +3723,7 @@ export type TradingAccountUncheckedCreateWithoutConditionalSellOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutConditionalSellOrdersInput = {
@@ -3710,6 +3783,7 @@ export type TradingAccountUpdateWithoutConditionalSellOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutConditionalSellOrdersInput = {
@@ -3753,6 +3827,7 @@ export type TradingAccountUncheckedUpdateWithoutConditionalSellOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesTpSlSettingsInput = {
@@ -3796,6 +3871,7 @@ export type TradingAccountCreateWithoutFuturesTpSlSettingsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesTpSlSettingsInput = {
@@ -3839,6 +3915,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesTpSlSettingsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesTpSlSettingsInput = {
@@ -3898,6 +3975,7 @@ export type TradingAccountUpdateWithoutFuturesTpSlSettingsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesTpSlSettingsInput = {
@@ -3941,6 +4019,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesTpSlSettingsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutEntryTpSlPlansInput = {
@@ -3984,6 +4063,7 @@ export type TradingAccountCreateWithoutEntryTpSlPlansInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutEntryTpSlPlansInput = {
@@ -4027,6 +4107,7 @@ export type TradingAccountUncheckedCreateWithoutEntryTpSlPlansInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutEntryTpSlPlansInput = {
@@ -4086,6 +4167,7 @@ export type TradingAccountUpdateWithoutEntryTpSlPlansInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutEntryTpSlPlansInput = {
@@ -4129,6 +4211,7 @@ export type TradingAccountUncheckedUpdateWithoutEntryTpSlPlansInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutPendingOrderModificationsInput = {
@@ -4172,6 +4255,7 @@ export type TradingAccountCreateWithoutPendingOrderModificationsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutPendingOrderModificationsInput = {
@@ -4215,6 +4299,7 @@ export type TradingAccountUncheckedCreateWithoutPendingOrderModificationsInput =
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutPendingOrderModificationsInput = {
@@ -4274,6 +4359,7 @@ export type TradingAccountUpdateWithoutPendingOrderModificationsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutPendingOrderModificationsInput = {
@@ -4317,6 +4403,7 @@ export type TradingAccountUncheckedUpdateWithoutPendingOrderModificationsInput =
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutLimitOnCloseOrdersInput = {
@@ -4360,6 +4447,7 @@ export type TradingAccountCreateWithoutLimitOnCloseOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutLimitOnCloseOrdersInput = {
@@ -4403,6 +4491,7 @@ export type TradingAccountUncheckedCreateWithoutLimitOnCloseOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutLimitOnCloseOrdersInput = {
@@ -4462,6 +4551,7 @@ export type TradingAccountUpdateWithoutLimitOnCloseOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutLimitOnCloseOrdersInput = {
@@ -4505,6 +4595,7 @@ export type TradingAccountUncheckedUpdateWithoutLimitOnCloseOrdersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutBeginnerQuestAcknowledgementsInput = {
@@ -4548,6 +4639,7 @@ export type TradingAccountCreateWithoutBeginnerQuestAcknowledgementsInput = {
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutBeginnerQuestAcknowledgementsInput = {
@@ -4591,6 +4683,7 @@ export type TradingAccountUncheckedCreateWithoutBeginnerQuestAcknowledgementsInp
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutBeginnerQuestAcknowledgementsInput = {
@@ -4650,6 +4743,7 @@ export type TradingAccountUpdateWithoutBeginnerQuestAcknowledgementsInput = {
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutBeginnerQuestAcknowledgementsInput = {
@@ -4693,6 +4787,7 @@ export type TradingAccountUncheckedUpdateWithoutBeginnerQuestAcknowledgementsInp
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutCashWalletsInput = {
@@ -4736,6 +4831,7 @@ export type TradingAccountCreateWithoutCashWalletsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutCashWalletsInput = {
@@ -4779,6 +4875,7 @@ export type TradingAccountUncheckedCreateWithoutCashWalletsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutCashWalletsInput = {
@@ -4838,6 +4935,7 @@ export type TradingAccountUpdateWithoutCashWalletsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutCashWalletsInput = {
@@ -4881,6 +4979,7 @@ export type TradingAccountUncheckedUpdateWithoutCashWalletsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutWalletTransactionsInput = {
@@ -4924,6 +5023,7 @@ export type TradingAccountCreateWithoutWalletTransactionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutWalletTransactionsInput = {
@@ -4967,6 +5067,7 @@ export type TradingAccountUncheckedCreateWithoutWalletTransactionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutWalletTransactionsInput = {
@@ -5026,6 +5127,7 @@ export type TradingAccountUpdateWithoutWalletTransactionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutWalletTransactionsInput = {
@@ -5069,6 +5171,7 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransactionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutAdRewardClaimsInput = {
@@ -5112,6 +5215,7 @@ export type TradingAccountCreateWithoutAdRewardClaimsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutAdRewardClaimsInput = {
@@ -5155,6 +5259,7 @@ export type TradingAccountUncheckedCreateWithoutAdRewardClaimsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutAdRewardClaimsInput = {
@@ -5214,6 +5319,7 @@ export type TradingAccountUpdateWithoutAdRewardClaimsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput = {
@@ -5252,6 +5358,199 @@ export type TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput = {
   conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountCreateWithoutAdRewardSessionsInput = {
+  id?: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
+  futuresPositions?: Prisma.FuturesPositionCreateNestedManyWithoutTradingAccountInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutTradingAccountInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  futuresLimitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutTradingAccountInput
+  futuresConditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTradingAccountInput
+  futuresTpSlSettings?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTradingAccountInput
+  futuresLeverageChanges?: Prisma.FuturesLeverageChangeCreateNestedManyWithoutTradingAccountInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutTradingAccountInput
+  pendingOrderModifications?: Prisma.PendingOrderModificationCreateNestedManyWithoutTradingAccountInput
+  futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountUncheckedCreateWithoutAdRewardSessionsInput = {
+  id?: string
+  userId: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresPositions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresLimitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresConditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresTpSlSettings?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresLeverageChanges?: Prisma.FuturesLeverageChangeUncheckedCreateNestedManyWithoutTradingAccountInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutTradingAccountInput
+  pendingOrderModifications?: Prisma.PendingOrderModificationUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountCreateOrConnectWithoutAdRewardSessionsInput = {
+  where: Prisma.TradingAccountWhereUniqueInput
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutAdRewardSessionsInput, Prisma.TradingAccountUncheckedCreateWithoutAdRewardSessionsInput>
+}
+
+export type TradingAccountUpsertWithoutAdRewardSessionsInput = {
+  update: Prisma.XOR<Prisma.TradingAccountUpdateWithoutAdRewardSessionsInput, Prisma.TradingAccountUncheckedUpdateWithoutAdRewardSessionsInput>
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutAdRewardSessionsInput, Prisma.TradingAccountUncheckedCreateWithoutAdRewardSessionsInput>
+  where?: Prisma.TradingAccountWhereInput
+}
+
+export type TradingAccountUpdateToOneWithWhereWithoutAdRewardSessionsInput = {
+  where?: Prisma.TradingAccountWhereInput
+  data: Prisma.XOR<Prisma.TradingAccountUpdateWithoutAdRewardSessionsInput, Prisma.TradingAccountUncheckedUpdateWithoutAdRewardSessionsInput>
+}
+
+export type TradingAccountUpdateWithoutAdRewardSessionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
+  futuresPositions?: Prisma.FuturesPositionUpdateManyWithoutTradingAccountNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutTradingAccountNestedInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  futuresLimitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutTradingAccountNestedInput
+  futuresConditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutTradingAccountNestedInput
+  futuresTpSlSettings?: Prisma.FuturesTpSlSettingUpdateManyWithoutTradingAccountNestedInput
+  futuresLeverageChanges?: Prisma.FuturesLeverageChangeUpdateManyWithoutTradingAccountNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutTradingAccountNestedInput
+  pendingOrderModifications?: Prisma.PendingOrderModificationUpdateManyWithoutTradingAccountNestedInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountUncheckedUpdateWithoutAdRewardSessionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresPositions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresLimitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresConditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresTpSlSettings?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresLeverageChanges?: Prisma.FuturesLeverageChangeUncheckedUpdateManyWithoutTradingAccountNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutTradingAccountNestedInput
+  pendingOrderModifications?: Prisma.PendingOrderModificationUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -5300,6 +5599,7 @@ export type TradingAccountCreateWithoutGeneralAccountResetsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutGeneralAccountResetsInput = {
@@ -5343,6 +5643,7 @@ export type TradingAccountUncheckedCreateWithoutGeneralAccountResetsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutGeneralAccountResetsInput = {
@@ -5402,6 +5703,7 @@ export type TradingAccountUpdateWithoutGeneralAccountResetsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutGeneralAccountResetsInput = {
@@ -5445,6 +5747,7 @@ export type TradingAccountUncheckedUpdateWithoutGeneralAccountResetsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutExchangeTransactionsInput = {
@@ -5488,6 +5791,7 @@ export type TradingAccountCreateWithoutExchangeTransactionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutExchangeTransactionsInput = {
@@ -5531,6 +5835,7 @@ export type TradingAccountUncheckedCreateWithoutExchangeTransactionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutExchangeTransactionsInput = {
@@ -5590,6 +5895,7 @@ export type TradingAccountUpdateWithoutExchangeTransactionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutExchangeTransactionsInput = {
@@ -5633,6 +5939,7 @@ export type TradingAccountUncheckedUpdateWithoutExchangeTransactionsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutQuotesInput = {
@@ -5676,6 +5983,7 @@ export type TradingAccountCreateWithoutQuotesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutQuotesInput = {
@@ -5719,6 +6027,7 @@ export type TradingAccountUncheckedCreateWithoutQuotesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutQuotesInput = {
@@ -5778,6 +6087,7 @@ export type TradingAccountUpdateWithoutQuotesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutQuotesInput = {
@@ -5821,6 +6131,7 @@ export type TradingAccountUncheckedUpdateWithoutQuotesInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutWalletTransfersInput = {
@@ -5864,6 +6175,7 @@ export type TradingAccountCreateWithoutWalletTransfersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutWalletTransfersInput = {
@@ -5907,6 +6219,7 @@ export type TradingAccountUncheckedCreateWithoutWalletTransfersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutWalletTransfersInput = {
@@ -5966,6 +6279,7 @@ export type TradingAccountUpdateWithoutWalletTransfersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutWalletTransfersInput = {
@@ -6009,6 +6323,7 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransfersInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutWalletTransferExecuteRequestsInput = {
@@ -6052,6 +6367,7 @@ export type TradingAccountCreateWithoutWalletTransferExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutWalletTransferExecuteRequestsInput = {
@@ -6095,6 +6411,7 @@ export type TradingAccountUncheckedCreateWithoutWalletTransferExecuteRequestsInp
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutWalletTransferExecuteRequestsInput = {
@@ -6154,6 +6471,7 @@ export type TradingAccountUpdateWithoutWalletTransferExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutWalletTransferExecuteRequestsInput = {
@@ -6197,6 +6515,7 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransferExecuteRequestsInp
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFxExecuteRequestsInput = {
@@ -6240,6 +6559,7 @@ export type TradingAccountCreateWithoutFxExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -6283,6 +6603,7 @@ export type TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -6342,6 +6663,7 @@ export type TradingAccountUpdateWithoutFxExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -6385,6 +6707,7 @@ export type TradingAccountUncheckedUpdateWithoutFxExecuteRequestsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutEquitySnapshotsInput = {
@@ -6428,6 +6751,7 @@ export type TradingAccountCreateWithoutEquitySnapshotsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutEquitySnapshotsInput = {
@@ -6471,6 +6795,7 @@ export type TradingAccountUncheckedCreateWithoutEquitySnapshotsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutEquitySnapshotsInput = {
@@ -6530,6 +6855,7 @@ export type TradingAccountUpdateWithoutEquitySnapshotsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutEquitySnapshotsInput = {
@@ -6573,6 +6899,7 @@ export type TradingAccountUncheckedUpdateWithoutEquitySnapshotsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutDailyPortfolioSnapshotsInput = {
@@ -6616,6 +6943,7 @@ export type TradingAccountCreateWithoutDailyPortfolioSnapshotsInput = {
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutDailyPortfolioSnapshotsInput = {
@@ -6659,6 +6987,7 @@ export type TradingAccountUncheckedCreateWithoutDailyPortfolioSnapshotsInput = {
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutDailyPortfolioSnapshotsInput = {
@@ -6718,6 +7047,7 @@ export type TradingAccountUpdateWithoutDailyPortfolioSnapshotsInput = {
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutDailyPortfolioSnapshotsInput = {
@@ -6761,6 +7091,7 @@ export type TradingAccountUncheckedUpdateWithoutDailyPortfolioSnapshotsInput = {
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutSeasonRankingsInput = {
@@ -6804,6 +7135,7 @@ export type TradingAccountCreateWithoutSeasonRankingsInput = {
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutSeasonRankingsInput = {
@@ -6847,6 +7179,7 @@ export type TradingAccountUncheckedCreateWithoutSeasonRankingsInput = {
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutSeasonRankingsInput = {
@@ -6906,6 +7239,7 @@ export type TradingAccountUpdateWithoutSeasonRankingsInput = {
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutSeasonRankingsInput = {
@@ -6949,6 +7283,7 @@ export type TradingAccountUncheckedUpdateWithoutSeasonRankingsInput = {
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesLiquidationsInput = {
@@ -6992,6 +7327,7 @@ export type TradingAccountCreateWithoutFuturesLiquidationsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesLiquidationsInput = {
@@ -7035,6 +7371,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesLiquidationsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesLiquidationsInput = {
@@ -7094,6 +7431,7 @@ export type TradingAccountUpdateWithoutFuturesLiquidationsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesLiquidationsInput = {
@@ -7137,6 +7475,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesLiquidationsInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFuturesSeasonSettlementInput = {
@@ -7180,6 +7519,7 @@ export type TradingAccountCreateWithoutFuturesSeasonSettlementInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFuturesSeasonSettlementInput = {
@@ -7223,6 +7563,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesSeasonSettlementInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFuturesSeasonSettlementInput = {
@@ -7282,6 +7623,7 @@ export type TradingAccountUpdateWithoutFuturesSeasonSettlementInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFuturesSeasonSettlementInput = {
@@ -7325,6 +7667,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesSeasonSettlementInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateManyUserInput = {
@@ -7379,6 +7722,7 @@ export type TradingAccountUpdateWithoutUserInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutUserInput = {
@@ -7422,6 +7766,7 @@ export type TradingAccountUncheckedUpdateWithoutUserInput = {
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateManyWithoutUserInput = {
@@ -7471,6 +7816,7 @@ export type TradingAccountCountOutputType = {
   dailyPortfolioSnapshots: number
   seasonRankings: number
   beginnerQuestAcknowledgements: number
+  adRewardSessions: number
 }
 
 export type TradingAccountCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -7504,6 +7850,7 @@ export type TradingAccountCountOutputTypeSelect<ExtArgs extends runtime.Types.Ex
   dailyPortfolioSnapshots?: boolean | TradingAccountCountOutputTypeCountDailyPortfolioSnapshotsArgs
   seasonRankings?: boolean | TradingAccountCountOutputTypeCountSeasonRankingsArgs
   beginnerQuestAcknowledgements?: boolean | TradingAccountCountOutputTypeCountBeginnerQuestAcknowledgementsArgs
+  adRewardSessions?: boolean | TradingAccountCountOutputTypeCountAdRewardSessionsArgs
 }
 
 /**
@@ -7726,6 +8073,13 @@ export type TradingAccountCountOutputTypeCountBeginnerQuestAcknowledgementsArgs<
   where?: Prisma.BeginnerQuestAcknowledgementWhereInput
 }
 
+/**
+ * TradingAccountCountOutputType without action
+ */
+export type TradingAccountCountOutputTypeCountAdRewardSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AdRewardSessionWhereInput
+}
+
 
 export type TradingAccountSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -7770,6 +8124,7 @@ export type TradingAccountSelect<ExtArgs extends runtime.Types.Extensions.Intern
   dailyPortfolioSnapshots?: boolean | Prisma.TradingAccount$dailyPortfolioSnapshotsArgs<ExtArgs>
   seasonRankings?: boolean | Prisma.TradingAccount$seasonRankingsArgs<ExtArgs>
   beginnerQuestAcknowledgements?: boolean | Prisma.TradingAccount$beginnerQuestAcknowledgementsArgs<ExtArgs>
+  adRewardSessions?: boolean | Prisma.TradingAccount$adRewardSessionsArgs<ExtArgs>
   _count?: boolean | Prisma.TradingAccountCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["tradingAccount"]>
 
@@ -7846,6 +8201,7 @@ export type TradingAccountInclude<ExtArgs extends runtime.Types.Extensions.Inter
   dailyPortfolioSnapshots?: boolean | Prisma.TradingAccount$dailyPortfolioSnapshotsArgs<ExtArgs>
   seasonRankings?: boolean | Prisma.TradingAccount$seasonRankingsArgs<ExtArgs>
   beginnerQuestAcknowledgements?: boolean | Prisma.TradingAccount$beginnerQuestAcknowledgementsArgs<ExtArgs>
+  adRewardSessions?: boolean | Prisma.TradingAccount$adRewardSessionsArgs<ExtArgs>
   _count?: boolean | Prisma.TradingAccountCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TradingAccountIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -7891,6 +8247,7 @@ export type $TradingAccountPayload<ExtArgs extends runtime.Types.Extensions.Inte
     dailyPortfolioSnapshots: Prisma.$DailyPortfolioSnapshotPayload<ExtArgs>[]
     seasonRankings: Prisma.$SeasonRankingPayload<ExtArgs>[]
     beginnerQuestAcknowledgements: Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>[]
+    adRewardSessions: Prisma.$AdRewardSessionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -8329,6 +8686,7 @@ export interface Prisma__TradingAccountClient<T, Null = never, ExtArgs extends r
   dailyPortfolioSnapshots<T extends Prisma.TradingAccount$dailyPortfolioSnapshotsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$dailyPortfolioSnapshotsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DailyPortfolioSnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   seasonRankings<T extends Prisma.TradingAccount$seasonRankingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$seasonRankingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRankingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   beginnerQuestAcknowledgements<T extends Prisma.TradingAccount$beginnerQuestAcknowledgementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$beginnerQuestAcknowledgementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  adRewardSessions<T extends Prisma.TradingAccount$adRewardSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$adRewardSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdRewardSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -9523,6 +9881,30 @@ export type TradingAccount$beginnerQuestAcknowledgementsArgs<ExtArgs extends run
   take?: number
   skip?: number
   distinct?: Prisma.BeginnerQuestAcknowledgementScalarFieldEnum | Prisma.BeginnerQuestAcknowledgementScalarFieldEnum[]
+}
+
+/**
+ * TradingAccount.adRewardSessions
+ */
+export type TradingAccount$adRewardSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AdRewardSession
+   */
+  select?: Prisma.AdRewardSessionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AdRewardSession
+   */
+  omit?: Prisma.AdRewardSessionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AdRewardSessionInclude<ExtArgs> | null
+  where?: Prisma.AdRewardSessionWhereInput
+  orderBy?: Prisma.AdRewardSessionOrderByWithRelationInput | Prisma.AdRewardSessionOrderByWithRelationInput[]
+  cursor?: Prisma.AdRewardSessionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AdRewardSessionScalarFieldEnum | Prisma.AdRewardSessionScalarFieldEnum[]
 }
 
 /**

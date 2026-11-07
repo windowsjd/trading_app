@@ -41,9 +41,9 @@ for (const [stack, root, label, icon] of [
     assert.equal(title.props.icon, icon);
     assert.equal(title.props.children, label);
     assert.equal(title.props.tintColor, '#f2f5f7');
-    // 종목 상세 (stocks/crypto and futures contracts) and 주문 alone take the
-    // heavy theme font (bolder, same size).
-    const bold = stack === 'Market' ? ['AssetDetail', 'FuturesDetail', 'Order'] : [];
+    // 종목 상세 (stocks/crypto and futures contracts), 주문 and 글쓰기
+    // (2026-11-07 (3)) alone take the heavy theme font (bolder, same size).
+    const bold = stack === 'Market' ? ['AssetDetail', 'FuturesDetail', 'Order'] : stack === 'Community' ? ['PostCompose'] : [];
     const route = (name: string, params: object = {}) => ({ key: name, name, params });
     for (const screen of screens) {
       const resolved = typeof screen.props.options === 'function'
@@ -56,6 +56,20 @@ for (const [stack, root, label, icon] of [
         assert.deepEqual(resolved.headerTitleStyle, bold.includes(screen.props.name)
           ? { fontFamily: 'System', fontWeight: '700' } : undefined, screen.props.name);
       }
+    }
+    if (stack === 'Community') {
+      // A post Home's card opened goes back to Home: the arrow alone, never labeled 커뮤니티.
+      const detail = screens.find(item => item.props.name === 'PostDetail');
+      const back = (params: object) => {
+        const options = detail.props.options({ theme: navigationTheme.useTheme(), route: route('PostDetail', params) });
+        return [options.title, options.headerBackTitle, options.headerBackButtonDisplayMode];
+      };
+      assert.deepEqual(back({ postId: 'p' }), ['커뮤니티', undefined, undefined]);
+      assert.deepEqual(back({ postId: 'p', returnTab: 'HomeTab' }), ['커뮤니티', '뒤로', 'minimal']);
+      assert.equal(detail.props.getId({ params: { postId: 'p', returnTab: 'HomeTab' } }), 'p', 'one screen per post');
+      assert.equal(typeof tree.props.screenListeners, 'function', 'back from a cross-tab post returns to its tab');
+      const compose = screens.find(item => item.props.name === 'PostCompose');
+      assert.equal(compose.props.options({ theme: navigationTheme.useTheme(), route: route('PostCompose') }).title, '글쓰기');
     }
     if (stack === 'Market') {
       for (const [name, title] of [['AssetDetail', '종목 상세'], ['FuturesDetail', '종목 상세'], ['Order', '주문']]) {
@@ -164,20 +178,30 @@ test('리그: the root header shows 랭킹 | 커뮤니티 at the left from the s
     tabs.props.onChange('community');
   }
   assert.deepEqual(params, [{ section: 'community' }, { section: 'community' }, { section: 'community' }]);
-  assert.deepEqual(screens.slice(1).map(screen => screen.props.options.title), ['유저 시즌 요약', '커뮤니티', '글쓰기']);
+  const resolved = (screen: any, routeParams: object = {}) => typeof screen.props.options === 'function'
+    ? screen.props.options({ theme: navigationTheme.useTheme(), route: { key: screen.props.name, name: screen.props.name, params: routeParams } })
+    : screen.props.options;
+  assert.deepEqual(screens.slice(1).map(screen => resolved(screen).title), ['유저 시즌 요약', '커뮤니티', '글쓰기']);
   for (const screen of screens.slice(1)) {
-    assert.equal(screen.props.options.headerLeft, undefined);
-    assert.equal(screen.props.options.headerTitle, undefined);
+    assert.equal(resolved(screen).headerLeft, undefined);
+    assert.equal(resolved(screen).headerTitle, undefined);
   }
+  // 글쓰기 takes the heavy theme font (2026-11-07 (3)); a post from Home goes back with the arrow alone.
+  assert.deepEqual(resolved(screens[3]).headerTitleStyle, { fontFamily: 'System', fontWeight: '700' });
+  assert.deepEqual([resolved(screens[2], { postId: 'p', returnTab: 'HomeTab' }).headerBackButtonDisplayMode,
+    resolved(screens[2], { postId: 'p' }).headerBackButtonDisplayMode], ['minimal', undefined]);
+  assert.equal(screens[2].props.getId({ params: { postId: 'q' } }), 'q', 'one screen per post');
 });
 
 test('the community stack registers the same post screens and 유저 시즌 요약 title as the 리그 stack', () => {
   const community = readFileSync(resolve('src/app/navigation/CommunityStack.tsx'), 'utf8');
   const ranking = readFileSync(resolve('src/app/navigation/RankingStack.tsx'), 'utf8');
   for (const source of [community, ranking]) {
-    assert.match(source, /name="PostDetail" component=\{PostDetailScreen\} options=\{\{ title: '커뮤니티' \}\}/);
-    assert.match(source, /name="PostCompose" component=\{PostComposeScreen\} options=\{\{ title: '글쓰기' \}\}/);
+    // One PostDetail header for both (communityPostEntry.postDetailOptions: 커뮤니티, back to an entry tab).
+    assert.match(source, /name="PostDetail" component=\{PostDetailScreen\} getId=\{postDetailId\}\s+options=\{\(\{ route \}\) => postDetailOptions\(route\.params\)\}/);
+    assert.match(source, /name="PostCompose" component=\{PostComposeScreen\}\s+options=\{\(\{ theme \}\) => \(\{ title: '글쓰기', headerTitleStyle: theme\.fonts\.heavy \}\)\}/);
     assert.match(source, /name="UserSeasonSummary"\s+component=\{UserSeasonSummaryScreen\}\s+options=\{\{ title: '유저 시즌 요약' \}\}/);
+    assert.match(source, /screenListeners=\{returnToEntryTab\}/);
   }
 });
 

@@ -29,6 +29,8 @@ import {
   type TpSlLegDraft,
 } from '../tpSlModel';
 import { getAccountHoldings } from '../../tradingAccount/holdings';
+import { getAssetDetail } from '../../asset/api';
+import { serverMarket } from '../../order/orderMethods';
 import { cancelTradingAccountOrder, getTradingAccountPositions } from '../../tradingAccount/api';
 import { invalidateAfterOrderCancel } from '../../tradingAccount/invalidation';
 import { getCurrentFxRate } from '../../wallet/api';
@@ -48,17 +50,29 @@ import TpSlRow from './TpSlRow';
 const USD_KRW = { baseCurrency: 'USD', quoteCurrency: 'KRW', refresh: false } as const;
 const BODY_KEY: Record<TpSlKind, 'takeProfit' | 'stopLoss'> = { take_profit: 'takeProfit', stop_loss: 'stopLoss' };
 const UNCERTAIN_CREATE = '등록 결과를 확인하지 못했어요. 위 목록을 먼저 확인해 주세요. 같은 내용으로 다시 누르면 중복 없이 다시 확인해요.';
+/** A closed stock market on a server that registers then (2026-11-07): registration is not execution. */
+export const OFF_SESSION_TP_SL_NOTICE =
+  '정규장 외 시간이에요. 지금 등록하면 다음 정규장부터 감시해요. 장 시작 시세가 이미 설정 가격을 지났다면 장 시작 직후 시장가로 매도되며, 체결 가격은 설정 가격과 다를 수 있어요.';
+const OFF_SESSION_ALREADY_MET = '마지막 정규장 가격이 이미 이 가격에 도달해 있어요. 다음 정규장 시세도 이 가격을 지나 있으면 장 시작 직후 시장가로 매도돼요.';
+const MARKET_STATE_UNAVAILABLE = '시장 운영 상태를 확인할 수 없어 지금은 익절가/손절가를 등록할 수 없어요. 잠시 후 다시 시도해 주세요.';
+const errorMessage = (cause: unknown) => {
+  const code = getApiErrorCode(cause);
+  return code === 'MARKET_CALENDAR_UNAVAILABLE' ? MARKET_STATE_UNAVAILABLE : getErrorMessageFromCode(code);
+};
 const freshLegs = (): Record<TpSlKind, TpSlLegDraft> => ({ take_profit: EMPTY_TP_SL_LEG, stop_loss: EMPTY_TP_SL_LEG });
 type Request = { accountId: string; epoch: number; body: ConditionalSellCreateDto; reportQuestCommand: ReturnType<typeof captureQuestGuideCommand> };
 
 /**
- * 손절가/익절가 of one Spot holding (KRX stock, crypto): the live independent
+ * 손절가/익절가 of one Spot holding (KRX/US stock, crypto): the live independent
  * settings with cancel, and new ones — a take-profit and/or a stop-loss, each
  * a trigger price and a whole-percent share of today's holding fixed into a
  * quantity when registered. They sell at market through the ordinary SELL
  * when reached; nothing is reserved while watching, and a fired setting never
  * cancels the others. A live whole-position OCO group on the holding blocks
- * new settings (server PROTECTION_CONFLICT).
+ * new settings (server PROTECTION_CONFLICT). While a stock market is closed
+ * (2026-11-07) a server that lists it registers them without a current price
+ * and watches from the next regular session; the sheet says so before and
+ * after — the server's `registeredOffSession` decides the result's words.
  */
 export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onInputFocus, onInputBlur, submitRef }: {
   accountId: string;
@@ -100,6 +114,19 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
     enabled: krw,
   });
   const learning = useLearningAccess(accountId).gate(position?.assetType === 'crypto' ? 'spotProtection' : 'allTrading');
+  // The stock's market state (the order screen's cached detail): a hint only,
+  // the server decides at registration.
+  const stockHolding = position?.assetType === 'domestic_stock' || position?.assetType === 'us_stock';
+  const assetQuery = useQuery({
+    queryKey: QUERY_KEYS.asset.detail(assetId),
+    queryFn: () => getAssetDetail(assetId),
+    enabled: stockHolding,
+    staleTime: 30_000,
+  });
+  const marketClosed = stockHolding && assetQuery.data?.asset?.id === assetId && assetQuery.data.asset.marketStatus === 'closed';
+  const market = serverMarket(position?.assetType);
+  const offSession = marketClosed && !!market
+    && (settingsData?.capabilities.protection?.offSessionMarkets?.includes(market) ?? false);
 
   const [legs, setLegs] = useState(freshLegs);
   const [registered, setRegistered] = useState<ConditionalSellOrderDto[] | null>(null);
@@ -135,6 +162,9 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
       const info = getApiErrorInfo(cause);
       const uncertain = !info.hasResponse || (info.status ?? 0) >= 500;
       if (!uncertain) actionRef.current = null;
+      // The server saw another session than this sheet: read the market state again.
+      if (info.serverCode === 'CONDITIONAL_PRICE_UNAVAILABLE' || info.serverCode === 'MARKET_CALENDAR_UNAVAILABLE')
+        void assetQuery.refetch();
       setError({ cause, uncertain });
     },
   });
@@ -237,7 +267,7 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
             return (
               <TpSlRow key={row.id} testID={`tp-sl-setting-${row.id}`}
                 title={`${TP_SL_KIND_LABEL[row.kind === 'stop_loss' ? 'stop_loss' : 'take_profit']} · ${formatDisplayDecimal(row.triggerPrice)} ${row.currencyCode} ${row.kind === 'stop_loss' ? '이하' : '이상'}`}
-                detail={`수량 ${formatTpSlQuantity(row.quantity, 6)} ${unit} · 시장가 매도`}
+                detail={`수량 ${formatTpSlQuantity(row.quantity, 6)} ${unit} · 시장가 매도${row.state === 'watching' && row.registeredOffSession ? ' · 다음 정규장부터 감시' : ''}`}
                 state={getConditionalSellStateLabel(row.state)}
                 cancelLabel={path ? path.kind === 'order' ? '지정가 매도 취소' : '취소' : null}
                 canceling={cancel.isPending && cancel.variables?.id === row.id}
@@ -246,6 +276,9 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
           })}
           {cancel.isError ? <ErrorNotice error={cancel.error} message={getErrorMessageFromCode(getApiErrorCode(cancel.error))} testID="tp-sl-cancel-error" /> : null}
         </View>
+      ) : null}
+      {offSession && !blockedReason ? (
+        <Text testID="tp-sl-off-session-notice" accessibilityLiveRegion="polite" style={styles.notice}>{OFF_SESSION_TP_SL_NOTICE}</Text>
       ) : null}
       <QuestTarget id="protection-editor"><View>
         <TpSlLegFields
@@ -261,7 +294,7 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
           }}
           error={legError}
           warning={(kind) => isTpSlAlreadyMet('long', kind, legs[kind].triggerPrice, currentPrice)
-            ? '현재가가 이미 이 가격에 도달해 등록되지 않을 수 있어요.' : null}
+            ? offSession ? OFF_SESSION_ALREADY_MET : '현재가가 이미 이 가격에 도달해 등록되지 않을 수 있어요.' : null}
           placeholder={(kind) => kind === 'take_profit' ? '현재가보다 높은 가격' : '현재가보다 낮은 가격'}
           onInputFocus={onInputFocus}
           onInputBlur={onInputBlur}
@@ -269,12 +302,15 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
       </View></QuestTarget>
       {blockedReason ? <Text testID="tp-sl-blocked" style={styles.error}>{blockedReason}</Text> : null}
       {error ? (
-        <ErrorNotice error={error.cause} message={error.uncertain ? UNCERTAIN_CREATE : getErrorMessageFromCode(getApiErrorCode(error.cause))}
+        <ErrorNotice error={error.cause} message={error.uncertain ? UNCERTAIN_CREATE : errorMessage(error.cause)}
           testID="tp-sl-error" style={styles.error} />
       ) : null}
       {registered ? (
         <Text testID="tp-sl-registered" accessibilityLiveRegion="polite" style={styles.success}>
           {registered.length === 2 ? '익절가와 손절가를 등록했어요.' : `${TP_SL_KIND_LABEL[registered[0]?.kind === 'stop_loss' ? 'stop_loss' : 'take_profit']}가를 등록했어요.`}
+          {/* The server's word: registered while closed, watched from the next regular session. */}
+          {registered.length > 0 && registered.every((row) => row.state === 'watching' && row.registeredOffSession)
+            ? ' 다음 정규장부터 감시해요.' : ''}
         </Text>
       ) : null}
       <View ref={submitRef} collapsable={false}>
@@ -300,5 +336,6 @@ const styles = {
   section: { fontSize: 13, lineHeight: 19, fontWeight: '700', color: semantic.text },
   list: { gap: 8, minWidth: 0 },
   error: { fontSize: 12, lineHeight: 17, color: semantic.error },
+  notice: { fontSize: 12, lineHeight: 17, color: semantic.info },
   success: { fontSize: 13, lineHeight: 19, fontWeight: '600', color: semantic.success },
 } as const;

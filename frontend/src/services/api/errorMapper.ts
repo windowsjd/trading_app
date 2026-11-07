@@ -513,7 +513,9 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.CONDITIONAL_BUY_LIMIT_EXCEEDED:
       return '감시 중인 조건주문이 최대 개수에 도달했습니다. 기존 조건주문을 확인해주세요.';
     case ERROR_CODE.CONDITIONAL_PRICE_UNAVAILABLE:
-      return '감시에 사용할 최신 시세가 없어 등록할 수 없습니다. 주식은 정규장 중에 등록해주세요.';
+      // Stock conditions (2026-10-18) and stop-loss/take-profit (2026-11-07)
+      // register while closed: this is a price failure, never a closure.
+      return '감시에 사용할 최신 시세를 확인할 수 없어 등록하지 못했습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.CONDITIONAL_BUY_ALREADY_MET:
       return '현재 가격이 이미 감시가격에 도달해 등록하지 않았습니다. 다시 정해진 감시 조건을 확인한 뒤 등록해주세요.';
     case ERROR_CODE.PENDING_ORDER_NOT_MODIFIABLE:
@@ -592,6 +594,10 @@ export function getErrorMessageFromCode(
       return '오늘 받을 수 있는 가상자금을 모두 받았습니다.';
     case ERROR_CODE.AD_REWARD_COOLDOWN_ACTIVE:
       return '잠시 후 다시 가상자금을 받을 수 있습니다.';
+    case ERROR_CODE.AD_REWARD_VERIFICATION_PENDING:
+      return '광고 시청 확인을 기다리고 있습니다. 확인되면 자동으로 처리되며 같은 광고로 두 번 처리되지 않습니다.';
+    case ERROR_CODE.AD_REWARD_SESSION_LIMIT:
+      return '확인을 기다리는 광고가 많습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.GENERAL_ACCOUNT_RESET_BLOCKED:
       return '보유 종목, 선물 포지션, 미체결·조건 주문을 모두 정리한 뒤 초기화할 수 있습니다.';
     case ERROR_CODE.GENERAL_ACCOUNT_RESET_UNAVAILABLE:

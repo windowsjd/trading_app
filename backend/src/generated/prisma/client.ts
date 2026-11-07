@@ -286,6 +286,17 @@ export type WalletTransaction = Prisma.WalletTransactionModel
  */
 export type AdRewardClaim = Prisma.AdRewardClaimModel
 /**
+ * Model AdRewardSession
+ * 광고 시청 시도 (2026-11-07): the server-issued attempt one AdMob rewarded ad
+ * is shown for. Created BEFORE the ad, it binds the member, the general
+ * account, the purpose (funding | account_reset) and the claim/reset command
+ * key; its id is the SSV custom data. Google's signed SSV callback records
+ * its reward event here once (transaction_id, unique), and the EXISTING
+ * claim/reset command (same key, proof = this id) redeems it once through
+ * the registry's AdMob verifier. No money moves on this row.
+ */
+export type AdRewardSession = Prisma.AdRewardSessionModel
+/**
  * Model GeneralAccountReset
  * A general-account reset (2026-10-20): the account, its id, its opening
  * grant and every past ledger/order/fill row stay; the four wallets are

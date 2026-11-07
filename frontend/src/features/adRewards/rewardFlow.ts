@@ -6,7 +6,7 @@ import type {
   AdRewardEligibilityDto,
   GeneralAccountResetBlocker,
 } from '../tradingAccount/api';
-import type { RewardedAdPurpose } from './rewardedAd';
+import type { RewardedAdPurpose } from './rewardedAdTypes';
 
 /**
  * The general home's 보상 sheet (2026-10-20), as pure rules: what may start,
@@ -79,7 +79,8 @@ function kstTime(iso: string): string | null {
 function fundingStatus(eligibility: AdRewardEligibilityDto): string | null {
   switch (eligibility.reason) {
     case null:
-      return eligibility.remainingCountToday > 0
+      // null: no daily count cap is configured (2026-11-07) — nothing to count down.
+      return eligibility.remainingCountToday !== null && eligibility.remainingCountToday > 0
         ? `오늘 ${eligibility.remainingCountToday}회 더 받을 수 있습니다.`
         : null;
     case 'AD_REWARD_DAILY_COUNT_LIMIT':
@@ -144,12 +145,16 @@ export function rewardSheetState(input: {
  * A command whose answer never arrived (network, timeout, a bare 5xx) may
  * still have committed: it is retried with the SAME idempotency key and
  * proof, and the server replays the first result — never re-paid, never
- * reset twice. A coded refusal is final for that attempt.
+ * reset twice. `pending` (2026-11-07): the ad was watched but Google's signed
+ * confirmation has not reached the server yet; nothing was written, the same
+ * command is asked again (and the server redeems it on its own when the
+ * confirmation arrives). Any other coded refusal is final for that attempt.
  */
 export function classifyRewardCommandFailure(
   failure: unknown,
-): 'uncertain' | 'refused' {
+): 'pending' | 'uncertain' | 'refused' {
   const info = getApiErrorInfo(failure);
+  if (info.serverCode === 'AD_REWARD_VERIFICATION_PENDING') return 'pending';
   if (info.serverCode && !GENERIC_SERVER_CODES.has(info.serverCode)) return 'refused';
   if (!info.hasResponse) return 'uncertain';
   return info.status !== null && info.status >= 500 ? 'uncertain' : 'refused';
@@ -170,3 +175,29 @@ export type RewardAttempt = {
   proof: string;
   providerKey: string;
 };
+
+/** How often, and how long, the sheet asks again while Google's confirmation is on its way. */
+export const REWARD_CONFIRM_POLL_MS = 2_000;
+export const REWARD_CONFIRM_WAIT_MS = 30_000;
+
+/**
+ * Attempts whose result is not known yet (a watched ad awaiting Google's
+ * confirmation, or an answer that never arrived), kept for this app session
+ * per sign-in and account (`scope`), so the sheet re-checks the SAME command
+ * after it closed, the account was switched away and back, or Home re-mounted
+ * it. In memory only: after a restart the server's state (its own redemption
+ * on Google's callback) is what the money views show.
+ */
+const openAttempts = new Map<string, RewardAttempt>();
+
+export function rememberRewardAttempt(scope: string, attempt: RewardAttempt) {
+  openAttempts.set(scope, attempt);
+}
+
+export function rememberedRewardAttempt(scope: string): RewardAttempt | null {
+  return openAttempts.get(scope) ?? null;
+}
+
+export function forgetRewardAttempt(scope: string, attempt: RewardAttempt) {
+  if (openAttempts.get(scope)?.idempotencyKey === attempt.idempotencyKey) openAttempts.delete(scope);
+}

@@ -71,7 +71,8 @@ export type CommunityFeedRouteParams = {
 
 /** The post screens both community stacks register under the same names. */
 export type CommunityPostRoutes = {
-  PostDetail: { postId: string };
+  /** `returnTab`: opened from that tab (Home's community card), where back returns. */
+  PostDetail: { postId: string; returnTab?: EntryTab };
   PostCompose: { category?: import('../../features/community/api').CommunityCategory } | undefined;
   UserSeasonSummary: { userId: string };
 };

@@ -1,7 +1,31 @@
 // Public identifiers, not credentials. Only EAS build profiles choose the mode.
-const TEST_REWARDED_UNITS = Object.freeze({
-  android: 'ca-app-pub-3940256099942544/5224354917',
-  ios: 'ca-app-pub-3940256099942544/1712485313',
+// Google's official sample units (developers.google.com/admob/*/test-ads):
+// development/preview builds may request only these.
+const TEST_UNITS = Object.freeze({
+  rewarded: Object.freeze({
+    android: 'ca-app-pub-3940256099942544/5224354917',
+    ios: 'ca-app-pub-3940256099942544/1712485313',
+  }),
+  // Anchored adaptive banner samples.
+  banner: Object.freeze({
+    android: 'ca-app-pub-3940256099942544/9214589741',
+    ios: 'ca-app-pub-3940256099942544/2435281174',
+  }),
+});
+
+// Trading Class's own units (confirmed 2026-11-07): requested ONLY by a
+// production build. Rewarded and banner are separate units per platform and
+// never interchangeable (a banner pays nothing; only the rewarded units carry
+// the server-side verification callback).
+const PRODUCTION_UNITS = Object.freeze({
+  rewarded: Object.freeze({
+    android: 'ca-app-pub-7899930948413451/3165650506',
+    ios: 'ca-app-pub-7899930948413451/8170740188',
+  }),
+  banner: Object.freeze({
+    android: 'ca-app-pub-7899930948413451/9868671521',
+    ios: 'ca-app-pub-7899930948413451/1842841847',
+  }),
 });
 
 function adMobBuildConfig(env = process.env) {
@@ -9,16 +33,17 @@ function adMobBuildConfig(env = process.env) {
   // The profile's explicit env value makes that evaluation match the worker.
   const profile = env.ADMOB_BUILD_PROFILE ?? env.EAS_BUILD_PROFILE;
   const workerProfile = typeof env.EAS_BUILD_PROFILE === 'string' ? env.EAS_BUILD_PROFILE : profile;
-  const test = (profile === 'development' || profile === 'preview') && profile === workerProfile;
+  const known = typeof profile === 'string' && profile === workerProfile;
+  // An unknown profile, a profile mismatch or a plain local run requests no ad at all.
+  const mode = known && (profile === 'development' || profile === 'preview') ? 'test'
+    : known && profile === 'production' ? 'production' : 'disabled';
+  const units = mode === 'test' ? TEST_UNITS : mode === 'production' ? PRODUCTION_UNITS : null;
   return {
-    mode: test ? 'test' : 'disabled',
+    mode,
     profile: typeof profile === 'string' ? profile : null,
-    // Real production units are prepared but NEVER requested in this release.
-    rewardedUnits: test ? { ...TEST_REWARDED_UNITS } : {
-      android: env.ADMOB_REWARDED_ANDROID_ID ?? null,
-      ios: env.ADMOB_REWARDED_IOS_ID ?? null,
-    },
+    rewardedUnits: units ? { ...units.rewarded } : {},
+    bannerUnits: units ? { ...units.banner } : {},
   };
 }
 
-module.exports = { adMobBuildConfig, TEST_REWARDED_UNITS };
+module.exports = { adMobBuildConfig, TEST_UNITS, PRODUCTION_UNITS };

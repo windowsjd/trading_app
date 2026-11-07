@@ -1,5 +1,7 @@
 # AdMob 보상형 테스트 광고 연동
 
+> **2026-11-07 갱신:** 이 문서의 테스트 전용 패널(`RewardedTestPanel`)과 `rewardedTest*` 모듈은 제거됐고, 실제 보상형 광고(SSV)·배너가 연결됐다. 현행 앱 측 문서는 [admob-ads-2026-11-07.md](admob-ads-2026-11-07.md). 아래 SDK 버전·네이티브 설정·권한 근거는 그대로 유효하다.
+
 작업일: 2026-10-20. 시작 HEAD/fetch한 origin/main: `6fe9b6ce23442616261cd0b09025aa9a1bb54b8b`, 작업 트리 clean. 사용자 지시에 따라 main에서 작업했다. 최종 SDK/권한 소스 커밋: `dfbf7b4164b7dd6902dba5b2c6e59d20ff7891f8`.
 
 **이번 변경은 SDK 테스트 전용이다. 실제 지급·초기화·SSV·수익화는 활성화하지 않았다. Android/iOS 실기기 광고 표시는 미검증이다.**

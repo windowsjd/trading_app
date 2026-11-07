@@ -18,6 +18,7 @@ import SeasonAccountHome from './SeasonAccountHome';
 import GeneralRewardSheet from './GeneralRewardSheet';
 import { HomeHeaderActions, HomeHeaderTitle } from './HomeHeader';
 import { useHomeCommunityHot } from './HomeCommunityTicker';
+import BannerAdSlot from '../../components/ads/BannerAdSlot';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -172,6 +173,9 @@ export default function HomeScreen({ navigation }: Props) {
           />
         )}
       </View>
+      {/* The banner (2026-11-07): Home's last band, right above the tab bar, for
+          every mode; the body above gives it room, so nothing is covered. */}
+      <BannerAdSlot testID="home-banner-ad" />
       {rewardSheet}
     </SafeAreaView>
   );

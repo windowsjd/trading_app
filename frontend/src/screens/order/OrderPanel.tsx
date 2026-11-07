@@ -25,6 +25,7 @@ import {
   getConditionalSellGate,
   getLimitOnCloseGate,
   getLimitOnCloseSellGate,
+  getLimitSellGate,
   getOrderMethodOptions,
   getOrderTypeForMethod,
   isEntryTpSlMarketSupported,
@@ -630,7 +631,8 @@ export function OrderForm({
     enabled: accountKnown && side === 'buy' && (isStock || asset?.assetType === 'crypto'),
     retry: 1,
   });
-  // LOC (stocks) is server-gated; a new SELL has no 지정가 to gate (2026-11-05).
+  // LOC and the stock SELL 지정가 (restored 2026-11-07 (3)) are server-gated;
+  // a crypto SELL has no 지정가 to gate.
   const orderCapabilitiesQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.orderCapabilities(accountId),
     queryFn: ({ signal }) => getTradingAccountOrderCapabilities(accountId, signal),
@@ -659,6 +661,7 @@ export function OrderForm({
     side,
     conditional: getConditionalSellGate({ ...sellIntentsQuery, data: sellIntentData }, asset?.assetType, 'condition'),
     loc: getLimitOnCloseSellGate({ ...orderCapabilitiesQuery, data: capabilityData }, asset?.assetType),
+    limit: getLimitSellGate({ ...orderCapabilitiesQuery, data: capabilityData }),
   });
   const selectedMethodOption = methodOptions.find((option) => option.method === orderMethod) ?? null;
   const limitOption = methodOptions.find((option) => option.method === 'limit');
@@ -789,7 +792,7 @@ export function OrderForm({
     stockMarketClosed && orderMethod === 'market'
       ? limitSelectable
         ? '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
-        // A SELL has no 지정가 to suggest (2026-11-05).
+        // No 지정가 to suggest now (its server gate is closed).
         : '정규장 외에는 시장가 주문을 할 수 없습니다. 정규장에 다시 주문해주세요.'
       : stockMarketClosed && limitOnClose
         ? `LOC ${side === 'buy' ? '매수' : '매도'}는 정규장 중에만 등록할 수 있습니다. 서버가 등록 시점의 장 상태를 최종 확인합니다.`
@@ -832,8 +835,9 @@ export function OrderForm({
             ? '보유 수량을 초과하여 매도할 수 없습니다.'
             : side === 'sell' && limitOnClose && positionAvailable !== null && Number(positionAvailable) < 1
               ? 'LOC 매도로 접수할 수 있는 수량이 없습니다. 다른 주문이 보유 수량을 예약하고 있습니다.'
-              // A market sell can use only what other orders have not reserved.
-              : side === 'sell' && orderMethod === 'market' && positionAvailable !== null
+              // A market sell, and a limit SELL (it reserves its quantity at
+              // submission), can use only what other orders have not reserved.
+              : side === 'sell' && (orderMethod === 'market' || orderMethod === 'limit') && positionAvailable !== null
                 && Number(orderInput) > Number(positionAvailable)
                 ? '매도 가능 수량을 초과했습니다. 다른 주문이 예약한 수량은 매도할 수 없습니다.'
                 : null;
@@ -952,10 +956,10 @@ export function OrderForm({
       ? '잔액이 부족합니다.'
       : null;
 
-  // Beginner learning access mirrors the server (B차): conditional and LOC
-  // need every quest complete; a market SELL stays risk reduction; a BUY is
-  // open only at its quest's step (crypto market/limit, Korean/US stock
-  // market) until then.
+  // Beginner learning access mirrors the server (B차): conditional, LOC and a
+  // user's own limit SELL need every quest complete; a market SELL stays risk
+  // reduction; a BUY is open only at its quest's step (crypto market/limit,
+  // Korean/US stock market) until then.
   const advancedGate = learning.gate('allTrading');
   // A crypto 손절가/익절가 opens with the TP/SL practice step (QUEST 04).
   const protectionGate = learning.gate(asset?.assetType === 'crypto' ? 'spotProtection' : 'allTrading');

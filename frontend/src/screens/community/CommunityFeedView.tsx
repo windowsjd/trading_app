@@ -21,6 +21,7 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import WhaleLoader from '../../components/states/WhaleLoader';
 import CommunityPostCard from './CommunityPostCard';
+import BannerAdSlot from '../../components/ads/BannerAdSlot';
 import { CategoryChip } from './CommunityParts';
 import { CommunityNoticeText, type CommunityNotice } from './CommunityNotice';
 import { CommunityViewerError, useCommunityViewer, useCommunityWrite } from './useCommunityWrite';
@@ -108,42 +109,48 @@ export default function CommunityFeedView({ request, testID = 'community-feed' }
           <CommunityNoticeText testID="community-feed-notice" notice={notice} style={{ fontSize: 13, lineHeight: 19, color: semantic.warning }} />
         </View>
       ) : null}
-      <FlatList
-        testID="community-feed-list"
-        data={posts}
-        keyExtractor={(post) => post.id}
-        refreshControl={refresh.refreshControl}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 104, gap: 8, flexGrow: 1 }}
-        onEndReachedThreshold={0.4}
-        onEndReached={() => { if (feed.hasNextPage && !feed.isFetchingNextPage && !feed.isError) void feed.fetchNextPage(); }}
-        renderItem={({ item }) => (
-          <CommunityPostCard post={item} now={now} canModerate={canModerate} likeBusy={likes.isBusy(item.id)}
-            onOpen={() => navigation.navigate('PostDetail', { postId: item.id })}
-            onOpenAuthor={(authorId) => navigation.navigate('UserSeasonSummary', { userId: authorId })}
-            onToggleLike={() => { setFailure(null); likes.toggle(item); }} />
-        )}
-        ListEmptyComponent={!userId || feed.isLoading ? (
-          <WhaleLoader size={32} accessibilityLabel="글을 불러오는 중" style={{ marginTop: 32 }} />
-        ) : feed.isError ? (
-          <ErrorState error={feed.error} title="글을 불러오지 못했어요." message="잠시 후 다시 시도해주세요."
-            onRetry={() => void feed.refetch()} />
-        ) : <InlineEmptyState testID="community-feed-empty" message={empty} />}
-        ListFooterComponent={feed.isFetchingNextPage ? <WhaleLoader size={24} accessibilityLabel="글을 더 불러오는 중" />
-          : feed.isFetchNextPageError ? (
-            <ActionPressable testID="community-feed-more-retry" accessibilityRole="button" onPress={() => void feed.fetchNextPage()}
-              style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 13, color: semantic.secondaryActionForeground, fontWeight: '600' }}>글을 더 불러오지 못했어요. 다시 시도</Text>
-            </ActionPressable>
-          ) : null}
-      />
-      <ActionPressable testID="community-compose" accessibilityRole="button" accessibilityLabel="글쓰기"
-        accessibilityState={{ disabled: !!restricted }} aria-disabled={!!restricted} onPress={compose}
-        style={{ position: 'absolute', right: 16, bottom: 24, minHeight: 48, borderRadius: 24, paddingHorizontal: 18,
-          flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: semantic.inverse, opacity: restricted ? 0.5 : 1,
-          shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}>
-        <CommunityIcon name="pencil" size={18} color={colors.onInverse} />
-        <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: semantic.onInverse }} maxFontSizeMultiplier={1.4}>글쓰기</Text>
-      </ActionPressable>
+      {/* The list and its 글쓰기 button share one area; the banner (2026-11-07)
+          is the band under it, so 글쓰기 sits 24dp above the banner and
+          neither covers the list. */}
+      <View style={{ flex: 1 }}>
+        <FlatList
+          testID="community-feed-list"
+          data={posts}
+          keyExtractor={(post) => post.id}
+          refreshControl={refresh.refreshControl}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 104, gap: 8, flexGrow: 1 }}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => { if (feed.hasNextPage && !feed.isFetchingNextPage && !feed.isError) void feed.fetchNextPage(); }}
+          renderItem={({ item }) => (
+            <CommunityPostCard post={item} now={now} canModerate={canModerate} likeBusy={likes.isBusy(item.id)}
+              onOpen={() => navigation.navigate('PostDetail', { postId: item.id })}
+              onOpenAuthor={(authorId) => navigation.navigate('UserSeasonSummary', { userId: authorId })}
+              onToggleLike={() => { setFailure(null); likes.toggle(item); }} />
+          )}
+          ListEmptyComponent={!userId || feed.isLoading ? (
+            <WhaleLoader size={32} accessibilityLabel="글을 불러오는 중" style={{ marginTop: 32 }} />
+          ) : feed.isError ? (
+            <ErrorState error={feed.error} title="글을 불러오지 못했어요." message="잠시 후 다시 시도해주세요."
+              onRetry={() => void feed.refetch()} />
+          ) : <InlineEmptyState testID="community-feed-empty" message={empty} />}
+          ListFooterComponent={feed.isFetchingNextPage ? <WhaleLoader size={24} accessibilityLabel="글을 더 불러오는 중" />
+            : feed.isFetchNextPageError ? (
+              <ActionPressable testID="community-feed-more-retry" accessibilityRole="button" onPress={() => void feed.fetchNextPage()}
+                style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 13, color: semantic.secondaryActionForeground, fontWeight: '600' }}>글을 더 불러오지 못했어요. 다시 시도</Text>
+              </ActionPressable>
+            ) : null}
+        />
+        <ActionPressable testID="community-compose" accessibilityRole="button" accessibilityLabel="글쓰기"
+          accessibilityState={{ disabled: !!restricted }} aria-disabled={!!restricted} onPress={compose}
+          style={{ position: 'absolute', right: 16, bottom: 24, minHeight: 48, borderRadius: 24, paddingHorizontal: 18,
+            flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: semantic.inverse, opacity: restricted ? 0.5 : 1,
+            shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}>
+          <CommunityIcon name="pencil" size={18} color={colors.onInverse} />
+          <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: semantic.onInverse }} maxFontSizeMultiplier={1.4}>글쓰기</Text>
+        </ActionPressable>
+      </View>
+      <BannerAdSlot testID={`${testID}-banner-ad`} />
       {write.rulesSheet}
     </View>
   );

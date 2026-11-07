@@ -13,6 +13,8 @@ Implemented:
 - `GET /api/v1/trading-accounts/:accountId/ad-rewards/claims`
 - `GET /api/v1/trading-accounts/:accountId/account-reset/eligibility` (2026-10-20)
 - `POST /api/v1/trading-accounts/:accountId/account-reset` (2026-10-20)
+- `POST /api/v1/trading-accounts/:accountId/ad-rewards/sessions` (2026-11-07, AdMob)
+- `GET /api/v1/ad-rewards/admob/ssv` (2026-11-07, Google's public SSV callback)
 
 One verified ad completion redeems ONE of two commands — the KRW top-up or a
 general-account reset — see "Ad reward purpose and the general-account reset"
@@ -38,14 +40,12 @@ implemented through the existing account-scoped FX API; see
 `docs/trading-account-finance-api-contract.md`. FX never creates wallets,
 auto-converts for an order, or uses a current season.
 
-NOT implemented (deliberately still blocked):
-
-- a real ad-network adapter, an ad SDK, and an ad-watching screen.
-
-**No real ad provider has been chosen.** No provider protocol, SDK, callback
-shape, or signature scheme is implemented or assumed anywhere. Ad rewards are
-DISABLED by default and, with no adapter registered, cannot pay out even when
-enabled.
+Since 2026-11-07 the one real provider is **AdMob** with Google's
+server-side verification (SSV) — see "AdMob rewarded ads with server-side
+verification" at the end. Ad rewards stay DISABLED by default
+(`AD_REWARD_ENABLED` unset); any provider key other than `admob` has no
+adapter and cannot pay out even when enabled. The sections below that say "no
+provider has been chosen" describe the 작업 6 state and are kept as history.
 
 ## Common Rules
 
@@ -212,10 +212,17 @@ None of these values has a product default; nothing is hardcoded.
 | `AD_REWARD_ENABLED`              | Feature switch. Absent/empty → **false**     | —                     |
 | `AD_REWARD_PROVIDER`             | Registered provider key                      | yes                   |
 | `AD_REWARD_AMOUNT_KRW`           | Reward per completed ad, > 0                 | yes                   |
-| `AD_REWARD_DAILY_MAX_COUNT`      | Max granted claims per day, positive integer | yes                   |
-| `AD_REWARD_DAILY_MAX_AMOUNT_KRW` | Max granted KRW per day, ≥ reward amount     | yes                   |
+| `AD_REWARD_DAILY_MAX_COUNT`      | Max granted claims per day, positive integer, or `unlimited` (2026-11-07) | yes |
+| `AD_REWARD_DAILY_MAX_AMOUNT_KRW` | Max granted KRW per day, ≥ reward amount, or `unlimited` (2026-11-07)     | yes |
 | `AD_REWARD_COOLDOWN_SECONDS`     | Minimum seconds between grants, ≥ 0          | yes                   |
 | `AD_REWARD_DAY_TIME_ZONE`        | IANA zone defining the daily boundary        | yes                   |
+
+`unlimited` (case-insensitive) switches that cap off explicitly: the claim
+transaction skips it and eligibility answers `remainingCountToday` /
+`remainingAmountTodayKrw` as `null` (never a made-up "0 left" or a huge
+number). A missing, empty or misspelled value still refuses to boot, and a
+numeric cap keeps its exact meaning. `AD_REWARD_COOLDOWN_SECONDS=0` is no wait
+between ads.
 
 Validated at boot by `src/common/env-validation.ts` through the single parser
 `readAdRewardConfig`. With `AD_REWARD_ENABLED=true` a missing or invalid value
@@ -1217,3 +1224,149 @@ A reset is never performed for a user: holding something that can no longer
 be sold (e.g. a retired listing) blocks it until that holding is gone. Recommended values when enabling: `AD_REWARD_AMOUNT_KRW=5000000`, a
 daily count/amount (e.g. 3 / 15,000,000), `AD_REWARD_COOLDOWN_SECONDS`, and
 `AD_REWARD_DAY_TIME_ZONE=Asia/Seoul`.
+
+---
+
+# AdMob rewarded ads with server-side verification (2026-11-07)
+
+Product policy (2026-11-07): general accounts only; one ad = 5,000,000 KRW
+(`ad_reward` ledger, external funding, never `initialCapitalKrw`) **or** one
+general-account reset (after its own confirmation in the app); no daily count
+or amount cap and no cooldown (`unlimited`, `unlimited`, `0`). The ad network's
+own inventory and the SDK's readiness still decide whether an ad can be shown.
+
+**The client's "reward earned" event is never evidence.** A payout or a reset
+happens only inside the existing claim/reset transactions, after Google's
+signed SSV callback confirmed an ad session that the server opened for that
+exact command.
+
+## Flow
+
+1. **Session (광고 시청 시도), before the ad.**
+   `POST /api/v1/trading-accounts/:accountId/ad-rewards/sessions` with
+   `{ purpose: "funding" | "account_reset", platform: "android" | "ios",
+   idempotencyKey }`. The key is the claim/reset command's own key (same
+   rules as the command key). Owned general account only; the account active;
+   ads enabled with `AD_REWARD_PROVIDER=admob`; a rewarded unit configured for
+   that platform; the key not already a committed command; and the command's
+   own gates NOW — any configured cap/cooldown for a top-up, no blocker and a
+   valuable ended epoch for a reset — so no ad is shown for a command that
+   would be refused. At most 100 unconfirmed, unexpired sessions per account
+   (`429 AD_REWARD_SESSION_LIMIT`) — a bound on scripted creation, not a
+   cooldown (a person never abandons 100 ads within 30 min; concurrent opens
+   may pass it by a few, no money moves). The same key replays the same session
+   (`created: false`); the key with another purpose/platform is `409
+   AD_REWARD_IDEMPOTENCY_CONFLICT`. Moves no money. Response:
+   `{ sessionId, tradingAccountId, provider: "admob", purpose, platform,
+   created, expiresAt, ssv: { userId, customData } }` — `customData` is the
+   session id, `userId` a per-session digest of the member and the session
+   (Google never receives a stable member id). Sessions expire after 30 min.
+2. **The ad.** The app sets `ssv` as the rewarded ad's
+   ServerSideVerificationOptions and shows it (`requestNonPersonalizedAdsOnly`).
+3. **Google's callback** (public, no token):
+   `GET /api/v1/ad-rewards/admob/ssv?…&signature=…&key_id=…`. The raw query is
+   verified exactly as Google documents it: `signature` and `key_id` must be
+   the last two parameters, the signed content is everything before
+   `&signature=` unmodified, ECDSA P-256 / SHA-256 / DER, web-safe base64.
+   Google's reference verifier signs the percent-DECODED query; the raw reading
+   is accepted as a second candidate. The decoded reading erases the
+   difference between a separator and an escaped `&`/`=`, so a signature made
+   for one split (e.g. another publisher's unit whose custom data carries
+   `&ad_unit=<ours>`) could be re-encoded to split into other parameters.
+   Every parameter name must therefore be plain (`[a-z_]`, never escaped) and
+   no decoded value may contain `&` or `=` (`400 PARAMETER_NAME` /
+   `AMBIGUOUS_VALUE`; our session id, user digest and Google's numeric values
+   never do — keep the console's reward item free of them too). Both readings
+   then split into the same parameters: what was verified is what is applied.
+   Keys come from `https://www.gstatic.com/admob/reward/verifier-keys.json`,
+   cached ≤ 12 h (Google: never > 24 h), re-read at most once a minute for an
+   unknown `key_id`; a failed read is not repeated for 10 s, and an unknown
+   `key_id` while the key server fails is undecidable (503, it may be a
+   rotated key) while after a successful read it is 403. The cache is
+   per-process memory. Then: `custom_data` must name an AdMob session; `ad_unit` must be
+   that session platform's configured REWARDED unit (numeric id or full id;
+   banner units never match); `user_id` must be the session's digest; the
+   session must not have expired. The event (`transaction_id`, UNIQUE across
+   sessions) is recorded on the session once, with the reward time, unit and
+   key id. The callback then redeems the session's command itself (below).
+4. **Redemption = the existing command.** `POST …/ad-rewards/claim` or
+   `POST …/account-reset` with `{ provider: "admob", proof: <sessionId>,
+   idempotencyKey: <the session's key> }`, sent by the callback AND by the
+   app. The AdMob verifier (`admob-reward-verifier.ts`) checks the session
+   (member, account, the command key) and reports the SESSION's purpose, so a
+   top-up session never resets and a reset session never pays
+   (`AD_REWARD_VERIFICATION_FAILED`); `providerEventId` = Google's
+   `transaction_id`. Before the callback has been recorded the answer is
+   `409 AD_REWARD_VERIFICATION_PENDING` with **nothing written**: the app asks
+   again with the same key (2 s apart, about 30 s), then shows 확인 대기 with
+   a 결과 확인 button. A never-confirmed session is final
+   (`AD_REWARD_VERIFICATION_FAILED`) only 2 min after `expires_at`
+   (`ADMOB_SESSION_EXPIRY_GRACE_MS`): a callback that passed its own expiry
+   check just before the deadline has committed by then, so the app is never
+   told "ended" for a session the server then confirms.
+
+Every ordering ends in ONE claim: (account, idempotencyKey) and (provider,
+providerEventId) are unique, the payout/reset transactions are unchanged
+(account row lock, ledger, boundary snapshots, stored replay payload), and
+duplicate, concurrent or late callbacks replay. A callback that arrives while
+the app is closed still credits/resets by itself; the app's next read shows it.
+
+Limitation: Google stops after its retries (≈ 5 s). If the callback cannot
+record or redeem for all of them (key server down with no usable cache, a
+database outage), a recorded but unredeemed event is redeemed only when the
+app sends the same command again — the app keeps the attempt for the same
+sign-in and account until its process ends — and otherwise stays recorded
+with no money moved (find them: `ad_reward_sessions.ssv_transaction_id` set
+and no `ad_reward_claims` row for the account and `idempotency_key`). An
+event never recorded is lost with its session. No path pays or resets
+without the recorded, Google-signed event.
+
+## Callback answers (Google retries non-200 up to five times, 1 s apart)
+
+| Status | When | Effect |
+| --- | --- | --- |
+| 200 | Redeemed, or replayed | the command's result |
+| 200 | Google-signed but not applicable: no/unknown session, another ad unit, another user id, expired session, an event already used by another session, a second event for a confirmed session, or the command refused (cap, blocked reset, inactive account, …) | nothing recorded/applied for it (a refused command keeps the recorded event redeemable once by the same command, e.g. a reset after its blocker is gone) |
+| 200 | Signed by Google's TEST key set only (AdMob console "Verify URL") | acknowledged, never applied |
+| 400 | Malformed query (signature/key_id not last, duplicates, an escaped name, a value decoding to `&`/`=`, formats) | nothing |
+| 403 | Signature invalid / `key_id` unknown after a successful key read | nothing |
+| 503 | Key server unreachable with no cache < 24 h, an unknown `key_id` while it fails, or a server failure while redeeming | Google retries; the recorded event keeps every retry safe |
+
+Logs carry identifiers only (`admob_ssv_callback`: status, outcome,
+transactionId, keyId, sessionId) — never the signature, the raw query or
+`user_id`.
+
+## Records
+
+`ad_reward_sessions` (migration `20261107130000_add_ad_reward_sessions`,
+additive): `user_id`, `trading_account_id` (FK RESTRICT), `provider`,
+`purpose`, `platform` (CHECK android/ios), `idempotency_key` (unique per
+account), `created_at`, `expires_at` (CHECK > created_at), and the event
+columns `ssv_transaction_id` (UNIQUE), `ssv_verified_at`, `ssv_rewarded_at`,
+`ssv_ad_unit`, `ssv_key_id`, `ssv_reward_item`, `ssv_reward_amount` (all or
+nothing, CHECK). No money moves on it; `ad_reward_claims` stays the payout
+record (its `verificationMetadataJson` keeps the session id, platform, unit,
+key id and reward item/amount). Member deletion and the test-season cleanup
+delete the member's sessions.
+
+## Errors added
+
+`409 AD_REWARD_VERIFICATION_PENDING` (not confirmed yet; nothing written;
+retry the same command) and `429 AD_REWARD_SESSION_LIMIT`.
+
+## Operations (AdMob)
+
+Environment (Render; none set by this change): `AD_REWARD_ENABLED=true`,
+`AD_REWARD_PROVIDER=admob`, `AD_REWARD_AMOUNT_KRW=5000000`,
+`AD_REWARD_DAILY_MAX_COUNT=unlimited`, `AD_REWARD_DAILY_MAX_AMOUNT_KRW=unlimited`,
+`AD_REWARD_COOLDOWN_SECONDS=0`, `AD_REWARD_DAY_TIME_ZONE=Asia/Seoul`,
+`ADMOB_REWARDED_AD_UNIT_ID_ANDROID=ca-app-pub-7899930948413451/3165650506`,
+`ADMOB_REWARDED_AD_UNIT_ID_IOS=ca-app-pub-7899930948413451/8170740188`. Boot
+refuses `AD_REWARD_PROVIDER=admob` with ads enabled and no rewarded unit, and
+a malformed unit whenever set. AdMob console: each REWARDED ad unit ›
+server-side verification › callback URL
+`https://<API host>/api/v1/ad-rewards/admob/ssv` (then "Verify URL"). The
+banner units carry no SSV and never reach this API. Deploy order: backend
+(migration) first with ads still disabled, verify the callback URL in the
+console, then a production app build, then — after a real-device rewarded
+test confirmed Google's callback end to end — set the flags.

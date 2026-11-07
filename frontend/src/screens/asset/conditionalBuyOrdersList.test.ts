@@ -96,6 +96,8 @@ function listHarness() {
       createEntryTpSlPlans: async () => { throw new Error('not used here'); },
       cancelEntryTpSlPlan: async () => { throw new Error('not used here'); },
     },
+    // The shared 손절가/익절가 sheet reads a stock's session (off-session TP/SL); never opened here.
+    '../../features/asset/api': { getAssetDetail: async () => { throw new Error('asset detail not mocked'); } },
     // A row's 손절가/익절가 sheet reads the account context (learning gates).
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({
       accounts: [], selectedAccountId: h.accountId, selectedAccount: null, isLoading: false }) },

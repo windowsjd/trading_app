@@ -251,6 +251,8 @@ async function hold(s: Scenario, kind: Market, quantity: string) {
 async function release(s: Scenario) {
   const where = { tradingAccountId: s.accountId };
   const assetIds = s.instruments.map((row) => row.asset.id);
+  // 설정 변경 audit rows (a scenario that changes a setting).
+  await db.pendingOrderModification.deleteMany({ where });
   await db.conditionalSellOrder.deleteMany({ where });
   const groups = await db.protectionGroup.findMany({
     where,
@@ -2182,16 +2184,12 @@ async function offSessionRegistration() {
     assert.deepEqual(listed.data.capabilities.condition.offSessionMarkets, [
       'KRX',
     ]);
-    assert.equal(
-      'offSessionMarkets' in listed.data.capabilities.protection,
-      false,
-    );
+    // Stock stop-loss/take-profit settings register off-session too
+    // (2026-11-07; offSessionTpSl covers them).
+    assert.deepEqual(listed.data.capabilities.protection.offSessionMarkets, [
+      'KRX',
+    ]);
     assert.equal((await position(s)).reservedQuantity.toFixed(8), '0.00000000');
-    // Stop-loss/take-profit settings keep the existing rule.
-    await rejects(
-      tpSl(s, { stopLoss: { triggerPrice: '80', quantity: '1' } }),
-      'CONDITIONAL_PRICE_UNAVAILABLE',
-    );
     // An off-hours trade that meets both is not evidence while closed.
     await quote(s, 'KRX', '50');
     for (const id of [below, above])
@@ -2232,8 +2230,185 @@ async function offSessionRegistration() {
     assert.equal(await evaluate(below), 'terminal');
     await invariants(s);
     pass(
-      'KRX SELL condition off-session: direction as sent, no reservation, no off-hours trigger, next-session first trade (gap) decides; TP/SL still need a price; calendar unavailable refused',
+      'KRX SELL condition off-session: direction as sent, no reservation, no off-hours trigger, next-session first trade (gap) decides; calendar unavailable refused',
     );
+  });
+}
+
+/**
+ * Stock stop-loss/take-profit settings registered and changed while the
+ * market is closed (2026-11-07): the target price and quantity are stored
+ * without a reference price and without a reservation, the per-family totals
+ * and distinct prices still apply, nothing fires on off-hours trades or on
+ * evidence older than the registration/change, and the next regular
+ * session's first eligible trade decides (an opening gap fires at once, at
+ * that session's price). The SELL is the ordinary market SELL sized from the
+ * unreserved holding at that moment. Crypto and an in-session price outage
+ * keep the fresh-price rule; an undecidable calendar refuses.
+ */
+async function offSessionTpSl() {
+  // A fractional stock holding (market buys keep 6 decimals).
+  await sellScenario('general', 'KRX', '10.5', async (s) => {
+    // In session without fresh evidence: an outage is never taken for a
+    // closure.
+    const stale = new Date((await now()).getTime() - 3_600_000);
+    await db.assetPriceSnapshot.updateMany({
+      where: { assetId: s.assetId },
+      data: { effectiveAt: stale, capturedAt: stale },
+    });
+    await rejects(
+      tpSl(s, { stopLoss: { triggerPrice: '95', quantity: '1' } }),
+      'CONDITIONAL_PRICE_UNAVAILABLE',
+    );
+    // The last regular-session trade is 100; then the market closes.
+    await quote(s, 'KRX', '100');
+    const clock = await now();
+    tradingSessions.set(clock, clock, ['KRX', 'US']);
+    const pair = await tpSl(s, {
+      stopLoss: { triggerPrice: '95', quantity: '4.5' },
+      takeProfit: { triggerPrice: '110', quantity: '3' },
+    });
+    const stopLoss = pair.stopLoss!;
+    const takeProfit = pair.takeProfit!;
+    for (const [id, direction] of [
+      [stopLoss, 'at_or_below'],
+      [takeProfit, 'at_or_above'],
+    ] as const) {
+      const row = await intent(id);
+      assert.equal(row.status, 'watching');
+      assert.equal(row.registrationSnapshotId, null, 'no price referenced');
+      assert.equal(row.triggerCondition, direction, 'the fixed direction');
+      assert.equal(row.executionType, 'market');
+      assert.equal(row.orderId, null);
+      assert.equal((await view(s, id)).registeredOffSession, true);
+    }
+    assert.equal((await intent(stopLoss)).quantity.toFixed(8), '4.50000000');
+    assert.equal(
+      (await position(s)).reservedQuantity.toFixed(8),
+      '0.00000000',
+      'watching reserves nothing',
+    );
+    // Family rules still apply off-session.
+    await rejects(
+      tpSl(s, { stopLoss: { triggerPrice: '95', quantity: '1' } }),
+      'CONDITIONAL_SELL_DUPLICATE_PRICE',
+    );
+    await rejects(
+      tpSl(s, { stopLoss: { triggerPrice: '80', quantity: '6.5' } }),
+      'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING',
+    );
+    // An undecidable calendar is never taken for a closure.
+    markMarketSessionOverrideStoreRequired();
+    try {
+      await rejects(
+        tpSl(s, { takeProfit: { triggerPrice: '120', quantity: '1' } }),
+        'MARKET_CALENDAR_UNAVAILABLE',
+      );
+    } finally {
+      resetMarketSessionOverrideStoreForTest();
+    }
+    // A change while closed follows the same rule (evidence floor moves).
+    const before = await intent(stopLoss);
+    await conditionalSell.modify(s.userId, s.accountId, stopLoss, {
+      triggerPrice: '96',
+      executionType: 'market',
+      quantity: '4.5',
+      expectedRevision: before.revision,
+      idempotencyKey: randomUUID(),
+    });
+    const changed = await intent(stopLoss);
+    assert.equal(changed.triggerPrice.toFixed(0), '96');
+    assert.equal(changed.registrationSnapshotId, null);
+    assert.ok(changed.revisedAt, 'the change is the new evidence floor');
+    assert.equal((await view(s, stopLoss)).registeredOffSession, true);
+    // An ordinary limit SELL registered off-session waits and reserves.
+    const limitId = (await limitSell(s, '8', '200')).data.order.orderId;
+    assert.equal(
+      (await db.order.findUniqueOrThrow({ where: { id: limitId } })).status,
+      'submitted',
+      'registered to wait for the next session, not filled',
+    );
+    assert.equal((await position(s)).reservedQuantity.toFixed(8), '8.00000000');
+    // Off-hours trades that meet both are no evidence while closed.
+    await quote(s, 'KRX', '50');
+    await quote(s, 'KRX', '150');
+    for (const id of [stopLoss, takeProfit])
+      assert.equal(await evaluate(id), 'price_unavailable');
+    // The next regular session opens after those trades.
+    const open = (await now()).getTime() + 300;
+    tradingSessions.set(new Date(open + 86_400_000), undefined, ['KRX', 'US']);
+    await untilDb(open + 50);
+    // A trade stamped before the change never fires it.
+    const early = new Date(changed.revisedAt!.getTime() - 500);
+    await db.assetPriceSnapshot.create({
+      data: {
+        assetId: s.assetId,
+        price: '40',
+        currencyCode: 'KRW',
+        sourceType: 'provider_api',
+        sourceName: 'koscom_krx_realtime_price',
+        effectiveAt: early,
+        capturedAt: early,
+      },
+    });
+    assert.ok(
+      ['watching', 'price_unavailable', 'awaiting_price'].includes(
+        await evaluate(stopLoss),
+      ),
+    );
+    assert.equal((await intent(stopLoss)).status, 'watching');
+    // The first eligible trade of the session gaps below 96: the stop-loss
+    // sells at that session price, only what the limit SELL left free.
+    await quote(s, 'KRX', '92');
+    assert.equal(await evaluate(stopLoss), 'ordered');
+    const sold = (await intent(stopLoss)).order!;
+    assert.equal(sold.orderType, 'market');
+    assert.equal(sold.status, 'executed');
+    assert.equal(sold.executedPrice?.toFixed(0), '92');
+    assert.equal(sold.quantity.toFixed(8), '2.50000000', 'min(4.5, 10.5 − 8)');
+    assert.equal((await view(s, stopLoss)).quantityLimited, true);
+    assert.equal(await evaluate(takeProfit), 'watching', '92 < 110');
+    // A setting made in session keeps referencing its price.
+    const inSession = await tpSl(s, {
+      takeProfit: { triggerPrice: '130', quantity: '1' },
+    });
+    const fresh = await intent(inSession.takeProfit!);
+    assert.ok(fresh.registrationSnapshotId);
+    assert.equal(
+      (await view(s, inSession.takeProfit!)).registeredOffSession,
+      false,
+    );
+    // The take-profit fires on 111 but nothing is free (8 reserved of 8).
+    await quote(s, 'KRX', '111');
+    assert.equal(
+      await evaluate(takeProfit),
+      'CONDITIONAL_SELL_QUANTITY_UNAVAILABLE',
+    );
+    const unsold = await intent(takeProfit);
+    assert.equal(unsold.status, 'failed');
+    assert.equal(unsold.terminalReason, 'quantity_unavailable');
+    assert.equal(unsold.orderId, null);
+    // The limit SELL's cancel releases its reservation.
+    await orders.cancelOrderForTradingAccount(s.userId, s.accountId, limitId);
+    assert.equal((await position(s)).reservedQuantity.toFixed(8), '0.00000000');
+    await invariants(s);
+    pass(
+      'KRX TP/SL off-session: stored price/quantity without reservation, family rules kept, change moves the floor, no off-hours/pre-change trigger, opening gap fires at the session price sized by the unreserved holding; limit SELL off-session waits/reserves/cancels; outage and unknown calendar refused',
+    );
+  });
+  await sellScenario('general', 'BINANCE', '10', async (s) => {
+    // Crypto Spot never closes: a stop-loss/take-profit still needs fresh
+    // evidence (unchanged).
+    const stale = new Date((await now()).getTime() - 3_600_000);
+    await db.assetPriceSnapshot.updateMany({
+      where: { assetId: s.assetId },
+      data: { effectiveAt: stale, capturedAt: stale },
+    });
+    await rejects(
+      tpSl(s, { stopLoss: { triggerPrice: '90', quantity: '1' } }),
+      'CONDITIONAL_PRICE_UNAVAILABLE',
+    );
+    pass('crypto TP/SL keep the fresh-price registration rule');
   });
 }
 
@@ -2629,8 +2804,36 @@ async function usOnTiingo() {
       assert.equal(stopped?.status, 'executed');
       assert.equal(stopped?.executedPrice?.toFixed(2), '89.00');
       assert.equal((await position(s)).quantity.toFixed(8), '5.00000000');
+      // Off-session (2026-11-07): a US take-profit registers while the market
+      // is closed and fires on the next session's first Tiingo trade.
+      const clock = await now();
+      tradingSessions.set(clock, clock, ['KRX', 'US']);
+      const listed = await conditionalSell.list(s.userId, s.accountId, {});
+      assert.deepEqual(listed.data.capabilities.protection.offSessionMarkets, [
+        'KRX',
+        'US',
+      ]);
+      const closedTp = (
+        await tpSl(s, { takeProfit: { triggerPrice: '120', quantity: '1' } })
+      ).takeProfit!;
+      assert.equal((await intent(closedTp)).registrationSnapshotId, null);
+      assert.equal((await view(s, closedTp)).registeredOffSession, true);
+      await usPrice('125');
+      assert.equal(await evaluate(closedTp), 'price_unavailable');
+      const open = (await now()).getTime() + 300;
+      tradingSessions.set(new Date(open + 86_400_000), undefined, [
+        'KRX',
+        'US',
+      ]);
+      await untilDb(open + 50);
+      await usPrice('121');
+      assert.equal(await evaluate(closedTp), 'ordered');
+      const taken = (await intent(closedTp)).order;
+      assert.equal(taken?.status, 'executed');
+      assert.equal(taken?.executedPrice?.toFixed(2), '121.00');
+      assert.equal((await position(s)).quantity.toFixed(8), '4.00000000');
       pass(
-        'US stocks on the Tiingo provider: SELL condition and stop-loss register, ignore a lower KIS price, and sell at the Tiingo price into the USD wallet',
+        'US stocks on the Tiingo provider: SELL condition and stop-loss register, ignore a lower KIS price, and sell at the Tiingo price into the USD wallet; an off-session take-profit fires on the next session only',
       );
     });
   } finally {
@@ -2838,6 +3041,7 @@ async function run() {
   await flags();
   await evidenceAndSession();
   await offSessionRegistration();
+  await offSessionTpSl();
   await lifecycle();
   await executionWindow();
   await scopeAndBeginner();

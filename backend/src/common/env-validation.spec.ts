@@ -91,3 +91,48 @@ describe('validateEnv guest market data', () => {
     ).toThrow(/GUEST_MARKET_DATA_ASSET_TYPES/u);
   });
 });
+
+describe('validateEnv rewarded ads (AdMob, 2026-11-07)', () => {
+  const ADS = {
+    ...BASE,
+    AD_REWARD_ENABLED: 'true',
+    AD_REWARD_PROVIDER: 'admob',
+    AD_REWARD_AMOUNT_KRW: '5000000',
+    AD_REWARD_DAILY_MAX_COUNT: 'unlimited',
+    AD_REWARD_DAILY_MAX_AMOUNT_KRW: 'unlimited',
+    AD_REWARD_COOLDOWN_SECONDS: '0',
+    AD_REWARD_DAY_TIME_ZONE: 'Asia/Seoul',
+  };
+  const ANDROID = 'ca-app-pub-7899930948413451/3165650506';
+  const IOS = 'ca-app-pub-7899930948413451/8170740188';
+
+  it('boots the product configuration with one or both rewarded units', () => {
+    expect(() =>
+      validateEnv({
+        ...ADS,
+        ADMOB_REWARDED_AD_UNIT_ID_ANDROID: ANDROID,
+        ADMOB_REWARDED_AD_UNIT_ID_IOS: IOS,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateEnv({ ...ADS, ADMOB_REWARDED_AD_UNIT_ID_IOS: IOS }),
+    ).not.toThrow();
+  });
+
+  it('refuses AdMob without a rewarded unit: no callback could ever confirm an ad', () => {
+    expect(() => validateEnv({ ...ADS })).toThrow(
+      /ADMOB_REWARDED_AD_UNIT_ID_ANDROID/u,
+    );
+  });
+
+  it('refuses a malformed unit even while ads are off (never read as "no unit")', () => {
+    expect(() =>
+      validateEnv({
+        ...BASE,
+        ADMOB_REWARDED_AD_UNIT_ID_ANDROID:
+          'ca-app-pub-7899930948413451~9002185139',
+      }),
+    ).toThrow(/ADMOB_REWARDED_AD_UNIT_ID_ANDROID/u);
+    expect(() => validateEnv({ ...BASE })).not.toThrow();
+  });
+});

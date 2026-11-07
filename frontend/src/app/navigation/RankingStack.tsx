@@ -4,6 +4,8 @@ import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { stackTransition } from './transitionPolicy';
 import { stackScreenLayout } from './stackScreenLayout';
+import { returnToEntryTab } from './marketTabEntry';
+import { postDetailId, postDetailOptions } from './communityPostEntry';
 
 import type { RankingStackParamList } from './types';
 import LeagueSectionTabs from '../../components/navigation/LeagueSectionTabs';
@@ -18,12 +20,14 @@ const Stack = createNativeStackNavigator<RankingStackParamList>();
  * 리그 (season mode). The root's header shows the 랭킹 | 커뮤니티 text tabs at
  * the left (both platforms) instead of a title; the section is a route param,
  * so a pushed post, composer or 유저 시즌 요약 returns to the same section, and
- * Home's community card opens `section: 'community'` directly.
+ * Home's community card opens `section: 'community'` directly — or, for a
+ * post it shows, that post (back returns to Home, as in CommunityStack).
  */
 export default function RankingStack() {
   const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="RankingStack" screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}>
+    <Stack.Navigator id="RankingStack" screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}
+      screenListeners={returnToEntryTab}>
       <Stack.Screen
         name="Ranking"
         component={LeagueScreen}
@@ -41,8 +45,10 @@ export default function RankingStack() {
         component={UserSeasonSummaryScreen}
         options={{ title: '유저 시즌 요약' }}
       />
-      <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ title: '커뮤니티' }} />
-      <Stack.Screen name="PostCompose" component={PostComposeScreen} options={{ title: '글쓰기' }} />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} getId={postDetailId}
+        options={({ route }) => postDetailOptions(route.params)} />
+      <Stack.Screen name="PostCompose" component={PostComposeScreen}
+        options={({ theme }) => ({ title: '글쓰기', headerTitleStyle: theme.fonts.heavy })} />
     </Stack.Navigator>
   );
 }

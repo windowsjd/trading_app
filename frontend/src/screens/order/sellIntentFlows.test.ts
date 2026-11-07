@@ -346,6 +346,71 @@ describe('익절가/손절가 설정 from the holding card (independent stop-los
     assert.equal(stockForm.requests[0].body.takeProfit.quantity, '3.5');
   });
 
+  it('closed stock market (2026-11-07): the server that lists it takes 익절가/손절가 now, watched from the next regular session', async (t) => {
+    const h = inlineTradingHarness();
+    stock(h);
+    h.assets.samsung.marketStatus = 'closed';
+    h.assets.samsung.tradable = false;
+    h.method = null;
+    h.positions.general = '10';
+    h.sellList = sellList('general', { protection: { offSessionMarkets: ['KRX'] } });
+    // The server's answer for an off-session registration.
+    h.sellResult = { registeredOffSession: true };
+    await h.mount(); t.after(h.close);
+    await openTpSl(h, 'samsung');
+    expectText(h, /정규장 외 시간이에요\. 지금 등록하면 다음 정규장부터 감시해요\./);
+    expectText(h, /체결 가격은 설정 가격과 다를 수 있어요/);
+    await h.press('tp-sl-stop-loss-toggle');
+    await h.input('tp-sl-stop-loss-trigger-price', '65000');
+    await h.press('tp-sl-stop-loss-ratio-50');
+    // Nothing blocks a closed market: the server decides at its own clock.
+    assert.equal(h.node('tp-sl-submit').props.state, 'enabled');
+    await h.press('tp-sl-submit'); await h.flush();
+    assert.equal(h.requests.length, 1);
+    assert.deepEqual({ ...h.requests[0].body, idempotencyKey: undefined }, {
+      kind: 'protection', assetId: 'samsung', stopLoss: { triggerPrice: '65000', executionType: 'market', quantity: '5' }, idempotencyKey: undefined,
+    });
+    // Registration is not a sale: the words come from the server's flag.
+    expectText(h, /손절가를 등록했어요\. 다음 정규장부터 감시해요\./);
+    expectNoText(h, /체결됐어요|매도했어요/);
+  });
+
+  it('closed stock market on an older server (no offSessionMarkets): no off-session promise; the server refusal is a price failure, not "register in session"', async (t) => {
+    const h = inlineTradingHarness();
+    stock(h);
+    h.assets.samsung.marketStatus = 'closed';
+    h.method = null;
+    h.positions.general = '10';
+    h.sellList = sellList('general');
+    h.sellFailure = Object.assign(new Error('price'), { response: { status: 409, data: { error: { code: 'CONDITIONAL_PRICE_UNAVAILABLE' } } } });
+    await h.mount(); t.after(h.close);
+    await openTpSl(h, 'samsung');
+    assert.equal(h.node('tp-sl-off-session-notice') === undefined, true);
+    await h.press('tp-sl-take-profit-toggle');
+    await h.input('tp-sl-take-profit-trigger-price', '90000');
+    await h.press('tp-sl-take-profit-ratio-25');
+    await h.press('tp-sl-submit'); await h.flush();
+    expectText(h, /감시에 사용할 최신 시세를 확인할 수 없어 등록하지 못했습니다/);
+    expectNoText(h, /주식은 정규장 중에 등록해주세요/);
+  });
+
+  it('an open stock market keeps the in-session words (no off-session notice)', async (t) => {
+    const h = inlineTradingHarness();
+    stock(h);
+    h.method = null;
+    h.positions.general = '10';
+    h.sellList = sellList('general', { protection: { offSessionMarkets: ['KRX'] } });
+    await h.mount(); t.after(h.close);
+    await openTpSl(h, 'samsung');
+    assert.equal(h.node('tp-sl-off-session-notice') === undefined, true);
+    await h.press('tp-sl-take-profit-toggle');
+    await h.input('tp-sl-take-profit-trigger-price', '90000');
+    await h.press('tp-sl-take-profit-ratio-25');
+    await h.press('tp-sl-submit'); await h.flush();
+    expectText(h, /익절가를 등록했어요\./);
+    expectNoText(h, /다음 정규장부터 감시해요/);
+  });
+
   it('an existing whole-position OCO protection blocks new settings until canceled; a refusal shows its mapped reason', async (t) => {
     const { conditionalFixture } = require('../../../test/conditionalFixtures.cjs');
     const h = inlineTradingHarness();

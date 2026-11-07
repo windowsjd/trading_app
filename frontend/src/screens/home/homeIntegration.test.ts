@@ -51,7 +51,10 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
         assert.equal(texts(nickname), '김재민');
         const avatar = elements(tree, 'ProfileAvatar')[0];
         assert.equal(avatar.props.profileImageUrl, 'https://example.test/me.png');
-        assert.equal(avatar.props.size, 32, 'compact account box');
+        assert.equal(avatar.props.size, 36, 'Home profile is a step larger (2026-11-07 (3))');
+        const nicknameStyle = Object.assign({}, ...[nickname.props.style].flat().filter(Boolean));
+        assert.equal([nicknameStyle.fontSize, nicknameStyle.lineHeight, nicknameStyle.fontWeight].join('/'), '18/27/700');
+        assert.equal(nickname.props.numberOfLines === undefined, true, 'a long nickname wraps, never clipped');
         // The rank is on the Ranking tab; Home keeps the tier beside the total.
         assert.equal(rank === undefined, true);
         assert.equal(texts(tree).includes('#2'), false);

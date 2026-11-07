@@ -96,9 +96,11 @@ export interface ConditionalSellKindCapabilitiesDto {
   enabled: boolean;
   canCreate: boolean;
   canUseLimit: boolean;
-  /** Conditions only: stock markets where one may also be registered while the
-   * market is closed, with a chosen 이상/이하 (2026-10-18). Absent on an older
-   * server: then a closed market cannot register. */
+  /** Stock markets where a new one may also be registered (or changed) while
+   * the market is closed: conditions with a chosen 이상/이하 (2026-10-18),
+   * stop-loss/take-profit with their fixed direction (2026-11-07), watched
+   * from the next regular session. Absent on an older server: then a closed
+   * market cannot register. */
   offSessionMarkets?: string[];
 }
 

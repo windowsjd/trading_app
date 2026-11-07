@@ -72,15 +72,13 @@ for (const accountId of ['general', 'season']) {
       assert.equal(h.requests[0].body.orderType, 'limit');
       assert.equal(h.success().payload.execution.state, 'submitted');
     });
-    test(`${accountId} ${assetType} closed sell: fractional market input, 지정가 neither suggested nor offered (2026-11-05)`, async (t) => {
+    test(`${accountId} ${assetType} closed sell without automatic limit matching: 지정가 is not suggested and cannot be chosen`, async (t) => {
       const h = inlineTradingHarness();
       h.accountId = accountId;
       h.assetId = 'samsung';
       h.assets.samsung.assetType = assetType;
       h.assets.samsung.marketStatus = 'closed';
-      // Even with limits registered AND matched.
-      h.orderCapabilities = { tradingAccountId: accountId, limitOrder: { enabled: true, autoExecutionEnabled: true },
-        limitOnClose: { enabled: false, markets: [], sides: ['buy'], attachedProtection: false } };
+      // The default capabilities register limits but never match them.
       await h.mount();
       t.after(h.close);
       await h.press(TEST_IDS.assetDetail.sellButton);
@@ -88,8 +86,34 @@ for (const accountId of ['general', 'season']) {
       assert.match(json(h), /정규장 외에는 시장가 주문을 할 수 없습니다. 정규장에 다시 주문해주세요/);
       assert.doesNotMatch(json(h), /지정가를 선택하면/);
       await h.press(TEST_IDS.order.typeSelect);
-      assert.equal(h.node('order-method-limit') === undefined, true);
+      assert.equal(h.node('order-method-limit').props.disabled, true);
+      assert.equal(h.node('order-method-limit-badge').props.children, '이용 불가');
       assert.equal(h.orderType(), '시장가');
+    });
+    test(`${accountId} ${assetType} closed sell with limits registered AND matched: 지정가 is suggested and registers a waiting whole-share order`, async (t) => {
+      const h = inlineTradingHarness();
+      h.accountId = accountId;
+      h.assetId = 'samsung';
+      h.assets.samsung.assetType = assetType;
+      h.assets.samsung.marketStatus = 'closed';
+      h.orderCapabilities = { tradingAccountId: accountId, limitOrder: { enabled: true, autoExecutionEnabled: true },
+        limitOnClose: { enabled: false, markets: [], sides: ['buy'], attachedProtection: false } };
+      await h.mount();
+      t.after(h.close);
+      await h.press(TEST_IDS.assetDetail.sellButton);
+      await h.input(input, '0.5');
+      assert.match(json(h), /지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다/);
+      await h.selectOrderType('limit');
+      await h.input(input, '0.5');
+      await h.input(TEST_IDS.order.limitPriceInput, '70000');
+      // The stock limit keeps the whole-share rule.
+      assert.equal(h.node(submit).props.state, 'disabled');
+      await h.input(input, '1');
+      assert.notEqual(h.node(submit).props.state, 'disabled');
+      await h.press(submit);
+      await h.flush();
+      assert.deepEqual([h.requests[0].body.side, h.requests[0].body.orderType, h.requests[0].body.quantity], ['sell', 'limit', '1']);
+      assert.equal(h.success().payload.execution.state, 'submitted', 'registered to wait, not filled');
     });
   }
 }

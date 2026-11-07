@@ -3,6 +3,11 @@ import {
   readAuthTrustProxyHops,
 } from '../auth/email-auth.config';
 import { readAdRewardConfig } from '../ad-rewards/ad-reward.config';
+import {
+  ADMOB_PROVIDER,
+  assertAdMobConfigured,
+  readAdMobConfig,
+} from '../ad-rewards/admob.config';
 import { parseLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
@@ -110,6 +115,10 @@ export function validateEnv(
   // nonsensical value refuses to boot rather than paying out a number nobody
   // decided.
   const adReward = collect(errors, () => readAdRewardConfig(env));
+  // ADMOB_REWARDED_AD_UNIT_ID_*: validated whenever set; with ads enabled and
+  // AD_REWARD_PROVIDER=admob at least one is required (2026-11-07).
+  collect(errors, () => readAdMobConfig(env));
+  if (adReward) collect(errors, () => assertAdMobConfigured(adReward, env));
 
   if (errors.length > 0) {
     throw new Error(
@@ -131,16 +140,16 @@ export function validateEnv(
     );
   }
 
-  // Enabling ad rewards without a registered provider adapter is a valid but
-  // inert state (every claim answers 503 AD_REWARD_PROVIDER_UNAVAILABLE), so
-  // it is flagged rather than fatal — no real provider adapter exists yet.
-  if (adReward?.enabled) {
+  // Enabling ad rewards for a provider without a registered adapter is a
+  // valid but inert state (every claim answers 503
+  // AD_REWARD_PROVIDER_UNAVAILABLE), so it is flagged rather than fatal. The
+  // one registered adapter is AdMob (2026-11-07).
+  if (adReward?.enabled && adReward.provider !== ADMOB_PROVIDER) {
     console.warn(
       JSON.stringify({
         event: 'ad_reward_enabled',
         provider: adReward.provider,
-        message:
-          'AD_REWARD_ENABLED=true: claims are still refused with AD_REWARD_PROVIDER_UNAVAILABLE until a real verifier adapter for this provider is registered in AdRewardsModule.',
+        message: `AD_REWARD_ENABLED=true: claims are refused with AD_REWARD_PROVIDER_UNAVAILABLE; the only registered adapter is "${ADMOB_PROVIDER}".`,
       }),
     );
   }

@@ -13,7 +13,9 @@ import { homeHeaderLayout, questBadgeCount, type HomeHeaderMode } from './homeHe
 /** Home's headerLeft: the mode title control that opens the account sheet (both platforms: left-aligned). */
 export function HomeHeaderTitle({ mode }: { mode: HomeHeaderMode }) {
   const { width, fontScale } = useWindowDimensions();
-  return <AccountSwitcher homeHeader maxWidth={homeHeaderLayout(width, fontScale, mode).titleMaxWidth} />;
+  const layout = homeHeaderLayout(width, fontScale, mode);
+  return <AccountSwitcher homeHeader maxWidth={layout.titleMaxWidth} titleFontCap={layout.titleFontCap}
+    changeFontCap={layout.changeFontCap} />;
 }
 
 /** Home's headerRight: 퀘스트 (beginner), 가이드 + 보상 (general), nothing for a season account. */

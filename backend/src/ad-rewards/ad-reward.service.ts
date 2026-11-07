@@ -355,8 +355,18 @@ export class AdRewardService {
       expectedUserId: account.userId,
       expectedTradingAccountId: account.id,
       expectedPurpose: AdRewardPurpose.funding,
+      commandKey: request.idempotencyKey,
     });
 
+    if (!verification.ok && verification.retryable) {
+      // The ad network has not confirmed the completion yet (AdMob SSV is
+      // asynchronous). Nothing is written, so the same key may come again;
+      // the callback redeems it on its own once it arrives.
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_VERIFICATION_PENDING,
+        'The ad completion has not been confirmed yet. Retry the same request.',
+      );
+    }
     if (!verification.ok || verification.purpose !== AdRewardPurpose.funding) {
       // Nothing is written: no claim row, no wallet change, no ledger row. An
       // event issued for a reset is never paid out as a top-up (2026-10-20).
@@ -888,6 +898,33 @@ export class AdRewardService {
     }
   }
 
+  /**
+   * Before an ad for a top-up is shown (AdMob session, 2026-11-07): the
+   * gates a claim would meet right now — the account active, the feature on,
+   * and any configured cap or cooldown — so a member never watches an ad
+   * that could not pay. Advisory and write-free: the claim re-checks all of
+   * it under the account lock.
+   */
+  async assertFundingAvailable(account: OwnedTradingAccount) {
+    this.assertAccountActive(account);
+    const config = this.readConfig();
+    if (!config.enabled) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_DISABLED,
+        'Ad rewards are disabled.',
+      );
+    }
+    const now = new Date();
+    const usage = await this.readDailyUsage(
+      this.prisma,
+      account.id,
+      config,
+      now,
+    );
+    const limit = this.evaluateLimits(usage, config, now);
+    if (limit) throwAdRewardError(limit.code, limit.message);
+  }
+
   // ------------------------------------------------------------- limits
 
   private async readDailyUsage(
@@ -951,7 +988,11 @@ export class AdRewardService {
     config: Extract<AdRewardConfig, { enabled: true }>,
     now: Date,
   ): { code: AdRewardLimitErrorCode; message: string } | null {
-    if (usage.grantedCountToday >= config.dailyMaxCount) {
+    // A cap configured `unlimited` (null, 2026-11-07) is simply not checked.
+    if (
+      config.dailyMaxCount !== null &&
+      usage.grantedCountToday >= config.dailyMaxCount
+    ) {
       return {
         code: adRewardErrorCodes.AD_REWARD_DAILY_COUNT_LIMIT,
         message: 'Daily ad reward count limit reached.',
@@ -961,7 +1002,10 @@ export class AdRewardService {
     const projected = usage.grantedAmountToday.add(
       new Prisma.Decimal(config.rewardAmountKrw),
     );
-    if (projected.gt(new Prisma.Decimal(config.dailyMaxAmountKrw))) {
+    if (
+      config.dailyMaxAmountKrw !== null &&
+      projected.gt(new Prisma.Decimal(config.dailyMaxAmountKrw))
+    ) {
       return {
         code: adRewardErrorCodes.AD_REWARD_DAILY_AMOUNT_LIMIT,
         message: 'Daily ad reward amount limit reached.',
@@ -983,7 +1027,8 @@ export class AdRewardService {
 
   // ------------------------------------------------------------ helpers
 
-  private async resolveGeneralAccount(
+  /** Owned general account or the ad endpoints' refusal (shared by AdMob sessions). */
+  async resolveGeneralAccount(
     userId: string | undefined,
     accountId: string,
   ): Promise<OwnedTradingAccount> {
@@ -1094,20 +1139,25 @@ export class AdRewardService {
         grantedCountToday: input.usage?.grantedCountToday ?? 0,
         grantedAmountTodayKrw:
           input.usage?.grantedAmountToday.toFixed(8) ?? '0.00000000',
-        remainingCountToday: enabled
-          ? Math.max(
-              0,
-              config.dailyMaxCount - (input.usage?.grantedCountToday ?? 0),
-            )
-          : 0,
-        remainingAmountTodayKrw: enabled
-          ? Prisma.Decimal.max(
-              new Prisma.Decimal(0),
-              new Prisma.Decimal(config.dailyMaxAmountKrw).sub(
-                input.usage?.grantedAmountToday ?? new Prisma.Decimal(0),
+        // null: that cap is configured `unlimited` (2026-11-07), not "0 left".
+        remainingCountToday: !enabled
+          ? 0
+          : config.dailyMaxCount === null
+            ? null
+            : Math.max(
+                0,
+                config.dailyMaxCount - (input.usage?.grantedCountToday ?? 0),
               ),
-            ).toFixed(8)
-          : '0.00000000',
+        remainingAmountTodayKrw: !enabled
+          ? '0.00000000'
+          : config.dailyMaxAmountKrw === null
+            ? null
+            : Prisma.Decimal.max(
+                new Prisma.Decimal(0),
+                new Prisma.Decimal(config.dailyMaxAmountKrw).sub(
+                  input.usage?.grantedAmountToday ?? new Prisma.Decimal(0),
+                ),
+              ).toFixed(8),
         nextEligibleAt: input.nextEligibleAt?.toISOString() ?? null,
         reason: input.reason,
       },

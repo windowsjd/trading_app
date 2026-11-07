@@ -124,8 +124,10 @@ export async function conditionalPrice(
  * changes for its evaluation — `conditionalPrice` never reads a closed market,
  * and only the next regular session's evidence of a trade after registration
  * can trigger it. An undecidable session fails closed with its own code (it
- * is never taken for a closure). Stop-loss/take-profit settings, protection
- * and Futures keep requiring `conditionalPrice` directly.
+ * is never taken for a closure). Since 2026-11-07 a stock stop-loss/
+ * take-profit setting (create or change) uses it too, with its fixed
+ * direction; crypto Spot stop-loss/take-profit, protection and Futures keep
+ * requiring `conditionalPrice` directly.
  */
 export async function conditionalRegistrationReference(
   tx: Pick<

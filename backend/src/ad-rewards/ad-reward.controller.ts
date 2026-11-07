@@ -6,6 +6,10 @@ import {
   type AdRewardClaimRequestBody,
   type AdRewardClaimsQuery,
 } from './ad-reward.service';
+import {
+  AdMobRewardSessionService,
+  type AdRewardSessionBody,
+} from './admob-reward-session.service';
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -24,7 +28,27 @@ type AuthenticatedRequest = Request & {
  */
 @Controller('api/v1/trading-accounts/:accountId/ad-rewards')
 export class AdRewardController {
-  constructor(private readonly adRewardService: AdRewardService) {}
+  constructor(
+    private readonly adRewardService: AdRewardService,
+    private readonly sessions: AdMobRewardSessionService,
+  ) {}
+
+  /**
+   * 광고 시청 시도 (2026-11-07): opened BEFORE an AdMob rewarded ad for one
+   * command (purpose + its idempotencyKey). Replays by key. Moves no money.
+   */
+  @Post('sessions')
+  createSession(
+    @Req() request: AuthenticatedRequest,
+    @Param('accountId') accountId: string,
+    @Body() body: AdRewardSessionBody,
+  ) {
+    return this.sessions.createSession(
+      this.extractUserId(request),
+      accountId,
+      body,
+    );
+  }
 
   @Get('eligibility')
   getEligibility(

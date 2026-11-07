@@ -16,6 +16,14 @@ export const adRewardErrorCodes = {
   AD_REWARD_PROVIDER_UNAVAILABLE: 'AD_REWARD_PROVIDER_UNAVAILABLE',
   /** The provider verifier rejected the proof. Nothing is written. */
   AD_REWARD_VERIFICATION_FAILED: 'AD_REWARD_VERIFICATION_FAILED',
+  /**
+   * The ad session is this command's, but the ad network's signed
+   * confirmation (AdMob SSV) has not arrived yet (2026-11-07). Nothing is
+   * written; retry the SAME command (key and proof) — never a new ad.
+   */
+  AD_REWARD_VERIFICATION_PENDING: 'AD_REWARD_VERIFICATION_PENDING',
+  /** Too many ad sessions are still waiting for their confirmation. */
+  AD_REWARD_SESSION_LIMIT: 'AD_REWARD_SESSION_LIMIT',
   /** This provider event was already consumed by another user/account. */
   AD_REWARD_EVENT_ALREADY_USED: 'AD_REWARD_EVENT_ALREADY_USED',
   AD_REWARD_DAILY_COUNT_LIMIT: 'AD_REWARD_DAILY_COUNT_LIMIT',
@@ -51,6 +59,8 @@ export const adRewardErrorHttpStatus: Record<AdRewardErrorCode, HttpStatus> = {
   AD_REWARD_DISABLED: HttpStatus.SERVICE_UNAVAILABLE,
   AD_REWARD_PROVIDER_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
   AD_REWARD_VERIFICATION_FAILED: HttpStatus.UNPROCESSABLE_ENTITY,
+  AD_REWARD_VERIFICATION_PENDING: HttpStatus.CONFLICT,
+  AD_REWARD_SESSION_LIMIT: HttpStatus.TOO_MANY_REQUESTS,
   AD_REWARD_EVENT_ALREADY_USED: HttpStatus.CONFLICT,
   AD_REWARD_DAILY_COUNT_LIMIT: HttpStatus.TOO_MANY_REQUESTS,
   AD_REWARD_DAILY_AMOUNT_LIMIT: HttpStatus.TOO_MANY_REQUESTS,

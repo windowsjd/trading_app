@@ -33,11 +33,10 @@ it('the order-method notice is newest and states how each method fills', () => {
   assert.equal(notices[0].id, NOTICE_IDS.orderMethodsAndExecution);
   const notice = findNotice(NOTICE_IDS.orderMethodsAndExecution)!;
   assert.equal(notice.title, '주문방식 및 체결 기준 안내');
-  assert.equal(notice.publishedOn, '2026-11-06');
+  assert.equal(notice.publishedOn, '2026-11-07');
   assert.deepEqual(notice.sections.map((section) => section.heading), ['시장가', '지정가', '조건주문', 'LOC 주문', '손절가/익절가 설정', '선물']);
   const text = notice.sections.flatMap((section) => [section.heading, ...section.paragraphs]).join('\n');
-  // 2026-11-05: no new spot SELL limit, which no longer "can be chosen while matched".
-  assert.equal(text.includes('자동으로 체결하고 있을 때만 선택할 수 있습니다'), false);
+  // 2026-11-07 (3): the stock SELL limit is chosen again, only while limits are matched; crypto Spot still has none.
   for (const required of [
     '실제 거래소로 전송되지 않고',
     '화면에서 본 가격과 최종 체결가격은 다를 수 있으며',
@@ -45,7 +44,9 @@ it('the order-method notice is newest and states how each method fills', () => {
     // Accepted SELL limits keep their fill rule; stock conditions register off-session (2026-10-18).
     '매도 지정가는 시세가 지정가격 이상으로 확인되면',
     '매도 수량만큼 보유 수량을 예약합니다',
-    '현물 매도 주문방식에서는 새 지정가 매도를 선택할 수 없습니다',
+    '한국·미국 주식의 매도 지정가는 서비스가 지정가 주문을 자동으로 체결하고 있을 때만 선택할 수 있습니다',
+    '주식 지정가 매도는 1주 단위로만 주문할 수 있습니다',
+    '암호화폐 현물 매도 주문방식에서는 새 지정가 매도를 선택할 수 없습니다',
     '이미 접수된 지정가 매도 주문은 대기 목록에서 그대로 확인·변경·취소할 수 있고',
     '보유종목 카드의 「익절가/손절가 설정」',
     '선물 포지션 카드와 체결을 기다리는 매수·진입 주문의 「손절가/익절가 설정」',
@@ -80,7 +81,12 @@ it('the order-method notice is newest and states how each method fills', () => {
     '등록하면 감시만 시작하고 아직 주문이 아닙니다',
     '시장가는 접수와 함께 바로 체결을 시도하고, 지정가는 체결될 때까지 대기 주문으로 남습니다',
     '지정가 주문은 등록하면 바로 접수되고',
-    '현물 매수는 주문방식에서 지정가를 선택할 수 있습니다',
+    '현물 매수와 한국·미국 주식 매도는 주문방식에서 지정가를 선택할 수 있습니다',
+    // 2026-11-07 (3): stock 익절가/손절가 registered off-session, watched from the next regular session only.
+    '정규장 외 시간(주말·휴장일 포함)에도 보유종목의 익절가·손절가를 등록하고 변경할 수 있습니다',
+    '등록은 감시를 시작할 준비일 뿐 체결이 아니며',
+    '익절가는 그 가격 이상, 손절가는 그 가격 이하에서 발동하고',
+    '설정 가격과 다른 가격에 체결될 수 있습니다',
     '「지정가 ○○ 이하 도달」',
     '「지정가 ○○ 이상 도달」',
     '그 주문부터는 일반 지정가 주문과 같은 기준으로 예약합니다',
@@ -131,7 +137,7 @@ it('merges published important notices by KST date without replacing app notices
   assert.equal(kstDate('2026-10-19T15:30:00.000Z'), '2026-10-20');
   assert.equal(kstDate('2026-10-19T14:59:00.000Z'), '2026-10-19');
   const merged = mergeNotices(notices, [
-    { id: 'server-1', title: '점검', publishedAt: '2026-11-06T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
+    { id: 'server-1', title: '점검', publishedAt: '2026-11-07T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
     { id: 'draft', title: '초안', publishedAt: null, sections: [] },
     { id: NOTICE_IDS.executionGapProtection, title: '덮어쓰기', publishedAt: '2026-10-18T00:00:00.000Z', sections: [] },
   ]);

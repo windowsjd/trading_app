@@ -151,6 +151,8 @@ function futuresHarness(options = {}) {
     '@react-navigation/native': { useIsFocused: () => h.focused }, '@react-navigation/elements': { useHeaderHeight: () => 64 },
     '../../features/auth/useAdminDiagnostics': { useAdminDiagnostics: () => h.role === 'admin' },
     '../../features/futures/api': api,
+    // The holding TP/SL sheet reads a stock's market state (2026-11-07); futures never asks.
+    '../../features/asset/api': { getAssetDetail: async () => { throw new Error('asset detail not mocked'); } },
     '../../features/futures/tpSlApi': tpSlApi,
     '../../features/conditional/entryTpSlApi': entryTpSlApi,
     '../../features/conditional/api': conditionalApi,

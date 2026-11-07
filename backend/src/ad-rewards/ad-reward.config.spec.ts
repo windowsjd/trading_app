@@ -81,6 +81,52 @@ describe('readAdRewardConfig', () => {
     ).toThrow(AdRewardConfigError);
   });
 
+  it('switches a daily cap off only with the explicit word `unlimited` (2026-11-07), never by omission or a huge number', () => {
+    // The product configuration: 5,000,000 KRW per ad, no count/amount cap, no cooldown.
+    expect(
+      readAdRewardConfig({
+        ...validEnv,
+        AD_REWARD_PROVIDER: 'admob',
+        AD_REWARD_AMOUNT_KRW: '5000000',
+        AD_REWARD_DAILY_MAX_COUNT: 'unlimited',
+        AD_REWARD_DAILY_MAX_AMOUNT_KRW: 'UNLIMITED',
+        AD_REWARD_COOLDOWN_SECONDS: '0',
+      }),
+    ).toEqual({
+      enabled: true,
+      provider: 'admob',
+      rewardAmountKrw: '5000000.00000000',
+      dailyMaxCount: null,
+      dailyMaxAmountKrw: null,
+      cooldownSeconds: 0,
+      dayTimeZone: 'Asia/Seoul',
+    });
+    // Each cap is its own decision; a numeric one keeps its exact meaning.
+    expect(
+      readAdRewardConfig({
+        ...validEnv,
+        AD_REWARD_DAILY_MAX_COUNT: 'unlimited',
+      }),
+    ).toMatchObject({
+      dailyMaxCount: null,
+      dailyMaxAmountKrw: '250000.00000000',
+    });
+    expect(
+      readAdRewardConfig({
+        ...validEnv,
+        AD_REWARD_DAILY_MAX_AMOUNT_KRW: ' unlimited ',
+      }),
+    ).toMatchObject({ dailyMaxCount: 5, dailyMaxAmountKrw: null });
+    // A missing, empty or misspelled value is still refused.
+    for (const value of [undefined, '', 'infinite', 'none', '-1']) {
+      const env = { ...validEnv, AD_REWARD_DAILY_MAX_COUNT: value } as Record<
+        string,
+        string | undefined
+      >;
+      expect(() => readAdRewardConfig(env)).toThrow(AdRewardConfigError);
+    }
+  });
+
   it('rejects a non-positive daily count', () => {
     expect(() =>
       readAdRewardConfig({ ...validEnv, AD_REWARD_DAILY_MAX_COUNT: '0' }),

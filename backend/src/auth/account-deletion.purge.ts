@@ -412,6 +412,11 @@ export async function purgeDeletionScope(
       Prisma.sql`DELETE FROM ad_reward_claims WHERE user_id = ${user} OR trading_account_id = ANY(${accounts})`,
     ],
     [
+      // AdMob ad sessions (2026-11-07): no money, only the member's attempts.
+      'ad_reward_sessions',
+      Prisma.sql`DELETE FROM ad_reward_sessions WHERE user_id = ${user} OR trading_account_id = ANY(${accounts})`,
+    ],
+    [
       'wallet_transactions',
       Prisma.sql`DELETE FROM wallet_transactions WHERE trading_account_id = ANY(${accounts})`,
     ],

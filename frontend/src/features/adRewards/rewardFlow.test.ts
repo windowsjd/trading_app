@@ -4,7 +4,10 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import {
   classifyRewardCommandFailure,
+  forgetRewardAttempt,
   formatManwon,
+  rememberedRewardAttempt,
+  rememberRewardAttempt,
   rewardSheetState,
 } from './rewardFlow.ts';
 import { getRewardedAdProvider } from './rewardedAd.ts';
@@ -19,14 +22,20 @@ const reset = (overrides: Record<string, unknown> = {}) => ({
   targetKrwBalance: '10000000.00000000', resetCount: 0, lastResetAt: null, ...overrides,
 }) as never;
 
-describe('rewarded ads cannot authorize financial commands before SSV', () => {
-  it('has no proof-producing financial provider, including after SDK test integration', () => {
+describe('the device never authorizes a financial command (AdMob SSV, 2026-11-07)', () => {
+  it('web/Node/Expo Go hosts have no provider at all', () => {
     assert.equal(getRewardedAdProvider(), null);
   });
 
-  it('ships no fake or test completion in the app source', () => {
-    const source = readFileSync(path.join(process.cwd(), 'src/features/adRewards/rewardedAd.ts'), 'utf8');
-    assert.equal(/status:\s*'completed'\s*,\s*proof:/u.test(source.replace(/\/\/.*$/gmu, '')), false);
+  it('the AdMob provider yields no proof: its only "success" is earned, and the server decides', () => {
+    for (const file of ['rewardedAd.ts', 'rewardedAd.native.ts', 'rewardedAdTypes.ts']) {
+      const source = readFileSync(path.join(process.cwd(), 'src/features/adRewards', file), 'utf8').replace(/\/\/.*$/gmu, '');
+      assert.equal(/status:\s*'completed'|proof:/u.test(source), false, file);
+    }
+    // The SSV options come from the server session; the app never invents them.
+    const native = readFileSync(path.join(process.cwd(), 'src/features/adRewards/rewardedAd.native.ts'), 'utf8');
+    assert.match(native, /serverSideVerificationOptions: \{ userId: ssv\.userId, customData: ssv\.customData \}/);
+    assert.match(native, /requestNonPersonalizedAdsOnly: true/);
   });
 });
 
@@ -82,6 +91,30 @@ describe('보상 sheet rules', () => {
       reset: reset({ eligible: false, reason: 'GENERAL_ACCOUNT_RESET_BLOCKED', blockers: ['FUTURES_POSITIONS', 'RESERVED_FUNDS'] }) });
     assert.equal(blocked.reset.canStart, false);
     assert.deepEqual(blocked.reset.blockers, ['열려 있는 선물 포지션이 있습니다.', '주문에 묶인 자금이 있습니다.']);
+  });
+
+  it('no daily cap configured (remaining null): no countdown line, still startable', () => {
+    const unlimited = rewardSheetState({ providerReady: true,
+      funding: funding({ remainingCountToday: null, remainingAmountTodayKrw: null, grantedCountToday: 12 }), reset: reset() });
+    assert.equal(unlimited.funding.canStart, true);
+    assert.equal(unlimited.funding.status, null);
+  });
+
+  it('"not confirmed yet" is pending (ask the same command again), never a refusal or a new ad', () => {
+    assert.equal(classifyRewardCommandFailure({ response: { status: 409, data: { error: { code: 'AD_REWARD_VERIFICATION_PENDING' } } } }), 'pending');
+    assert.equal(classifyRewardCommandFailure({ response: { status: 422, data: { error: { code: 'AD_REWARD_VERIFICATION_FAILED' } } } }), 'refused');
+  });
+
+  it('open attempts are kept per sign-in and account, and only their own key forgets them', () => {
+    const attempt = { purpose: 'funding' as const, idempotencyKey: 'k1', proof: 's1', providerKey: 'admob' };
+    rememberRewardAttempt('1:G', attempt);
+    assert.equal(rememberedRewardAttempt('1:G')?.idempotencyKey, 'k1');
+    assert.equal(rememberedRewardAttempt('1:H') === null, true, 'another account');
+    assert.equal(rememberedRewardAttempt('2:G') === null, true, 'another sign-in');
+    forgetRewardAttempt('1:G', { ...attempt, idempotencyKey: 'k2' });
+    assert.equal(rememberedRewardAttempt('1:G')?.idempotencyKey, 'k1');
+    forgetRewardAttempt('1:G', attempt);
+    assert.equal(rememberedRewardAttempt('1:G') === null, true);
   });
 
   it('only an answer that never arrived is uncertain (re-check with the same key)', () => {

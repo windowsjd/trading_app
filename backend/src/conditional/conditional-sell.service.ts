@@ -96,6 +96,9 @@ const CONDITIONAL_SELL_INCLUDE = {
       canceledAt: true,
     },
   },
+  // Only to tell a fill-time entry-plan activation (no registration price)
+  // from an off-session registration (registeredOffSession).
+  entryTpSlPlan: { select: { id: true } },
 } as const;
 
 type ConditionalSellRecord = Prisma.ConditionalSellOrderGetPayload<{
@@ -644,7 +647,7 @@ export class ConditionalSellService {
             canUseLimit: conditionEnabled && canUseLimit,
             // Additive (2026-10-18): stock markets where a condition may also
             // be registered while the market is closed, with a chosen
-            // direction. Stop-loss/take-profit settings have no such list.
+            // direction. Stop-loss/take-profit settings list theirs below.
             offSessionMarkets: conditionalOffSessionMarkets(),
           },
           protection: {
@@ -652,6 +655,10 @@ export class ConditionalSellService {
             canCreate: protectionEnabled && tradable,
             // New stop-loss/take-profit settings execute at market only.
             canUseLimit: false,
+            // Additive (2026-11-07): stock markets where a stop-loss/
+            // take-profit may also be registered or changed while the market
+            // is closed (watched from the next regular session).
+            offSessionMarkets: conditionalOffSessionMarkets(),
           },
           canCancel: true,
           markets: conditionalMarkets(),
@@ -986,10 +993,17 @@ export class ConditionalSellService {
   }
 
   /**
-   * The price intents are registered against. A user condition on a
-   * confirmed-closed stock market registers without a price (its direction as
-   * sent, watched from the next regular session); stop-loss/take-profit
-   * settings keep requiring one. No intent may already be met.
+   * The price intents are registered against. On a confirmed-closed stock
+   * market a user condition (2026-10-18) and, since 2026-11-07, a stock
+   * stop-loss/take-profit register without a price: a condition keeps its
+   * direction as sent, a stop-loss/take-profit its fixed one (이하/이상), and
+   * every one is watched from the next regular session only — evaluation
+   * reads no closed market and no evidence older than the registration (or
+   * the change), so an opening gap triggers on the first eligible price. A
+   * crypto Spot stop-loss/take-profit keeps requiring fresh evidence; an
+   * undecidable session refuses (MARKET_CALENDAR_UNAVAILABLE) and a price
+   * failure during the session stays CONDITIONAL_PRICE_UNAVAILABLE. No
+   * intent may already be met against a referenced price.
    */
   private async sellReference(
     tx: Prisma.TransactionClient,
@@ -999,7 +1013,11 @@ export class ConditionalSellService {
     now: Date,
     operation: 'CONDITIONAL_SELL_CREATE' | 'CONDITIONAL_SELL_MODIFY',
   ) {
-    const price = intents.every((intent) => intent.kind === 'condition')
+    const offSessionAllowed =
+      intents.every((intent) => intent.kind === 'condition') ||
+      asset.assetType === 'domestic_stock' ||
+      asset.assetType === 'us_stock';
+    const price = offSessionAllowed
       ? await conditionalRegistrationReference(tx, asset, now)
       : await conditionalPrice(tx, asset, 'spot', now);
     if (!price) {
@@ -1121,12 +1139,16 @@ export function presentConditionalSell(
             : order?.status === 'canceled'
               ? 'order_canceled'
               : 'order_rejected',
-    // A condition registered while its stock market was closed (no price
-    // referenced): watching starts in the next regular session. Settings an
-    // entry plan activated at its fill have no registration price either,
-    // but they are never conditions.
+    // Registered (or last changed) while its stock market was closed, no
+    // price referenced: watching starts in the next regular session. A
+    // condition (2026-10-18) or a stock stop-loss/take-profit (2026-11-07).
+    // Settings an entry plan activated at its fill have no registration
+    // price either; they count only once changed off-session.
     registeredOffSession:
-      row.kind === 'condition' && row.registrationSnapshotId === null,
+      row.registrationSnapshotId === null &&
+      (row.kind === 'condition' ||
+        row.entryTpSlPlan === null ||
+        row.revisedAt !== null),
     position:
       position && sizing
         ? {

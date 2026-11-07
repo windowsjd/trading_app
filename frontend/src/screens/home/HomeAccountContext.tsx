@@ -53,12 +53,16 @@ function readSeasonStanding(context: HomeAccountContextData, mode: 'light' | 'da
   return { tier, tierLabel };
 }
 
+/** Home's own profile size (2026-11-07 (3): 32 → 36dp); shared avatars keep theirs. */
+export const HOME_PROFILE_AVATAR_SIZE = 36;
+
 /**
  * The profile row under Home's header (2026-11-07): the mode or season title
  * and the change action moved to the header (AccountSwitcher homeHeader), so
  * this is the avatar and nickname on the canvas, then any account or season
  * notice and the ranking read's failure. The rank lives on the 리그 tab; the
- * season tier is shown next to the total assets (HomeTierBadge).
+ * season tier is shown next to the total assets (HomeTierBadge). The avatar
+ * (36dp) and nickname (18sp, wrapping) are a step larger than elsewhere.
  */
 export default function HomeAccountContext({ context }: { context: HomeAccountContextData }) {
   const { meQuery, rankingQuery, hasSeason } = context;
@@ -66,7 +70,7 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
     <View style={styles.context} testID={TEST_IDS.home.accountContext}>
       <View style={styles.identity}>
         {meQuery.isLoading ? <View style={styles.flex}><SectionSkeleton lines={1} /></View> : meQuery.data ? <>
-          <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={32} testID="home-profile-avatar" />
+          <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={HOME_PROFILE_AVATAR_SIZE} testID="home-profile-avatar" />
           <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
         </> : <View style={styles.flex}><InlineEmptyState message="사용자 정보를 불러오지 못했습니다." /></View>}
       </View>
@@ -137,8 +141,9 @@ const styles = StyleSheet.create({
   // No card: one row on the canvas, 20 below the header (the content's 16 + 4).
   context: { marginTop: 4, gap: 8 },
   flex: { flex: 1, minWidth: 0 },
-  identity: { flexDirection: 'row', alignItems: 'center', columnGap: 10, minWidth: 0, minHeight: 32 },
-  nickname: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 16, fontWeight: '700', lineHeight: 24 },
+  identity: { flexDirection: 'row', alignItems: 'center', columnGap: 10, minWidth: 0, minHeight: HOME_PROFILE_AVATAR_SIZE },
+  // Wraps (never clipped) for a long nickname or a large system font.
+  nickname: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 18, fontWeight: '700', lineHeight: 27 },
   tier: { alignItems: 'center', flexShrink: 0 },
   tierNameColumn: { maxWidth: '100%', flexShrink: 1, alignItems: 'center' },
   // The same size and weight as the 보유종목 및 포지션 heading (HomeHoldings).

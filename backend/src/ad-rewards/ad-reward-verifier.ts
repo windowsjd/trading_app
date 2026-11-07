@@ -3,10 +3,10 @@ import { createHash } from 'node:crypto';
 /**
  * Provider-neutral rewarded-ad verification (작업 6).
  *
- * NO real ad network has been chosen yet, so this file deliberately contains
- * NO provider protocol, SDK, callback shape, or signature scheme. It defines
- * only the contract a future adapter must satisfy, so that picking a provider
- * later is an additive change.
+ * This file contains NO provider protocol, SDK, callback shape, or signature
+ * scheme. It defines only the contract an adapter must satisfy. The first
+ * real adapter is AdMob (2026-11-07, admob-reward-verifier.ts: Google's
+ * signed server-side verification callback, recorded on an ad session).
  *
  * WHAT A VERIFIER MUST PROVE before the server pays anything:
  *  - the ad-completion event was genuinely issued by that provider,
@@ -25,8 +25,8 @@ import { createHash } from 'node:crypto';
  * PRODUCTION MUST NOT REGISTER A FAKE VERIFIER. With no adapter registered
  * the feature answers 503 AD_REWARD_PROVIDER_UNAVAILABLE; an unverifiable ad
  * completion is never treated as complete. Test-only deterministic fakes are
- * injected through the registry in tests (see ad-reward.module.ts, which
- * registers nothing).
+ * injected through the registry in tests (ad-rewards.module.ts registers only
+ * the real AdMob adapter).
  */
 
 /**
@@ -49,6 +49,12 @@ export type AdRewardVerificationRequest = {
   expectedTradingAccountId: string;
   /** The command the completion must have been issued for. */
   expectedPurpose: AdRewardVerificationPurpose;
+  /**
+   * The command's idempotency key (2026-11-07). An adapter whose provider
+   * binds the completion to the command before the ad (AdMob: the session
+   * names its key) refuses any other key; others may ignore it.
+   */
+  commandKey?: string;
 };
 
 export type AdRewardVerificationSuccess = {
@@ -78,6 +84,12 @@ export type AdRewardVerificationFailure = {
   reasonCode: string;
   /** Operator-facing detail; never echoes the proof. */
   reason: string;
+  /**
+   * Not a refusal yet (2026-11-07): the provider's asynchronous confirmation
+   * (AdMob's SSV callback) has not arrived. Nothing is written and the SAME
+   * command may be retried; every other failure is final for the proof.
+   */
+  retryable?: boolean;
 };
 
 export type AdRewardVerificationResult =
@@ -93,9 +105,9 @@ export interface AdRewardVerifier {
 }
 
 /**
- * Registry of available provider adapters. It is EMPTY in production wiring
- * today; `resolve` returning undefined is what makes the feature answer 503
- * instead of paying out.
+ * Registry of available provider adapters. Production wiring registers only
+ * the AdMob adapter (2026-11-07); `resolve` returning undefined (any other
+ * provider key) is what makes the feature answer 503 instead of paying out.
  */
 export class AdRewardVerificationRegistry {
   private readonly verifiers = new Map<string, AdRewardVerifier>();
@@ -119,7 +131,7 @@ export class AdRewardVerificationRegistry {
   }
 }
 
-/** DI token for the registry (an empty registry is the production default). */
+/** DI token for the registry. */
 export const AD_REWARD_VERIFICATION_REGISTRY =
   'AD_REWARD_VERIFICATION_REGISTRY';
 
