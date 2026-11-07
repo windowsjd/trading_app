@@ -436,6 +436,12 @@ jobs:
       # limit, operator-only reads and answers (demoted/suspended refused), one
       # answer under concurrency, answer + audit rollback, financial rows untouched.
       INQUIRIES_DB_INTEGRATION: "1"
+      # Community over real HTTP + guards: rules consent, photo leases (in-memory
+      # storage), anonymity in every member response, concurrent 익명N numbering,
+      # HOT, comment sort, sanctions hide/restore, operator removal + audit,
+      # account deletion (탈퇴계정, carryover, receipt), signup carryover,
+      # retention; financial rows untouched.
+      COMMUNITY_DB_INTEGRATION: "1"
       # Feature flags the account-scoped suites assert THROUGH; they gate
       # product behaviour, not the tests.
       LIMIT_ORDER_ENABLED: "true"
@@ -504,6 +510,7 @@ jobs:
           src/futures/futures-position-history.integration.spec.ts
           src/notifications/push-notifications.integration.spec.ts
           src/inquiries/inquiries.integration.spec.ts
+          src/community/community.integration.spec.ts
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts
           src/ops/ops-job-lock.integration.spec.ts

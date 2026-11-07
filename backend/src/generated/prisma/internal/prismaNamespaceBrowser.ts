@@ -128,7 +128,18 @@ export const ModelName = {
   EmailAuthChallenge: 'EmailAuthChallenge',
   EmailAuthRateBucket: 'EmailAuthRateBucket',
   AccountDeletion: 'AccountDeletion',
-  ProfileImageCleanup: 'ProfileImageCleanup'
+  ProfileImageCleanup: 'ProfileImageCleanup',
+  CommunityPost: 'CommunityPost',
+  CommunityPostPhoto: 'CommunityPostPhoto',
+  CommunityComment: 'CommunityComment',
+  CommunityPostLike: 'CommunityPostLike',
+  CommunityCommentLike: 'CommunityCommentLike',
+  CommunityPostAlias: 'CommunityPostAlias',
+  CommunityReport: 'CommunityReport',
+  CommunitySanction: 'CommunitySanction',
+  CommunitySanctionCarryover: 'CommunitySanctionCarryover',
+  CommunityRuleConsent: 'CommunityRuleConsent',
+  CommunityPhotoCleanup: 'CommunityPhotoCleanup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1737,6 +1748,159 @@ export const ProfileImageCleanupScalarFieldEnum = {
 } as const
 
 export type ProfileImageCleanupScalarFieldEnum = (typeof ProfileImageCleanupScalarFieldEnum)[keyof typeof ProfileImageCleanupScalarFieldEnum]
+
+
+export const CommunityPostScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  clientRequestId: 'clientRequestId',
+  category: 'category',
+  body: 'body',
+  anonymous: 'anonymous',
+  assetId: 'assetId',
+  createdAt: 'createdAt',
+  deletedAt: 'deletedAt',
+  deletionKind: 'deletionKind',
+  removedByUserId: 'removedByUserId',
+  removalReason: 'removalReason',
+  removalNote: 'removalNote',
+  hiddenBySanctionId: 'hiddenBySanctionId'
+} as const
+
+export type CommunityPostScalarFieldEnum = (typeof CommunityPostScalarFieldEnum)[keyof typeof CommunityPostScalarFieldEnum]
+
+
+export const CommunityPostPhotoScalarFieldEnum = {
+  id: 'id',
+  postId: 'postId',
+  position: 'position',
+  objectKey: 'objectKey',
+  width: 'width',
+  height: 'height',
+  byteSize: 'byteSize',
+  sha256: 'sha256',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityPostPhotoScalarFieldEnum = (typeof CommunityPostPhotoScalarFieldEnum)[keyof typeof CommunityPostPhotoScalarFieldEnum]
+
+
+export const CommunityCommentScalarFieldEnum = {
+  id: 'id',
+  postId: 'postId',
+  userId: 'userId',
+  parentCommentId: 'parentCommentId',
+  clientRequestId: 'clientRequestId',
+  body: 'body',
+  anonymous: 'anonymous',
+  createdAt: 'createdAt',
+  deletedAt: 'deletedAt',
+  deletionKind: 'deletionKind',
+  removedByUserId: 'removedByUserId',
+  removalReason: 'removalReason',
+  removalNote: 'removalNote',
+  hiddenBySanctionId: 'hiddenBySanctionId',
+  erasedAt: 'erasedAt'
+} as const
+
+export type CommunityCommentScalarFieldEnum = (typeof CommunityCommentScalarFieldEnum)[keyof typeof CommunityCommentScalarFieldEnum]
+
+
+export const CommunityPostLikeScalarFieldEnum = {
+  id: 'id',
+  postId: 'postId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityPostLikeScalarFieldEnum = (typeof CommunityPostLikeScalarFieldEnum)[keyof typeof CommunityPostLikeScalarFieldEnum]
+
+
+export const CommunityCommentLikeScalarFieldEnum = {
+  id: 'id',
+  commentId: 'commentId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityCommentLikeScalarFieldEnum = (typeof CommunityCommentLikeScalarFieldEnum)[keyof typeof CommunityCommentLikeScalarFieldEnum]
+
+
+export const CommunityPostAliasScalarFieldEnum = {
+  id: 'id',
+  postId: 'postId',
+  userId: 'userId',
+  aliasNo: 'aliasNo',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityPostAliasScalarFieldEnum = (typeof CommunityPostAliasScalarFieldEnum)[keyof typeof CommunityPostAliasScalarFieldEnum]
+
+
+export const CommunityReportScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  postId: 'postId',
+  commentId: 'commentId',
+  reason: 'reason',
+  note: 'note',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityReportScalarFieldEnum = (typeof CommunityReportScalarFieldEnum)[keyof typeof CommunityReportScalarFieldEnum]
+
+
+export const CommunitySanctionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  reason: 'reason',
+  note: 'note',
+  hideContent: 'hideContent',
+  createdAt: 'createdAt',
+  endsAt: 'endsAt',
+  createdByUserId: 'createdByUserId',
+  revokedAt: 'revokedAt',
+  revokedByUserId: 'revokedByUserId',
+  carriedOver: 'carriedOver'
+} as const
+
+export type CommunitySanctionScalarFieldEnum = (typeof CommunitySanctionScalarFieldEnum)[keyof typeof CommunitySanctionScalarFieldEnum]
+
+
+export const CommunitySanctionCarryoverScalarFieldEnum = {
+  id: 'id',
+  emailHash: 'emailHash',
+  reason: 'reason',
+  endsAt: 'endsAt',
+  sanctionedAt: 'sanctionedAt',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunitySanctionCarryoverScalarFieldEnum = (typeof CommunitySanctionCarryoverScalarFieldEnum)[keyof typeof CommunitySanctionCarryoverScalarFieldEnum]
+
+
+export const CommunityRuleConsentScalarFieldEnum = {
+  userId: 'userId',
+  rulesVersion: 'rulesVersion',
+  acceptedAt: 'acceptedAt'
+} as const
+
+export type CommunityRuleConsentScalarFieldEnum = (typeof CommunityRuleConsentScalarFieldEnum)[keyof typeof CommunityRuleConsentScalarFieldEnum]
+
+
+export const CommunityPhotoCleanupScalarFieldEnum = {
+  objectKey: 'objectKey',
+  userId: 'userId',
+  accountDeletionId: 'accountDeletionId',
+  attempts: 'attempts',
+  nextAttemptAt: 'nextAttemptAt',
+  lastErrorCode: 'lastErrorCode',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CommunityPhotoCleanupScalarFieldEnum = (typeof CommunityPhotoCleanupScalarFieldEnum)[keyof typeof CommunityPhotoCleanupScalarFieldEnum]
 
 
 export const SortOrder = {

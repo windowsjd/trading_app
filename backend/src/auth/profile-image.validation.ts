@@ -41,7 +41,9 @@ export function validateProfileImage(file?: ProfileImageFile): Buffer {
     file.size < 4
   )
     invalidImage();
-  return validateJpegAndStripMetadata(file.buffer);
+  const parsed = parseJpegStripMetadata(file.buffer, PROFILE_JPEG_RULES);
+  if (!parsed) invalidImage();
+  return parsed.bytes;
 }
 
 function invalidImage(): never {
@@ -53,19 +55,40 @@ function invalidImage(): never {
   );
 }
 
-/** Bounded JPEG structure validation, not a pixel decoder. Strip APP/COM metadata. */
-function validateJpegAndStripMetadata(bytes: Buffer): Buffer {
-  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) invalidImage();
+export type JpegRules = {
+  maxDimension: number;
+  /** Width must equal height (profile photos). */
+  square: boolean;
+  /** Allowed SOF component counts. */
+  components: readonly number[];
+};
+
+export type ParsedJpeg = { bytes: Buffer; width: number; height: number };
+
+const PROFILE_JPEG_RULES: JpegRules = {
+  maxDimension: PROFILE_IMAGE_MAX_DIMENSION,
+  square: true,
+  components: [1, 2, 3, 4],
+};
+
+/** Bounded JPEG structure validation, not a pixel decoder. Strip APP/COM
+ * metadata. Returns null for anything that is not a valid JPEG under `rules`;
+ * callers own their error (profile and community photos differ). */
+export function parseJpegStripMetadata(
+  bytes: Buffer,
+  rules: JpegRules,
+): ParsedJpeg | null {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
   const chunks: Buffer[] = [bytes.subarray(0, 2)];
   let offset = 2;
-  let frame = false;
+  let frame: { width: number; height: number } | null = null;
   let scan = false;
   let quantization = false;
   let huffman = false;
 
   while (offset < bytes.length) {
     const start = offset;
-    if (bytes[offset++] !== 0xff) invalidImage();
+    if (bytes[offset++] !== 0xff) return null;
     while (bytes[offset] === 0xff) offset++;
     const marker = bytes[offset++];
     if (marker === 0xd9) {
@@ -76,45 +99,46 @@ function validateJpegAndStripMetadata(bytes: Buffer): Buffer {
         !huffman ||
         offset !== bytes.length
       )
-        invalidImage();
+        return null;
       chunks.push(bytes.subarray(start, offset));
-      return Buffer.concat(chunks);
+      return { bytes: Buffer.concat(chunks), ...frame };
     }
-    if (offset + 2 > bytes.length) invalidImage();
+    if (offset + 2 > bytes.length) return null;
     const length = bytes.readUInt16BE(offset);
     const end = offset + length;
-    if (length < 2 || end > bytes.length) invalidImage();
+    if (length < 2 || end > bytes.length) return null;
     const metadata = (marker >= 0xe0 && marker <= 0xef) || marker === 0xfe;
 
     if (marker === 0xc0 || marker === 0xc2) {
-      if (frame || length < 11 || bytes[offset + 2] !== 8) invalidImage();
+      if (frame || length < 11 || bytes[offset + 2] !== 8) return null;
       const height = bytes.readUInt16BE(offset + 3);
       const width = bytes.readUInt16BE(offset + 5);
       const components = bytes[offset + 7];
       if (
         !width ||
-        width !== height ||
-        width > PROFILE_IMAGE_MAX_DIMENSION ||
-        components < 1 ||
-        components > 4 ||
+        !height ||
+        (rules.square && width !== height) ||
+        width > rules.maxDimension ||
+        height > rules.maxDimension ||
+        !rules.components.includes(components) ||
         length !== 8 + components * 3
       )
-        invalidImage();
-      frame = true;
+        return null;
+      frame = { width, height };
     } else if (marker === 0xdb) {
-      if (length < 67) invalidImage();
+      if (length < 67) return null;
       quantization = true;
     } else if (marker === 0xc4) {
-      if (length < 20) invalidImage();
+      if (length < 20) return null;
       huffman = true;
     } else if (marker === 0xdd) {
-      if (length !== 4) invalidImage();
+      if (length !== 4) return null;
     } else if (marker === 0xda) {
       if (!frame || length < 8 || length !== 6 + bytes[offset + 2] * 2)
-        invalidImage();
+        return null;
       scan = true;
     } else if (!metadata) {
-      invalidImage();
+      return null;
     }
 
     if (!metadata) chunks.push(bytes.subarray(start, end));
@@ -139,8 +163,8 @@ function validateJpegAndStripMetadata(bytes: Buffer): Buffer {
       }
       break;
     }
-    if (offset === scanStart || offset >= bytes.length) invalidImage();
+    if (offset === scanStart || offset >= bytes.length) return null;
     chunks.push(bytes.subarray(scanStart, offset));
   }
-  invalidImage();
+  return null;
 }

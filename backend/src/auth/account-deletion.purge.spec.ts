@@ -83,6 +83,9 @@ const EXEMPT: Record<string, string> = {
   operator_audit_logs: 'refused',
   // ON DELETE CASCADE from push_notifications (and SET NULL from devices).
   push_deliveries: 'cascade',
+  // Kept for the cleanup worker: prepareCommunityAccountDeletion links the
+  // member's upload leases to the receipt and clears user_id before the purge.
+  community_photo_cleanups: 'adopted',
 };
 
 describe('account deletion purge plan', () => {

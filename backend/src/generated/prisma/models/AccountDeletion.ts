@@ -195,6 +195,7 @@ export type AccountDeletionWhereInput = {
   deletedAt?: Prisma.DateTimeFilter<"AccountDeletion"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"AccountDeletion"> | Date | string | null
   profileImageCleanups?: Prisma.ProfileImageCleanupListRelationFilter
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupListRelationFilter
 }
 
 export type AccountDeletionOrderByWithRelationInput = {
@@ -205,6 +206,7 @@ export type AccountDeletionOrderByWithRelationInput = {
   deletedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   profileImageCleanups?: Prisma.ProfileImageCleanupOrderByRelationAggregateInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupOrderByRelationAggregateInput
 }
 
 export type AccountDeletionWhereUniqueInput = Prisma.AtLeast<{
@@ -218,6 +220,7 @@ export type AccountDeletionWhereUniqueInput = Prisma.AtLeast<{
   deletedAt?: Prisma.DateTimeFilter<"AccountDeletion"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"AccountDeletion"> | Date | string | null
   profileImageCleanups?: Prisma.ProfileImageCleanupListRelationFilter
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupListRelationFilter
 }, "id" | "requestKeyHash">
 
 export type AccountDeletionOrderByWithAggregationInput = {
@@ -252,6 +255,7 @@ export type AccountDeletionCreateInput = {
   deletedAt: Date | string
   completedAt?: Date | string | null
   profileImageCleanups?: Prisma.ProfileImageCleanupCreateNestedManyWithoutAccountDeletionInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutAccountDeletionInput
 }
 
 export type AccountDeletionUncheckedCreateInput = {
@@ -262,6 +266,7 @@ export type AccountDeletionUncheckedCreateInput = {
   deletedAt: Date | string
   completedAt?: Date | string | null
   profileImageCleanups?: Prisma.ProfileImageCleanupUncheckedCreateNestedManyWithoutAccountDeletionInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutAccountDeletionInput
 }
 
 export type AccountDeletionUpdateInput = {
@@ -272,6 +277,7 @@ export type AccountDeletionUpdateInput = {
   deletedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   profileImageCleanups?: Prisma.ProfileImageCleanupUpdateManyWithoutAccountDeletionNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutAccountDeletionNestedInput
 }
 
 export type AccountDeletionUncheckedUpdateInput = {
@@ -282,6 +288,7 @@ export type AccountDeletionUncheckedUpdateInput = {
   deletedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   profileImageCleanups?: Prisma.ProfileImageCleanupUncheckedUpdateManyWithoutAccountDeletionNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutAccountDeletionNestedInput
 }
 
 export type AccountDeletionCreateManyInput = {
@@ -367,6 +374,22 @@ export type AccountDeletionUpdateOneWithoutProfileImageCleanupsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AccountDeletionUpdateToOneWithWhereWithoutProfileImageCleanupsInput, Prisma.AccountDeletionUpdateWithoutProfileImageCleanupsInput>, Prisma.AccountDeletionUncheckedUpdateWithoutProfileImageCleanupsInput>
 }
 
+export type AccountDeletionCreateNestedOneWithoutCommunityPhotoCleanupsInput = {
+  create?: Prisma.XOR<Prisma.AccountDeletionCreateWithoutCommunityPhotoCleanupsInput, Prisma.AccountDeletionUncheckedCreateWithoutCommunityPhotoCleanupsInput>
+  connectOrCreate?: Prisma.AccountDeletionCreateOrConnectWithoutCommunityPhotoCleanupsInput
+  connect?: Prisma.AccountDeletionWhereUniqueInput
+}
+
+export type AccountDeletionUpdateOneWithoutCommunityPhotoCleanupsNestedInput = {
+  create?: Prisma.XOR<Prisma.AccountDeletionCreateWithoutCommunityPhotoCleanupsInput, Prisma.AccountDeletionUncheckedCreateWithoutCommunityPhotoCleanupsInput>
+  connectOrCreate?: Prisma.AccountDeletionCreateOrConnectWithoutCommunityPhotoCleanupsInput
+  upsert?: Prisma.AccountDeletionUpsertWithoutCommunityPhotoCleanupsInput
+  disconnect?: Prisma.AccountDeletionWhereInput | boolean
+  delete?: Prisma.AccountDeletionWhereInput | boolean
+  connect?: Prisma.AccountDeletionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AccountDeletionUpdateToOneWithWhereWithoutCommunityPhotoCleanupsInput, Prisma.AccountDeletionUpdateWithoutCommunityPhotoCleanupsInput>, Prisma.AccountDeletionUncheckedUpdateWithoutCommunityPhotoCleanupsInput>
+}
+
 export type AccountDeletionCreateWithoutProfileImageCleanupsInput = {
   id?: string
   requestKeyHash: string
@@ -374,6 +397,7 @@ export type AccountDeletionCreateWithoutProfileImageCleanupsInput = {
   status: $Enums.AccountDeletionStatus
   deletedAt: Date | string
   completedAt?: Date | string | null
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutAccountDeletionInput
 }
 
 export type AccountDeletionUncheckedCreateWithoutProfileImageCleanupsInput = {
@@ -383,6 +407,7 @@ export type AccountDeletionUncheckedCreateWithoutProfileImageCleanupsInput = {
   status: $Enums.AccountDeletionStatus
   deletedAt: Date | string
   completedAt?: Date | string | null
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutAccountDeletionInput
 }
 
 export type AccountDeletionCreateOrConnectWithoutProfileImageCleanupsInput = {
@@ -408,6 +433,7 @@ export type AccountDeletionUpdateWithoutProfileImageCleanupsInput = {
   status?: Prisma.EnumAccountDeletionStatusFieldUpdateOperationsInput | $Enums.AccountDeletionStatus
   deletedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutAccountDeletionNestedInput
 }
 
 export type AccountDeletionUncheckedUpdateWithoutProfileImageCleanupsInput = {
@@ -417,6 +443,63 @@ export type AccountDeletionUncheckedUpdateWithoutProfileImageCleanupsInput = {
   status?: Prisma.EnumAccountDeletionStatusFieldUpdateOperationsInput | $Enums.AccountDeletionStatus
   deletedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutAccountDeletionNestedInput
+}
+
+export type AccountDeletionCreateWithoutCommunityPhotoCleanupsInput = {
+  id?: string
+  requestKeyHash: string
+  channel: $Enums.AccountDeletionChannel
+  status: $Enums.AccountDeletionStatus
+  deletedAt: Date | string
+  completedAt?: Date | string | null
+  profileImageCleanups?: Prisma.ProfileImageCleanupCreateNestedManyWithoutAccountDeletionInput
+}
+
+export type AccountDeletionUncheckedCreateWithoutCommunityPhotoCleanupsInput = {
+  id?: string
+  requestKeyHash: string
+  channel: $Enums.AccountDeletionChannel
+  status: $Enums.AccountDeletionStatus
+  deletedAt: Date | string
+  completedAt?: Date | string | null
+  profileImageCleanups?: Prisma.ProfileImageCleanupUncheckedCreateNestedManyWithoutAccountDeletionInput
+}
+
+export type AccountDeletionCreateOrConnectWithoutCommunityPhotoCleanupsInput = {
+  where: Prisma.AccountDeletionWhereUniqueInput
+  create: Prisma.XOR<Prisma.AccountDeletionCreateWithoutCommunityPhotoCleanupsInput, Prisma.AccountDeletionUncheckedCreateWithoutCommunityPhotoCleanupsInput>
+}
+
+export type AccountDeletionUpsertWithoutCommunityPhotoCleanupsInput = {
+  update: Prisma.XOR<Prisma.AccountDeletionUpdateWithoutCommunityPhotoCleanupsInput, Prisma.AccountDeletionUncheckedUpdateWithoutCommunityPhotoCleanupsInput>
+  create: Prisma.XOR<Prisma.AccountDeletionCreateWithoutCommunityPhotoCleanupsInput, Prisma.AccountDeletionUncheckedCreateWithoutCommunityPhotoCleanupsInput>
+  where?: Prisma.AccountDeletionWhereInput
+}
+
+export type AccountDeletionUpdateToOneWithWhereWithoutCommunityPhotoCleanupsInput = {
+  where?: Prisma.AccountDeletionWhereInput
+  data: Prisma.XOR<Prisma.AccountDeletionUpdateWithoutCommunityPhotoCleanupsInput, Prisma.AccountDeletionUncheckedUpdateWithoutCommunityPhotoCleanupsInput>
+}
+
+export type AccountDeletionUpdateWithoutCommunityPhotoCleanupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  requestKeyHash?: Prisma.StringFieldUpdateOperationsInput | string
+  channel?: Prisma.EnumAccountDeletionChannelFieldUpdateOperationsInput | $Enums.AccountDeletionChannel
+  status?: Prisma.EnumAccountDeletionStatusFieldUpdateOperationsInput | $Enums.AccountDeletionStatus
+  deletedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  profileImageCleanups?: Prisma.ProfileImageCleanupUpdateManyWithoutAccountDeletionNestedInput
+}
+
+export type AccountDeletionUncheckedUpdateWithoutCommunityPhotoCleanupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  requestKeyHash?: Prisma.StringFieldUpdateOperationsInput | string
+  channel?: Prisma.EnumAccountDeletionChannelFieldUpdateOperationsInput | $Enums.AccountDeletionChannel
+  status?: Prisma.EnumAccountDeletionStatusFieldUpdateOperationsInput | $Enums.AccountDeletionStatus
+  deletedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  profileImageCleanups?: Prisma.ProfileImageCleanupUncheckedUpdateManyWithoutAccountDeletionNestedInput
 }
 
 
@@ -426,10 +509,12 @@ export type AccountDeletionUncheckedUpdateWithoutProfileImageCleanupsInput = {
 
 export type AccountDeletionCountOutputType = {
   profileImageCleanups: number
+  communityPhotoCleanups: number
 }
 
 export type AccountDeletionCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   profileImageCleanups?: boolean | AccountDeletionCountOutputTypeCountProfileImageCleanupsArgs
+  communityPhotoCleanups?: boolean | AccountDeletionCountOutputTypeCountCommunityPhotoCleanupsArgs
 }
 
 /**
@@ -449,6 +534,13 @@ export type AccountDeletionCountOutputTypeCountProfileImageCleanupsArgs<ExtArgs 
   where?: Prisma.ProfileImageCleanupWhereInput
 }
 
+/**
+ * AccountDeletionCountOutputType without action
+ */
+export type AccountDeletionCountOutputTypeCountCommunityPhotoCleanupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityPhotoCleanupWhereInput
+}
+
 
 export type AccountDeletionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -458,6 +550,7 @@ export type AccountDeletionSelect<ExtArgs extends runtime.Types.Extensions.Inter
   deletedAt?: boolean
   completedAt?: boolean
   profileImageCleanups?: boolean | Prisma.AccountDeletion$profileImageCleanupsArgs<ExtArgs>
+  communityPhotoCleanups?: boolean | Prisma.AccountDeletion$communityPhotoCleanupsArgs<ExtArgs>
   _count?: boolean | Prisma.AccountDeletionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["accountDeletion"]>
 
@@ -491,6 +584,7 @@ export type AccountDeletionSelectScalar = {
 export type AccountDeletionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "requestKeyHash" | "channel" | "status" | "deletedAt" | "completedAt", ExtArgs["result"]["accountDeletion"]>
 export type AccountDeletionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   profileImageCleanups?: boolean | Prisma.AccountDeletion$profileImageCleanupsArgs<ExtArgs>
+  communityPhotoCleanups?: boolean | Prisma.AccountDeletion$communityPhotoCleanupsArgs<ExtArgs>
   _count?: boolean | Prisma.AccountDeletionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AccountDeletionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -500,6 +594,7 @@ export type $AccountDeletionPayload<ExtArgs extends runtime.Types.Extensions.Int
   name: "AccountDeletion"
   objects: {
     profileImageCleanups: Prisma.$ProfileImageCleanupPayload<ExtArgs>[]
+    communityPhotoCleanups: Prisma.$CommunityPhotoCleanupPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -906,6 +1001,7 @@ readonly fields: AccountDeletionFieldRefs;
 export interface Prisma__AccountDeletionClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   profileImageCleanups<T extends Prisma.AccountDeletion$profileImageCleanupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AccountDeletion$profileImageCleanupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProfileImageCleanupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityPhotoCleanups<T extends Prisma.AccountDeletion$communityPhotoCleanupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AccountDeletion$communityPhotoCleanupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityPhotoCleanupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1355,6 +1451,30 @@ export type AccountDeletion$profileImageCleanupsArgs<ExtArgs extends runtime.Typ
   take?: number
   skip?: number
   distinct?: Prisma.ProfileImageCleanupScalarFieldEnum | Prisma.ProfileImageCleanupScalarFieldEnum[]
+}
+
+/**
+ * AccountDeletion.communityPhotoCleanups
+ */
+export type AccountDeletion$communityPhotoCleanupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityPhotoCleanup
+   */
+  select?: Prisma.CommunityPhotoCleanupSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityPhotoCleanup
+   */
+  omit?: Prisma.CommunityPhotoCleanupOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityPhotoCleanupInclude<ExtArgs> | null
+  where?: Prisma.CommunityPhotoCleanupWhereInput
+  orderBy?: Prisma.CommunityPhotoCleanupOrderByWithRelationInput | Prisma.CommunityPhotoCleanupOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityPhotoCleanupWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityPhotoCleanupScalarFieldEnum | Prisma.CommunityPhotoCleanupScalarFieldEnum[]
 }
 
 /**

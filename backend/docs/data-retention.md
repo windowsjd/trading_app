@@ -13,12 +13,20 @@
 | 시즌 최종 결과 푸시 기록 | `push_notifications` (`season_final_result`) | `created_at` | 30일 | — | 같은 prune, 2026-10-21부터 면제 없음 ([push 계약](push-notifications-contract.md) §2.6) |
 | 이메일 인증 기록 | `email_auth_challenges`, `email_auth_rate_buckets` | 코드·증명 만료 | 만료 24시간 후 | — | `EmailAuthCleanupService` (기존) |
 | 푸시 토큰·프로필 이미지·회원 정보 | 회원 관련 표 | 탈퇴 | 탈퇴 시 삭제 | — | [회원탈퇴 계약](account-deletion-contract.md) (기존) |
+| 커뮤니티: 작성자가 지운 글 | `community_posts`와 그 아래(댓글·좋아요·신고·익명 번호·사진 행) | `deleted_at` | 30일 | `community.policy.ts` 상수 | `DataRetentionCleanupService` (2026-11-07) |
+| 커뮤니티: 운영자가 지운 글 | 〃 | `deleted_at` | 1년 | 〃 | 〃 |
+| 커뮤니티: 지운 댓글(작성자 30일 / 운영자 1년) | `community_comments`의 본문·메모·작성자 연결 (+ 그 댓글의 좋아요·신고) | `deleted_at` | 30일 / 1년 | 〃 | 〃 (행은 답글 구조를 위해 빈 자리로 남고 `erased_at` 표시) |
+| 커뮤니티 신고 | `community_reports` | `created_at` | 1년 | 〃 | 〃 |
+| 커뮤니티 제재 승계 기록(이메일 해시) | `community_sanction_carryovers` | `expires_at` | 기간제 = 제재 종료 시각, 영구 = 탈퇴 후 3년 | 〃 | 〃 |
+| 커뮤니티 사진 객체(지운 글·탈퇴) | 저장소 `community-images/` | 삭제 시각 | 즉시 삭제 요청 | — | `CommunityPhotoCleanupWorker` |
 | 서버 오류 로그 | 호스팅(Render) | — | 30일 이내 | 호스팅 설정 | 코드 아님 |
 
 - 아직 유효한 세션(만료 전·미폐기)은 종료 시각이 미래이므로 절대 삭제되지 않는다.
 - **미답변 문의는 접수일 기준 3년**이다(결정 확인 필요: 기본 가정).
 - 감사로그는 법정 최소 1년 미만으로 설정할 수 없다(365 미만은 서버 시작 거부). 회원이 5만 명에 가까워지면 730으로 올린다.
 - 설정값은 엄격한 10진 정수만 받는다. 잘못된 값은 서버 시작을 거부하며(`common/env-validation.ts`), 오류에는 변수 이름과 범위만 나온다. `DATA_RETENTION_CLEANUP_ENABLED`(기본 `true`, 정확히 `true`/`false`)는 비상 정지 스위치다. **운영 환경변수는 설정하지 않아도 위 기본값으로 동작한다.**
+
+커뮤니티 보존기간 근거와 나머지 항목(보이는 글·댓글, 제재 기록, 이용규칙 동의는 회원 탈퇴 시까지, 탈퇴 회원이 남긴 다른 회원 글의 댓글은 '탈퇴계정'으로 남음)은 [커뮤니티 계약](community-api-contract.md) §12–§13. 기간은 환경변수가 아니라 코드 상수다. 기능이 새로 생겼으므로 첫 배포 때 파기할 과거 행은 없다.
 
 ## 2. 실행 방식
 
@@ -27,7 +35,8 @@
 - 표마다 최대 500행, `FOR UPDATE SKIP LOCKED` 후보 CTE + 고정 SQL(동적 표 이름·사용자 입력 없음). 기간은 설정값 파라미터, 기준 시각은 그 트랜잭션의 DB 시각(UTC)이다.
 - 한 실행에서 어느 표든 배치가 가득 차면 최대 10배치까지 이어서 돌리고, 그래도 가득 차면 다음 실행을 **1분 뒤**로 잡는다(밀린 데이터 해소). 그렇지 않으면 1시간 뒤.
 - 문의: 같은 트랜잭션에서 배치의 문의 id를 잡고(문의 행 잠금) **답변을 먼저, 그다음 문의를** 지운다(두 FK 모두 RESTRICT).
-- 진단 로그는 고정 이벤트와 건수만: `data_retention_completed {sessions, auditLogs, inquiries}`, 실패는 `data_retention_failed`. ID·IP·내용은 남기지 않는다. 실패한 배치는 롤백되고(앞서 커밋된 배치는 삭제된 상태로 남음) 다음 1분 tick이 다시 시도한다.
+- 커뮤니티(같은 트랜잭션·잠금·시계): 만료 승계 기록 삭제 → 기간이 지난 지운 글의 하위 전부와 글 삭제(좋아요·신고·번호·사진 행·댓글 → 글) → 기간이 지난 지운 댓글의 좋아요·신고 삭제 후 본문·메모·작성자 연결 파기 → 1년 지난 신고 삭제. 단계마다 최대 500 후보, `FOR UPDATE SKIP LOCKED`.
+- 진단 로그는 고정 이벤트와 건수만: `data_retention_completed {sessions, auditLogs, inquiries, communityPosts, communityComments, communityReports, sanctionCarryovers}`, 실패는 `data_retention_failed`. ID·IP·내용은 남기지 않는다. 실패한 배치는 롤백되고(앞서 커밋된 배치는 삭제된 상태로 남음) 다음 1분 tick이 다시 시도한다.
 
 ## 3. 참조·업무 로직 확인 (2026-10-21)
 

@@ -31,6 +31,31 @@ export async function databaseNow(
   return new Date(Number(row.epochMs));
 }
 
+/** A receipt waits on every managed object it links: profile photos and
+ * community photos (docs/community-api-contract.md §12). */
+const NOTHING_LEFT_TO_REMOVE = {
+  profileImageCleanups: { none: {} },
+  communityPhotoCleanups: { none: {} },
+} satisfies Prisma.AccountDeletionWhereInput;
+
+/** `completed` once no linked object of the deletion is left; idempotent.
+ * Shared by the profile and community photo cleanups. */
+export async function settleAccountDeletionReceipt(
+  client: Pick<PrismaService, 'accountDeletion' | '$queryRaw'>,
+  accountDeletionId: string,
+): Promise<boolean> {
+  const now = await databaseNow(client);
+  const { count } = await client.accountDeletion.updateMany({
+    where: {
+      id: accountDeletionId,
+      status: 'cleanup_pending',
+      ...NOTHING_LEFT_TO_REMOVE,
+    },
+    data: { status: 'completed', completedAt: now },
+  });
+  return count === 1;
+}
+
 export type ProfileImageCleanupRun = {
   due: number;
   removed: number;
@@ -158,16 +183,7 @@ export class ProfileImageCleanupService {
 
   /** `completed` once no object of the deletion is left; idempotent. */
   async settle(accountDeletionId: string): Promise<boolean> {
-    const now = await databaseNow(this.prisma);
-    const { count } = await this.prisma.accountDeletion.updateMany({
-      where: {
-        id: accountDeletionId,
-        status: 'cleanup_pending',
-        profileImageCleanups: { none: {} },
-      },
-      data: { status: 'completed', completedAt: now },
-    });
-    return count === 1;
+    return settleAccountDeletionReceipt(this.prisma, accountDeletionId);
   }
 
   /** Right after a deletion commits: its due objects, then its status. */
@@ -218,7 +234,7 @@ export class ProfileImageCleanupService {
     // A receipt whose last object was removed by a path that could not
     // settle it (e.g. a crash between the delete and the settle).
     const unsettled = await this.prisma.accountDeletion.findMany({
-      where: { status: 'cleanup_pending', profileImageCleanups: { none: {} } },
+      where: { status: 'cleanup_pending', ...NOTHING_LEFT_TO_REMOVE },
       select: { id: true },
       take: 100,
     });

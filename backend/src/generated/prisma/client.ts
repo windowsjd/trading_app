@@ -501,3 +501,99 @@ export type AccountDeletion = Prisma.AccountDeletionModel
  * succeeds. accountDeletionId links the objects an account deletion waits on.
  */
 export type ProfileImageCleanup = Prisma.ProfileImageCleanupModel
+/**
+ * Model CommunityPost
+ * A community post. Never edited: only author deletion or operator removal
+ * (deletedAt + deletionKind; the body is kept) and hiding by an operator
+ * sanction (hiddenBySanctionId, cleared only by revoking that sanction)
+ * change it. Visible = deletedAt IS NULL AND hiddenBySanctionId IS NULL.
+ * Body: trimmed, 1-500 code points, not blank (SQL CHECK); the deletion
+ * columns are consistent per deletionKind (SQL CHECK).
+ */
+export type CommunityPost = Prisma.CommunityPostModel
+/**
+ * Model CommunityPostPhoto
+ * One photo of a post, positions 0-3. objectKey is
+ * community-images/{random uuid v4}.jpg: neither the member nor the post is
+ * in the key or the public URL. The bytes were validated and stripped of
+ * metadata by the server; sha256 (of the stored bytes) lets an idempotent
+ * replay recognise the same photos. Kept when the post is deleted (the
+ * object itself is then removed through community_photo_cleanups).
+ */
+export type CommunityPostPhoto = Prisma.CommunityPostPhotoModel
+/**
+ * Model CommunityComment
+ * A comment, or a one-level reply (parentCommentId = a top-level comment of
+ * the same post; the composite key enforces the same post, the service the
+ * single level). Same deletion/hiding columns and CHECKs as posts; a
+ * deleted or hidden comment keeps its place as a placeholder. userId NULL:
+ * the author deleted their account (shown as 탈퇴계정, body kept).
+ * erasedAt: a deleted comment past its retention lost its body, note and
+ * author link (the placeholder stays for the replies under it).
+ */
+export type CommunityComment = Prisma.CommunityCommentModel
+/**
+ * Model CommunityPostLike
+ * One member's like of a post (never the author's own: the service refuses).
+ */
+export type CommunityPostLike = Prisma.CommunityPostLikeModel
+/**
+ * Model CommunityCommentLike
+ * One member's like of a comment (never the author's own).
+ */
+export type CommunityCommentLike = Prisma.CommunityCommentLikeModel
+/**
+ * Model CommunityPostAlias
+ * Per-post anonymous commenter numbers (익명1, 익명2 … in the order of each
+ * member's first anonymous comment on the post; the anonymous post's own
+ * author has none). Assigned under the post row lock; both unique keys
+ * make a shared or reused number impossible.
+ */
+export type CommunityPostAlias = Prisma.CommunityPostAliasModel
+/**
+ * Model CommunityReport
+ * A member's report of exactly one post or one comment (SQL CHECK), at most
+ * one per reporter and target. Counts are returned to operators only.
+ */
+export type CommunityReport = Prisma.CommunityReportModel
+/**
+ * Model CommunitySanction
+ * A community-only restriction of one member, separate from users.status:
+ * community writes are refused while it is active (revokedAt IS NULL AND
+ * (endsAt IS NULL OR endsAt > now)); reads and trading are unaffected. With
+ * hideContent the member's visible posts and comments were pointed here at
+ * creation; revoking restores exactly those, expiry restores nothing. At
+ * most one active per member (checked under the member's users row lock).
+ * carriedOver: re-created at signup from community_sanction_carryovers (the
+ * same email's sanction ongoing at its account deletion); no operator.
+ */
+export type CommunitySanction = Prisma.CommunitySanctionModel
+/**
+ * Model CommunitySanctionCarryover
+ * A sanction that was ongoing when its member deleted their account, kept so
+ * that signing up again with the same email re-applies it (2026-11-07
+ * decision). Deliberately NOT linked to users: the member row is gone; the
+ * only handle is emailHash = SHA-256 of "community-sanction:" + the
+ * normalized email. Consumed (deleted) at that signup; otherwise deleted by
+ * data retention at expiresAt (endsAt, or the deletion + 3 years when
+ * permanent).
+ */
+export type CommunitySanctionCarryover = Prisma.CommunitySanctionCarryoverModel
+/**
+ * Model CommunityRuleConsent
+ * The member's acceptance of the community rules. Community writes require
+ * rulesVersion = the server's COMMUNITY_RULES_VERSION; reads do not.
+ * Independent of the signup terms (users.terms_version).
+ */
+export type CommunityRuleConsent = Prisma.CommunityRuleConsentModel
+/**
+ * Model CommunityPhotoCleanup
+ * Durable removal of one community photo object, the profile-image lease
+ * pattern: an upload reserves its key before the storage write (userId =
+ * uploader, nextAttemptAt = lease end) and the post transaction deletes the
+ * row; photos of a deleted post and of a deleted member are enqueued due at
+ * once. The cleanup worker retries with backoff until the storage delete
+ * succeeds. accountDeletionId links the objects an account deletion receipt
+ * waits on (the account deletion clears userId before the member row goes).
+ */
+export type CommunityPhotoCleanup = Prisma.CommunityPhotoCleanupModel

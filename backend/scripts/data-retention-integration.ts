@@ -203,7 +203,17 @@ async function run() {
   await inquiry('answered-1096', ago(2000), ago(1096));
 
   const result = await service.deleteBatch(config);
-  assert.deepEqual(result, { sessions: 5, auditLogs: 1, inquiries: 2 });
+  assert.deepEqual(result, {
+    sessions: 5,
+    auditLogs: 1,
+    inquiries: 2,
+    // Community steps run in the same batch (covered by the community
+    // integration); this fixture has no community rows.
+    communityPosts: 0,
+    communityComments: 0,
+    communityReports: 0,
+    sanctionCarryovers: 0,
+  });
   checks++;
   const sessions = await db.refreshTokenSession.findMany({
     where: { userId: member.id },

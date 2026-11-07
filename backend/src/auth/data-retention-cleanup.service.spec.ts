@@ -45,6 +45,8 @@ function harness(
       if (sql.startsWith('DELETE FROM inquiry_answers')) return 1;
       if (sql.startsWith('DELETE FROM inquiries'))
         return (values[0] as string[]).length;
+      // Community retention (no candidates selected in these cases).
+      if (/community_(sanction_carryovers|reports)/.test(sql)) return 0;
       throw new Error(`unexpected statement: ${sql}`);
     }),
     $queryRaw: respond((sql) => {
@@ -52,6 +54,7 @@ function harness(
         return [{ acquired: options.acquired ?? true }];
       if (sql.includes('FROM inquiries i'))
         return (inquiries.shift() ?? []).map((id) => ({ id }));
+      if (/^SELECT id FROM community_(posts|comments)/.test(sql)) return [];
       throw new Error(`unexpected query: ${sql}`);
     }),
   };
@@ -106,6 +109,10 @@ describe('DataRetentionCleanupService', () => {
       sessions: 0,
       auditLogs: 0,
       inquiries: 0,
+      communityPosts: 0,
+      communityComments: 0,
+      communityReports: 0,
+      sanctionCarryovers: 0,
     });
     const sql = statements.map((statement) => statement.sql);
     expect(sql[0]).toBe("SET LOCAL lock_timeout = '100ms'");
@@ -123,8 +130,23 @@ describe('DataRetentionCleanupService', () => {
     expect(sessions.values).toEqual([120, 120, DATA_RETENTION_BATCH, 120, 120]);
     expect(auditLogs.values).toEqual([400, DATA_RETENTION_BATCH, 400]);
     expect(inquiries.values).toEqual([2000, DATA_RETENTION_BATCH]);
-    // No inquiry selected: nothing else is deleted.
-    expect(statements).toHaveLength(6);
+    // Then the community steps, in the same transaction and lock: carryovers,
+    // deleted posts, deleted comments, reports — fixed statements whose
+    // periods and batch size are parameters.
+    const community = statements.slice(6).map((statement) => statement.sql);
+    expect(community).toHaveLength(4);
+    expect(community[0]).toContain('DELETE FROM community_sanction_carryovers');
+    expect(community[1]).toMatch(/^SELECT id FROM community_posts/);
+    expect(community[2]).toMatch(/^SELECT id FROM community_comments/);
+    expect(community[3]).toContain('DELETE FROM community_reports');
+    expect(
+      community.every((sql) => sql.includes('FOR UPDATE SKIP LOCKED')),
+    ).toBe(true);
+    expect(statements[7].values).toEqual([30, 365, DATA_RETENTION_BATCH]);
+    expect(statements[8].values).toEqual([30, 365, DATA_RETENTION_BATCH]);
+    expect(statements[9].values).toEqual([365, DATA_RETENTION_BATCH]);
+    // No inquiry, post or comment selected: nothing else is deleted.
+    expect(statements).toHaveLength(10);
   });
 
   it('deletes the answers of a batch before its inquiries', async () => {
@@ -181,6 +203,10 @@ describe('DataRetentionCleanupService', () => {
         sessions: 3,
         auditLogs: DATA_RETENTION_BATCH - 1,
         inquiries: 1,
+        communityPosts: 0,
+        communityComments: 0,
+        communityReports: 0,
+        sanctionCarryovers: 0,
       },
     ]);
     now += 3_599_999;
@@ -206,6 +232,10 @@ describe('DataRetentionCleanupService', () => {
       sessions: 0,
       auditLogs: DATA_RETENTION_BATCH * DATA_RETENTION_MAX_BATCHES,
       inquiries: 0,
+      communityPosts: 0,
+      communityComments: 0,
+      communityReports: 0,
+      sanctionCarryovers: 0,
     });
     now += 59_999;
     await service.runIfDue();

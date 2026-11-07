@@ -317,6 +317,19 @@ export type UserWhereInput = {
   pushDevices?: Prisma.PushDeviceListRelationFilter
   notificationPreference?: Prisma.XOR<Prisma.NotificationPreferenceNullableScalarRelationFilter, Prisma.NotificationPreferenceWhereInput> | null
   pushNotifications?: Prisma.PushNotificationListRelationFilter
+  communityPosts?: Prisma.CommunityPostListRelationFilter
+  communityPostsRemoved?: Prisma.CommunityPostListRelationFilter
+  communityComments?: Prisma.CommunityCommentListRelationFilter
+  communityCommentsRemoved?: Prisma.CommunityCommentListRelationFilter
+  communityPostLikes?: Prisma.CommunityPostLikeListRelationFilter
+  communityCommentLikes?: Prisma.CommunityCommentLikeListRelationFilter
+  communityPostAliases?: Prisma.CommunityPostAliasListRelationFilter
+  communityReports?: Prisma.CommunityReportListRelationFilter
+  communitySanctions?: Prisma.CommunitySanctionListRelationFilter
+  communitySanctionsCreated?: Prisma.CommunitySanctionListRelationFilter
+  communitySanctionsRevoked?: Prisma.CommunitySanctionListRelationFilter
+  communityRuleConsent?: Prisma.XOR<Prisma.CommunityRuleConsentNullableScalarRelationFilter, Prisma.CommunityRuleConsentWhereInput> | null
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -356,6 +369,19 @@ export type UserOrderByWithRelationInput = {
   pushDevices?: Prisma.PushDeviceOrderByRelationAggregateInput
   notificationPreference?: Prisma.NotificationPreferenceOrderByWithRelationInput
   pushNotifications?: Prisma.PushNotificationOrderByRelationAggregateInput
+  communityPosts?: Prisma.CommunityPostOrderByRelationAggregateInput
+  communityPostsRemoved?: Prisma.CommunityPostOrderByRelationAggregateInput
+  communityComments?: Prisma.CommunityCommentOrderByRelationAggregateInput
+  communityCommentsRemoved?: Prisma.CommunityCommentOrderByRelationAggregateInput
+  communityPostLikes?: Prisma.CommunityPostLikeOrderByRelationAggregateInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeOrderByRelationAggregateInput
+  communityPostAliases?: Prisma.CommunityPostAliasOrderByRelationAggregateInput
+  communityReports?: Prisma.CommunityReportOrderByRelationAggregateInput
+  communitySanctions?: Prisma.CommunitySanctionOrderByRelationAggregateInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionOrderByRelationAggregateInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionOrderByRelationAggregateInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentOrderByWithRelationInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -398,6 +424,19 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   pushDevices?: Prisma.PushDeviceListRelationFilter
   notificationPreference?: Prisma.XOR<Prisma.NotificationPreferenceNullableScalarRelationFilter, Prisma.NotificationPreferenceWhereInput> | null
   pushNotifications?: Prisma.PushNotificationListRelationFilter
+  communityPosts?: Prisma.CommunityPostListRelationFilter
+  communityPostsRemoved?: Prisma.CommunityPostListRelationFilter
+  communityComments?: Prisma.CommunityCommentListRelationFilter
+  communityCommentsRemoved?: Prisma.CommunityCommentListRelationFilter
+  communityPostLikes?: Prisma.CommunityPostLikeListRelationFilter
+  communityCommentLikes?: Prisma.CommunityCommentLikeListRelationFilter
+  communityPostAliases?: Prisma.CommunityPostAliasListRelationFilter
+  communityReports?: Prisma.CommunityReportListRelationFilter
+  communitySanctions?: Prisma.CommunitySanctionListRelationFilter
+  communitySanctionsCreated?: Prisma.CommunitySanctionListRelationFilter
+  communitySanctionsRevoked?: Prisma.CommunitySanctionListRelationFilter
+  communityRuleConsent?: Prisma.XOR<Prisma.CommunityRuleConsentNullableScalarRelationFilter, Prisma.CommunityRuleConsentWhereInput> | null
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupListRelationFilter
 }, "id" | "email" | "nickname">
 
 export type UserOrderByWithAggregationInput = {
@@ -481,6 +520,19 @@ export type UserCreateInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -520,6 +572,19 @@ export type UserUncheckedCreateInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -559,6 +624,19 @@ export type UserUpdateInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -598,6 +676,19 @@ export type UserUncheckedUpdateInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -1060,6 +1151,200 @@ export type UserUpdateOneRequiredWithoutPushNotificationsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutPushNotificationsInput, Prisma.UserUpdateWithoutPushNotificationsInput>, Prisma.UserUncheckedUpdateWithoutPushNotificationsInput>
 }
 
+export type UserCreateNestedOneWithoutCommunityPostsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsInput, Prisma.UserUncheckedCreateWithoutCommunityPostsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutCommunityPostsRemovedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsRemovedInput, Prisma.UserUncheckedCreateWithoutCommunityPostsRemovedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostsRemovedInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutCommunityPostsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsInput, Prisma.UserUncheckedCreateWithoutCommunityPostsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostsInput
+  upsert?: Prisma.UserUpsertWithoutCommunityPostsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityPostsInput, Prisma.UserUpdateWithoutCommunityPostsInput>, Prisma.UserUncheckedUpdateWithoutCommunityPostsInput>
+}
+
+export type UserUpdateOneWithoutCommunityPostsRemovedNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsRemovedInput, Prisma.UserUncheckedCreateWithoutCommunityPostsRemovedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostsRemovedInput
+  upsert?: Prisma.UserUpsertWithoutCommunityPostsRemovedInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityPostsRemovedInput, Prisma.UserUpdateWithoutCommunityPostsRemovedInput>, Prisma.UserUncheckedUpdateWithoutCommunityPostsRemovedInput>
+}
+
+export type UserCreateNestedOneWithoutCommunityCommentsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentsInput, Prisma.UserUncheckedCreateWithoutCommunityCommentsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityCommentsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutCommunityCommentsRemovedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentsRemovedInput, Prisma.UserUncheckedCreateWithoutCommunityCommentsRemovedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityCommentsRemovedInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutCommunityCommentsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentsInput, Prisma.UserUncheckedCreateWithoutCommunityCommentsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityCommentsInput
+  upsert?: Prisma.UserUpsertWithoutCommunityCommentsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityCommentsInput, Prisma.UserUpdateWithoutCommunityCommentsInput>, Prisma.UserUncheckedUpdateWithoutCommunityCommentsInput>
+}
+
+export type UserUpdateOneWithoutCommunityCommentsRemovedNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentsRemovedInput, Prisma.UserUncheckedCreateWithoutCommunityCommentsRemovedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityCommentsRemovedInput
+  upsert?: Prisma.UserUpsertWithoutCommunityCommentsRemovedInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityCommentsRemovedInput, Prisma.UserUpdateWithoutCommunityCommentsRemovedInput>, Prisma.UserUncheckedUpdateWithoutCommunityCommentsRemovedInput>
+}
+
+export type UserCreateNestedOneWithoutCommunityPostLikesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostLikesInput, Prisma.UserUncheckedCreateWithoutCommunityPostLikesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostLikesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutCommunityPostLikesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostLikesInput, Prisma.UserUncheckedCreateWithoutCommunityPostLikesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostLikesInput
+  upsert?: Prisma.UserUpsertWithoutCommunityPostLikesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityPostLikesInput, Prisma.UserUpdateWithoutCommunityPostLikesInput>, Prisma.UserUncheckedUpdateWithoutCommunityPostLikesInput>
+}
+
+export type UserCreateNestedOneWithoutCommunityCommentLikesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentLikesInput, Prisma.UserUncheckedCreateWithoutCommunityCommentLikesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityCommentLikesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutCommunityCommentLikesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentLikesInput, Prisma.UserUncheckedCreateWithoutCommunityCommentLikesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityCommentLikesInput
+  upsert?: Prisma.UserUpsertWithoutCommunityCommentLikesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityCommentLikesInput, Prisma.UserUpdateWithoutCommunityCommentLikesInput>, Prisma.UserUncheckedUpdateWithoutCommunityCommentLikesInput>
+}
+
+export type UserCreateNestedOneWithoutCommunityPostAliasesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostAliasesInput, Prisma.UserUncheckedCreateWithoutCommunityPostAliasesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostAliasesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutCommunityPostAliasesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostAliasesInput, Prisma.UserUncheckedCreateWithoutCommunityPostAliasesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostAliasesInput
+  upsert?: Prisma.UserUpsertWithoutCommunityPostAliasesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityPostAliasesInput, Prisma.UserUpdateWithoutCommunityPostAliasesInput>, Prisma.UserUncheckedUpdateWithoutCommunityPostAliasesInput>
+}
+
+export type UserCreateNestedOneWithoutCommunityReportsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityReportsInput, Prisma.UserUncheckedCreateWithoutCommunityReportsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityReportsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutCommunityReportsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityReportsInput, Prisma.UserUncheckedCreateWithoutCommunityReportsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityReportsInput
+  upsert?: Prisma.UserUpsertWithoutCommunityReportsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityReportsInput, Prisma.UserUpdateWithoutCommunityReportsInput>, Prisma.UserUncheckedUpdateWithoutCommunityReportsInput>
+}
+
+export type UserCreateNestedOneWithoutCommunitySanctionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunitySanctionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutCommunitySanctionsCreatedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsCreatedInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsCreatedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunitySanctionsCreatedInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutCommunitySanctionsRevokedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsRevokedInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsRevokedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunitySanctionsRevokedInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutCommunitySanctionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunitySanctionsInput
+  upsert?: Prisma.UserUpsertWithoutCommunitySanctionsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunitySanctionsInput, Prisma.UserUpdateWithoutCommunitySanctionsInput>, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsInput>
+}
+
+export type UserUpdateOneWithoutCommunitySanctionsCreatedNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsCreatedInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsCreatedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunitySanctionsCreatedInput
+  upsert?: Prisma.UserUpsertWithoutCommunitySanctionsCreatedInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunitySanctionsCreatedInput, Prisma.UserUpdateWithoutCommunitySanctionsCreatedInput>, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput>
+}
+
+export type UserUpdateOneWithoutCommunitySanctionsRevokedNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsRevokedInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsRevokedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunitySanctionsRevokedInput
+  upsert?: Prisma.UserUpsertWithoutCommunitySanctionsRevokedInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunitySanctionsRevokedInput, Prisma.UserUpdateWithoutCommunitySanctionsRevokedInput>, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput>
+}
+
+export type UserCreateNestedOneWithoutCommunityRuleConsentInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityRuleConsentInput, Prisma.UserUncheckedCreateWithoutCommunityRuleConsentInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityRuleConsentInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutCommunityRuleConsentNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityRuleConsentInput, Prisma.UserUncheckedCreateWithoutCommunityRuleConsentInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityRuleConsentInput
+  upsert?: Prisma.UserUpsertWithoutCommunityRuleConsentInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityRuleConsentInput, Prisma.UserUpdateWithoutCommunityRuleConsentInput>, Prisma.UserUncheckedUpdateWithoutCommunityRuleConsentInput>
+}
+
+export type UserCreateNestedOneWithoutCommunityPhotoCleanupsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPhotoCleanupsInput, Prisma.UserUncheckedCreateWithoutCommunityPhotoCleanupsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPhotoCleanupsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutCommunityPhotoCleanupsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPhotoCleanupsInput, Prisma.UserUncheckedCreateWithoutCommunityPhotoCleanupsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPhotoCleanupsInput
+  upsert?: Prisma.UserUpsertWithoutCommunityPhotoCleanupsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutCommunityPhotoCleanupsInput, Prisma.UserUpdateWithoutCommunityPhotoCleanupsInput>, Prisma.UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput>
+}
+
 export type UserCreateWithoutInquiriesInput = {
   id?: string
   email: string
@@ -1096,6 +1381,19 @@ export type UserCreateWithoutInquiriesInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutInquiriesInput = {
@@ -1134,6 +1432,19 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutInquiriesInput = {
@@ -1188,6 +1499,19 @@ export type UserUpdateWithoutInquiriesInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutInquiriesInput = {
@@ -1226,6 +1550,19 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutInquiryAnswersInput = {
@@ -1264,6 +1601,19 @@ export type UserCreateWithoutInquiryAnswersInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutInquiryAnswersInput = {
@@ -1302,6 +1652,19 @@ export type UserUncheckedCreateWithoutInquiryAnswersInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutInquiryAnswersInput = {
@@ -1356,6 +1719,19 @@ export type UserUpdateWithoutInquiryAnswersInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
@@ -1394,6 +1770,19 @@ export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFriendshipsLowInput = {
@@ -1432,6 +1821,19 @@ export type UserCreateWithoutFriendshipsLowInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFriendshipsLowInput = {
@@ -1470,6 +1872,19 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFriendshipsLowInput = {
@@ -1513,6 +1928,19 @@ export type UserCreateWithoutFriendshipsHighInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFriendshipsHighInput = {
@@ -1551,6 +1979,19 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFriendshipsHighInput = {
@@ -1605,6 +2046,19 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
@@ -1643,6 +2097,19 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutFriendshipsHighInput = {
@@ -1692,6 +2159,19 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
@@ -1730,6 +2210,19 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutOperatorAuditLogsInput = {
@@ -1768,6 +2261,19 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
@@ -1806,6 +2312,19 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutOperatorAuditLogsInput = {
@@ -1860,6 +2379,19 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
@@ -1898,6 +2430,19 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRefreshTokenSessionsInput = {
@@ -1936,6 +2481,19 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
@@ -1974,6 +2532,19 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRefreshTokenSessionsInput = {
@@ -2028,6 +2599,19 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
@@ -2066,6 +2650,19 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTradingAccountsInput = {
@@ -2104,6 +2701,19 @@ export type UserCreateWithoutTradingAccountsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTradingAccountsInput = {
@@ -2142,6 +2752,19 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTradingAccountsInput = {
@@ -2196,6 +2819,19 @@ export type UserUpdateWithoutTradingAccountsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTradingAccountsInput = {
@@ -2234,6 +2870,19 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSeasonParticipantsInput = {
@@ -2272,6 +2921,19 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
@@ -2310,6 +2972,19 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonParticipantsInput = {
@@ -2364,6 +3039,19 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
@@ -2402,6 +3090,19 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutUserBadgesInput = {
@@ -2440,6 +3141,19 @@ export type UserCreateWithoutUserBadgesInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutUserBadgesInput = {
@@ -2478,6 +3192,19 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutUserBadgesInput = {
@@ -2532,6 +3259,19 @@ export type UserUpdateWithoutUserBadgesInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutUserBadgesInput = {
@@ -2570,6 +3310,19 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSeasonRewardsInput = {
@@ -2608,6 +3361,19 @@ export type UserCreateWithoutSeasonRewardsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonRewardsInput = {
@@ -2646,6 +3412,19 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonRewardsInput = {
@@ -2700,6 +3479,19 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
@@ -2738,6 +3530,19 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRewardFulfillmentTargetsInput = {
@@ -2776,6 +3581,19 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
@@ -2814,6 +3632,19 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentTargetsInput = {
@@ -2857,6 +3688,19 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
@@ -2895,6 +3739,19 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsRequestedInput = {
@@ -2938,6 +3795,19 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
@@ -2976,6 +3846,19 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsProcessedInput = {
@@ -3019,6 +3902,19 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
@@ -3057,6 +3953,19 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsCanceledInput = {
@@ -3111,6 +4020,19 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
@@ -3149,6 +4071,19 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsRequestedInput = {
@@ -3198,6 +4133,19 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
@@ -3236,6 +4184,19 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsProcessedInput = {
@@ -3285,6 +4246,19 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
@@ -3323,6 +4297,19 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsCanceledInput = {
@@ -3372,6 +4359,19 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
@@ -3410,6 +4410,19 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAdRewardClaimsInput = {
@@ -3448,6 +4461,19 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
@@ -3486,6 +4512,19 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAdRewardClaimsInput = {
@@ -3540,6 +4579,19 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
@@ -3578,6 +4630,19 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutGeneralAccountResetsInput = {
@@ -3616,6 +4681,19 @@ export type UserCreateWithoutGeneralAccountResetsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
@@ -3654,6 +4732,19 @@ export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutGeneralAccountResetsInput = {
@@ -3708,6 +4799,19 @@ export type UserUpdateWithoutGeneralAccountResetsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
@@ -3746,6 +4850,19 @@ export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutQuotesInput = {
@@ -3784,6 +4901,19 @@ export type UserCreateWithoutQuotesInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutQuotesInput = {
@@ -3822,6 +4952,19 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutQuotesInput = {
@@ -3876,6 +5019,19 @@ export type UserUpdateWithoutQuotesInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutQuotesInput = {
@@ -3914,6 +5070,19 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFxExecuteRequestsInput = {
@@ -3952,6 +5121,19 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -3990,6 +5172,19 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -4044,6 +5239,19 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -4082,6 +5290,19 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPushDevicesInput = {
@@ -4120,6 +5341,19 @@ export type UserCreateWithoutPushDevicesInput = {
   inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPushDevicesInput = {
@@ -4158,6 +5392,19 @@ export type UserUncheckedCreateWithoutPushDevicesInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPushDevicesInput = {
@@ -4212,6 +5459,19 @@ export type UserUpdateWithoutPushDevicesInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPushDevicesInput = {
@@ -4250,6 +5510,19 @@ export type UserUncheckedUpdateWithoutPushDevicesInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutNotificationPreferenceInput = {
@@ -4288,6 +5561,19 @@ export type UserCreateWithoutNotificationPreferenceInput = {
   inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
@@ -4326,6 +5612,19 @@ export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutNotificationPreferenceInput = {
@@ -4380,6 +5679,19 @@ export type UserUpdateWithoutNotificationPreferenceInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
@@ -4418,6 +5730,19 @@ export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPushNotificationsInput = {
@@ -4456,6 +5781,19 @@ export type UserCreateWithoutPushNotificationsInput = {
   inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPushNotificationsInput = {
@@ -4494,6 +5832,19 @@ export type UserUncheckedCreateWithoutPushNotificationsInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPushNotificationsInput = {
@@ -4548,6 +5899,19 @@ export type UserUpdateWithoutPushNotificationsInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPushNotificationsInput = {
@@ -4586,6 +5950,2879 @@ export type UserUncheckedUpdateWithoutPushNotificationsInput = {
   inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunityPostsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityPostsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityPostsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsInput, Prisma.UserUncheckedCreateWithoutCommunityPostsInput>
+}
+
+export type UserCreateWithoutCommunityPostsRemovedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityPostsRemovedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityPostsRemovedInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsRemovedInput, Prisma.UserUncheckedCreateWithoutCommunityPostsRemovedInput>
+}
+
+export type UserUpsertWithoutCommunityPostsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPostsInput, Prisma.UserUncheckedUpdateWithoutCommunityPostsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsInput, Prisma.UserUncheckedCreateWithoutCommunityPostsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityPostsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPostsInput, Prisma.UserUncheckedUpdateWithoutCommunityPostsInput>
+}
+
+export type UserUpdateWithoutCommunityPostsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityPostsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserUpsertWithoutCommunityPostsRemovedInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPostsRemovedInput, Prisma.UserUncheckedUpdateWithoutCommunityPostsRemovedInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsRemovedInput, Prisma.UserUncheckedCreateWithoutCommunityPostsRemovedInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityPostsRemovedInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPostsRemovedInput, Prisma.UserUncheckedUpdateWithoutCommunityPostsRemovedInput>
+}
+
+export type UserUpdateWithoutCommunityPostsRemovedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityPostsRemovedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunityCommentsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityCommentsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityCommentsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentsInput, Prisma.UserUncheckedCreateWithoutCommunityCommentsInput>
+}
+
+export type UserCreateWithoutCommunityCommentsRemovedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityCommentsRemovedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityCommentsRemovedInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentsRemovedInput, Prisma.UserUncheckedCreateWithoutCommunityCommentsRemovedInput>
+}
+
+export type UserUpsertWithoutCommunityCommentsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityCommentsInput, Prisma.UserUncheckedUpdateWithoutCommunityCommentsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentsInput, Prisma.UserUncheckedCreateWithoutCommunityCommentsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityCommentsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityCommentsInput, Prisma.UserUncheckedUpdateWithoutCommunityCommentsInput>
+}
+
+export type UserUpdateWithoutCommunityCommentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityCommentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserUpsertWithoutCommunityCommentsRemovedInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityCommentsRemovedInput, Prisma.UserUncheckedUpdateWithoutCommunityCommentsRemovedInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentsRemovedInput, Prisma.UserUncheckedCreateWithoutCommunityCommentsRemovedInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityCommentsRemovedInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityCommentsRemovedInput, Prisma.UserUncheckedUpdateWithoutCommunityCommentsRemovedInput>
+}
+
+export type UserUpdateWithoutCommunityCommentsRemovedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityCommentsRemovedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunityPostLikesInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityPostLikesInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityPostLikesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostLikesInput, Prisma.UserUncheckedCreateWithoutCommunityPostLikesInput>
+}
+
+export type UserUpsertWithoutCommunityPostLikesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPostLikesInput, Prisma.UserUncheckedUpdateWithoutCommunityPostLikesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostLikesInput, Prisma.UserUncheckedCreateWithoutCommunityPostLikesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityPostLikesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPostLikesInput, Prisma.UserUncheckedUpdateWithoutCommunityPostLikesInput>
+}
+
+export type UserUpdateWithoutCommunityPostLikesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityPostLikesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunityCommentLikesInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityCommentLikesInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityCommentLikesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentLikesInput, Prisma.UserUncheckedCreateWithoutCommunityCommentLikesInput>
+}
+
+export type UserUpsertWithoutCommunityCommentLikesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityCommentLikesInput, Prisma.UserUncheckedUpdateWithoutCommunityCommentLikesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityCommentLikesInput, Prisma.UserUncheckedCreateWithoutCommunityCommentLikesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityCommentLikesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityCommentLikesInput, Prisma.UserUncheckedUpdateWithoutCommunityCommentLikesInput>
+}
+
+export type UserUpdateWithoutCommunityCommentLikesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityCommentLikesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunityPostAliasesInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityPostAliasesInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityPostAliasesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostAliasesInput, Prisma.UserUncheckedCreateWithoutCommunityPostAliasesInput>
+}
+
+export type UserUpsertWithoutCommunityPostAliasesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPostAliasesInput, Prisma.UserUncheckedUpdateWithoutCommunityPostAliasesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostAliasesInput, Prisma.UserUncheckedCreateWithoutCommunityPostAliasesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityPostAliasesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPostAliasesInput, Prisma.UserUncheckedUpdateWithoutCommunityPostAliasesInput>
+}
+
+export type UserUpdateWithoutCommunityPostAliasesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityPostAliasesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunityReportsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityReportsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityReportsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityReportsInput, Prisma.UserUncheckedCreateWithoutCommunityReportsInput>
+}
+
+export type UserUpsertWithoutCommunityReportsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityReportsInput, Prisma.UserUncheckedUpdateWithoutCommunityReportsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityReportsInput, Prisma.UserUncheckedCreateWithoutCommunityReportsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityReportsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityReportsInput, Prisma.UserUncheckedUpdateWithoutCommunityReportsInput>
+}
+
+export type UserUpdateWithoutCommunityReportsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityReportsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunitySanctionsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunitySanctionsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunitySanctionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsInput>
+}
+
+export type UserCreateWithoutCommunitySanctionsCreatedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunitySanctionsCreatedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunitySanctionsCreatedInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsCreatedInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsCreatedInput>
+}
+
+export type UserCreateWithoutCommunitySanctionsRevokedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunitySanctionsRevokedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunitySanctionsRevokedInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsRevokedInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsRevokedInput>
+}
+
+export type UserUpsertWithoutCommunitySanctionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunitySanctionsInput, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunitySanctionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunitySanctionsInput, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsInput>
+}
+
+export type UserUpdateWithoutCommunitySanctionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunitySanctionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserUpsertWithoutCommunitySanctionsCreatedInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunitySanctionsCreatedInput, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsCreatedInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsCreatedInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunitySanctionsCreatedInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunitySanctionsCreatedInput, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput>
+}
+
+export type UserUpdateWithoutCommunitySanctionsCreatedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserUpsertWithoutCommunitySanctionsRevokedInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunitySanctionsRevokedInput, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunitySanctionsRevokedInput, Prisma.UserUncheckedCreateWithoutCommunitySanctionsRevokedInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunitySanctionsRevokedInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunitySanctionsRevokedInput, Prisma.UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput>
+}
+
+export type UserUpdateWithoutCommunitySanctionsRevokedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunityRuleConsentInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityRuleConsentInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityRuleConsentInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityRuleConsentInput, Prisma.UserUncheckedCreateWithoutCommunityRuleConsentInput>
+}
+
+export type UserUpsertWithoutCommunityRuleConsentInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityRuleConsentInput, Prisma.UserUncheckedUpdateWithoutCommunityRuleConsentInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityRuleConsentInput, Prisma.UserUncheckedCreateWithoutCommunityRuleConsentInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityRuleConsentInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityRuleConsentInput, Prisma.UserUncheckedUpdateWithoutCommunityRuleConsentInput>
+}
+
+export type UserUpdateWithoutCommunityRuleConsentInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityRuleConsentInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutCommunityPhotoCleanupsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutCommunityPhotoCleanupsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutCommunityPhotoCleanupsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPhotoCleanupsInput, Prisma.UserUncheckedCreateWithoutCommunityPhotoCleanupsInput>
+}
+
+export type UserUpsertWithoutCommunityPhotoCleanupsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPhotoCleanupsInput, Prisma.UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutCommunityPhotoCleanupsInput, Prisma.UserUncheckedCreateWithoutCommunityPhotoCleanupsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutCommunityPhotoCleanupsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutCommunityPhotoCleanupsInput, Prisma.UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput>
+}
+
+export type UserUpdateWithoutCommunityPhotoCleanupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
 }
 
 
@@ -4614,6 +8851,18 @@ export type UserCountOutputType = {
   inquiryAnswers: number
   pushDevices: number
   pushNotifications: number
+  communityPosts: number
+  communityPostsRemoved: number
+  communityComments: number
+  communityCommentsRemoved: number
+  communityPostLikes: number
+  communityCommentLikes: number
+  communityPostAliases: number
+  communityReports: number
+  communitySanctions: number
+  communitySanctionsCreated: number
+  communitySanctionsRevoked: number
+  communityPhotoCleanups: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -4637,6 +8886,18 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   inquiryAnswers?: boolean | UserCountOutputTypeCountInquiryAnswersArgs
   pushDevices?: boolean | UserCountOutputTypeCountPushDevicesArgs
   pushNotifications?: boolean | UserCountOutputTypeCountPushNotificationsArgs
+  communityPosts?: boolean | UserCountOutputTypeCountCommunityPostsArgs
+  communityPostsRemoved?: boolean | UserCountOutputTypeCountCommunityPostsRemovedArgs
+  communityComments?: boolean | UserCountOutputTypeCountCommunityCommentsArgs
+  communityCommentsRemoved?: boolean | UserCountOutputTypeCountCommunityCommentsRemovedArgs
+  communityPostLikes?: boolean | UserCountOutputTypeCountCommunityPostLikesArgs
+  communityCommentLikes?: boolean | UserCountOutputTypeCountCommunityCommentLikesArgs
+  communityPostAliases?: boolean | UserCountOutputTypeCountCommunityPostAliasesArgs
+  communityReports?: boolean | UserCountOutputTypeCountCommunityReportsArgs
+  communitySanctions?: boolean | UserCountOutputTypeCountCommunitySanctionsArgs
+  communitySanctionsCreated?: boolean | UserCountOutputTypeCountCommunitySanctionsCreatedArgs
+  communitySanctionsRevoked?: boolean | UserCountOutputTypeCountCommunitySanctionsRevokedArgs
+  communityPhotoCleanups?: boolean | UserCountOutputTypeCountCommunityPhotoCleanupsArgs
 }
 
 /**
@@ -4789,6 +9050,90 @@ export type UserCountOutputTypeCountPushNotificationsArgs<ExtArgs extends runtim
   where?: Prisma.PushNotificationWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityPostsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityPostWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityPostsRemovedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityPostWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityCommentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityCommentWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityCommentsRemovedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityCommentWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityPostLikesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityPostLikeWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityCommentLikesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityCommentLikeWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityPostAliasesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityPostAliasWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityReportsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityReportWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunitySanctionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunitySanctionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunitySanctionsCreatedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunitySanctionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunitySanctionsRevokedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunitySanctionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountCommunityPhotoCleanupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CommunityPhotoCleanupWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -4827,6 +9172,19 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   pushDevices?: boolean | Prisma.User$pushDevicesArgs<ExtArgs>
   notificationPreference?: boolean | Prisma.User$notificationPreferenceArgs<ExtArgs>
   pushNotifications?: boolean | Prisma.User$pushNotificationsArgs<ExtArgs>
+  communityPosts?: boolean | Prisma.User$communityPostsArgs<ExtArgs>
+  communityPostsRemoved?: boolean | Prisma.User$communityPostsRemovedArgs<ExtArgs>
+  communityComments?: boolean | Prisma.User$communityCommentsArgs<ExtArgs>
+  communityCommentsRemoved?: boolean | Prisma.User$communityCommentsRemovedArgs<ExtArgs>
+  communityPostLikes?: boolean | Prisma.User$communityPostLikesArgs<ExtArgs>
+  communityCommentLikes?: boolean | Prisma.User$communityCommentLikesArgs<ExtArgs>
+  communityPostAliases?: boolean | Prisma.User$communityPostAliasesArgs<ExtArgs>
+  communityReports?: boolean | Prisma.User$communityReportsArgs<ExtArgs>
+  communitySanctions?: boolean | Prisma.User$communitySanctionsArgs<ExtArgs>
+  communitySanctionsCreated?: boolean | Prisma.User$communitySanctionsCreatedArgs<ExtArgs>
+  communitySanctionsRevoked?: boolean | Prisma.User$communitySanctionsRevokedArgs<ExtArgs>
+  communityRuleConsent?: boolean | Prisma.User$communityRuleConsentArgs<ExtArgs>
+  communityPhotoCleanups?: boolean | Prisma.User$communityPhotoCleanupsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -4907,6 +9265,19 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   pushDevices?: boolean | Prisma.User$pushDevicesArgs<ExtArgs>
   notificationPreference?: boolean | Prisma.User$notificationPreferenceArgs<ExtArgs>
   pushNotifications?: boolean | Prisma.User$pushNotificationsArgs<ExtArgs>
+  communityPosts?: boolean | Prisma.User$communityPostsArgs<ExtArgs>
+  communityPostsRemoved?: boolean | Prisma.User$communityPostsRemovedArgs<ExtArgs>
+  communityComments?: boolean | Prisma.User$communityCommentsArgs<ExtArgs>
+  communityCommentsRemoved?: boolean | Prisma.User$communityCommentsRemovedArgs<ExtArgs>
+  communityPostLikes?: boolean | Prisma.User$communityPostLikesArgs<ExtArgs>
+  communityCommentLikes?: boolean | Prisma.User$communityCommentLikesArgs<ExtArgs>
+  communityPostAliases?: boolean | Prisma.User$communityPostAliasesArgs<ExtArgs>
+  communityReports?: boolean | Prisma.User$communityReportsArgs<ExtArgs>
+  communitySanctions?: boolean | Prisma.User$communitySanctionsArgs<ExtArgs>
+  communitySanctionsCreated?: boolean | Prisma.User$communitySanctionsCreatedArgs<ExtArgs>
+  communitySanctionsRevoked?: boolean | Prisma.User$communitySanctionsRevokedArgs<ExtArgs>
+  communityRuleConsent?: boolean | Prisma.User$communityRuleConsentArgs<ExtArgs>
+  communityPhotoCleanups?: boolean | Prisma.User$communityPhotoCleanupsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -4936,6 +9307,19 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     pushDevices: Prisma.$PushDevicePayload<ExtArgs>[]
     notificationPreference: Prisma.$NotificationPreferencePayload<ExtArgs> | null
     pushNotifications: Prisma.$PushNotificationPayload<ExtArgs>[]
+    communityPosts: Prisma.$CommunityPostPayload<ExtArgs>[]
+    communityPostsRemoved: Prisma.$CommunityPostPayload<ExtArgs>[]
+    communityComments: Prisma.$CommunityCommentPayload<ExtArgs>[]
+    communityCommentsRemoved: Prisma.$CommunityCommentPayload<ExtArgs>[]
+    communityPostLikes: Prisma.$CommunityPostLikePayload<ExtArgs>[]
+    communityCommentLikes: Prisma.$CommunityCommentLikePayload<ExtArgs>[]
+    communityPostAliases: Prisma.$CommunityPostAliasPayload<ExtArgs>[]
+    communityReports: Prisma.$CommunityReportPayload<ExtArgs>[]
+    communitySanctions: Prisma.$CommunitySanctionPayload<ExtArgs>[]
+    communitySanctionsCreated: Prisma.$CommunitySanctionPayload<ExtArgs>[]
+    communitySanctionsRevoked: Prisma.$CommunitySanctionPayload<ExtArgs>[]
+    communityRuleConsent: Prisma.$CommunityRuleConsentPayload<ExtArgs> | null
+    communityPhotoCleanups: Prisma.$CommunityPhotoCleanupPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -5377,6 +9761,19 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   pushDevices<T extends Prisma.User$pushDevicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$pushDevicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PushDevicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   notificationPreference<T extends Prisma.User$notificationPreferenceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$notificationPreferenceArgs<ExtArgs>>): Prisma.Prisma__NotificationPreferenceClient<runtime.Types.Result.GetResult<Prisma.$NotificationPreferencePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   pushNotifications<T extends Prisma.User$pushNotificationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$pushNotificationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PushNotificationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityPosts<T extends Prisma.User$communityPostsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityPostsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityPostPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityPostsRemoved<T extends Prisma.User$communityPostsRemovedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityPostsRemovedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityPostPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityComments<T extends Prisma.User$communityCommentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityCommentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityCommentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityCommentsRemoved<T extends Prisma.User$communityCommentsRemovedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityCommentsRemovedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityCommentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityPostLikes<T extends Prisma.User$communityPostLikesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityPostLikesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityPostLikePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityCommentLikes<T extends Prisma.User$communityCommentLikesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityCommentLikesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityCommentLikePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityPostAliases<T extends Prisma.User$communityPostAliasesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityPostAliasesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityPostAliasPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityReports<T extends Prisma.User$communityReportsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityReportsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityReportPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communitySanctions<T extends Prisma.User$communitySanctionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communitySanctionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunitySanctionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communitySanctionsCreated<T extends Prisma.User$communitySanctionsCreatedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communitySanctionsCreatedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunitySanctionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communitySanctionsRevoked<T extends Prisma.User$communitySanctionsRevokedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communitySanctionsRevokedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunitySanctionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  communityRuleConsent<T extends Prisma.User$communityRuleConsentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityRuleConsentArgs<ExtArgs>>): Prisma.Prisma__CommunityRuleConsentClient<runtime.Types.Result.GetResult<Prisma.$CommunityRuleConsentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  communityPhotoCleanups<T extends Prisma.User$communityPhotoCleanupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityPhotoCleanupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityPhotoCleanupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -6310,6 +10707,313 @@ export type User$pushNotificationsArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.PushNotificationScalarFieldEnum | Prisma.PushNotificationScalarFieldEnum[]
+}
+
+/**
+ * User.communityPosts
+ */
+export type User$communityPostsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityPost
+   */
+  select?: Prisma.CommunityPostSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityPost
+   */
+  omit?: Prisma.CommunityPostOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityPostInclude<ExtArgs> | null
+  where?: Prisma.CommunityPostWhereInput
+  orderBy?: Prisma.CommunityPostOrderByWithRelationInput | Prisma.CommunityPostOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityPostWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityPostScalarFieldEnum | Prisma.CommunityPostScalarFieldEnum[]
+}
+
+/**
+ * User.communityPostsRemoved
+ */
+export type User$communityPostsRemovedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityPost
+   */
+  select?: Prisma.CommunityPostSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityPost
+   */
+  omit?: Prisma.CommunityPostOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityPostInclude<ExtArgs> | null
+  where?: Prisma.CommunityPostWhereInput
+  orderBy?: Prisma.CommunityPostOrderByWithRelationInput | Prisma.CommunityPostOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityPostWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityPostScalarFieldEnum | Prisma.CommunityPostScalarFieldEnum[]
+}
+
+/**
+ * User.communityComments
+ */
+export type User$communityCommentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityComment
+   */
+  select?: Prisma.CommunityCommentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityComment
+   */
+  omit?: Prisma.CommunityCommentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityCommentInclude<ExtArgs> | null
+  where?: Prisma.CommunityCommentWhereInput
+  orderBy?: Prisma.CommunityCommentOrderByWithRelationInput | Prisma.CommunityCommentOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityCommentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityCommentScalarFieldEnum | Prisma.CommunityCommentScalarFieldEnum[]
+}
+
+/**
+ * User.communityCommentsRemoved
+ */
+export type User$communityCommentsRemovedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityComment
+   */
+  select?: Prisma.CommunityCommentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityComment
+   */
+  omit?: Prisma.CommunityCommentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityCommentInclude<ExtArgs> | null
+  where?: Prisma.CommunityCommentWhereInput
+  orderBy?: Prisma.CommunityCommentOrderByWithRelationInput | Prisma.CommunityCommentOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityCommentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityCommentScalarFieldEnum | Prisma.CommunityCommentScalarFieldEnum[]
+}
+
+/**
+ * User.communityPostLikes
+ */
+export type User$communityPostLikesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityPostLike
+   */
+  select?: Prisma.CommunityPostLikeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityPostLike
+   */
+  omit?: Prisma.CommunityPostLikeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityPostLikeInclude<ExtArgs> | null
+  where?: Prisma.CommunityPostLikeWhereInput
+  orderBy?: Prisma.CommunityPostLikeOrderByWithRelationInput | Prisma.CommunityPostLikeOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityPostLikeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityPostLikeScalarFieldEnum | Prisma.CommunityPostLikeScalarFieldEnum[]
+}
+
+/**
+ * User.communityCommentLikes
+ */
+export type User$communityCommentLikesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityCommentLike
+   */
+  select?: Prisma.CommunityCommentLikeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityCommentLike
+   */
+  omit?: Prisma.CommunityCommentLikeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityCommentLikeInclude<ExtArgs> | null
+  where?: Prisma.CommunityCommentLikeWhereInput
+  orderBy?: Prisma.CommunityCommentLikeOrderByWithRelationInput | Prisma.CommunityCommentLikeOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityCommentLikeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityCommentLikeScalarFieldEnum | Prisma.CommunityCommentLikeScalarFieldEnum[]
+}
+
+/**
+ * User.communityPostAliases
+ */
+export type User$communityPostAliasesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityPostAlias
+   */
+  select?: Prisma.CommunityPostAliasSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityPostAlias
+   */
+  omit?: Prisma.CommunityPostAliasOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityPostAliasInclude<ExtArgs> | null
+  where?: Prisma.CommunityPostAliasWhereInput
+  orderBy?: Prisma.CommunityPostAliasOrderByWithRelationInput | Prisma.CommunityPostAliasOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityPostAliasWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityPostAliasScalarFieldEnum | Prisma.CommunityPostAliasScalarFieldEnum[]
+}
+
+/**
+ * User.communityReports
+ */
+export type User$communityReportsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityReport
+   */
+  select?: Prisma.CommunityReportSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityReport
+   */
+  omit?: Prisma.CommunityReportOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityReportInclude<ExtArgs> | null
+  where?: Prisma.CommunityReportWhereInput
+  orderBy?: Prisma.CommunityReportOrderByWithRelationInput | Prisma.CommunityReportOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityReportWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityReportScalarFieldEnum | Prisma.CommunityReportScalarFieldEnum[]
+}
+
+/**
+ * User.communitySanctions
+ */
+export type User$communitySanctionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunitySanction
+   */
+  select?: Prisma.CommunitySanctionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunitySanction
+   */
+  omit?: Prisma.CommunitySanctionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunitySanctionInclude<ExtArgs> | null
+  where?: Prisma.CommunitySanctionWhereInput
+  orderBy?: Prisma.CommunitySanctionOrderByWithRelationInput | Prisma.CommunitySanctionOrderByWithRelationInput[]
+  cursor?: Prisma.CommunitySanctionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunitySanctionScalarFieldEnum | Prisma.CommunitySanctionScalarFieldEnum[]
+}
+
+/**
+ * User.communitySanctionsCreated
+ */
+export type User$communitySanctionsCreatedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunitySanction
+   */
+  select?: Prisma.CommunitySanctionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunitySanction
+   */
+  omit?: Prisma.CommunitySanctionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunitySanctionInclude<ExtArgs> | null
+  where?: Prisma.CommunitySanctionWhereInput
+  orderBy?: Prisma.CommunitySanctionOrderByWithRelationInput | Prisma.CommunitySanctionOrderByWithRelationInput[]
+  cursor?: Prisma.CommunitySanctionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunitySanctionScalarFieldEnum | Prisma.CommunitySanctionScalarFieldEnum[]
+}
+
+/**
+ * User.communitySanctionsRevoked
+ */
+export type User$communitySanctionsRevokedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunitySanction
+   */
+  select?: Prisma.CommunitySanctionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunitySanction
+   */
+  omit?: Prisma.CommunitySanctionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunitySanctionInclude<ExtArgs> | null
+  where?: Prisma.CommunitySanctionWhereInput
+  orderBy?: Prisma.CommunitySanctionOrderByWithRelationInput | Prisma.CommunitySanctionOrderByWithRelationInput[]
+  cursor?: Prisma.CommunitySanctionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunitySanctionScalarFieldEnum | Prisma.CommunitySanctionScalarFieldEnum[]
+}
+
+/**
+ * User.communityRuleConsent
+ */
+export type User$communityRuleConsentArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityRuleConsent
+   */
+  select?: Prisma.CommunityRuleConsentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityRuleConsent
+   */
+  omit?: Prisma.CommunityRuleConsentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityRuleConsentInclude<ExtArgs> | null
+  where?: Prisma.CommunityRuleConsentWhereInput
+}
+
+/**
+ * User.communityPhotoCleanups
+ */
+export type User$communityPhotoCleanupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CommunityPhotoCleanup
+   */
+  select?: Prisma.CommunityPhotoCleanupSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CommunityPhotoCleanup
+   */
+  omit?: Prisma.CommunityPhotoCleanupOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CommunityPhotoCleanupInclude<ExtArgs> | null
+  where?: Prisma.CommunityPhotoCleanupWhereInput
+  orderBy?: Prisma.CommunityPhotoCleanupOrderByWithRelationInput | Prisma.CommunityPhotoCleanupOrderByWithRelationInput[]
+  cursor?: Prisma.CommunityPhotoCleanupWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CommunityPhotoCleanupScalarFieldEnum | Prisma.CommunityPhotoCleanupScalarFieldEnum[]
 }
 
 /**

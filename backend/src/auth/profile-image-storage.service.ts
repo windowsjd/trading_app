@@ -78,7 +78,13 @@ export class ProfileImageStorageService implements OnModuleDestroy {
     return `profile-images/${userId}/${filename}`;
   }
 
-  async upload(key: string, bytes: Buffer): Promise<void> {
+  /** `cacheControl`: profile photos are immutable for a year; community
+   * photos pass a shorter value so a removal stops being served sooner. */
+  async upload(
+    key: string,
+    bytes: Buffer,
+    cacheControl = 'public, max-age=31536000, immutable',
+  ): Promise<void> {
     const { client, config } = this.requireConfigured();
     await client.send(
       new PutObjectCommand({
@@ -87,7 +93,7 @@ export class ProfileImageStorageService implements OnModuleDestroy {
         Body: bytes,
         ContentType: 'image/jpeg',
         ContentLength: bytes.length,
-        CacheControl: 'public, max-age=31536000, immutable',
+        CacheControl: cacheControl,
       }),
       { abortSignal: AbortSignal.timeout(10000) },
     );

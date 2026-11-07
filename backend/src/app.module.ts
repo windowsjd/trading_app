@@ -11,6 +11,7 @@ import { AppService } from './app.service';
 import { AdRewardsModule } from './ad-rewards/ad-rewards.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
+import { CommunityModule } from './community/community.module';
 import { BatchModule } from './batch/batch.module';
 import { validateEnv } from './common/env-validation';
 import { GlobalHttpExceptionFilter } from './common/global-http-exception.filter';
@@ -48,6 +49,7 @@ import { WalletsModule } from './wallets/wallets.module';
     AssetsModule,
     AuthModule,
     BatchModule,
+    CommunityModule,
     FriendsModule,
     FxModule,
     FuturesModule,

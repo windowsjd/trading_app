@@ -304,6 +304,7 @@ enum OpsJobName {
   crypto_order_book_retention
   push_notifications
   account_deletion_cleanup
+  community_photo_cleanup
 }
 
 enum MarketCandleSyncMode {
@@ -388,6 +389,19 @@ model User {
   pushDevices                 PushDevice[]
   notificationPreference      NotificationPreference?
   pushNotifications           PushNotification[]
+  communityPosts              CommunityPost[]            @relation("CommunityPostAuthor")
+  communityPostsRemoved       CommunityPost[]            @relation("CommunityPostRemovedBy")
+  communityComments           CommunityComment[]         @relation("CommunityCommentAuthor")
+  communityCommentsRemoved    CommunityComment[]         @relation("CommunityCommentRemovedBy")
+  communityPostLikes          CommunityPostLike[]
+  communityCommentLikes       CommunityCommentLike[]
+  communityPostAliases        CommunityPostAlias[]
+  communityReports            CommunityReport[]
+  communitySanctions          CommunitySanction[]        @relation("CommunitySanctionTarget")
+  communitySanctionsCreated   CommunitySanction[]        @relation("CommunitySanctionCreatedBy")
+  communitySanctionsRevoked   CommunitySanction[]        @relation("CommunitySanctionRevokedBy")
+  communityRuleConsent        CommunityRuleConsent?
+  communityPhotoCleanups      CommunityPhotoCleanup[]
 
   @@map("users")
 }
@@ -809,6 +823,7 @@ model Asset {
   limitOnCloseOrders       LimitOnCloseOrder[]
   sessionCloseEvidences    SessionClosePriceEvidence[]
   entryTpSlPlans           EntryTpSlPlan[]
+  communityPosts           CommunityPost[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -3085,14 +3100,15 @@ enum AccountDeletionStatus {
 /// requester (app or web) reads its status with the client-generated request
 /// key, whose SHA-256 is the only lookup handle.
 model AccountDeletion {
-  id                   String                 @id @default(uuid(7))
-  requestKeyHash       String                 @unique @map("request_key_hash")
-  channel              AccountDeletionChannel
-  status               AccountDeletionStatus
+  id                     String                  @id @default(uuid(7))
+  requestKeyHash         String                  @unique @map("request_key_hash")
+  channel                AccountDeletionChannel
+  status                 AccountDeletionStatus
   /// Database commit time of the data deletion.
-  deletedAt            DateTime               @map("deleted_at")
-  completedAt          DateTime?              @map("completed_at")
-  profileImageCleanups ProfileImageCleanup[]
+  deletedAt              DateTime                @map("deleted_at")
+  completedAt            DateTime?               @map("completed_at")
+  profileImageCleanups   ProfileImageCleanup[]
+  communityPhotoCleanups CommunityPhotoCleanup[]
 
   @@index([status, deletedAt])
   @@map("account_deletions")
@@ -3119,4 +3135,304 @@ model ProfileImageCleanup {
   @@index([nextAttemptAt])
   @@index([accountDeletionId])
   @@map("profile_image_cleanups")
+}
+
+// ---------------------------------------------------------------------------
+// Community (docs/community-api-contract.md): posts, comments, likes, photos,
+// reports, operator removal and the community-only restriction (sanction).
+// Not financial: no trading account, wallet, order or ledger is read or
+// written. The author is always stored; an anonymous post or comment never
+// exposes it to members (operators only). Partial feed/maintenance indexes
+// are migration only (add_community_feed_indexes), not declared here.
+// ---------------------------------------------------------------------------
+
+/// Stored feed category. HOT is a computed view, never stored.
+enum CommunityCategory {
+  free
+  theory
+}
+
+/// The single moderation reason list shared by operator removal, sanctions,
+/// member reports and the app (labels/descriptions: GET /community/bootstrap).
+/// OTHER requires a note on operator actions.
+enum CommunityModerationReason {
+  AD_SPAM
+  ABUSE
+  FLOOD
+  PERSONAL_INFO
+  ILLEGAL_OR_SOLICITATION
+  INAPPROPRIATE_MEDIA
+  OTHER
+}
+
+/// Who soft-deleted a post or comment.
+enum CommunityDeletionKind {
+  author
+  operator
+}
+
+/// A community post. Never edited: only author deletion or operator removal
+/// (deletedAt + deletionKind; the body is kept) and hiding by an operator
+/// sanction (hiddenBySanctionId, cleared only by revoking that sanction)
+/// change it. Visible = deletedAt IS NULL AND hiddenBySanctionId IS NULL.
+/// Body: trimmed, 1-500 code points, not blank (SQL CHECK); the deletion
+/// columns are consistent per deletionKind (SQL CHECK).
+model CommunityPost {
+  id                 String                     @id @default(uuid(7))
+  userId             String                     @map("user_id")
+  /// (userId, clientRequestId) makes a resubmitted form return the same post.
+  clientRequestId    String                     @map("client_request_id") @db.VarChar(100)
+  category           CommunityCategory
+  body               String                     @db.VarChar(500)
+  /// Members never see who wrote an anonymous post; operators do.
+  anonymous          Boolean
+  /// Optional single asset tag.
+  assetId            String?                    @map("asset_id")
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  deletedAt          DateTime?                  @map("deleted_at")
+  deletionKind       CommunityDeletionKind?     @map("deletion_kind")
+  /// Operator removal only: who, the required reason and an optional note.
+  removedByUserId    String?                    @map("removed_by_user_id")
+  removalReason      CommunityModerationReason? @map("removal_reason")
+  removalNote        String?                    @map("removal_note") @db.VarChar(200)
+  /// Set by a sanction with hideContent; revoking that sanction clears it.
+  hiddenBySanctionId String?                    @map("hidden_by_sanction_id")
+  user               User                       @relation("CommunityPostAuthor", fields: [userId], references: [id], onDelete: Restrict)
+  removedBy          User?                      @relation("CommunityPostRemovedBy", fields: [removedByUserId], references: [id], onDelete: Restrict)
+  asset              Asset?                     @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  hiddenBySanction   CommunitySanction?         @relation(fields: [hiddenBySanctionId], references: [id], onDelete: Restrict)
+  photos             CommunityPostPhoto[]
+  comments           CommunityComment[]
+  likes              CommunityPostLike[]
+  aliases            CommunityPostAlias[]
+  reports            CommunityReport[]
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, createdAt])
+  @@map("community_posts")
+}
+
+/// One photo of a post, positions 0-3. objectKey is
+/// community-images/{random uuid v4}.jpg: neither the member nor the post is
+/// in the key or the public URL. The bytes were validated and stripped of
+/// metadata by the server; sha256 (of the stored bytes) lets an idempotent
+/// replay recognise the same photos. Kept when the post is deleted (the
+/// object itself is then removed through community_photo_cleanups).
+model CommunityPostPhoto {
+  id        String        @id @default(uuid(7))
+  postId    String        @map("post_id")
+  position  Int
+  objectKey String        @unique @map("object_key")
+  width     Int
+  height    Int
+  byteSize  Int           @map("byte_size")
+  sha256    String        @db.Char(64)
+  createdAt DateTime      @default(now()) @map("created_at")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Restrict)
+
+  @@unique([postId, position])
+  @@map("community_post_photos")
+}
+
+/// A comment, or a one-level reply (parentCommentId = a top-level comment of
+/// the same post; the composite key enforces the same post, the service the
+/// single level). Same deletion/hiding columns and CHECKs as posts; a
+/// deleted or hidden comment keeps its place as a placeholder. userId NULL:
+/// the author deleted their account (shown as 탈퇴계정, body kept).
+/// erasedAt: a deleted comment past its retention lost its body, note and
+/// author link (the placeholder stays for the replies under it).
+model CommunityComment {
+  id                 String                     @id @default(uuid(7))
+  postId             String                     @map("post_id")
+  userId             String?                    @map("user_id")
+  parentCommentId    String?                    @map("parent_comment_id")
+  clientRequestId    String                     @map("client_request_id") @db.VarChar(100)
+  body               String?                    @db.VarChar(300)
+  /// Effective value: always true for the author of an anonymous post.
+  anonymous          Boolean
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  deletedAt          DateTime?                  @map("deleted_at")
+  deletionKind       CommunityDeletionKind?     @map("deletion_kind")
+  removedByUserId    String?                    @map("removed_by_user_id")
+  removalReason      CommunityModerationReason? @map("removal_reason")
+  removalNote        String?                    @map("removal_note") @db.VarChar(200)
+  hiddenBySanctionId String?                    @map("hidden_by_sanction_id")
+  erasedAt           DateTime?                  @map("erased_at")
+  post               CommunityPost              @relation(fields: [postId], references: [id], onDelete: Restrict)
+  user               User?                      @relation("CommunityCommentAuthor", fields: [userId], references: [id], onDelete: Restrict)
+  parent             CommunityComment?          @relation("CommunityCommentReplies", fields: [parentCommentId, postId], references: [id, postId], onDelete: Restrict)
+  replies            CommunityComment[]         @relation("CommunityCommentReplies")
+  removedBy          User?                      @relation("CommunityCommentRemovedBy", fields: [removedByUserId], references: [id], onDelete: Restrict)
+  hiddenBySanction   CommunitySanction?         @relation(fields: [hiddenBySanctionId], references: [id], onDelete: Restrict)
+  likes              CommunityCommentLike[]
+  reports            CommunityReport[]
+
+  @@unique([id, postId])
+  @@unique([userId, clientRequestId])
+  @@index([postId, createdAt, id])
+  @@index([parentCommentId])
+  @@index([userId, createdAt])
+  @@map("community_comments")
+}
+
+/// One member's like of a post (never the author's own: the service refuses).
+model CommunityPostLike {
+  id        String        @id @default(uuid(7))
+  postId    String        @map("post_id")
+  userId    String        @map("user_id")
+  createdAt DateTime      @default(now()) @map("created_at")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Restrict)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([postId, userId])
+  @@index([userId])
+  @@map("community_post_likes")
+}
+
+/// One member's like of a comment (never the author's own).
+model CommunityCommentLike {
+  id        String           @id @default(uuid(7))
+  commentId String           @map("comment_id")
+  userId    String           @map("user_id")
+  createdAt DateTime         @default(now()) @map("created_at")
+  comment   CommunityComment @relation(fields: [commentId], references: [id], onDelete: Restrict)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([commentId, userId])
+  @@index([userId])
+  @@map("community_comment_likes")
+}
+
+/// Per-post anonymous commenter numbers (익명1, 익명2 … in the order of each
+/// member's first anonymous comment on the post; the anonymous post's own
+/// author has none). Assigned under the post row lock; both unique keys
+/// make a shared or reused number impossible.
+model CommunityPostAlias {
+  id        String        @id @default(uuid(7))
+  postId    String        @map("post_id")
+  userId    String        @map("user_id")
+  aliasNo   Int           @map("alias_no")
+  createdAt DateTime      @default(now()) @map("created_at")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Restrict)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([postId, userId])
+  @@unique([postId, aliasNo])
+  @@index([userId])
+  @@map("community_post_aliases")
+}
+
+/// A member's report of exactly one post or one comment (SQL CHECK), at most
+/// one per reporter and target. Counts are returned to operators only.
+model CommunityReport {
+  id        String                    @id @default(uuid(7))
+  /// The reporter.
+  userId    String                    @map("user_id")
+  postId    String?                   @map("post_id")
+  commentId String?                   @map("comment_id")
+  reason    CommunityModerationReason
+  note      String?                   @db.VarChar(200)
+  createdAt DateTime                  @default(now()) @map("created_at")
+  user      User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  post      CommunityPost?            @relation(fields: [postId], references: [id], onDelete: Restrict)
+  comment   CommunityComment?         @relation(fields: [commentId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@index([userId, createdAt])
+  @@index([postId])
+  @@index([commentId])
+  @@map("community_reports")
+}
+
+/// A community-only restriction of one member, separate from users.status:
+/// community writes are refused while it is active (revokedAt IS NULL AND
+/// (endsAt IS NULL OR endsAt > now)); reads and trading are unaffected. With
+/// hideContent the member's visible posts and comments were pointed here at
+/// creation; revoking restores exactly those, expiry restores nothing. At
+/// most one active per member (checked under the member's users row lock).
+/// carriedOver: re-created at signup from community_sanction_carryovers (the
+/// same email's sanction ongoing at its account deletion); no operator.
+model CommunitySanction {
+  id              String                    @id @default(uuid(7))
+  /// The restricted member.
+  userId          String                    @map("user_id")
+  reason          CommunityModerationReason
+  note            String?                   @db.VarChar(200)
+  hideContent     Boolean                   @map("hide_content")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  /// null = permanent.
+  endsAt          DateTime?                 @map("ends_at")
+  createdByUserId String?                   @map("created_by_user_id")
+  revokedAt       DateTime?                 @map("revoked_at")
+  revokedByUserId String?                   @map("revoked_by_user_id")
+  carriedOver     Boolean                   @default(false) @map("carried_over")
+  user            User                      @relation("CommunitySanctionTarget", fields: [userId], references: [id], onDelete: Restrict)
+  createdBy       User?                     @relation("CommunitySanctionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  revokedBy       User?                     @relation("CommunitySanctionRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+  hiddenPosts     CommunityPost[]
+  hiddenComments  CommunityComment[]
+
+  @@index([userId, createdAt])
+  @@map("community_sanctions")
+}
+
+/// A sanction that was ongoing when its member deleted their account, kept so
+/// that signing up again with the same email re-applies it (2026-11-07
+/// decision). Deliberately NOT linked to users: the member row is gone; the
+/// only handle is emailHash = SHA-256 of "community-sanction:" + the
+/// normalized email. Consumed (deleted) at that signup; otherwise deleted by
+/// data retention at expiresAt (endsAt, or the deletion + 3 years when
+/// permanent).
+model CommunitySanctionCarryover {
+  id           String                    @id @default(uuid(7))
+  emailHash    String                    @map("email_hash") @db.Char(64)
+  reason       CommunityModerationReason
+  /// null = permanent.
+  endsAt       DateTime?                 @map("ends_at")
+  /// When the original sanction started.
+  sanctionedAt DateTime                  @map("sanctioned_at")
+  expiresAt    DateTime                  @map("expires_at")
+  createdAt    DateTime                  @default(now()) @map("created_at")
+
+  @@index([emailHash])
+  @@index([expiresAt])
+  @@map("community_sanction_carryovers")
+}
+
+/// The member's acceptance of the community rules. Community writes require
+/// rulesVersion = the server's COMMUNITY_RULES_VERSION; reads do not.
+/// Independent of the signup terms (users.terms_version).
+model CommunityRuleConsent {
+  userId       String   @id @map("user_id")
+  rulesVersion String   @map("rules_version") @db.VarChar(32)
+  acceptedAt   DateTime @map("accepted_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@map("community_rule_consents")
+}
+
+/// Durable removal of one community photo object, the profile-image lease
+/// pattern: an upload reserves its key before the storage write (userId =
+/// uploader, nextAttemptAt = lease end) and the post transaction deletes the
+/// row; photos of a deleted post and of a deleted member are enqueued due at
+/// once. The cleanup worker retries with backoff until the storage delete
+/// succeeds. accountDeletionId links the objects an account deletion receipt
+/// waits on (the account deletion clears userId before the member row goes).
+model CommunityPhotoCleanup {
+  objectKey         String           @id @map("object_key")
+  userId            String?          @map("user_id")
+  accountDeletionId String?          @map("account_deletion_id")
+  attempts          Int              @default(0)
+  nextAttemptAt     DateTime         @map("next_attempt_at")
+  lastErrorCode     String?          @map("last_error_code") @db.VarChar(64)
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  user              User?            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  accountDeletion   AccountDeletion? @relation(fields: [accountDeletionId], references: [id], onDelete: Restrict)
+
+  @@index([nextAttemptAt])
+  @@index([accountDeletionId])
+  @@index([userId])
+  @@map("community_photo_cleanups")
 }

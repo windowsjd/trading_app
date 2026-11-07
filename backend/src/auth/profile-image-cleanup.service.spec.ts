@@ -122,11 +122,13 @@ describe('ProfileImageCleanupService', () => {
     const h = harness();
     await expect(h.service.process(key)).resolves.toBe(true);
     expect(h.storage.delete).toHaveBeenCalledWith(key);
+    // A receipt also waits on its community photo objects (2026-11-07).
     expect(h.prisma.accountDeletion.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'deletion',
         status: 'cleanup_pending',
         profileImageCleanups: { none: {} },
+        communityPhotoCleanups: { none: {} },
       },
       data: { status: 'completed', completedAt: now },
     });

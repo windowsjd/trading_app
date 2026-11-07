@@ -851,6 +851,21 @@ Requires migration `20261017180000_add_inquiry_answers` (additive). Since
 2026-10-18 the app's MY > 문의하기 > 문의 관리 tab (operator/admin sessions)
 uses these three routes unchanged (inquiries contract §6).
 
+## Community Moderation (2026-11-07)
+
+Operator/admin (`OperatorGuard`) under `/api/v1/operator/community`: remove a
+post or comment (`POST posts/:postId/remove`, `POST comments/:commentId/remove`
+with `{ reason, note? }` — a reason from the single community list is required,
+`OTHER` needs a note; soft delete, idempotent), read a member's community
+summary (`GET users/:userId`), restrict a member's community activity
+(`POST users/:userId/sanctions` with `{ reason, note?, duration: 7d|30d|permanent,
+hideContent }`; never operators/admins/self; one active at a time; separate
+from `users.status`) and lift it (`POST sanctions/:sanctionId/revoke`, restores
+exactly what it hid). Every write and its `operator.community.*` success audit
+commit together; replays and failures are audited best effort; no body or note
+text is ever audited. Operators also receive `adminAuthor`/`reportCount` in the
+member community reads. Contract: [community](community-api-contract.md) §8–§9.
+
 ## Not Implemented In This MVP
 
 - HTTP batch execution API.

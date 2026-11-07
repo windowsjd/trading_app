@@ -1,3 +1,4 @@
+import { applyCommunitySanctionCarryover } from '../community/community-sanction-carryover';
 import {
   EmailVerificationService,
   authEmail,
@@ -141,6 +142,14 @@ export class AuthService implements OnModuleInit {
             role: true,
             status: true,
           },
+        });
+
+        // A community restriction ongoing when this email's previous account
+        // was deleted applies again (docs/community-api-contract.md §12).
+        await applyCommunitySanctionCarryover(tx, {
+          userId: createdUser.id,
+          email: request.email,
+          now: consentAt,
         });
 
         await this.createRefreshSession(

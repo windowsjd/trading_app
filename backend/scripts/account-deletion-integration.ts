@@ -72,6 +72,7 @@ import { OrdersService } from '../src/orders/orders.service';
 import { GeneralAccountPerformanceService } from '../src/portfolio/general-account-performance.service';
 import { GeneralExternalFundingService } from '../src/portfolio/general-external-funding.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
+import { communitySanctionEmailHash } from '../src/community/community-sanction-carryover';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RankingService } from '../src/ranking/ranking.service';
 import { TradingAccountAccessService } from '../src/trading-accounts/trading-account-access.service';
@@ -644,6 +645,17 @@ async function ownedRowCounts(ids: {
     'push_notifications',
     'notification_preferences',
     'refresh_token_sessions',
+    // Community: nothing keeps the member's id (comments elsewhere are
+    // unlinked and shown as 탈퇴계정, leases moved to the receipt).
+    'community_posts',
+    'community_comments',
+    'community_post_likes',
+    'community_comment_likes',
+    'community_post_aliases',
+    'community_reports',
+    'community_sanctions',
+    'community_rule_consents',
+    'community_photo_cleanups',
   ];
   const counts: Record<string, number> = {};
   for (const table of byAccount) {
@@ -851,6 +863,9 @@ async function deletionProof(email: string) {
 
 /** One member with every kind of row the purge removes, beside three other
  * members whose data must stay identical. */
+/** Community carryover hashes created by fixtures (no member FK to sweep). */
+const communityEmailHashes: string[] = [];
+
 async function fullMember() {
   const s = await fixture('general', '10000');
   const u = await adopt(s, 'full');
@@ -1168,6 +1183,107 @@ async function fullMember() {
   await db.notificationPreference.create({
     data: { userId: u.userId, tradeFill: false },
   });
+  // Community (docs/community-api-contract.md §12): u's anonymous post with
+  // a photo and other members' comment/like/report/number on it; u's
+  // anonymous comment on w's post with w's reply under it; u's like, report,
+  // consent and an ongoing restriction (carried over by email hash).
+  const wPost = await db.communityPost.create({
+    data: {
+      userId: w.userId,
+      clientRequestId: `community_${randomUUID()}`,
+      category: 'free',
+      body: '다른 회원의 글',
+      anonymous: false,
+    },
+  });
+  const uPost = await db.communityPost.create({
+    data: {
+      userId: u.userId,
+      clientRequestId: `community_${randomUUID()}`,
+      category: 'theory',
+      body: '탈퇴할 회원의 글',
+      anonymous: true,
+    },
+  });
+  const uPhotoKey = `community-images/${randomUUID()}.jpg`;
+  await db.communityPostPhoto.create({
+    data: {
+      postId: uPost.id,
+      position: 0,
+      objectKey: uPhotoKey,
+      width: 10,
+      height: 10,
+      byteSize: 100,
+      sha256: 'a'.repeat(64),
+    },
+  });
+  const onUPost = await db.communityComment.create({
+    data: {
+      postId: uPost.id,
+      userId: w.userId,
+      clientRequestId: `community_${randomUUID()}`,
+      body: '함께 사라질 댓글',
+      anonymous: true,
+    },
+  });
+  await db.communityPostAlias.create({
+    data: { postId: uPost.id, userId: w.userId, aliasNo: 1 },
+  });
+  await db.communityCommentLike.create({
+    data: { commentId: onUPost.id, userId: v.userId },
+  });
+  await db.communityPostLike.create({
+    data: { postId: uPost.id, userId: w.userId },
+  });
+  await db.communityReport.create({
+    data: { userId: w.userId, postId: uPost.id, reason: 'ABUSE' },
+  });
+  const uComment = await db.communityComment.create({
+    data: {
+      postId: wPost.id,
+      userId: u.userId,
+      clientRequestId: `community_${randomUUID()}`,
+      body: '탈퇴계정으로 남을 댓글',
+      anonymous: true,
+    },
+  });
+  await db.communityPostAlias.create({
+    data: { postId: wPost.id, userId: u.userId, aliasNo: 1 },
+  });
+  const wReply = await db.communityComment.create({
+    data: {
+      postId: wPost.id,
+      userId: w.userId,
+      parentCommentId: uComment.id,
+      clientRequestId: `community_${randomUUID()}`,
+      body: '남을 답글',
+      anonymous: false,
+    },
+  });
+  await db.communityCommentLike.create({
+    data: { commentId: uComment.id, userId: v.userId },
+  });
+  await db.communityPostLike.create({
+    data: { postId: wPost.id, userId: u.userId },
+  });
+  await db.communityReport.create({
+    data: { userId: u.userId, postId: wPost.id, reason: 'FLOOD' },
+  });
+  await db.communityRuleConsent.create({
+    data: { userId: u.userId, rulesVersion: '2026-11-07', acceptedAt: clock },
+  });
+  const uSanctionEnd = new Date(clock.getTime() + 30 * 86_400_000);
+  await db.communitySanction.create({
+    data: {
+      userId: u.userId,
+      reason: 'ABUSE',
+      hideContent: false,
+      createdAt: clock,
+      endsAt: uSanctionEnd,
+      createdByUserId: operator.userId,
+    },
+  });
+  communityEmailHashes.push(communitySanctionEmailHash(u.email));
   const tokens = await login(u);
   await login(u);
   await mail.verification.request(
@@ -1218,6 +1334,37 @@ async function fullMember() {
   await assertGone(scope);
   pass(
     'app deletion removes every personal and virtual-trading row in one commit',
+  );
+  assert.equal(await db.communityPost.count({ where: { id: uPost.id } }), 0);
+  assert.equal(
+    await db.communityComment.count({ where: { id: onUPost.id } }),
+    0,
+    "comments on the member's post go with it",
+  );
+  const keptComment = await db.communityComment.findUniqueOrThrow({
+    where: { id: uComment.id },
+  });
+  assert.equal(keptComment.userId, null);
+  assert.equal(keptComment.body, '탈퇴계정으로 남을 댓글');
+  assert.equal(await db.communityComment.count({ where: { id: wReply.id } }), 1);
+  assert.equal(
+    await db.communityCommentLike.count({ where: { commentId: uComment.id } }),
+    1,
+    'others keep their reply and like under the kept comment',
+  );
+  assert.equal(await db.communityPost.count({ where: { id: wPost.id } }), 1);
+  assert.equal(
+    await db.communityPhotoCleanup.count({ where: { objectKey: uPhotoKey } }),
+    0,
+    'the post photo object was removed right after the commit',
+  );
+  const carryover = await db.communitySanctionCarryover.findFirstOrThrow({
+    where: { emailHash: communitySanctionEmailHash(u.email) },
+  });
+  assert.equal(carryover.reason, 'ABUSE');
+  assert.equal(carryover.endsAt?.getTime(), uSanctionEnd.getTime());
+  pass(
+    "community: the member's posts go, their comments elsewhere stay as 탈퇴계정, an ongoing restriction is kept by email hash",
   );
 
   assertSameState(await othersState(others, [u]), before, 'others');
@@ -2092,6 +2239,9 @@ async function failures() {
 
 // ------------------------------------------------------------------ cleanup
 async function cleanup() {
+  await db.communitySanctionCarryover.deleteMany({
+    where: { emailHash: { in: communityEmailHashes } },
+  });
   const placeholders = await db.user.findMany({
     where: {
       email: { endsWith: '@deleted-member.invalid' },

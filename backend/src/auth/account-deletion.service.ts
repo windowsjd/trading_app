@@ -5,6 +5,8 @@ import { postgresErrorCode } from '../common/database-failure';
 import { classifyFailureCause } from '../common/safe-failure-cause';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { prepareCommunityAccountDeletion } from '../community/community-account-deletion';
+import { CommunityPhotoCleanupService } from '../community/community-photo-cleanup.service';
 import {
   AccountDeletionScopeChanged,
   hasOperatorFootprint,
@@ -339,6 +341,12 @@ export class AccountDeletionService {
 
     if (committed.waiting > 0) {
       try {
+        // Community photos first; the profile pass then settles the receipt
+        // once neither kind of object is left.
+        await new CommunityPhotoCleanupService(
+          this.prisma,
+          this.storage,
+        ).processAccountDeletion(committed.id);
         await this.cleanups.processAccountDeletion(committed.id);
       } catch {
         // Committed already; the cleanup worker retries the objects.
@@ -416,17 +424,27 @@ export class AccountDeletionService {
       select: { id: true },
     });
     const preserved = await preserveSettledFinalResults(tx, scope);
+    // Community: sanction carryovers, comments kept as 탈퇴계정, photo
+    // objects linked to this receipt — before the rows are purged.
+    const communityPhotos = await prepareCommunityAccountDeletion(tx, {
+      userId: member.id,
+      email: member.email,
+      accountDeletionId: receipt.id,
+      now,
+    });
     const rows = await purgeDeletionScope(tx, {
       userId: member.id,
       email: member.email,
       scope,
     });
-    const waiting = await this.cleanups.adoptForAccountDeletion(tx, {
-      userId: member.id,
-      currentKey: this.storage.managedKey(member.profileImageUrl, member.id),
-      accountDeletionId: receipt.id,
-      now,
-    });
+    const waiting =
+      communityPhotos +
+      (await this.cleanups.adoptForAccountDeletion(tx, {
+        userId: member.id,
+        currentKey: this.storage.managedKey(member.profileImageUrl, member.id),
+        accountDeletionId: receipt.id,
+        now,
+      }));
     if (waiting === 0)
       await tx.accountDeletion.update({
         where: { id: receipt.id },

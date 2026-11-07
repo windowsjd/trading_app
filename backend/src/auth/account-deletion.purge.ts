@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Prisma } from '../generated/prisma/client';
+import { lockCommunityDeletionScope } from '../community/community-account-deletion';
 
 /**
  * The database half of a self-service account deletion
@@ -116,6 +117,8 @@ export async function lockDeletionScope(
   await tx.$queryRaw`
     SELECT id FROM orders WHERE trading_account_id = ANY(${accountIds})
     ORDER BY id FOR UPDATE`;
+  // Community posts, then comments (docs/community-api-contract.md §12).
+  await lockCommunityDeletionScope(tx, userId);
 
   return {
     accountIds,
@@ -156,6 +159,11 @@ export async function hasOperatorFootprint(
         WHERE excluded_by_user_id = ${userId}
            OR ranking_hidden_by_user_id = ${userId}
            OR result_corrected_by_user_id = ${userId})
+      OR EXISTS (SELECT 1 FROM community_posts WHERE removed_by_user_id = ${userId})
+      OR EXISTS (SELECT 1 FROM community_comments WHERE removed_by_user_id = ${userId})
+      OR EXISTS (
+        SELECT 1 FROM community_sanctions
+        WHERE created_by_user_id = ${userId} OR revoked_by_user_id = ${userId})
     ) AS found`;
   return row?.found === true;
 }
@@ -455,6 +463,48 @@ export async function purgeDeletionScope(
     [
       'trading_accounts',
       Prisma.sql`DELETE FROM trading_accounts WHERE user_id = ${user}`,
+    ],
+    // Community (docs/community-api-contract.md §12). Before this,
+    // prepareCommunityAccountDeletion kept ongoing sanctions as carryovers,
+    // turned sanction-hidden comments on other members' posts into removals
+    // and unlinked the member from their comments on other members' posts
+    // (shown as 탈퇴계정). What remains: the member's posts with everything
+    // under them, the member's own likes/reports/aliases, sanctions, consent.
+    [
+      'community_comment_likes',
+      Prisma.sql`DELETE FROM community_comment_likes WHERE user_id = ${user} OR comment_id IN (SELECT c.id FROM community_comments c JOIN community_posts p ON p.id = c.post_id WHERE p.user_id = ${user})`,
+    ],
+    [
+      'community_post_likes',
+      Prisma.sql`DELETE FROM community_post_likes WHERE user_id = ${user} OR post_id IN (SELECT id FROM community_posts WHERE user_id = ${user})`,
+    ],
+    [
+      'community_reports',
+      Prisma.sql`DELETE FROM community_reports WHERE user_id = ${user} OR post_id IN (SELECT id FROM community_posts WHERE user_id = ${user}) OR comment_id IN (SELECT c.id FROM community_comments c JOIN community_posts p ON p.id = c.post_id WHERE p.user_id = ${user})`,
+    ],
+    [
+      'community_post_aliases',
+      Prisma.sql`DELETE FROM community_post_aliases WHERE user_id = ${user} OR post_id IN (SELECT id FROM community_posts WHERE user_id = ${user})`,
+    ],
+    [
+      'community_post_photos',
+      Prisma.sql`DELETE FROM community_post_photos WHERE post_id IN (SELECT id FROM community_posts WHERE user_id = ${user})`,
+    ],
+    [
+      'community_comments',
+      Prisma.sql`DELETE FROM community_comments WHERE post_id IN (SELECT id FROM community_posts WHERE user_id = ${user})`,
+    ],
+    [
+      'community_posts',
+      Prisma.sql`DELETE FROM community_posts WHERE user_id = ${user}`,
+    ],
+    [
+      'community_sanctions',
+      Prisma.sql`DELETE FROM community_sanctions WHERE user_id = ${user}`,
+    ],
+    [
+      'community_rule_consents',
+      Prisma.sql`DELETE FROM community_rule_consents WHERE user_id = ${user}`,
     ],
     // Member and social data.
     [

@@ -251,6 +251,7 @@ export function getOpsSchedulerConfig(
       [OpsJobName.crypto_order_book_retention]: false, // Dedicated bounded retention worker.
       [OpsJobName.push_notifications]: false, // Dedicated push notification worker.
       [OpsJobName.account_deletion_cleanup]: false, // Dedicated ProfileImageCleanupWorker.
+      [OpsJobName.community_photo_cleanup]: false, // Dedicated CommunityPhotoCleanupWorker.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,

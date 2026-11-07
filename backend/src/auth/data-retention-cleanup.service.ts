@@ -1,4 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  type CommunityRetentionBatch,
+  deleteCommunityRetentionBatch,
+} from '../community/community-retention';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   dataRetentionConfig,
@@ -15,11 +19,22 @@ export type DataRetentionBatch = {
   sessions: number;
   auditLogs: number;
   inquiries: number;
+} & CommunityRetentionBatch;
+
+const EMPTY_BATCH: DataRetentionBatch = {
+  sessions: 0,
+  auditLogs: 0,
+  inquiries: 0,
+  communityPosts: 0,
+  communityComments: 0,
+  communityReports: 0,
+  sanctionCarryovers: 0,
 };
 
 /**
- * Deletes refresh sessions, operator audit logs and support inquiries past
- * their retention (docs/data-retention.md). Invoked by the existing Auth
+ * Deletes refresh sessions, operator audit logs, support inquiries and
+ * community content/reports/sanction carryovers past their retention
+ * (docs/data-retention.md). Invoked by the existing Auth
  * maintenance timer right after email retention; never on the request path.
  * Each batch is one transaction under a cluster-wide advisory lock; locked
  * rows are skipped and retried by a later run.
@@ -38,11 +53,7 @@ export class DataRetentionCleanupService {
     try {
       const config = dataRetentionConfig();
       if (!config.enabled) return;
-      const deleted: DataRetentionBatch = {
-        sessions: 0,
-        auditLogs: 0,
-        inquiries: 0,
-      };
+      const deleted: DataRetentionBatch = { ...EMPTY_BATCH };
       let ran = false;
       let backlog = false;
       for (let batch = 0; batch < DATA_RETENTION_MAX_BATCHES; batch++) {
@@ -50,9 +61,10 @@ export class DataRetentionCleanupService {
         // Another instance holds the lock and does this work.
         if (!result) break;
         ran = true;
-        deleted.sessions += result.sessions;
-        deleted.auditLogs += result.auditLogs;
-        deleted.inquiries += result.inquiries;
+        for (const key of Object.keys(
+          EMPTY_BATCH,
+        ) as (keyof DataRetentionBatch)[])
+          deleted[key] += result[key];
         backlog = Object.values(result).some(
           (count) => count >= DATA_RETENTION_BATCH,
         );
@@ -122,7 +134,17 @@ export class DataRetentionCleanupService {
           await tx.$executeRaw`
           DELETE FROM inquiries WHERE id = ANY(${ids}::text[])`;
         }
-        return { sessions, auditLogs, inquiries: inquiries.length };
+        // Community (docs/community-api-contract.md §13), same lock and clock.
+        const community = await deleteCommunityRetentionBatch(
+          tx,
+          DATA_RETENTION_BATCH,
+        );
+        return {
+          sessions,
+          auditLogs,
+          inquiries: inquiries.length,
+          ...community,
+        };
       },
       { maxWait: 500, timeout: 20_000 },
     );

@@ -376,7 +376,8 @@ export const OpsJobName = {
   futures_tp_sl_settings: 'futures_tp_sl_settings',
   crypto_order_book_retention: 'crypto_order_book_retention',
   push_notifications: 'push_notifications',
-  account_deletion_cleanup: 'account_deletion_cleanup'
+  account_deletion_cleanup: 'account_deletion_cleanup',
+  community_photo_cleanup: 'community_photo_cleanup'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -663,3 +664,32 @@ export const AccountDeletionStatus = {
 } as const
 
 export type AccountDeletionStatus = (typeof AccountDeletionStatus)[keyof typeof AccountDeletionStatus]
+
+
+export const CommunityCategory = {
+  free: 'free',
+  theory: 'theory'
+} as const
+
+export type CommunityCategory = (typeof CommunityCategory)[keyof typeof CommunityCategory]
+
+
+export const CommunityModerationReason = {
+  AD_SPAM: 'AD_SPAM',
+  ABUSE: 'ABUSE',
+  FLOOD: 'FLOOD',
+  PERSONAL_INFO: 'PERSONAL_INFO',
+  ILLEGAL_OR_SOLICITATION: 'ILLEGAL_OR_SOLICITATION',
+  INAPPROPRIATE_MEDIA: 'INAPPROPRIATE_MEDIA',
+  OTHER: 'OTHER'
+} as const
+
+export type CommunityModerationReason = (typeof CommunityModerationReason)[keyof typeof CommunityModerationReason]
+
+
+export const CommunityDeletionKind = {
+  author: 'author',
+  operator: 'operator'
+} as const
+
+export type CommunityDeletionKind = (typeof CommunityDeletionKind)[keyof typeof CommunityDeletionKind]

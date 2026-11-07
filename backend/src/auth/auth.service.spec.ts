@@ -70,6 +70,13 @@ describe('AuthService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      // Signup re-applies a community restriction kept from a deleted
+      // account with the same email (none by default).
+      communitySanctionCarryover: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      communitySanction: { create: jest.fn() },
     };
 
     prisma.$transaction.mockImplementation(
@@ -254,6 +261,57 @@ describe('AuthService', () => {
     expect(storedTokenHash).not.toBe(response.data.tokens.refreshToken);
     expect(storedTokenHash).toBe(hashToken(response.data.tokens.refreshToken));
     expect(JSON.stringify(response)).not.toContain('passwordHash');
+  });
+
+  it('re-applies a community restriction kept from a deleted account with the same email', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    prisma.user.create.mockResolvedValueOnce({
+      id: activeUser.id,
+      email: activeUser.email,
+      nickname: activeUser.nickname,
+      role: activeUser.role,
+      status: activeUser.status,
+    });
+    const endsAt = new Date(Date.now() + 3 * 24 * 3_600_000);
+    prisma.communitySanctionCarryover.findMany.mockResolvedValueOnce([
+      // expired: ignored
+      {
+        reason: 'FLOOD',
+        endsAt: new Date(Date.now() - 1000),
+        expiresAt: new Date(Date.now() - 1000),
+      },
+      { reason: 'ABUSE', endsAt, expiresAt: endsAt },
+    ]);
+
+    await service.signup({
+      email: 'USER@example.com ',
+      password: 'Password123!',
+      nickname: 'traderKim',
+      ...consent,
+    });
+
+    const [[lookup]] = prisma.communitySanctionCarryover.findMany.mock
+      .calls as unknown as [[{ where: { emailHash: string } }]];
+    // Same normalization as signup: trimmed, lower-cased email.
+    expect(lookup.where.emailHash).toBe(
+      createHash('sha256')
+        .update('community-sanction:user@example.com')
+        .digest('hex'),
+    );
+    expect(prisma.communitySanction.create).toHaveBeenCalledTimes(1);
+    const [[created]] = prisma.communitySanction.create.mock
+      .calls as unknown as [[{ data: Record<string, unknown> }]];
+    expect(created.data.userId).toBe(activeUser.id);
+    expect(created.data.reason).toBe('ABUSE');
+    expect((created.data.endsAt as Date).getTime()).toBe(endsAt.getTime());
+    expect(created.data.carriedOver).toBe(true);
+    expect(created.data.hideContent).toBe(false);
+    expect(prisma.communitySanctionCarryover.deleteMany).toHaveBeenCalledWith({
+      where: { emailHash: lookup.where.emailHash },
+    });
   });
 
   it('rejects duplicate email during signup', async () => {

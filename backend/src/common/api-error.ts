@@ -14,11 +14,15 @@ export function apiErrorDiagnosticMessage(error: unknown): string | undefined {
 /** HTTP surface: the global filter supplies diagnostics, never this factory.
  * A new code does not make arbitrary message text safe. Add reviewed fixed
  * product messages to the public policy independently of the diagnostic catalog.
+ * `details` carries reviewed structured fields a client needs (e.g. the end
+ * of a community restriction); never exception text or raw payloads. The
+ * global filter keeps it on 4xx responses only.
  */
 export function createApiError(
   code: string,
   message: string,
   status: number,
+  details?: Record<string, unknown>,
 ): HttpException {
   const publicMessage =
     safePublicErrorMessage(message) ?? 'Request could not be completed.';
@@ -30,6 +34,7 @@ export function createApiError(
           ? code
           : 'INTERNAL_SERVER_ERROR',
         message: publicMessage,
+        ...(details ? { details } : {}),
       },
     },
     status,

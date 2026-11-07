@@ -1605,6 +1605,74 @@ export type EnumAccountDeletionStatusWithAggregatesFilter<$PrismaModel = never> 
   _max?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel>
 }
 
+export type EnumCommunityCategoryFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityCategory | Prisma.EnumCommunityCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.CommunityCategory[] | Prisma.ListEnumCommunityCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CommunityCategory[] | Prisma.ListEnumCommunityCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCommunityCategoryFilter<$PrismaModel> | $Enums.CommunityCategory
+}
+
+export type EnumCommunityDeletionKindNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityDeletionKind | Prisma.EnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CommunityDeletionKind[] | Prisma.ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CommunityDeletionKind[] | Prisma.ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCommunityDeletionKindNullableFilter<$PrismaModel> | $Enums.CommunityDeletionKind | null
+}
+
+export type EnumCommunityModerationReasonNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityModerationReason | Prisma.EnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCommunityModerationReasonNullableFilter<$PrismaModel> | $Enums.CommunityModerationReason | null
+}
+
+export type EnumCommunityCategoryWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityCategory | Prisma.EnumCommunityCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.CommunityCategory[] | Prisma.ListEnumCommunityCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CommunityCategory[] | Prisma.ListEnumCommunityCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCommunityCategoryWithAggregatesFilter<$PrismaModel> | $Enums.CommunityCategory
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCommunityCategoryFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCommunityCategoryFilter<$PrismaModel>
+}
+
+export type EnumCommunityDeletionKindNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityDeletionKind | Prisma.EnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CommunityDeletionKind[] | Prisma.ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CommunityDeletionKind[] | Prisma.ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCommunityDeletionKindNullableWithAggregatesFilter<$PrismaModel> | $Enums.CommunityDeletionKind | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCommunityDeletionKindNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCommunityDeletionKindNullableFilter<$PrismaModel>
+}
+
+export type EnumCommunityModerationReasonNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityModerationReason | Prisma.EnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCommunityModerationReasonNullableWithAggregatesFilter<$PrismaModel> | $Enums.CommunityModerationReason | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCommunityModerationReasonNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCommunityModerationReasonNullableFilter<$PrismaModel>
+}
+
+export type EnumCommunityModerationReasonFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityModerationReason | Prisma.EnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  in?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCommunityModerationReasonFilter<$PrismaModel> | $Enums.CommunityModerationReason
+}
+
+export type EnumCommunityModerationReasonWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityModerationReason | Prisma.EnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  in?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCommunityModerationReasonWithAggregatesFilter<$PrismaModel> | $Enums.CommunityModerationReason
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCommunityModerationReasonFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCommunityModerationReasonFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -3153,6 +3221,74 @@ export type NestedEnumAccountDeletionStatusWithAggregatesFilter<$PrismaModel = n
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumCommunityCategoryFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityCategory | Prisma.EnumCommunityCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.CommunityCategory[] | Prisma.ListEnumCommunityCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CommunityCategory[] | Prisma.ListEnumCommunityCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCommunityCategoryFilter<$PrismaModel> | $Enums.CommunityCategory
+}
+
+export type NestedEnumCommunityDeletionKindNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityDeletionKind | Prisma.EnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CommunityDeletionKind[] | Prisma.ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CommunityDeletionKind[] | Prisma.ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCommunityDeletionKindNullableFilter<$PrismaModel> | $Enums.CommunityDeletionKind | null
+}
+
+export type NestedEnumCommunityModerationReasonNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityModerationReason | Prisma.EnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCommunityModerationReasonNullableFilter<$PrismaModel> | $Enums.CommunityModerationReason | null
+}
+
+export type NestedEnumCommunityCategoryWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityCategory | Prisma.EnumCommunityCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.CommunityCategory[] | Prisma.ListEnumCommunityCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CommunityCategory[] | Prisma.ListEnumCommunityCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCommunityCategoryWithAggregatesFilter<$PrismaModel> | $Enums.CommunityCategory
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCommunityCategoryFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCommunityCategoryFilter<$PrismaModel>
+}
+
+export type NestedEnumCommunityDeletionKindNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityDeletionKind | Prisma.EnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CommunityDeletionKind[] | Prisma.ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CommunityDeletionKind[] | Prisma.ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCommunityDeletionKindNullableWithAggregatesFilter<$PrismaModel> | $Enums.CommunityDeletionKind | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCommunityDeletionKindNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCommunityDeletionKindNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumCommunityModerationReasonNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityModerationReason | Prisma.EnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCommunityModerationReasonNullableWithAggregatesFilter<$PrismaModel> | $Enums.CommunityModerationReason | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCommunityModerationReasonNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCommunityModerationReasonNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumCommunityModerationReasonFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityModerationReason | Prisma.EnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  in?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCommunityModerationReasonFilter<$PrismaModel> | $Enums.CommunityModerationReason
+}
+
+export type NestedEnumCommunityModerationReasonWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CommunityModerationReason | Prisma.EnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  in?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  notIn?: $Enums.CommunityModerationReason[] | Prisma.ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumCommunityModerationReasonWithAggregatesFilter<$PrismaModel> | $Enums.CommunityModerationReason
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCommunityModerationReasonFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCommunityModerationReasonFilter<$PrismaModel>
 }
 
 

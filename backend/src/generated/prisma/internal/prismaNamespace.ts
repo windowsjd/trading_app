@@ -461,7 +461,18 @@ export const ModelName = {
   EmailAuthChallenge: 'EmailAuthChallenge',
   EmailAuthRateBucket: 'EmailAuthRateBucket',
   AccountDeletion: 'AccountDeletion',
-  ProfileImageCleanup: 'ProfileImageCleanup'
+  ProfileImageCleanup: 'ProfileImageCleanup',
+  CommunityPost: 'CommunityPost',
+  CommunityPostPhoto: 'CommunityPostPhoto',
+  CommunityComment: 'CommunityComment',
+  CommunityPostLike: 'CommunityPostLike',
+  CommunityCommentLike: 'CommunityCommentLike',
+  CommunityPostAlias: 'CommunityPostAlias',
+  CommunityReport: 'CommunityReport',
+  CommunitySanction: 'CommunitySanction',
+  CommunitySanctionCarryover: 'CommunitySanctionCarryover',
+  CommunityRuleConsent: 'CommunityRuleConsent',
+  CommunityPhotoCleanup: 'CommunityPhotoCleanup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -477,7 +488,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLeverageChange" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLeverageChange" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup" | "communityPost" | "communityPostPhoto" | "communityComment" | "communityPostLike" | "communityCommentLike" | "communityPostAlias" | "communityReport" | "communitySanction" | "communitySanctionCarryover" | "communityRuleConsent" | "communityPhotoCleanup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -6253,6 +6264,820 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    CommunityPost: {
+      payload: Prisma.$CommunityPostPayload<ExtArgs>
+      fields: Prisma.CommunityPostFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityPostFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityPostFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityPostFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityPostFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>
+        }
+        findMany: {
+          args: Prisma.CommunityPostFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>[]
+        }
+        create: {
+          args: Prisma.CommunityPostCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>
+        }
+        createMany: {
+          args: Prisma.CommunityPostCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityPostCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityPostDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>
+        }
+        update: {
+          args: Prisma.CommunityPostUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityPostDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityPostUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityPostUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityPostUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityPostAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityPost>
+        }
+        groupBy: {
+          args: Prisma.CommunityPostGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPostGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityPostCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPostCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunityPostPhoto: {
+      payload: Prisma.$CommunityPostPhotoPayload<ExtArgs>
+      fields: Prisma.CommunityPostPhotoFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityPostPhotoFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityPostPhotoFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityPostPhotoFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityPostPhotoFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>
+        }
+        findMany: {
+          args: Prisma.CommunityPostPhotoFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>[]
+        }
+        create: {
+          args: Prisma.CommunityPostPhotoCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>
+        }
+        createMany: {
+          args: Prisma.CommunityPostPhotoCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityPostPhotoCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityPostPhotoDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>
+        }
+        update: {
+          args: Prisma.CommunityPostPhotoUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityPostPhotoDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityPostPhotoUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityPostPhotoUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityPostPhotoUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostPhotoPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityPostPhotoAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityPostPhoto>
+        }
+        groupBy: {
+          args: Prisma.CommunityPostPhotoGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPostPhotoGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityPostPhotoCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPostPhotoCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunityComment: {
+      payload: Prisma.$CommunityCommentPayload<ExtArgs>
+      fields: Prisma.CommunityCommentFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityCommentFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityCommentFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityCommentFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityCommentFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>
+        }
+        findMany: {
+          args: Prisma.CommunityCommentFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>[]
+        }
+        create: {
+          args: Prisma.CommunityCommentCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>
+        }
+        createMany: {
+          args: Prisma.CommunityCommentCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityCommentCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityCommentDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>
+        }
+        update: {
+          args: Prisma.CommunityCommentUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityCommentDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityCommentUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityCommentUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityCommentUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityCommentAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityComment>
+        }
+        groupBy: {
+          args: Prisma.CommunityCommentGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityCommentGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityCommentCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityCommentCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunityPostLike: {
+      payload: Prisma.$CommunityPostLikePayload<ExtArgs>
+      fields: Prisma.CommunityPostLikeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityPostLikeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityPostLikeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityPostLikeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityPostLikeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>
+        }
+        findMany: {
+          args: Prisma.CommunityPostLikeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>[]
+        }
+        create: {
+          args: Prisma.CommunityPostLikeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>
+        }
+        createMany: {
+          args: Prisma.CommunityPostLikeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityPostLikeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityPostLikeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>
+        }
+        update: {
+          args: Prisma.CommunityPostLikeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityPostLikeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityPostLikeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityPostLikeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityPostLikeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostLikePayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityPostLikeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityPostLike>
+        }
+        groupBy: {
+          args: Prisma.CommunityPostLikeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPostLikeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityPostLikeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPostLikeCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunityCommentLike: {
+      payload: Prisma.$CommunityCommentLikePayload<ExtArgs>
+      fields: Prisma.CommunityCommentLikeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityCommentLikeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityCommentLikeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityCommentLikeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityCommentLikeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>
+        }
+        findMany: {
+          args: Prisma.CommunityCommentLikeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>[]
+        }
+        create: {
+          args: Prisma.CommunityCommentLikeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>
+        }
+        createMany: {
+          args: Prisma.CommunityCommentLikeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityCommentLikeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityCommentLikeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>
+        }
+        update: {
+          args: Prisma.CommunityCommentLikeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityCommentLikeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityCommentLikeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityCommentLikeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityCommentLikeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityCommentLikePayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityCommentLikeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityCommentLike>
+        }
+        groupBy: {
+          args: Prisma.CommunityCommentLikeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityCommentLikeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityCommentLikeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityCommentLikeCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunityPostAlias: {
+      payload: Prisma.$CommunityPostAliasPayload<ExtArgs>
+      fields: Prisma.CommunityPostAliasFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityPostAliasFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityPostAliasFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityPostAliasFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityPostAliasFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>
+        }
+        findMany: {
+          args: Prisma.CommunityPostAliasFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>[]
+        }
+        create: {
+          args: Prisma.CommunityPostAliasCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>
+        }
+        createMany: {
+          args: Prisma.CommunityPostAliasCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityPostAliasCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityPostAliasDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>
+        }
+        update: {
+          args: Prisma.CommunityPostAliasUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityPostAliasDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityPostAliasUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityPostAliasUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityPostAliasUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPostAliasPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityPostAliasAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityPostAlias>
+        }
+        groupBy: {
+          args: Prisma.CommunityPostAliasGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPostAliasGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityPostAliasCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPostAliasCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunityReport: {
+      payload: Prisma.$CommunityReportPayload<ExtArgs>
+      fields: Prisma.CommunityReportFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityReportFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityReportFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityReportFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityReportFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>
+        }
+        findMany: {
+          args: Prisma.CommunityReportFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>[]
+        }
+        create: {
+          args: Prisma.CommunityReportCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>
+        }
+        createMany: {
+          args: Prisma.CommunityReportCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityReportCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityReportDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>
+        }
+        update: {
+          args: Prisma.CommunityReportUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityReportDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityReportUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityReportUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityReportUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityReportPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityReportAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityReport>
+        }
+        groupBy: {
+          args: Prisma.CommunityReportGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityReportGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityReportCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityReportCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunitySanction: {
+      payload: Prisma.$CommunitySanctionPayload<ExtArgs>
+      fields: Prisma.CommunitySanctionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunitySanctionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunitySanctionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunitySanctionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunitySanctionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>
+        }
+        findMany: {
+          args: Prisma.CommunitySanctionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>[]
+        }
+        create: {
+          args: Prisma.CommunitySanctionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>
+        }
+        createMany: {
+          args: Prisma.CommunitySanctionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunitySanctionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunitySanctionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>
+        }
+        update: {
+          args: Prisma.CommunitySanctionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunitySanctionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunitySanctionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunitySanctionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunitySanctionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunitySanctionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunitySanction>
+        }
+        groupBy: {
+          args: Prisma.CommunitySanctionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunitySanctionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunitySanctionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunitySanctionCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunitySanctionCarryover: {
+      payload: Prisma.$CommunitySanctionCarryoverPayload<ExtArgs>
+      fields: Prisma.CommunitySanctionCarryoverFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunitySanctionCarryoverFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunitySanctionCarryoverFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunitySanctionCarryoverFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunitySanctionCarryoverFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>
+        }
+        findMany: {
+          args: Prisma.CommunitySanctionCarryoverFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>[]
+        }
+        create: {
+          args: Prisma.CommunitySanctionCarryoverCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>
+        }
+        createMany: {
+          args: Prisma.CommunitySanctionCarryoverCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunitySanctionCarryoverCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunitySanctionCarryoverDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>
+        }
+        update: {
+          args: Prisma.CommunitySanctionCarryoverUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunitySanctionCarryoverDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunitySanctionCarryoverUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunitySanctionCarryoverUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunitySanctionCarryoverUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunitySanctionCarryoverPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunitySanctionCarryoverAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunitySanctionCarryover>
+        }
+        groupBy: {
+          args: Prisma.CommunitySanctionCarryoverGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunitySanctionCarryoverGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunitySanctionCarryoverCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunitySanctionCarryoverCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunityRuleConsent: {
+      payload: Prisma.$CommunityRuleConsentPayload<ExtArgs>
+      fields: Prisma.CommunityRuleConsentFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityRuleConsentFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityRuleConsentFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityRuleConsentFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityRuleConsentFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>
+        }
+        findMany: {
+          args: Prisma.CommunityRuleConsentFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>[]
+        }
+        create: {
+          args: Prisma.CommunityRuleConsentCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>
+        }
+        createMany: {
+          args: Prisma.CommunityRuleConsentCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityRuleConsentCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityRuleConsentDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>
+        }
+        update: {
+          args: Prisma.CommunityRuleConsentUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityRuleConsentDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityRuleConsentUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityRuleConsentUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityRuleConsentUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityRuleConsentPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityRuleConsentAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityRuleConsent>
+        }
+        groupBy: {
+          args: Prisma.CommunityRuleConsentGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityRuleConsentGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityRuleConsentCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityRuleConsentCountAggregateOutputType> | number
+        }
+      }
+    }
+    CommunityPhotoCleanup: {
+      payload: Prisma.$CommunityPhotoCleanupPayload<ExtArgs>
+      fields: Prisma.CommunityPhotoCleanupFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CommunityPhotoCleanupFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CommunityPhotoCleanupFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>
+        }
+        findFirst: {
+          args: Prisma.CommunityPhotoCleanupFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CommunityPhotoCleanupFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>
+        }
+        findMany: {
+          args: Prisma.CommunityPhotoCleanupFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>[]
+        }
+        create: {
+          args: Prisma.CommunityPhotoCleanupCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>
+        }
+        createMany: {
+          args: Prisma.CommunityPhotoCleanupCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CommunityPhotoCleanupCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>[]
+        }
+        delete: {
+          args: Prisma.CommunityPhotoCleanupDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>
+        }
+        update: {
+          args: Prisma.CommunityPhotoCleanupUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>
+        }
+        deleteMany: {
+          args: Prisma.CommunityPhotoCleanupDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CommunityPhotoCleanupUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CommunityPhotoCleanupUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>[]
+        }
+        upsert: {
+          args: Prisma.CommunityPhotoCleanupUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CommunityPhotoCleanupPayload>
+        }
+        aggregate: {
+          args: Prisma.CommunityPhotoCleanupAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCommunityPhotoCleanup>
+        }
+        groupBy: {
+          args: Prisma.CommunityPhotoCleanupGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPhotoCleanupGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CommunityPhotoCleanupCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CommunityPhotoCleanupCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -7884,6 +8709,159 @@ export const ProfileImageCleanupScalarFieldEnum = {
 export type ProfileImageCleanupScalarFieldEnum = (typeof ProfileImageCleanupScalarFieldEnum)[keyof typeof ProfileImageCleanupScalarFieldEnum]
 
 
+export const CommunityPostScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  clientRequestId: 'clientRequestId',
+  category: 'category',
+  body: 'body',
+  anonymous: 'anonymous',
+  assetId: 'assetId',
+  createdAt: 'createdAt',
+  deletedAt: 'deletedAt',
+  deletionKind: 'deletionKind',
+  removedByUserId: 'removedByUserId',
+  removalReason: 'removalReason',
+  removalNote: 'removalNote',
+  hiddenBySanctionId: 'hiddenBySanctionId'
+} as const
+
+export type CommunityPostScalarFieldEnum = (typeof CommunityPostScalarFieldEnum)[keyof typeof CommunityPostScalarFieldEnum]
+
+
+export const CommunityPostPhotoScalarFieldEnum = {
+  id: 'id',
+  postId: 'postId',
+  position: 'position',
+  objectKey: 'objectKey',
+  width: 'width',
+  height: 'height',
+  byteSize: 'byteSize',
+  sha256: 'sha256',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityPostPhotoScalarFieldEnum = (typeof CommunityPostPhotoScalarFieldEnum)[keyof typeof CommunityPostPhotoScalarFieldEnum]
+
+
+export const CommunityCommentScalarFieldEnum = {
+  id: 'id',
+  postId: 'postId',
+  userId: 'userId',
+  parentCommentId: 'parentCommentId',
+  clientRequestId: 'clientRequestId',
+  body: 'body',
+  anonymous: 'anonymous',
+  createdAt: 'createdAt',
+  deletedAt: 'deletedAt',
+  deletionKind: 'deletionKind',
+  removedByUserId: 'removedByUserId',
+  removalReason: 'removalReason',
+  removalNote: 'removalNote',
+  hiddenBySanctionId: 'hiddenBySanctionId',
+  erasedAt: 'erasedAt'
+} as const
+
+export type CommunityCommentScalarFieldEnum = (typeof CommunityCommentScalarFieldEnum)[keyof typeof CommunityCommentScalarFieldEnum]
+
+
+export const CommunityPostLikeScalarFieldEnum = {
+  id: 'id',
+  postId: 'postId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityPostLikeScalarFieldEnum = (typeof CommunityPostLikeScalarFieldEnum)[keyof typeof CommunityPostLikeScalarFieldEnum]
+
+
+export const CommunityCommentLikeScalarFieldEnum = {
+  id: 'id',
+  commentId: 'commentId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityCommentLikeScalarFieldEnum = (typeof CommunityCommentLikeScalarFieldEnum)[keyof typeof CommunityCommentLikeScalarFieldEnum]
+
+
+export const CommunityPostAliasScalarFieldEnum = {
+  id: 'id',
+  postId: 'postId',
+  userId: 'userId',
+  aliasNo: 'aliasNo',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityPostAliasScalarFieldEnum = (typeof CommunityPostAliasScalarFieldEnum)[keyof typeof CommunityPostAliasScalarFieldEnum]
+
+
+export const CommunityReportScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  postId: 'postId',
+  commentId: 'commentId',
+  reason: 'reason',
+  note: 'note',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunityReportScalarFieldEnum = (typeof CommunityReportScalarFieldEnum)[keyof typeof CommunityReportScalarFieldEnum]
+
+
+export const CommunitySanctionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  reason: 'reason',
+  note: 'note',
+  hideContent: 'hideContent',
+  createdAt: 'createdAt',
+  endsAt: 'endsAt',
+  createdByUserId: 'createdByUserId',
+  revokedAt: 'revokedAt',
+  revokedByUserId: 'revokedByUserId',
+  carriedOver: 'carriedOver'
+} as const
+
+export type CommunitySanctionScalarFieldEnum = (typeof CommunitySanctionScalarFieldEnum)[keyof typeof CommunitySanctionScalarFieldEnum]
+
+
+export const CommunitySanctionCarryoverScalarFieldEnum = {
+  id: 'id',
+  emailHash: 'emailHash',
+  reason: 'reason',
+  endsAt: 'endsAt',
+  sanctionedAt: 'sanctionedAt',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+} as const
+
+export type CommunitySanctionCarryoverScalarFieldEnum = (typeof CommunitySanctionCarryoverScalarFieldEnum)[keyof typeof CommunitySanctionCarryoverScalarFieldEnum]
+
+
+export const CommunityRuleConsentScalarFieldEnum = {
+  userId: 'userId',
+  rulesVersion: 'rulesVersion',
+  acceptedAt: 'acceptedAt'
+} as const
+
+export type CommunityRuleConsentScalarFieldEnum = (typeof CommunityRuleConsentScalarFieldEnum)[keyof typeof CommunityRuleConsentScalarFieldEnum]
+
+
+export const CommunityPhotoCleanupScalarFieldEnum = {
+  objectKey: 'objectKey',
+  userId: 'userId',
+  accountDeletionId: 'accountDeletionId',
+  attempts: 'attempts',
+  nextAttemptAt: 'nextAttemptAt',
+  lastErrorCode: 'lastErrorCode',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CommunityPhotoCleanupScalarFieldEnum = (typeof CommunityPhotoCleanupScalarFieldEnum)[keyof typeof CommunityPhotoCleanupScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -8954,6 +9932,48 @@ export type ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel> = FieldRefI
 
 
 /**
+ * Reference to a field of type 'CommunityCategory'
+ */
+export type EnumCommunityCategoryFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunityCategory'>
+    
+
+
+/**
+ * Reference to a field of type 'CommunityCategory[]'
+ */
+export type ListEnumCommunityCategoryFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunityCategory[]'>
+    
+
+
+/**
+ * Reference to a field of type 'CommunityDeletionKind'
+ */
+export type EnumCommunityDeletionKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunityDeletionKind'>
+    
+
+
+/**
+ * Reference to a field of type 'CommunityDeletionKind[]'
+ */
+export type ListEnumCommunityDeletionKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunityDeletionKind[]'>
+    
+
+
+/**
+ * Reference to a field of type 'CommunityModerationReason'
+ */
+export type EnumCommunityModerationReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunityModerationReason'>
+    
+
+
+/**
+ * Reference to a field of type 'CommunityModerationReason[]'
+ */
+export type ListEnumCommunityModerationReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CommunityModerationReason[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -9139,6 +10159,17 @@ export type GlobalOmitConfig = {
   emailAuthRateBucket?: Prisma.EmailAuthRateBucketOmit
   accountDeletion?: Prisma.AccountDeletionOmit
   profileImageCleanup?: Prisma.ProfileImageCleanupOmit
+  communityPost?: Prisma.CommunityPostOmit
+  communityPostPhoto?: Prisma.CommunityPostPhotoOmit
+  communityComment?: Prisma.CommunityCommentOmit
+  communityPostLike?: Prisma.CommunityPostLikeOmit
+  communityCommentLike?: Prisma.CommunityCommentLikeOmit
+  communityPostAlias?: Prisma.CommunityPostAliasOmit
+  communityReport?: Prisma.CommunityReportOmit
+  communitySanction?: Prisma.CommunitySanctionOmit
+  communitySanctionCarryover?: Prisma.CommunitySanctionCarryoverOmit
+  communityRuleConsent?: Prisma.CommunityRuleConsentOmit
+  communityPhotoCleanup?: Prisma.CommunityPhotoCleanupOmit
 }
 
 /* Types for Logging */
