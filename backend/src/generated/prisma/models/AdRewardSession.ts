@@ -26,8 +26,18 @@ export type AdRewardSessionModel = runtime.Types.Result.DefaultSelection<Prisma.
 
 export type AggregateAdRewardSession = {
   _count: AdRewardSessionCountAggregateOutputType | null
+  _avg: AdRewardSessionAvgAggregateOutputType | null
+  _sum: AdRewardSessionSumAggregateOutputType | null
   _min: AdRewardSessionMinAggregateOutputType | null
   _max: AdRewardSessionMaxAggregateOutputType | null
+}
+
+export type AdRewardSessionAvgAggregateOutputType = {
+  redemptionAttemptCount: number | null
+}
+
+export type AdRewardSessionSumAggregateOutputType = {
+  redemptionAttemptCount: number | null
 }
 
 export type AdRewardSessionMinAggregateOutputType = {
@@ -47,6 +57,10 @@ export type AdRewardSessionMinAggregateOutputType = {
   ssvKeyId: string | null
   ssvRewardItem: string | null
   ssvRewardAmount: string | null
+  redemptionStatus: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount: number | null
+  redemptionNextAttemptAt: Date | null
+  redemptionErrorCode: string | null
 }
 
 export type AdRewardSessionMaxAggregateOutputType = {
@@ -66,6 +80,10 @@ export type AdRewardSessionMaxAggregateOutputType = {
   ssvKeyId: string | null
   ssvRewardItem: string | null
   ssvRewardAmount: string | null
+  redemptionStatus: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount: number | null
+  redemptionNextAttemptAt: Date | null
+  redemptionErrorCode: string | null
 }
 
 export type AdRewardSessionCountAggregateOutputType = {
@@ -85,9 +103,21 @@ export type AdRewardSessionCountAggregateOutputType = {
   ssvKeyId: number
   ssvRewardItem: number
   ssvRewardAmount: number
+  redemptionStatus: number
+  redemptionAttemptCount: number
+  redemptionNextAttemptAt: number
+  redemptionErrorCode: number
   _all: number
 }
 
+
+export type AdRewardSessionAvgAggregateInputType = {
+  redemptionAttemptCount?: true
+}
+
+export type AdRewardSessionSumAggregateInputType = {
+  redemptionAttemptCount?: true
+}
 
 export type AdRewardSessionMinAggregateInputType = {
   id?: true
@@ -106,6 +136,10 @@ export type AdRewardSessionMinAggregateInputType = {
   ssvKeyId?: true
   ssvRewardItem?: true
   ssvRewardAmount?: true
+  redemptionStatus?: true
+  redemptionAttemptCount?: true
+  redemptionNextAttemptAt?: true
+  redemptionErrorCode?: true
 }
 
 export type AdRewardSessionMaxAggregateInputType = {
@@ -125,6 +159,10 @@ export type AdRewardSessionMaxAggregateInputType = {
   ssvKeyId?: true
   ssvRewardItem?: true
   ssvRewardAmount?: true
+  redemptionStatus?: true
+  redemptionAttemptCount?: true
+  redemptionNextAttemptAt?: true
+  redemptionErrorCode?: true
 }
 
 export type AdRewardSessionCountAggregateInputType = {
@@ -144,6 +182,10 @@ export type AdRewardSessionCountAggregateInputType = {
   ssvKeyId?: true
   ssvRewardItem?: true
   ssvRewardAmount?: true
+  redemptionStatus?: true
+  redemptionAttemptCount?: true
+  redemptionNextAttemptAt?: true
+  redemptionErrorCode?: true
   _all?: true
 }
 
@@ -185,6 +227,18 @@ export type AdRewardSessionAggregateArgs<ExtArgs extends runtime.Types.Extension
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: AdRewardSessionAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: AdRewardSessionSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: AdRewardSessionMinAggregateInputType
@@ -215,6 +269,8 @@ export type AdRewardSessionGroupByArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   _count?: AdRewardSessionCountAggregateInputType | true
+  _avg?: AdRewardSessionAvgAggregateInputType
+  _sum?: AdRewardSessionSumAggregateInputType
   _min?: AdRewardSessionMinAggregateInputType
   _max?: AdRewardSessionMaxAggregateInputType
 }
@@ -236,7 +292,13 @@ export type AdRewardSessionGroupByOutputType = {
   ssvKeyId: string | null
   ssvRewardItem: string | null
   ssvRewardAmount: string | null
+  redemptionStatus: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount: number
+  redemptionNextAttemptAt: Date | null
+  redemptionErrorCode: string | null
   _count: AdRewardSessionCountAggregateOutputType | null
+  _avg: AdRewardSessionAvgAggregateOutputType | null
+  _sum: AdRewardSessionSumAggregateOutputType | null
   _min: AdRewardSessionMinAggregateOutputType | null
   _max: AdRewardSessionMaxAggregateOutputType | null
 }
@@ -276,6 +338,10 @@ export type AdRewardSessionWhereInput = {
   ssvKeyId?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
   ssvRewardItem?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
   ssvRewardAmount?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
+  redemptionStatus?: Prisma.EnumAdRewardRedemptionStatusNullableFilter<"AdRewardSession"> | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFilter<"AdRewardSession"> | number
+  redemptionNextAttemptAt?: Prisma.DateTimeNullableFilter<"AdRewardSession"> | Date | string | null
+  redemptionErrorCode?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
 }
@@ -297,6 +363,10 @@ export type AdRewardSessionOrderByWithRelationInput = {
   ssvKeyId?: Prisma.SortOrderInput | Prisma.SortOrder
   ssvRewardItem?: Prisma.SortOrderInput | Prisma.SortOrder
   ssvRewardAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  redemptionStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  redemptionAttemptCount?: Prisma.SortOrder
+  redemptionNextAttemptAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  redemptionErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
 }
@@ -322,6 +392,10 @@ export type AdRewardSessionWhereUniqueInput = Prisma.AtLeast<{
   ssvKeyId?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
   ssvRewardItem?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
   ssvRewardAmount?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
+  redemptionStatus?: Prisma.EnumAdRewardRedemptionStatusNullableFilter<"AdRewardSession"> | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFilter<"AdRewardSession"> | number
+  redemptionNextAttemptAt?: Prisma.DateTimeNullableFilter<"AdRewardSession"> | Date | string | null
+  redemptionErrorCode?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
 }, "id" | "ssvTransactionId" | "tradingAccountId_idempotencyKey">
@@ -343,9 +417,15 @@ export type AdRewardSessionOrderByWithAggregationInput = {
   ssvKeyId?: Prisma.SortOrderInput | Prisma.SortOrder
   ssvRewardItem?: Prisma.SortOrderInput | Prisma.SortOrder
   ssvRewardAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  redemptionStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  redemptionAttemptCount?: Prisma.SortOrder
+  redemptionNextAttemptAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  redemptionErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.AdRewardSessionCountOrderByAggregateInput
+  _avg?: Prisma.AdRewardSessionAvgOrderByAggregateInput
   _max?: Prisma.AdRewardSessionMaxOrderByAggregateInput
   _min?: Prisma.AdRewardSessionMinOrderByAggregateInput
+  _sum?: Prisma.AdRewardSessionSumOrderByAggregateInput
 }
 
 export type AdRewardSessionScalarWhereWithAggregatesInput = {
@@ -368,6 +448,10 @@ export type AdRewardSessionScalarWhereWithAggregatesInput = {
   ssvKeyId?: Prisma.StringNullableWithAggregatesFilter<"AdRewardSession"> | string | null
   ssvRewardItem?: Prisma.StringNullableWithAggregatesFilter<"AdRewardSession"> | string | null
   ssvRewardAmount?: Prisma.StringNullableWithAggregatesFilter<"AdRewardSession"> | string | null
+  redemptionStatus?: Prisma.EnumAdRewardRedemptionStatusNullableWithAggregatesFilter<"AdRewardSession"> | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntWithAggregatesFilter<"AdRewardSession"> | number
+  redemptionNextAttemptAt?: Prisma.DateTimeNullableWithAggregatesFilter<"AdRewardSession"> | Date | string | null
+  redemptionErrorCode?: Prisma.StringNullableWithAggregatesFilter<"AdRewardSession"> | string | null
 }
 
 export type AdRewardSessionCreateInput = {
@@ -385,6 +469,10 @@ export type AdRewardSessionCreateInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
   user: Prisma.UserCreateNestedOneWithoutAdRewardSessionsInput
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutAdRewardSessionsInput
 }
@@ -406,6 +494,10 @@ export type AdRewardSessionUncheckedCreateInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
 }
 
 export type AdRewardSessionUpdateInput = {
@@ -423,6 +515,10 @@ export type AdRewardSessionUpdateInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   user?: Prisma.UserUpdateOneRequiredWithoutAdRewardSessionsNestedInput
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutAdRewardSessionsNestedInput
 }
@@ -444,6 +540,10 @@ export type AdRewardSessionUncheckedUpdateInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type AdRewardSessionCreateManyInput = {
@@ -463,6 +563,10 @@ export type AdRewardSessionCreateManyInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
 }
 
 export type AdRewardSessionUpdateManyMutationInput = {
@@ -480,6 +584,10 @@ export type AdRewardSessionUpdateManyMutationInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type AdRewardSessionUncheckedUpdateManyInput = {
@@ -499,6 +607,10 @@ export type AdRewardSessionUncheckedUpdateManyInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type AdRewardSessionListRelationFilter = {
@@ -533,6 +645,14 @@ export type AdRewardSessionCountOrderByAggregateInput = {
   ssvKeyId?: Prisma.SortOrder
   ssvRewardItem?: Prisma.SortOrder
   ssvRewardAmount?: Prisma.SortOrder
+  redemptionStatus?: Prisma.SortOrder
+  redemptionAttemptCount?: Prisma.SortOrder
+  redemptionNextAttemptAt?: Prisma.SortOrder
+  redemptionErrorCode?: Prisma.SortOrder
+}
+
+export type AdRewardSessionAvgOrderByAggregateInput = {
+  redemptionAttemptCount?: Prisma.SortOrder
 }
 
 export type AdRewardSessionMaxOrderByAggregateInput = {
@@ -552,6 +672,10 @@ export type AdRewardSessionMaxOrderByAggregateInput = {
   ssvKeyId?: Prisma.SortOrder
   ssvRewardItem?: Prisma.SortOrder
   ssvRewardAmount?: Prisma.SortOrder
+  redemptionStatus?: Prisma.SortOrder
+  redemptionAttemptCount?: Prisma.SortOrder
+  redemptionNextAttemptAt?: Prisma.SortOrder
+  redemptionErrorCode?: Prisma.SortOrder
 }
 
 export type AdRewardSessionMinOrderByAggregateInput = {
@@ -571,6 +695,14 @@ export type AdRewardSessionMinOrderByAggregateInput = {
   ssvKeyId?: Prisma.SortOrder
   ssvRewardItem?: Prisma.SortOrder
   ssvRewardAmount?: Prisma.SortOrder
+  redemptionStatus?: Prisma.SortOrder
+  redemptionAttemptCount?: Prisma.SortOrder
+  redemptionNextAttemptAt?: Prisma.SortOrder
+  redemptionErrorCode?: Prisma.SortOrder
+}
+
+export type AdRewardSessionSumOrderByAggregateInput = {
+  redemptionAttemptCount?: Prisma.SortOrder
 }
 
 export type AdRewardSessionCreateNestedManyWithoutUserInput = {
@@ -657,6 +789,10 @@ export type AdRewardSessionUncheckedUpdateManyWithoutTradingAccountNestedInput =
   deleteMany?: Prisma.AdRewardSessionScalarWhereInput | Prisma.AdRewardSessionScalarWhereInput[]
 }
 
+export type NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput = {
+  set?: $Enums.AdRewardRedemptionStatus | null
+}
+
 export type AdRewardSessionCreateWithoutUserInput = {
   id?: string
   provider: string
@@ -672,6 +808,10 @@ export type AdRewardSessionCreateWithoutUserInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutAdRewardSessionsInput
 }
 
@@ -691,6 +831,10 @@ export type AdRewardSessionUncheckedCreateWithoutUserInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
 }
 
 export type AdRewardSessionCreateOrConnectWithoutUserInput = {
@@ -739,6 +883,10 @@ export type AdRewardSessionScalarWhereInput = {
   ssvKeyId?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
   ssvRewardItem?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
   ssvRewardAmount?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
+  redemptionStatus?: Prisma.EnumAdRewardRedemptionStatusNullableFilter<"AdRewardSession"> | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFilter<"AdRewardSession"> | number
+  redemptionNextAttemptAt?: Prisma.DateTimeNullableFilter<"AdRewardSession"> | Date | string | null
+  redemptionErrorCode?: Prisma.StringNullableFilter<"AdRewardSession"> | string | null
 }
 
 export type AdRewardSessionCreateWithoutTradingAccountInput = {
@@ -756,6 +904,10 @@ export type AdRewardSessionCreateWithoutTradingAccountInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
   user: Prisma.UserCreateNestedOneWithoutAdRewardSessionsInput
 }
 
@@ -775,6 +927,10 @@ export type AdRewardSessionUncheckedCreateWithoutTradingAccountInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
 }
 
 export type AdRewardSessionCreateOrConnectWithoutTradingAccountInput = {
@@ -819,6 +975,10 @@ export type AdRewardSessionCreateManyUserInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
 }
 
 export type AdRewardSessionUpdateWithoutUserInput = {
@@ -836,6 +996,10 @@ export type AdRewardSessionUpdateWithoutUserInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutAdRewardSessionsNestedInput
 }
 
@@ -855,6 +1019,10 @@ export type AdRewardSessionUncheckedUpdateWithoutUserInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type AdRewardSessionUncheckedUpdateManyWithoutUserInput = {
@@ -873,6 +1041,10 @@ export type AdRewardSessionUncheckedUpdateManyWithoutUserInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type AdRewardSessionCreateManyTradingAccountInput = {
@@ -891,6 +1063,10 @@ export type AdRewardSessionCreateManyTradingAccountInput = {
   ssvKeyId?: string | null
   ssvRewardItem?: string | null
   ssvRewardAmount?: string | null
+  redemptionStatus?: $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: number
+  redemptionNextAttemptAt?: Date | string | null
+  redemptionErrorCode?: string | null
 }
 
 export type AdRewardSessionUpdateWithoutTradingAccountInput = {
@@ -908,6 +1084,10 @@ export type AdRewardSessionUpdateWithoutTradingAccountInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   user?: Prisma.UserUpdateOneRequiredWithoutAdRewardSessionsNestedInput
 }
 
@@ -927,6 +1107,10 @@ export type AdRewardSessionUncheckedUpdateWithoutTradingAccountInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type AdRewardSessionUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -945,6 +1129,10 @@ export type AdRewardSessionUncheckedUpdateManyWithoutTradingAccountInput = {
   ssvKeyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardItem?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ssvRewardAmount?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  redemptionStatus?: Prisma.NullableEnumAdRewardRedemptionStatusFieldUpdateOperationsInput | $Enums.AdRewardRedemptionStatus | null
+  redemptionAttemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  redemptionNextAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  redemptionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 
@@ -966,6 +1154,10 @@ export type AdRewardSessionSelect<ExtArgs extends runtime.Types.Extensions.Inter
   ssvKeyId?: boolean
   ssvRewardItem?: boolean
   ssvRewardAmount?: boolean
+  redemptionStatus?: boolean
+  redemptionAttemptCount?: boolean
+  redemptionNextAttemptAt?: boolean
+  redemptionErrorCode?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["adRewardSession"]>
@@ -987,6 +1179,10 @@ export type AdRewardSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   ssvKeyId?: boolean
   ssvRewardItem?: boolean
   ssvRewardAmount?: boolean
+  redemptionStatus?: boolean
+  redemptionAttemptCount?: boolean
+  redemptionNextAttemptAt?: boolean
+  redemptionErrorCode?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["adRewardSession"]>
@@ -1008,6 +1204,10 @@ export type AdRewardSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   ssvKeyId?: boolean
   ssvRewardItem?: boolean
   ssvRewardAmount?: boolean
+  redemptionStatus?: boolean
+  redemptionAttemptCount?: boolean
+  redemptionNextAttemptAt?: boolean
+  redemptionErrorCode?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["adRewardSession"]>
@@ -1029,9 +1229,13 @@ export type AdRewardSessionSelectScalar = {
   ssvKeyId?: boolean
   ssvRewardItem?: boolean
   ssvRewardAmount?: boolean
+  redemptionStatus?: boolean
+  redemptionAttemptCount?: boolean
+  redemptionNextAttemptAt?: boolean
+  redemptionErrorCode?: boolean
 }
 
-export type AdRewardSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "tradingAccountId" | "provider" | "purpose" | "platform" | "idempotencyKey" | "createdAt" | "expiresAt" | "ssvTransactionId" | "ssvVerifiedAt" | "ssvRewardedAt" | "ssvAdUnit" | "ssvKeyId" | "ssvRewardItem" | "ssvRewardAmount", ExtArgs["result"]["adRewardSession"]>
+export type AdRewardSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "tradingAccountId" | "provider" | "purpose" | "platform" | "idempotencyKey" | "createdAt" | "expiresAt" | "ssvTransactionId" | "ssvVerifiedAt" | "ssvRewardedAt" | "ssvAdUnit" | "ssvKeyId" | "ssvRewardItem" | "ssvRewardAmount" | "redemptionStatus" | "redemptionAttemptCount" | "redemptionNextAttemptAt" | "redemptionErrorCode", ExtArgs["result"]["adRewardSession"]>
 export type AdRewardSessionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -1081,6 +1285,27 @@ export type $AdRewardSessionPayload<ExtArgs extends runtime.Types.Extensions.Int
     ssvKeyId: string | null
     ssvRewardItem: string | null
     ssvRewardAmount: string | null
+    /**
+     * Server-side redemption of the recorded event (2026-11-08, SQL CHECK):
+     * set to pending together with the event, so a confirmed ad whose command
+     * failed for a server reason is redeemed even when Google's retries are
+     * over and the app is closed. Null before the event (and on sessions
+     * recorded before this column existed — the server never redeems those).
+     */
+    redemptionStatus: $Enums.AdRewardRedemptionStatus | null
+    /**
+     * Recovery worker attempts so far (the callback's own call is not one).
+     */
+    redemptionAttemptCount: number
+    /**
+     * Set exactly while pending: when the recovery worker runs the command next.
+     */
+    redemptionNextAttemptAt: Date | null
+    /**
+     * A fixed code: the refusal (refused) or the last server failure
+     * (pending, exhausted). Never an exception message.
+     */
+    redemptionErrorCode: string | null
   }, ExtArgs["result"]["adRewardSession"]>
   composites: {}
 }
@@ -1522,6 +1747,10 @@ export interface AdRewardSessionFieldRefs {
   readonly ssvKeyId: Prisma.FieldRef<"AdRewardSession", 'String'>
   readonly ssvRewardItem: Prisma.FieldRef<"AdRewardSession", 'String'>
   readonly ssvRewardAmount: Prisma.FieldRef<"AdRewardSession", 'String'>
+  readonly redemptionStatus: Prisma.FieldRef<"AdRewardSession", 'AdRewardRedemptionStatus'>
+  readonly redemptionAttemptCount: Prisma.FieldRef<"AdRewardSession", 'Int'>
+  readonly redemptionNextAttemptAt: Prisma.FieldRef<"AdRewardSession", 'DateTime'>
+  readonly redemptionErrorCode: Prisma.FieldRef<"AdRewardSession", 'String'>
 }
     
 

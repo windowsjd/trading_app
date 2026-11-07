@@ -252,6 +252,7 @@ export function getOpsSchedulerConfig(
       [OpsJobName.push_notifications]: false, // Dedicated push notification worker.
       [OpsJobName.account_deletion_cleanup]: false, // Dedicated ProfileImageCleanupWorker.
       [OpsJobName.community_photo_cleanup]: false, // Dedicated CommunityPhotoCleanupWorker.
+      [OpsJobName.ad_reward_redemption]: false, // Dedicated AdMobRedemptionWorker.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,

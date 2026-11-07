@@ -8192,7 +8192,11 @@ export const AdRewardSessionScalarFieldEnum = {
   ssvAdUnit: 'ssvAdUnit',
   ssvKeyId: 'ssvKeyId',
   ssvRewardItem: 'ssvRewardItem',
-  ssvRewardAmount: 'ssvRewardAmount'
+  ssvRewardAmount: 'ssvRewardAmount',
+  redemptionStatus: 'redemptionStatus',
+  redemptionAttemptCount: 'redemptionAttemptCount',
+  redemptionNextAttemptAt: 'redemptionNextAttemptAt',
+  redemptionErrorCode: 'redemptionErrorCode'
 } as const
 
 export type AdRewardSessionScalarFieldEnum = (typeof AdRewardSessionScalarFieldEnum)[keyof typeof AdRewardSessionScalarFieldEnum]
@@ -9745,6 +9749,20 @@ export type EnumAdRewardPurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$
  * Reference to a field of type 'AdRewardPurpose[]'
  */
 export type ListEnumAdRewardPurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdRewardPurpose[]'>
+    
+
+
+/**
+ * Reference to a field of type 'AdRewardRedemptionStatus'
+ */
+export type EnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdRewardRedemptionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'AdRewardRedemptionStatus[]'
+ */
+export type ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdRewardRedemptionStatus[]'>
     
 
 

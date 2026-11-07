@@ -37,6 +37,7 @@ export const fetchAdMobKeys: AdMobKeyFetch = async (url) => {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (response.status !== 200)
+    // @diagnosticSurface internal: AdMobSsvKeyStore.key() catches and discards every key read failure; the SSV callback answers only its fixed 503 KEYS_UNAVAILABLE outcome. The text carries the HTTP status alone, never the URL or the body.
     throw new Error(`AdMob key server answered ${response.status}`);
   return response.json();
 };
@@ -50,7 +51,9 @@ export function parseAdMobKeyFile(body: unknown): Map<string, KeyObject> {
     Array.isArray((body as { keys?: unknown }).keys)
       ? (body as { keys: unknown[] }).keys
       : null;
-  if (!list) throw new Error('AdMob key file has no keys array');
+  if (!list)
+    // @diagnosticSurface internal: Only AdMobSsvKeyStore.refresh() parses key files; key() catches and discards the failed read, and the SSV callback answers its fixed 503 KEYS_UNAVAILABLE outcome. Fixed text, no key material.
+    throw new Error('AdMob key file has no keys array');
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') continue;
     const { keyId, base64, pem } = entry as Record<string, unknown>;

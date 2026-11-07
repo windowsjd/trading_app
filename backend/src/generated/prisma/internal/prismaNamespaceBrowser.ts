@@ -1159,7 +1159,11 @@ export const AdRewardSessionScalarFieldEnum = {
   ssvAdUnit: 'ssvAdUnit',
   ssvKeyId: 'ssvKeyId',
   ssvRewardItem: 'ssvRewardItem',
-  ssvRewardAmount: 'ssvRewardAmount'
+  ssvRewardAmount: 'ssvRewardAmount',
+  redemptionStatus: 'redemptionStatus',
+  redemptionAttemptCount: 'redemptionAttemptCount',
+  redemptionNextAttemptAt: 'redemptionNextAttemptAt',
+  redemptionErrorCode: 'redemptionErrorCode'
 } as const
 
 export type AdRewardSessionScalarFieldEnum = (typeof AdRewardSessionScalarFieldEnum)[keyof typeof AdRewardSessionScalarFieldEnum]

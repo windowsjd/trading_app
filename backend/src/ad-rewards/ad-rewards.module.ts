@@ -12,8 +12,11 @@ import {
 } from './ad-reward-verifier';
 import { AdMobRewardVerifier } from './admob-reward-verifier';
 import { AdMobRewardSessionService } from './admob-reward-session.service';
+import { AdMobRedemptionWorker } from './admob-redemption.worker';
 import { AdMobSsvController } from './admob-ssv.controller';
 import { AdMobSsvKeyStore } from './admob-ssv-keys';
+import { OpsJobLockService } from '../ops/ops-job-lock.service';
+import { OpsJobRunService } from '../ops/ops-job-run.service';
 
 /**
  * Rewarded-ad module.
@@ -45,6 +48,12 @@ import { AdMobSsvKeyStore } from './admob-ssv-keys';
     AdRewardService,
     GeneralAccountResetService,
     AdMobRewardSessionService,
+    // Server recovery of confirmed rewards whose command failed for a
+    // server reason (2026-11-08); its Ops lease and run records (same as
+    // AuthModule / CommunityModule).
+    AdMobRedemptionWorker,
+    OpsJobLockService,
+    OpsJobRunService,
     { provide: AdMobSsvKeyStore, useFactory: () => new AdMobSsvKeyStore() },
     {
       provide: AD_REWARD_VERIFICATION_REGISTRY,

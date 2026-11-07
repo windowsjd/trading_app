@@ -17,6 +17,17 @@
  * session resets once; a blocked reset is refused before the ad, and one
  * blocked at callback time stays redeemable once the blocker is gone; and
  * member deletion removes the sessions.
+ *
+ * Server recovery (2026-11-08): a real PostgreSQL failure injected into the
+ * payout/reset transaction AFTER the event was recorded (a trigger raising a
+ * serialization failure on that account's ledger insert) rolls everything
+ * back and leaves the session pending; once it is over, the worker alone —
+ * app closed, Google's retries spent — pays 5,000,000 KRW or resets once,
+ * with its Ops run recorded. Also: worker passes racing Google's callback and
+ * the app's own call pay once; a refused command (blocked reset, suspended
+ * account) is never run again by the worker or a re-sent callback; ads
+ * switched off pay nothing; a paid reward whose bookkeeping was lost is
+ * replayed, never paid again; past 24 h the server stops.
  */
 import assert from 'node:assert/strict';
 import {
@@ -38,8 +49,14 @@ import { GeneralAccountResetService } from '../src/ad-rewards/general-account-re
 import { AdRewardVerificationRegistry } from '../src/ad-rewards/ad-reward-verifier';
 import { AdMobRewardVerifier } from '../src/ad-rewards/admob-reward-verifier';
 import { AdMobRewardSessionService } from '../src/ad-rewards/admob-reward-session.service';
+import { AdMobRedemptionWorker } from '../src/ad-rewards/admob-redemption.worker';
 import { AdMobSsvKeyStore } from '../src/ad-rewards/admob-ssv-keys';
-import { ADMOB_SESSION_EXPIRY_GRACE_MS } from '../src/ad-rewards/admob.config';
+import {
+  ADMOB_REDEMPTION_WINDOW_MS,
+  ADMOB_SESSION_EXPIRY_GRACE_MS,
+} from '../src/ad-rewards/admob.config';
+import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
+import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 import { purgeDeletionScope } from '../src/auth/account-deletion.purge';
 
 const target = new URL(process.env.DATABASE_URL ?? 'http://invalid');
@@ -119,6 +136,14 @@ const keys = new AdMobSsvKeyStore(
   { production: 'prod', test: 'test' },
 );
 const sessions = new AdMobRewardSessionService(db, ads, resets, registry, keys);
+// The production worker with the real Ops lease and run records (its timer
+// is never started here: each tick is called explicitly).
+const worker = new AdMobRedemptionWorker(
+  sessions,
+  new OpsJobLockService(db),
+  new OpsJobRunService(db),
+);
+const REDEMPTION_LOCK_KEY = 'ad_reward_redemption:current';
 
 const users: Array<{ id: string; email: string }> = [];
 const assets: string[] = [];
@@ -242,6 +267,68 @@ const command = (s: { sessionId: string; idempotencyKey: string }) => ({
   idempotencyKey: s.idempotencyKey,
 });
 
+/** A worker pass "this long from now" (the due scan only; attempts use the real clock). */
+const after = (ms: number) => new Date(Date.now() + ms);
+async function redemption(sessionId: string) {
+  return db.adRewardSession.findUniqueOrThrow({
+    where: { id: sessionId },
+    select: {
+      ssvTransactionId: true,
+      redemptionStatus: true,
+      redemptionAttemptCount: true,
+      redemptionNextAttemptAt: true,
+      redemptionErrorCode: true,
+    },
+  });
+}
+/** The backoff has passed: the worker's next tick, without waiting a minute. */
+async function makeDue(sessionId: string) {
+  await db.adRewardSession.update({
+    where: { id: sessionId },
+    data: { redemptionNextAttemptAt: new Date(Date.now() - 1_000) },
+  });
+}
+/**
+ * A real PostgreSQL failure inside this account's payout/reset transaction:
+ * its ledger insert raises a serialization failure (40001, Prisma P2034)
+ * after the wallet row already moved, so the whole transaction rolls back.
+ * Only this account, only while `work` runs.
+ */
+async function withLedgerFault<T>(
+  accountId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  assert.match(accountId, /^[0-9a-f-]{36}$/u);
+  const name = `admob_ssv_fault_${randomUUID().replace(/-/gu, '')}`;
+  await db.$executeRawUnsafe(
+    `CREATE FUNCTION "${name}"() RETURNS trigger LANGUAGE plpgsql AS $fault$
+     BEGIN
+       IF NEW."trading_account_id" = '${accountId}' THEN
+         RAISE EXCEPTION 'injected outage' USING ERRCODE = '40001';
+       END IF;
+       RETURN NEW;
+     END $fault$`,
+  );
+  await db.$executeRawUnsafe(
+    `CREATE TRIGGER "${name}" BEFORE INSERT ON "wallet_transactions" FOR EACH ROW EXECUTE FUNCTION "${name}"()`,
+  );
+  try {
+    return await work();
+  } finally {
+    await db.$executeRawUnsafe(
+      `DROP TRIGGER IF EXISTS "${name}" ON "wallet_transactions"`,
+    );
+    await db.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${name}"()`);
+  }
+}
+async function latestRedemptionRun() {
+  return db.opsJobRun.findFirstOrThrow({
+    where: { jobName: 'ad_reward_redemption' },
+    orderBy: { startedAt: 'desc' },
+    select: { status: true, resultJson: true },
+  });
+}
+
 async function run() {
   await db.$connect();
 
@@ -283,6 +370,11 @@ async function run() {
     resetRows: 0,
   });
   assert.equal(await krw(a.accountId), opening);
+  // Not confirmed by Google: nothing for the server to redeem, ever — a
+  // recovery pass (even "an hour later") never touches it.
+  assert.equal((await redemption(s1.sessionId)).redemptionStatus, null);
+  assert.equal((await sessions.redeemDueSessions(after(3_600_000))).due, 0);
+  assert.equal(await krw(a.accountId), opening);
   // Google's callback records the event and redeems the command itself.
   const cb1 = callback(s1);
   assert.deepEqual(await sessions.handleSsvCallback(cb1.query), {
@@ -293,6 +385,10 @@ async function run() {
     where: { id: s1.sessionId },
   });
   assert.equal(recorded.ssvTransactionId, cb1.transactionId);
+  // Redeemed on arrival: settled, nothing left for the recovery worker.
+  assert.equal(recorded.redemptionStatus, 'redeemed');
+  assert.equal(recorded.redemptionNextAttemptAt === null, true);
+  assert.equal(recorded.redemptionAttemptCount, 0);
   assert.equal(
     await krw(a.accountId),
     money(new Prisma.Decimal(opening).add(5_000_000)),
@@ -583,6 +679,10 @@ async function run() {
     rewardLedger: 1,
     resetRows: 1,
   });
+  assert.equal(
+    (await redemption(resetSession.sessionId)).redemptionStatus,
+    'redeemed',
+  );
   await rejectsCode(
     ads.claim(c.userId, c.accountId, {
       provider: 'admob',
@@ -677,11 +777,31 @@ async function run() {
     rewardLedger: 0,
     resetRows: 0,
   });
+  // A product-rule refusal is final for the server: settled `refused`.
+  const refusedRow = await redemption(late.sessionId);
+  assert.equal(refusedRow.redemptionStatus, 'refused');
+  assert.equal(refusedRow.redemptionErrorCode, 'GENERAL_ACCOUNT_RESET_BLOCKED');
+  assert.equal(refusedRow.redemptionNextAttemptAt === null, true);
   await rejectsCode(
     resets.reset(d.userId, d.accountId, command(late)),
     'GENERAL_ACCOUNT_RESET_BLOCKED',
   );
   await clear(lateBlocker.id);
+  // The blocker is gone, yet no automatic path resets the account: neither a
+  // recovery pass (even hours later), nor the worker, nor Google re-sending.
+  assert.equal((await sessions.redeemDueSessions(after(7_200_000))).due, 0);
+  await worker.tick();
+  assert.deepEqual(await sessions.handleSsvCallback(lateEvent.query), {
+    status: 200,
+    outcome: 'REDEMPTION_REFUSED',
+  });
+  assert.deepEqual(await counts(d.accountId), {
+    claims: 0,
+    rewardLedger: 0,
+    resetRows: 0,
+  });
+  assert.equal(await krw(d.accountId), '10000000.00000000');
+  // Only the member's own command (same key) redeems it, as before.
   const done = await resets.reset(d.userId, d.accountId, command(late));
   assert.equal(done.data.reset, true);
   assert.deepEqual(await counts(d.accountId), {
@@ -690,8 +810,10 @@ async function run() {
     resetRows: 1,
   });
   pass(
-    'a blocked reset is refused before the ad; blocked at callback time it moves nothing and stays redeemable once',
+    'a blocked reset is refused before the ad; blocked at callback time it moves nothing, is never re-run by the worker or a re-sent callback, and stays redeemable once by the member',
   );
+
+  await serverRecovery();
 
   // ============================================== member deletion
   const e = await member();
@@ -704,6 +826,360 @@ async function run() {
   pass("member deletion removes the member's ad sessions");
 
   console.log(`admob ssv DB integration passed (${checks} checks)`);
+}
+
+async function serverRecovery() {
+  // ============================== top-up: outage after the recorded event
+  const f = await member();
+  const fOpening = await krw(f.accountId);
+  const fCapital = (
+    await db.tradingAccount.findUniqueOrThrow({ where: { id: f.accountId } })
+  ).initialCapitalKrw.toFixed(8);
+  const r1 = await open(f, 'funding');
+  const r1Event = callback(r1);
+  await withLedgerFault(f.accountId, async () => {
+    // Google's call and its retries (five, 1 s apart) all meet the outage.
+    for (let i = 0; i < 6; i += 1)
+      assert.deepEqual(await sessions.handleSsvCallback(r1Event.query), {
+        status: 503,
+        outcome: 'REDEEM_FAILED',
+      });
+    // A recovery attempt during the outage fails too, and backs off.
+    assert.equal((await sessions.redeemDueSessions(after(61_000))).retrying, 1);
+  });
+  let row = await redemption(r1.sessionId);
+  assert.equal(row.ssvTransactionId, r1Event.transactionId);
+  assert.equal(row.redemptionStatus, 'pending');
+  assert.equal(row.redemptionAttemptCount, 1);
+  assert.equal(row.redemptionErrorCode, 'REDEEM_FAILED');
+  // Rolled back as a whole (the wallet had moved before the ledger insert).
+  assert.deepEqual(await counts(f.accountId), {
+    claims: 0,
+    rewardLedger: 0,
+    resetRows: 0,
+  });
+  assert.equal(await krw(f.accountId), fOpening);
+  // Backing off: a pass right now runs nothing.
+  assert.equal((await sessions.redeemDueSessions()).due, 0);
+  // The outage is over and the app is closed — no app call, no callback:
+  // the worker's next tick redeems it, once, and records its Ops run.
+  await makeDue(r1.sessionId);
+  await worker.tick();
+  row = await redemption(r1.sessionId);
+  assert.equal(row.redemptionStatus, 'redeemed');
+  assert.equal(row.redemptionAttemptCount, 2);
+  assert.equal(row.redemptionNextAttemptAt === null, true);
+  assert.equal(row.redemptionErrorCode, null);
+  assert.deepEqual(await counts(f.accountId), {
+    claims: 1,
+    rewardLedger: 1,
+    resetRows: 0,
+  });
+  assert.equal(
+    await krw(f.accountId),
+    money(new Prisma.Decimal(fOpening).add(5_000_000)),
+  );
+  const claim = await db.adRewardClaim.findFirstOrThrow({
+    where: { tradingAccountId: f.accountId },
+  });
+  assert.equal(claim.status, 'granted');
+  assert.equal(claim.providerEventId, r1Event.transactionId);
+  assert.equal(claim.idempotencyKey, r1.idempotencyKey);
+  assert.equal(money(claim.rewardAmountKrw), '5000000.00000000');
+  const ledger = await db.walletTransaction.findFirstOrThrow({
+    where: { tradingAccountId: f.accountId, txType: 'ad_reward' },
+  });
+  assert.equal(ledger.referenceId, claim.id);
+  assert.equal(money(ledger.amount), '5000000.00000000');
+  assert.equal(
+    (
+      await db.tradingAccount.findUniqueOrThrow({ where: { id: f.accountId } })
+    ).initialCapitalKrw.toFixed(8),
+    fCapital,
+  );
+  const run = await latestRedemptionRun();
+  assert.equal(run.status, 'succeeded');
+  assert.equal((run.resultJson as { redeemed: number }).redeemed, 1);
+  // Later deliveries replay: Google re-sending, the app's call, more passes.
+  assert.deepEqual(await sessions.handleSsvCallback(r1Event.query), {
+    status: 200,
+    outcome: 'REDEEMED',
+  });
+  assert.equal(
+    (await ads.claim(f.userId, f.accountId, command(r1))).data.duplicate,
+    true,
+  );
+  assert.equal((await sessions.redeemDueSessions(after(7_200_000))).due, 0);
+  assert.deepEqual(await counts(f.accountId), {
+    claims: 1,
+    rewardLedger: 1,
+    resetRows: 0,
+  });
+  pass(
+    'top-up: a DB failure after the recorded event rolls the payout back; afterwards the worker alone (app closed, Google retries spent) pays 5,000,000 KRW once',
+  );
+
+  // Already paid, but its bookkeeping lost (as if the settle write failed):
+  // the worker replays the committed command and never pays again.
+  await db.adRewardSession.update({
+    where: { id: r1.sessionId },
+    data: {
+      redemptionStatus: 'pending',
+      redemptionNextAttemptAt: new Date(Date.now() - 1_000),
+    },
+  });
+  assert.equal((await sessions.redeemDueSessions()).redeemed, 1);
+  assert.equal((await redemption(r1.sessionId)).redemptionStatus, 'redeemed');
+  assert.deepEqual(await counts(f.accountId), {
+    claims: 1,
+    rewardLedger: 1,
+    resetRows: 0,
+  });
+  assert.equal(
+    await krw(f.accountId),
+    money(new Prisma.Decimal(fOpening).add(5_000_000)),
+  );
+  pass('a paid reward run again by the worker replays; nothing is paid twice');
+
+  // ================================ reset: outage in the middle of a reset
+  const g = await member();
+  const topUp = await open(g, 'funding');
+  assert.equal(
+    (await sessions.handleSsvCallback(callback(topUp).query)).outcome,
+    'REDEEMED',
+  );
+  assert.equal(await krw(g.accountId), '15000000.00000000');
+  const r2 = await open(g, 'account_reset');
+  const r2Event = callback(r2);
+  await withLedgerFault(g.accountId, async () => {
+    assert.deepEqual(await sessions.handleSsvCallback(r2Event.query), {
+      status: 503,
+      outcome: 'REDEEM_FAILED',
+    });
+  });
+  assert.deepEqual(await counts(g.accountId), {
+    claims: 1,
+    rewardLedger: 1,
+    resetRows: 0,
+  });
+  assert.equal(await krw(g.accountId), '15000000.00000000');
+  assert.equal((await redemption(r2.sessionId)).redemptionStatus, 'pending');
+  await makeDue(r2.sessionId);
+  await worker.tick();
+  assert.equal(await krw(g.accountId), '10000000.00000000');
+  assert.deepEqual(await counts(g.accountId), {
+    claims: 2,
+    rewardLedger: 1,
+    resetRows: 1,
+  });
+  assert.equal((await redemption(r2.sessionId)).redemptionStatus, 'redeemed');
+  assert.equal(
+    (await resets.reset(g.userId, g.accountId, command(r2))).data.duplicate,
+    true,
+  );
+  assert.deepEqual(await sessions.handleSsvCallback(r2Event.query), {
+    status: 200,
+    outcome: 'REDEEMED',
+  });
+  assert.equal(
+    await db.generalAccountReset.count({
+      where: { tradingAccountId: g.accountId },
+    }),
+    1,
+  );
+  pass(
+    'reset: a DB failure mid-reset rolls the whole reset back; afterwards the worker resets once (app closed), replays answer the same reset',
+  );
+
+  // ===================== concurrency: worker passes vs callback vs the app
+  const h = await member();
+  const hOpening = await krw(h.accountId);
+  const pendingAfterOutage = async () => {
+    const opened = await open(h, 'funding');
+    const event = callback(opened);
+    await withLedgerFault(h.accountId, async () => {
+      assert.equal((await sessions.handleSsvCallback(event.query)).status, 503);
+    });
+    await makeDue(opened.sessionId);
+    return { opened, event };
+  };
+  const r3 = await pendingAfterOutage();
+  const raced3 = await Promise.allSettled([
+    sessions.handleSsvCallback(r3.event.query),
+    sessions.handleSsvCallback(r3.event.query),
+    sessions.redeemDueSessions(),
+    sessions.redeemDueSessions(),
+    worker.tick(),
+  ]);
+  for (const result of raced3) assert.equal(result.status, 'fulfilled');
+  for (const result of raced3.slice(0, 2))
+    assert.deepEqual((result as PromiseFulfilledResult<unknown>).value, {
+      status: 200,
+      outcome: 'REDEEMED',
+    });
+  assert.deepEqual(await counts(h.accountId), {
+    claims: 1,
+    rewardLedger: 1,
+    resetRows: 0,
+  });
+  assert.equal(
+    await krw(h.accountId),
+    money(new Prisma.Decimal(hOpening).add(5_000_000)),
+  );
+  assert.equal(
+    (await redemption(r3.opened.sessionId)).redemptionStatus,
+    'redeemed',
+  );
+  const r4 = await pendingAfterOutage();
+  const raced4 = await Promise.allSettled([
+    ads.claim(h.userId, h.accountId, command(r4.opened)),
+    ads.claim(h.userId, h.accountId, command(r4.opened)),
+    sessions.redeemDueSessions(),
+    sessions.redeemDueSessions(),
+  ]);
+  for (const result of raced4) assert.equal(result.status, 'fulfilled');
+  assert.deepEqual(await counts(h.accountId), {
+    claims: 2,
+    rewardLedger: 2,
+    resetRows: 0,
+  });
+  assert.equal(
+    await krw(h.accountId),
+    money(new Prisma.Decimal(hOpening).add(10_000_000)),
+  );
+  assert.equal(
+    (await redemption(r4.opened.sessionId)).redemptionStatus,
+    'redeemed',
+  );
+  pass(
+    "worker passes racing Google's callback, or the app's own call: one claim, one ledger row, one credit",
+  );
+
+  // ======================= account status changed before the recovery
+  const k = await member();
+  const r5 = await open(k, 'funding');
+  const r5Event = callback(r5);
+  await withLedgerFault(k.accountId, async () => {
+    assert.equal((await sessions.handleSsvCallback(r5Event.query)).status, 503);
+  });
+  await db.tradingAccount.update({
+    where: { id: k.accountId },
+    data: { status: 'suspended' },
+  });
+  await makeDue(r5.sessionId);
+  assert.equal((await sessions.redeemDueSessions()).refused, 1);
+  row = await redemption(r5.sessionId);
+  assert.equal(row.redemptionStatus, 'refused');
+  assert.equal(row.redemptionErrorCode, 'TRADING_ACCOUNT_NOT_ACTIVE');
+  await db.tradingAccount.update({
+    where: { id: k.accountId },
+    data: { status: 'active' },
+  });
+  // Active again: no automatic path pays the refused command.
+  assert.equal((await sessions.redeemDueSessions(after(7_200_000))).due, 0);
+  assert.deepEqual(await sessions.handleSsvCallback(r5Event.query), {
+    status: 200,
+    outcome: 'REDEMPTION_REFUSED',
+  });
+  assert.deepEqual(await counts(k.accountId), {
+    claims: 0,
+    rewardLedger: 0,
+    resetRows: 0,
+  });
+  // The member's own command (same key) still redeems it once, as before.
+  assert.equal(
+    (await ads.claim(k.userId, k.accountId, command(r5))).data.granted,
+    true,
+  );
+  assert.deepEqual(await counts(k.accountId), {
+    claims: 1,
+    rewardLedger: 1,
+    resetRows: 0,
+  });
+  pass(
+    'an account suspended before the recovery: refused (TRADING_ACCOUNT_NOT_ACTIVE), never paid automatically after reactivation; the member can still redeem once',
+  );
+
+  // ================================================ ads switched off
+  const kBalance = await krw(k.accountId);
+  const r6 = await open(k, 'funding');
+  const r6Event = callback(r6);
+  await withLedgerFault(k.accountId, async () => {
+    assert.equal((await sessions.handleSsvCallback(r6Event.query)).status, 503);
+  });
+  process.env.AD_REWARD_ENABLED = 'false';
+  try {
+    await makeDue(r6.sessionId);
+    await worker.tick();
+    row = await redemption(r6.sessionId);
+    assert.equal(row.redemptionStatus, 'pending', 'paused, not spent');
+    assert.equal(row.redemptionAttemptCount, 0);
+    // Forced anyway: the command refuses (503), nothing is paid.
+    assert.equal((await sessions.redeemDueSessions()).retrying, 1);
+    assert.deepEqual(await sessions.handleSsvCallback(r6Event.query), {
+      status: 503,
+      outcome: 'AD_REWARD_DISABLED',
+    });
+    row = await redemption(r6.sessionId);
+    assert.equal(row.redemptionStatus, 'pending');
+    assert.equal(row.redemptionErrorCode, 'AD_REWARD_DISABLED');
+    assert.equal(await krw(k.accountId), kBalance);
+    assert.deepEqual(await counts(k.accountId), {
+      claims: 1,
+      rewardLedger: 1,
+      resetRows: 0,
+    });
+  } finally {
+    process.env.AD_REWARD_ENABLED = 'true';
+  }
+  await makeDue(r6.sessionId);
+  await worker.tick();
+  assert.equal((await redemption(r6.sessionId)).redemptionStatus, 'redeemed');
+  assert.equal(
+    await krw(k.accountId),
+    money(new Prisma.Decimal(kBalance).add(5_000_000)),
+  );
+  assert.deepEqual(await counts(k.accountId), {
+    claims: 2,
+    rewardLedger: 2,
+    resetRows: 0,
+  });
+  pass(
+    'ads switched off: the worker pauses and a forced run or callback is refused (AD_REWARD_DISABLED), nothing paid; back on, it pays once',
+  );
+
+  // ================================== the 24 h window after confirmation
+  const r8 = await open(k, 'funding');
+  const r8Event = callback(r8);
+  await withLedgerFault(k.accountId, async () => {
+    assert.equal((await sessions.handleSsvCallback(r8Event.query)).status, 503);
+  });
+  // Google confirmed it over a day ago (the server was down all that time).
+  await db.adRewardSession.update({
+    where: { id: r8.sessionId },
+    data: {
+      ssvVerifiedAt: new Date(Date.now() - ADMOB_REDEMPTION_WINDOW_MS - 60_000),
+      redemptionNextAttemptAt: new Date(Date.now() - 1_000),
+    },
+  });
+  await worker.tick();
+  row = await redemption(r8.sessionId);
+  assert.equal(row.redemptionStatus, 'exhausted');
+  assert.equal(row.redemptionErrorCode, 'REDEEM_FAILED');
+  assert.equal(row.redemptionNextAttemptAt === null, true);
+  assert.equal((await latestRedemptionRun()).status, 'failed');
+  assert.deepEqual(await sessions.handleSsvCallback(r8Event.query), {
+    status: 200,
+    outcome: 'REDEMPTION_EXHAUSTED',
+  });
+  assert.deepEqual(await counts(k.accountId), {
+    claims: 2,
+    rewardLedger: 2,
+    resetRows: 0,
+  });
+  pass(
+    'past 24 h after Google confirmed it, the server stops (exhausted, run recorded failed) without running the command',
+  );
 }
 
 async function deleteMember(userId: string) {
@@ -727,6 +1203,8 @@ async function deleteMember(userId: string) {
 async function cleanup() {
   for (const member of [...users]) await deleteMember(member.id);
   await db.asset.deleteMany({ where: { id: { in: assets } } });
+  await db.opsJobRun.deleteMany({ where: { lockKey: REDEMPTION_LOCK_KEY } });
+  await db.opsJobLock.deleteMany({ where: { lockKey: REDEMPTION_LOCK_KEY } });
 }
 
 run()

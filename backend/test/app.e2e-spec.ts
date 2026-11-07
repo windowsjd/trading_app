@@ -1,5 +1,6 @@
 import { EmailVerificationService } from '../src/auth/email-verification.service';
 import { CURRENT_TERMS_VERSION } from '../src/auth/terms.constants';
+import { communitySanctionEmailHash } from '../src/community/community-sanction-carryover';
 import { createApiError } from '../src/common/api-error';
 import { SPOT_ASSET_WHERE } from '../src/providers/binance/binance-product-catalog';
 import { publicTradingAccountWhere } from '../src/seasons/season-availability.policy';
@@ -370,6 +371,15 @@ type PrismaMock = ReturnType<typeof emptyProtectionState> & {
     findUnique: jest.Mock;
     update: jest.Mock;
   };
+  // Signup's transaction re-applies a community restriction kept by email
+  // hash when an earlier account was deleted (docs/community-api-contract.md §12).
+  communitySanctionCarryover: {
+    findMany: jest.Mock;
+    deleteMany: jest.Mock;
+  };
+  communitySanction: {
+    create: jest.Mock;
+  };
   walletTransaction: {
     count: jest.Mock;
     create: jest.Mock;
@@ -677,6 +687,14 @@ describe('AppController (e2e)', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      // No earlier deleted account of this email kept a restriction.
+      communitySanctionCarryover: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn(),
+      },
+      communitySanction: {
+        create: jest.fn(),
       },
       walletTransaction: {
         count: jest.fn(),
@@ -1469,6 +1487,17 @@ describe('AppController (e2e)', () => {
             }),
           }),
         );
+        // The same signup transaction looked for a restriction kept from an
+        // earlier deleted account of this email (normalized), and found none.
+        expect(prisma.communitySanctionCarryover.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { emailHash: communitySanctionEmailHash(user.email) },
+          }),
+        );
+        expect(prisma.communitySanction.create).not.toHaveBeenCalled();
+        expect(
+          prisma.communitySanctionCarryover.deleteMany,
+        ).not.toHaveBeenCalled();
         const storedTokenHash =
           prisma.refreshTokenSession.create.mock.calls[0][0].data.tokenHash;
         expect(storedTokenHash).not.toBe(

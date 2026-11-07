@@ -1311,30 +1311,95 @@ providerEventId) are unique, the payout/reset transactions are unchanged
 duplicate, concurrent or late callbacks replay. A callback that arrives while
 the app is closed still credits/resets by itself; the app's next read shows it.
 
-Limitation: Google stops after its retries (≈ 5 s). If the callback cannot
-record or redeem for all of them (key server down with no usable cache, a
-database outage), a recorded but unredeemed event is redeemed only when the
-app sends the same command again — the app keeps the attempt for the same
-sign-in and account until its process ends — and otherwise stays recorded
-with no money moved (find them: `ad_reward_sessions.ssv_transaction_id` set
-and no `ad_reward_claims` row for the account and `idempotency_key`). An
-event never recorded is lost with its session. No path pays or resets
-without the recorded, Google-signed event.
+## Server recovery (2026-11-08)
+
+Google stops after its retries (≈ 5 s). A Google-signed event that was
+**recorded** but whose command did not commit for a **server** reason (a
+database failure inside the payout/reset transaction, a 5xx such as
+`GENERAL_ACCOUNT_RESET_UNAVAILABLE`, ads switched off meanwhile) is no longer
+left to the app: the server redeems it itself, app closed or not.
+
+- **State** (`ad_reward_sessions.redemption_*`, bookkeeping of the automatic
+  paths only; what was paid or reset is still the `ad_reward_claims` row +
+  wallet/ledger rows / `general_account_resets`):
+
+  | `redemption_status` | Meaning | Server paths |
+  | --- | --- | --- |
+  | `NULL` | not confirmed by Google (no event) — or recorded before 2026-11-08 | never redeemed by the server |
+  | `pending` | event recorded, command not committed yet (`redemption_attempt_count` = recovery attempts made so far, `redemption_error_code` = the last server failure) | callback and worker run the command |
+  | `redeemed` | the command committed (a claim exists for the session's key) | replays only |
+  | `refused` | the command refused it for a product rule (4xx: blocked reset, inactive account, verification/purpose/ownership refusal, idempotency conflict, a configured cap…), code in `redemption_error_code` | **never run again automatically** — worker and re-sent callbacks answer it as refused |
+  | `exhausted` | still not committed 24 h after Google's confirmation (server failures throughout, or ads off all that time) | never run again automatically |
+
+  `pending` is written in the same statement that records the event, so a
+  crash between recording and redeeming cannot lose it. A SQL CHECK keeps a
+  status only on recorded sessions, `redemption_next_attempt_at` exactly
+  while pending and a code on every refusal.
+- **Classification** of one run of the command: success (granted, or the
+  replay of a committed one) → `redeemed`; 4xx → `refused`; 5xx, a database
+  error or anything unexpected → stays `pending` (fixed code: the error code,
+  or `REDEEM_FAILED` for non-HTTP errors). `AD_REWARD_VERIFICATION_PENDING`
+  cannot happen for a recorded event and is treated as a server failure,
+  never as a refusal.
+- **Worker** (`AdMobRedemptionWorker`, every 60 s, one instance by Ops lease
+  `ad_reward_redemption:current`, Ops job `ad_reward_redemption`). The first
+  attempt waits 60 s after the event was recorded (the callback, Google's
+  retries and the app's ~30 s polling normally redeem it first); every
+  failed attempt waits 1, 2, 4, 8, 16, 32, then 60 minutes; 25 due sessions
+  per pass, oldest first. Each attempt is **reserved before it runs**
+  (`attempt_count + 1` and the next attempt time, conditional on the count it
+  read), so two passes, or a pass and a callback, never run the same attempt
+  and a crash mid-command waits out its backoff instead of looping. It runs
+  the **same** command as the callback and the app (`{ provider: "admob",
+  proof: <sessionId>, idempotencyKey: <the session's key> }` for the
+  session's own member and account): ownership, general-account, active
+  status, feature switch, purpose, blockers and every financial check apply
+  unchanged, and (account, idempotencyKey) + (provider, providerEventId) +
+  the account row lock keep every overlap with the callback or the app to
+  ONE payout or reset. A run with work is recorded in `ops_job_runs`
+  (`failed` with `AD_REWARD_REDEMPTION_RETRYING` while a server failure keeps
+  a session pending or one was exhausted; counts only in `resultJson`); an
+  idle tick is one indexed read.
+- **Ads switched off** (or another provider configured): the worker pauses —
+  every new command would be refused anyway (`503 AD_REWARD_DISABLED`), so
+  nothing is paid and no attempt is spent; pending sessions resume once ads
+  are back on, within their window.
+- **Window:** the server stops 24 h after Google's confirmation
+  (`ssv_verified_at`): a still-pending session is settled `exhausted` without
+  running the command, so an automatic payout or reset never lands days after
+  the ad.
+- **The member's own command** is unchanged: it still redeems a recorded
+  event in any state, as before (e.g. a reset refused as blocked, once its
+  blocker is gone — that is the member's decision, never an automatic one).
+
+Not recoverable by anyone: an event that was never recorded (no valid Google
+signature reached the database — e.g. the key server down with no usable
+cache, or a database outage through all of Google's retries) is lost with its
+session. No path pays or resets without the recorded, Google-signed event.
+
+Find stuck ones: `SELECT id, redemption_status, redemption_attempt_count,
+redemption_error_code, ssv_verified_at FROM ad_reward_sessions WHERE
+redemption_status IN ('pending', 'exhausted')`; a paid one has an
+`ad_reward_claims` row with the same `trading_account_id` and
+`idempotency_key`.
 
 ## Callback answers (Google retries non-200 up to five times, 1 s apart)
 
 | Status | When | Effect |
 | --- | --- | --- |
 | 200 | Redeemed, or replayed | the command's result |
-| 200 | Google-signed but not applicable: no/unknown session, another ad unit, another user id, expired session, an event already used by another session, a second event for a confirmed session, or the command refused (cap, blocked reset, inactive account, …) | nothing recorded/applied for it (a refused command keeps the recorded event redeemable once by the same command, e.g. a reset after its blocker is gone) |
+| 200 | Google-signed but not applicable: no/unknown session, another ad unit, another user id, expired session, an event already used by another session, a second event for a confirmed session, or the command refused (cap, blocked reset, inactive account, …) | nothing recorded/applied for it; a refused command settles the session `refused` (never re-run automatically; the member's own command can still redeem it once, e.g. a reset after its blocker is gone) |
+| 200 | `REDEMPTION_REFUSED` / `REDEMPTION_EXHAUSTED`: the same event again for a session already settled `refused` / `exhausted` | the command is NOT run again |
 | 200 | Signed by Google's TEST key set only (AdMob console "Verify URL") | acknowledged, never applied |
 | 400 | Malformed query (signature/key_id not last, duplicates, an escaped name, a value decoding to `&`/`=`, formats) | nothing |
 | 403 | Signature invalid / `key_id` unknown after a successful key read | nothing |
-| 503 | Key server unreachable with no cache < 24 h, an unknown `key_id` while it fails, or a server failure while redeeming | Google retries; the recorded event keeps every retry safe |
+| 503 | Key server unreachable with no cache < 24 h, an unknown `key_id` while it fails, or a server failure while redeeming (also when a refusal could not be recorded) | Google retries; a recorded event stays `pending` and the recovery worker redeems it after Google's retries |
 
 Logs carry identifiers only (`admob_ssv_callback`: status, outcome,
-transactionId, keyId, sessionId) — never the signature, the raw query or
-`user_id`.
+transactionId, keyId, sessionId; `admob_ssv_redemption`: source, outcome,
+attempt, sessionId, transactionId and, for a non-HTTP failure, a
+`safeCause` category) — never the signature, the raw query, `user_id` or an
+exception message.
 
 ## Records
 
@@ -1348,6 +1413,15 @@ nothing, CHECK). No money moves on it; `ad_reward_claims` stays the payout
 record (its `verificationMetadataJson` keeps the session id, platform, unit,
 key id and reward item/amount). Member deletion and the test-season cleanup
 delete the member's sessions.
+
+Server recovery (migrations `20261108120000_add_ad_reward_redemption_enums`
+— enum `AdRewardRedemptionStatus` + Ops job name `ad_reward_redemption` —
+and `20261108120100_add_ad_reward_session_redemption`, both additive):
+`redemption_status` (nullable enum), `redemption_attempt_count` (int, default
+0), `redemption_next_attempt_at`, `redemption_error_code` (varchar 64, a
+fixed code only), CHECK `ad_reward_sessions_redemption_check`, index
+`ad_reward_sessions_redemption_due_idx (redemption_status,
+redemption_next_attempt_at)`. No API request or response changes.
 
 ## Errors added
 
@@ -1369,4 +1443,7 @@ server-side verification › callback URL
 banner units carry no SSV and never reach this API. Deploy order: backend
 (migration) first with ads still disabled, verify the callback URL in the
 console, then a production app build, then — after a real-device rewarded
-test confirmed Google's callback end to end — set the flags.
+test confirmed Google's callback end to end — set the flags. The recovery
+worker needs no setting of its own: it runs whenever ads are on with AdMob
+(and pauses otherwise); watch `ops_job_runs` for `ad_reward_redemption`
+runs recorded `failed`.

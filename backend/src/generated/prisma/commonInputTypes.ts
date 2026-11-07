@@ -1180,6 +1180,23 @@ export type EnumAdRewardPurposeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumAdRewardPurposeFilter<$PrismaModel>
 }
 
+export type EnumAdRewardRedemptionStatusNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.AdRewardRedemptionStatus | Prisma.EnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  in?: $Enums.AdRewardRedemptionStatus[] | Prisma.ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.AdRewardRedemptionStatus[] | Prisma.ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumAdRewardRedemptionStatusNullableFilter<$PrismaModel> | $Enums.AdRewardRedemptionStatus | null
+}
+
+export type EnumAdRewardRedemptionStatusNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AdRewardRedemptionStatus | Prisma.EnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  in?: $Enums.AdRewardRedemptionStatus[] | Prisma.ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.AdRewardRedemptionStatus[] | Prisma.ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumAdRewardRedemptionStatusNullableWithAggregatesFilter<$PrismaModel> | $Enums.AdRewardRedemptionStatus | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAdRewardRedemptionStatusNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAdRewardRedemptionStatusNullableFilter<$PrismaModel>
+}
+
 export type EnumFxRateSourceTypeFilter<$PrismaModel = never> = {
   equals?: $Enums.FxRateSourceType | Prisma.EnumFxRateSourceTypeFieldRefInput<$PrismaModel>
   in?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
@@ -2796,6 +2813,23 @@ export type NestedEnumAdRewardPurposeWithAggregatesFilter<$PrismaModel = never> 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumAdRewardPurposeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumAdRewardPurposeFilter<$PrismaModel>
+}
+
+export type NestedEnumAdRewardRedemptionStatusNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.AdRewardRedemptionStatus | Prisma.EnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  in?: $Enums.AdRewardRedemptionStatus[] | Prisma.ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.AdRewardRedemptionStatus[] | Prisma.ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumAdRewardRedemptionStatusNullableFilter<$PrismaModel> | $Enums.AdRewardRedemptionStatus | null
+}
+
+export type NestedEnumAdRewardRedemptionStatusNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AdRewardRedemptionStatus | Prisma.EnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  in?: $Enums.AdRewardRedemptionStatus[] | Prisma.ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.AdRewardRedemptionStatus[] | Prisma.ListEnumAdRewardRedemptionStatusFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumAdRewardRedemptionStatusNullableWithAggregatesFilter<$PrismaModel> | $Enums.AdRewardRedemptionStatus | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAdRewardRedemptionStatusNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAdRewardRedemptionStatusNullableFilter<$PrismaModel>
 }
 
 export type NestedEnumFxRateSourceTypeFilter<$PrismaModel = never> = {

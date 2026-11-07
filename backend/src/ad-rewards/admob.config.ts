@@ -26,6 +26,31 @@ export const ADMOB_SESSION_TTL_MS = 30 * 60_000;
  */
 export const ADMOB_SESSION_EXPIRY_GRACE_MS = 2 * 60_000;
 
+/**
+ * Server recovery (2026-11-08): a recorded event whose command did not commit
+ * for a SERVER reason is run again by AdMobRedemptionWorker, even after
+ * Google's retries (five, 1 s apart) are over and the app is closed.
+ *
+ * - The first worker attempt comes this long after the event was recorded:
+ *   the callback itself, Google's retries and the app's polling (~30 s)
+ *   normally redeem it before.
+ * - Each failed attempt waits 1, 2, 4 … minutes, at most an hour.
+ * - The server stops this long after Google's confirmation (`exhausted`), so
+ *   an automatic payout or reset never lands days after the ad. Attempts are
+ *   only spent while the worker actually runs (ads switched on, database up).
+ */
+export const ADMOB_REDEMPTION_FIRST_ATTEMPT_DELAY_MS = 60_000;
+export const ADMOB_REDEMPTION_MAX_RETRY_DELAY_MS = 60 * 60_000;
+export const ADMOB_REDEMPTION_WINDOW_MS = 24 * 60 * 60_000;
+/** Due sessions one worker pass attempts (oldest due first). */
+export const ADMOB_REDEMPTION_BATCH_SIZE = 25;
+
+/** The wait after failed attempt number `attempt` (1-based). */
+export function adMobRedemptionRetryDelayMs(attempt: number): number {
+  const exponent = Math.min(Math.max(attempt - 1, 0), 30);
+  return Math.min(60_000 * 2 ** exponent, ADMOB_REDEMPTION_MAX_RETRY_DELAY_MS);
+}
+
 export type AdMobConfig = {
   rewardedAdUnits: Record<AdMobPlatform, string | null>;
 };
@@ -61,6 +86,7 @@ export function assertAdMobConfigured(
   const admob = readAdMobConfig(env);
   if (!adReward.enabled || adReward.provider !== ADMOB_PROVIDER) return;
   if (!admob.rewardedAdUnits.android && !admob.rewardedAdUnits.ios) {
+    // @diagnosticSurface internal: Startup validation (validateEnv) collects this fixed configuration error before the server accepts requests; it names only setting keys.
     throw new AdRewardConfigError(
       'AD_REWARD_PROVIDER=admob requires ADMOB_REWARDED_AD_UNIT_ID_ANDROID and/or ADMOB_REWARDED_AD_UNIT_ID_IOS.',
     );
@@ -86,8 +112,9 @@ function optionalAdUnit(raw: string | undefined, name: string): string | null {
   const trimmed = raw?.trim();
   if (!trimmed) return null;
   if (!AD_UNIT.test(trimmed)) {
+    // @diagnosticSurface internal: Startup validation (validateEnv) names the invalid setting without exposing its value; the runtime re-reads in AdMobRewardSessionService see the same validated environment.
     throw new AdRewardConfigError(
-      `${name} must be an AdMob ad unit id (ca-app-pub-<publisher>/<unit>). Received: ${JSON.stringify(raw)}.`,
+      `${name} must be an AdMob ad unit id (ca-app-pub-<publisher>/<unit>).`,
     );
   }
   return trimmed;

@@ -155,6 +155,23 @@ enum AdRewardPurpose {
   account_reset
 }
 
+/// The server's own redemption of an ad session's recorded SSV event
+/// (2026-11-08). Bookkeeping of the automatic paths only — the payout/reset
+/// record stays the AdRewardClaim (+ wallet/ledger rows, GeneralAccountReset).
+enum AdRewardRedemptionStatus {
+  /// Google's event is recorded and the session's command has not committed:
+  /// the recovery worker runs it at redemptionNextAttemptAt.
+  pending
+  /// The command committed (a claim exists for the session's command key).
+  redeemed
+  /// The command refused it for a product rule (blocked reset, inactive
+  /// account, …): the server never runs it again on its own.
+  refused
+  /// Still not committed 24 h after Google's confirmation: the server stops;
+  /// the member's own command (same key) can still redeem it.
+  exhausted
+}
+
 enum SnapshotReason {
   season_join
   exchange_executed
@@ -305,6 +322,7 @@ enum OpsJobName {
   push_notifications
   account_deletion_cleanup
   community_photo_cleanup
+  ad_reward_redemption
 }
 
 enum MarketCandleSyncMode {
@@ -2189,6 +2207,19 @@ model AdRewardSession {
   ssvKeyId         String?         @map("ssv_key_id")
   ssvRewardItem    String?         @map("ssv_reward_item")
   ssvRewardAmount  String?         @map("ssv_reward_amount")
+  /// Server-side redemption of the recorded event (2026-11-08, SQL CHECK):
+  /// set to pending together with the event, so a confirmed ad whose command
+  /// failed for a server reason is redeemed even when Google's retries are
+  /// over and the app is closed. Null before the event (and on sessions
+  /// recorded before this column existed — the server never redeems those).
+  redemptionStatus        AdRewardRedemptionStatus? @map("redemption_status")
+  /// Recovery worker attempts so far (the callback's own call is not one).
+  redemptionAttemptCount  Int                       @default(0) @map("redemption_attempt_count")
+  /// Set exactly while pending: when the recovery worker runs the command next.
+  redemptionNextAttemptAt DateTime?                 @map("redemption_next_attempt_at")
+  /// A fixed code: the refusal (refused) or the last server failure
+  /// (pending, exhausted). Never an exception message.
+  redemptionErrorCode     String?                   @map("redemption_error_code") @db.VarChar(64)
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
@@ -2196,6 +2227,8 @@ model AdRewardSession {
   @@unique([tradingAccountId, idempotencyKey])
   @@index([tradingAccountId, createdAt])
   @@index([userId])
+  // The recovery worker's due scan (status = pending, next attempt <= now).
+  @@index([redemptionStatus, redemptionNextAttemptAt], map: "ad_reward_sessions_redemption_due_idx")
   @@map("ad_reward_sessions")
 }
 

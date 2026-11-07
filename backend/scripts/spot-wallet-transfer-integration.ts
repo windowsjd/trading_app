@@ -1046,7 +1046,10 @@ async function modern(s: Scenario) {
  * does: Prisma sends each statement on its own, while one multi-statement
  * query runs as a single implicit transaction, which CREATE INDEX CONCURRENTLY
  * refuses (25001). Those files are plain index DDL, so their statements are
- * sent one by one; every other file still runs as one query.
+ * sent one by one; every other file still runs as one query. Only SQL code
+ * decides this, never a comment: a file whose header merely mentions
+ * CONCURRENTLY (e.g. add_community, pointing at its index migration) is an
+ * ordinary file.
  *
  * Existence probes assume one public schema; here they are scoped to the
  * private one (the public schema already has every type and constraint).
@@ -1065,15 +1068,15 @@ async function applyMigration(db: Client, migration: string, schema: string) {
       'FROM pg_constraint WHERE',
       'FROM pg_constraint WHERE connamespace = current_schema()::regnamespace AND',
     );
-  if (!/\bCONCURRENTLY\b/.test(sql)) {
-    await db.query(sql);
-    return;
-  }
-  // Full-line comments may contain semicolons themselves.
+  // Full-line comments may contain semicolons (and CONCURRENTLY) themselves.
   const code = sql
     .split('\n')
     .filter((line) => !line.trimStart().startsWith('--'))
     .join('\n');
+  if (!/\bCONCURRENTLY\b/.test(code)) {
+    await db.query(sql);
+    return;
+  }
   const statements = code
     .split(';')
     .map((statement) => statement.trim())

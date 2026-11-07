@@ -195,6 +195,16 @@ export const AdRewardPurpose = {
 export type AdRewardPurpose = (typeof AdRewardPurpose)[keyof typeof AdRewardPurpose]
 
 
+export const AdRewardRedemptionStatus = {
+  pending: 'pending',
+  redeemed: 'redeemed',
+  refused: 'refused',
+  exhausted: 'exhausted'
+} as const
+
+export type AdRewardRedemptionStatus = (typeof AdRewardRedemptionStatus)[keyof typeof AdRewardRedemptionStatus]
+
+
 export const SnapshotReason = {
   season_join: 'season_join',
   exchange_executed: 'exchange_executed',
@@ -377,7 +387,8 @@ export const OpsJobName = {
   crypto_order_book_retention: 'crypto_order_book_retention',
   push_notifications: 'push_notifications',
   account_deletion_cleanup: 'account_deletion_cleanup',
-  community_photo_cleanup: 'community_photo_cleanup'
+  community_photo_cleanup: 'community_photo_cleanup',
+  ad_reward_redemption: 'ad_reward_redemption'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
