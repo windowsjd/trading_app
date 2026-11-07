@@ -13,11 +13,12 @@ import QuantityRatioSlider from '../order/QuantityRatioSlider';
 export type FuturesLeverageSheet = 'list' | 'custom' | null;
 
 /**
- * 레버리지 for a new position: the field shows the chosen multiple (`10x`) and
+ * 레버리지 for the entry: the field shows the chosen multiple (`10x`) and
  * opens the preset list; 직접 설정하기 at its end opens a second sheet for any
  * integer 1–100, applied only by 설정하기. Closing either sheet keeps the
  * previous leverage. The screen owns the value and the open sheet (a command
- * in flight closes it); an open position's leverage is fixed and not offered.
+ * in flight closes it). Choosing never changes an open position: a different
+ * leverage for it applies only after the user's approval and the server's check.
  */
 export default function FuturesLeverageSelect({ leverage, onChange, disabled, sheet, onSheetChange }: {
   leverage: number;

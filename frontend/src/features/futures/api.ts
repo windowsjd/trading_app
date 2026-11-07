@@ -459,8 +459,9 @@ export async function cancelFuturesLimitOrder(id: string, orderId: string) {
 
 /**
  * Futures conditional entries (`futures/conditional-entries`): a watch on the
- * contract's Futures Last that opens ONE new position — a market open or a
- * Futures limit entry — when it triggers. Registering reserves nothing;
+ * contract's Futures Last that makes ONE entry in its direction — a market
+ * entry or a Futures limit entry — when it triggers; the fill opens that
+ * direction's position or adds to the open one. Registering reserves nothing;
  * `state` follows the created execution or limit entry, so a met condition is
  * never reported as filled. Separate from position TP/SL (protections).
  */

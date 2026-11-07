@@ -29,6 +29,13 @@ export type PortfolioAccess =
   | 'not_friend'
   | 'unavailable';
 
+/**
+ * Whether `viewerId` may read `targetId`'s current-season portfolio.
+ * `viewerId` must be the authenticated caller, never a client-sent id.
+ * Owners read their own (2026-11-06): only the friendship and the sharing
+ * switch are skipped — an inactive owner stays unavailable, and the caller's
+ * season/participant/account checks and post-read recheck still apply.
+ */
 export async function readPortfolioAccess(
   prisma: Pick<Prisma.TransactionClient, 'user'>,
   viewerId: string,
@@ -50,6 +57,7 @@ export async function readPortfolioAccess(
     },
   });
   if (!user || user.status !== 'active') return 'unavailable';
+  if (viewerId === targetId) return 'available';
   if (!user.friendshipsLow.length && !user.friendshipsHigh.length)
     return 'not_friend';
   return user.portfolioPublic ? 'available' : 'private';

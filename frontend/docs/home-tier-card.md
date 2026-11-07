@@ -30,10 +30,23 @@
 | gold → Gold | 03_Gold_Light.png | 03_Gold_Dark.png | 538×315 / 동일 |
 | platinum → Platinum | 04_Platinum_Light.png | 04_Platinum_Dark.png | 538×318 / 동일 |
 | diamond → Diamond | 05_Diamond_Light.png | 05_Diamond_Dark.png | 538×318 / 동일 |
-| master → Whale | 06_Whale_Light.png | 06_Whale_Dark.png | 848×533 / 849×530 |
+| master → Whale | 06_Whale_Light.png (표시: `_thin-rim` 파생본) | 06_Whale_Dark.png (표시: `_thin-rim` 파생본) | 848×533 / 849×530 |
 
 Bronze~Platinum은 원본의 금속 반사, Diamond/Whale은 원본의 패싯을 사용한다.
 모든 원본은 RGB PNG이며 UI 문구·프로필·앰블럼이 포함되어 있지 않다.
+
+**Whale 금테 파생본 (2026-11-06):** Whale 카드의 바깥 금테가 두껍다는 의견에 따라, 원본 2개는
+그대로 두고(`manifest.json` 해시 불변) 금테만 원래 두께의 75%로 그린 파생본
+`06_Whale_Light_thin-rim.png`·`06_Whale_Dark_thin-rim.png`를 `tierBackgrounds.ts`가 표시한다.
+`scripts/prepare-whale-tier-rim.cjs`가 원본에서 금테의 바깥 윤곽(변별 inset, 모서리별 반지름)과
+두께를 측정해, 금테 픽셀만 금테의 법선(직선 변)·반지름(둥근 모서리) 방향으로 원본에서 다시
+샘플링한다. 그래서 바깥 어두운 선·밝은 띠·안쪽 어두운 선의 금속 단면과 바깥 윤곽·모서리 곡선은
+그대로이고 두께만 준다. 금테 안쪽 16px 배경 띠가 줄어든 폭을 메우며, 그 밖의 패싯·광택·여백
+픽셀은 원본과 한 픽셀도 다르지 않다(색 보정·블러·생성 이미지 없음). 크기(848×533 / 849×530)가
+같아 `TierCardBackground`의 분할·확장 규칙(하단 보호 20 source px 포함)은 바뀌지 않았다.
+측정값·파라미터·해시는 `whale-rim.json`에 있고, `tierAssets.test.ts`가 원본 해시, 파생본의
+재현성(스크립트 출력과 픽셀 동일), 두께 비율, 윤곽 불변, 띠 밖 픽셀 동일을 검사한다.
+두께를 다시 조정하려면 `RIM.scale`만 바꿔 스크립트를 다시 실행한다(항상 원본에서 파생).
 색 보정, 블러, 생성 이미지, 불투명 패널, 신규 라이브러리를 사용하지 않는다.
 Whale Light도 실제 원본은 남청색이므로 흰색 글자를 사용한다.
 

@@ -283,3 +283,87 @@ test('standalone account binding clears inputs when selection changes and cannot
   assert.deepEqual(selected(h), []);
   assert.equal(h.requests.length, 0);
 });
+
+// 2026-11-06: a stock 지정가/LOC BUY takes whole shares; when the whole
+// available amount (the ratio's fee buffer included) cannot pay for one share
+// at the entered price, the ratio controls say so instead of "too small".
+const WHOLE_SHARE = '지정가 주문은 1주 단위로 가능해요. 현재 주문 가능 금액으로는 1주를 매수할 수 없어요.';
+const TOO_SMALL = '계산된 수량이 너무 작습니다.';
+const shows = (h: any, message: string) => json(h).includes(message);
+function usStock(h: any, available: string) {
+  h.assets.bnb.assetType = 'us_stock';
+  h.usdBalance = available;
+  h.usdReserved = '0';
+  h.usdAvailable = available;
+}
+function krStock(h: any, balance: string) {
+  h.assetId = 'samsung';
+  h.assets.samsung.marketStatus = 'open';
+  h.assets.samsung.tradable = true;
+  h.krwBalance = balance;
+}
+
+for (const scenario of [
+  { name: 'US limit', method: 'limit', setup: (h: any) => usStock(h, '25.87'), price: '182', reachable: '12', shares: '2' },
+  { name: 'KR limit', method: 'limit', setup: (h: any) => krStock(h, '150000'), price: '182000', reachable: '12000', shares: '12' },
+  { name: 'KR LOC', method: 'loc', setup: (h: any) => {
+    krStock(h, '150000');
+    h.orderCapabilities = { tradingAccountId: 'general', limitOrder: { enabled: true, autoExecutionEnabled: false },
+      limitOnClose: { enabled: true, markets: ['KRX'], sides: ['buy'], attachedProtection: false } };
+  }, price: '182000', reachable: '12000', shares: '12' },
+])
+  test(`${scenario.name} BUY: an amount below one share at the entered price explains the whole-share rule`, async (t) => {
+    const h = inlineTradingHarness();
+    scenario.setup(h);
+    await h.mount();
+    t.after(h.close);
+    await h.selectOrderType(scenario.method);
+    await h.input(TEST_IDS.order.limitPriceInput, scenario.price);
+    assert.equal(shows(h, WHOLE_SHARE), false, 'no explanation before a ratio is used');
+    for (const percent of [25, 50, 75, 100]) {
+      await h.press(`order-ratio-${percent}`);
+      assert.equal(shows(h, WHOLE_SHARE), true, `${percent}%`);
+      assert.equal(shows(h, TOO_SMALL), false);
+      assert.equal(h.node(qty).props.value, '');
+      assert.deepEqual(selected(h), []);
+    }
+    await h.slide(0);
+    assert.equal(h.node(qty).props.value, '');
+    assert.equal(shows(h, WHOLE_SHARE), false, '0% clears the input and says nothing');
+    await h.slide(60);
+    assert.equal(shows(h, WHOLE_SHARE), true, 'the slider explains too');
+    // A price one share fits under: whole shares again, and the explanation is gone.
+    await h.input(TEST_IDS.order.limitPriceInput, scenario.reachable);
+    assert.equal(shows(h, WHOLE_SHARE), false, 'a price change clears it');
+    await h.press('order-ratio-100');
+    assert.equal(h.node(qty).props.value, scenario.shares);
+    assert.equal(shows(h, WHOLE_SHARE) || shows(h, TOO_SMALL), false);
+    assert.equal(h.requests.length, 0);
+  });
+
+test('stock limit BUY: a ratio under one share of an amount that buys one keeps the general message', async (t) => {
+  const h = inlineTradingHarness();
+  usStock(h, '300');
+  await h.mount();
+  t.after(h.close);
+  await h.selectOrderType('limit');
+  await h.input(TEST_IDS.order.limitPriceInput, '182');
+  await h.press('order-ratio-25');
+  assert.equal(shows(h, TOO_SMALL), true);
+  assert.equal(shows(h, WHOLE_SHARE), false);
+  await h.press('order-ratio-100');
+  assert.equal(h.node(qty).props.value, '1');
+  assert.equal(shows(h, TOO_SMALL), false);
+});
+
+test('stock market BUY keeps fractional ratio quantities for the same amount and price', async (t) => {
+  const h = inlineTradingHarness();
+  usStock(h, '25.87');
+  h.assets.bnb.price.currentPrice = '182';
+  await h.mount();
+  t.after(h.close);
+  await h.press('order-ratio-100');
+  // 25.87 / (182 × 1.002), floored to six decimals.
+  assert.equal(h.node(qty).props.value, '0.141859');
+  assert.equal(shows(h, WHOLE_SHARE) || shows(h, TOO_SMALL), false);
+});

@@ -173,6 +173,29 @@ describe('유저 시즌 요약: friend action by user id', () => {
     assert.equal(self.requests.some((request: string) => request.startsWith('/friends/relationships/')), false);
   });
 
+  it("the member's own summary shows the portfolio the server authorizes and never upgrades a refusal", async (t) => {
+    const portfolio = { valuationState: 'available', holdings: [], history: [],
+      allocation: { cashKrwValue: '7654321.00000000', domesticStockValueKrw: '0', usStockValueKrw: '0', cryptoValueKrw: '0' },
+      futures: { evaluatedAt: new Date().toISOString(), positions: [] } };
+    const own = (patch: Record<string, unknown>) =>
+      ({ ...summary({}, patch), user: { id: 'user-1', nickname: '사용자', profileImageUrl: null } });
+    // 2026-11-06 server: the owner's own read is authorized without a friendship.
+    const self = harness('summary', 'user'); t.after(self.close);
+    self.route = { userId: 'user-1' };
+    self.data['/users/user-1/season-summary'] = own({ portfolioAccess: 'available', portfolio });
+    await self.start();
+    assert.equal(self.text().includes('자산 배분'), true);
+    assert.equal(self.text().includes('7,654,321'), true);
+    assert.equal(self.text().includes('친구 요청을 수락한 사용자만'), false);
+    // An older server still says not_friend: the client shows nothing in its place.
+    const older = harness('summary', 'user'); t.after(older.close);
+    older.route = { userId: 'user-1' };
+    older.data['/users/user-1/season-summary'] = own({ portfolioAccess: 'not_friend', portfolio });
+    await older.start();
+    assert.equal(older.text().includes('자산 배분') || older.text().includes('7,654,321'), false);
+    assert.equal(older.text().includes('친구 요청을 수락한 사용자만 포트폴리오를 볼 수 있습니다.'), true);
+  });
+
   it('a failed relationship read is never "none": it offers 다시 시도; an inactive user says so without a request button', async (t) => {
     for (const role of ['user', 'admin'] as const) {
       const h = harness('summary', role); t.after(h.close);

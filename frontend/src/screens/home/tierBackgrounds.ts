@@ -11,8 +11,8 @@ import platinumLight from '../../assets/home-tier-backgrounds/04_Platinum_Light.
 import platinumDark from '../../assets/home-tier-backgrounds/04_Platinum_Dark.png';
 import diamondLight from '../../assets/home-tier-backgrounds/05_Diamond_Light.png';
 import diamondDark from '../../assets/home-tier-backgrounds/05_Diamond_Dark.png';
-import whaleLight from '../../assets/home-tier-backgrounds/06_Whale_Light.png';
-import whaleDark from '../../assets/home-tier-backgrounds/06_Whale_Dark.png';
+import whaleLight from '../../assets/home-tier-backgrounds/06_Whale_Light_thin-rim.png';
+import whaleDark from '../../assets/home-tier-backgrounds/06_Whale_Dark_thin-rim.png';
 import manifest from '../../assets/home-tier-backgrounds/manifest.json';
 
 type Background = { source: ImageSourcePropType; width: number; height: number };
@@ -23,6 +23,9 @@ function asset(source: ImageSourcePropType, filename: keyof typeof manifest): Ba
 
 // Original ZIP filenames and bytes are retained. Canonical master is mapped to
 // Home's whale by getHomeTier before reaching this presentation-only table.
+// Whale draws derivatives whose gold rim is 75% as thick (2026-11-06,
+// whale-rim.json, scripts/prepare-whale-tier-rim.cjs): same size as the
+// originals beside them, so their manifest entries give the dimensions.
 export const TIER_BACKGROUNDS: Record<HomeTier, Record<AppearanceMode, Background>> = {
   bronze: { light: asset(bronzeLight, '01_Bronze_Light.png'), dark: asset(bronzeDark, '01_Bronze_Dark.png') },
   silver: { light: asset(silverLight, '02_Silver_Light.png'), dark: asset(silverDark, '02_Silver_Dark.png') },

@@ -2000,6 +2000,157 @@ describe('RecordsService', () => {
     },
   );
 
+  // 2026-11-06: viewer = target (the authenticated id) is the owner's own
+  // summary. Only friendship and the sharing switch are skipped.
+  const ownValuation = () => ({
+    calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+      seasonParticipantId: participant.id,
+      totalAssetKrw: '100',
+      krwCash: '100',
+      usdCashKrw: '0',
+      domesticStockValueKrw: '0',
+      usStockValueKrw: '0',
+      cryptoValueKrw: '0',
+      positionValues: [],
+    }),
+  });
+  const ownerRow = {
+    status: 'active',
+    portfolioPublic: false,
+    friendshipsLow: [],
+    friendshipsHigh: [],
+  };
+
+  it("returns the caller's own current-season portfolio without friendship or sharing", async () => {
+    const valuation = ownValuation();
+    const { prisma, service, positionsProjection } = createService(valuation);
+    prisma.user.findUnique
+      .mockResolvedValueOnce({ id: 'user-1', nickname: 'owner' })
+      .mockResolvedValue(ownerRow);
+    mockCurrentSeason(prisma);
+    mockDetailedParticipant(prisma);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
+
+    const result = await service.getUserCurrentSeasonSummary(
+      'user-1',
+      'user-1',
+    );
+
+    expect(result.data.portfolioAccess).toBe('available');
+    expect(result.data.portfolio === null).toBe(false);
+    expect(valuation.calculateTradingAccountValuation).toHaveBeenCalledWith(
+      participantAccount.id,
+      expect.any(Date),
+      'home_live_valuation',
+    );
+    expect(positionsProjection.readOpenHoldingProjection).toHaveBeenCalledWith(
+      participantAccount.id,
+      expect.any(Date),
+    );
+    // Season ownership and the active season are rechecked after the reads.
+    expect(prisma.seasonParticipant.findFirst).toHaveBeenCalledTimes(1);
+    const [recheck] = prisma.seasonParticipant.findFirst.mock.calls[0] as [
+      { where: Record<string, unknown> },
+    ];
+    expect(recheck.where).toMatchObject({
+      id: participant.id,
+      userId: 'user-1',
+      tradingAccount: { userId: 'user-1', mode: 'season', status: 'active' },
+    });
+    // Target lookup, access check and the post-read access recheck.
+    expect(prisma.user.findUnique).toHaveBeenCalledTimes(3);
+    expectNoRecordWrites(prisma);
+  });
+
+  it('never extends the owner exception to another viewer', async () => {
+    const valuation = ownValuation();
+    const { prisma, service, positionsProjection } = createService(valuation);
+    prisma.user.findUnique
+      .mockResolvedValueOnce({ id: 'user-1', nickname: 'owner' })
+      .mockResolvedValue({ ...ownerRow, portfolioPublic: true });
+    mockCurrentSeason(prisma);
+    mockDetailedParticipant(prisma);
+
+    const result = await service.getUserCurrentSeasonSummary(
+      'viewer-1',
+      'user-1',
+    );
+
+    expect(result.data.portfolioAccess).toBe('not_friend');
+    expect(result.data.portfolio).toBeNull();
+    expect(valuation.calculateTradingAccountValuation).not.toHaveBeenCalled();
+    expect(
+      positionsProjection.readOpenHoldingProjection,
+    ).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it.each([
+    'not_joined',
+    'hidden',
+    'excluded',
+    'inactive',
+    'ended_season',
+    'closed_account',
+    'revoked_during_read',
+  ])(
+    "keeps the participation, visibility, season and account gates on the caller's own summary: %s",
+    async (gate) => {
+      const valuation = ownValuation();
+      const { prisma, service, positionsProjection } = createService(valuation);
+      prisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'user-1', nickname: 'owner' })
+        .mockResolvedValue(
+          gate === 'inactive' ? { ...ownerRow, status: 'suspended' } : ownerRow,
+        );
+      prisma.season.findFirst.mockResolvedValue(
+        gate === 'ended_season'
+          ? { ...season, status: SeasonStatus.ended }
+          : season,
+      );
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+        gate === 'not_joined'
+          ? null
+          : gate === 'hidden'
+            ? { ...detailedParticipant, rankingHiddenAt: new Date() }
+            : gate === 'excluded'
+              ? {
+                  ...detailedParticipant,
+                  participantStatus: ParticipantStatus.excluded,
+                }
+              : gate === 'closed_account'
+                ? {
+                    ...detailedParticipant,
+                    tradingAccount: {
+                      ...detailedParticipant.tradingAccount,
+                      status: 'closed',
+                    },
+                  }
+                : detailedParticipant,
+      );
+      if (gate === 'revoked_during_read')
+        prisma.seasonParticipant.findFirst.mockResolvedValue(null);
+      prisma.dailyPortfolioSnapshot.findMany.mockResolvedValue([]);
+
+      const result = await service.getUserCurrentSeasonSummary(
+        'user-1',
+        'user-1',
+      );
+
+      expect(result.data.portfolioAccess).toBe('unavailable');
+      expect(result.data.portfolio).toBeNull();
+      if (gate !== 'revoked_during_read') {
+        expect(
+          valuation.calculateTradingAccountValuation,
+        ).not.toHaveBeenCalled();
+        expect(
+          positionsProjection.readOpenHoldingProjection,
+        ).not.toHaveBeenCalled();
+      }
+      expectNoRecordWrites(prisma);
+    },
+  );
+
   it('hides current public user season summary for ranking-hidden participants', async () => {
     const portfolioValuationService = {
       calculateTradingAccountValuation: jest.fn(),

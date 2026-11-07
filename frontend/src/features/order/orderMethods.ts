@@ -109,15 +109,15 @@ export function isEntryTpSlMarketSupported(
 
 /**
  * Futures (USDⓈ-M synthetic perpetual) offers 시장가, 지정가 and 조건주문 only:
- * never LOC or the spot SELL settings. 지정가 (Futures Limit Entry v1) and
- * 조건주문 (Futures Conditional Entry v1: a watch on Futures Last that opens a
- * new LONG/SHORT) both open a NEW position, so they need a flat contract;
- * whether a new 조건주문 may be registered is the server's capability. Position
- * TP/SL is not an order method here: it is set from the position card.
- */
-/**
- * Futures 주문방식 (two-way positions, 2026-11-06): every method opens the
- * selected direction's position or adds to it, whether or not one is open.
+ * never LOC or the spot SELL settings. 조건주문 (Futures Conditional Entry v1)
+ * watches Futures Last; whether a new one may be registered is the server's
+ * capability. Two-way positions (2026-11-06): a contract holds its LONG and
+ * SHORT independently, one open position per direction, and every method
+ * opens the selected direction's position or adds to it (a 지정가 or 조건주문
+ * decides which when it fills). A leverage change needs the user's approval
+ * and the server's check; the margin mode stays fixed for the position's
+ * lifetime. Position TP/SL is not an order method here: it is set from the
+ * position card.
  */
 export function getFuturesOrderMethodOptions(conditional: ServerGate): OrderMethodOption[] {
   return [

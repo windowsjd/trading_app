@@ -487,13 +487,26 @@ describe('other ranking consumers', () => {
       const props = { account };
       // Home's account box no longer repeats the rank (the Ranking tab shows it).
       assert.equal(/#2/.test(h.render(screen, props)), !screen.startsWith('home/'));
-      assert.match(h.render(screen, props), screen.startsWith('home/') ? /Silver/ : /silver/);
+      // MY's 현재 등급 names the tier as every other screen does (2026-11-06): the
+      // API code (master) is never shown; an unknown code is the plain '-'.
+      const myTier = (html: string) => /현재 등급 (?:<!-- -->)?([^<]*)</.exec(html)?.[1] ?? null;
+      const shows = (name: string) => {
+        const html = h.render(screen, props);
+        assert.equal(html.includes(name), true, name);
+        if (!screen.startsWith('my/')) return;
+        assert.equal(myTier(html), name);
+        assert.equal(/master|silver|diamond/.test(html), false, 'no API tier code');
+      };
+      shows('Silver');
       h.page.myRanking = { ...availableRankings.myRanking, provisionalTier: 'master', finalTier: null };
-      assert.match(h.render(screen, props), screen.startsWith('home/') ? /Whale/ : /master/);
-      if (screen.startsWith('my/')) assert.doesNotMatch(h.render(screen, props), /Whale/);
+      shows('Whale');
+      if (screen.startsWith('my/')) {
+        h.page.myRanking = { ...availableRankings.myRanking, provisionalTier: 'grandmaster', finalTier: null };
+        assert.equal(myTier(h.render(screen, props)), '-');
+      }
       account.season.seasonStatus = 'settled';
       h.page.myRanking = { ...availableRankings.myRanking, provisionalTier: null, finalTier: 'diamond' };
-      assert.match(h.render(screen, props), screen.startsWith('home/') ? /Diamond/ : /diamond/);
+      shows('Diamond');
       const options = h.queryOptions.filter((q) => q.queryKey[0] === 'ranking').at(-1);
       assert.equal(options.enabled, true);
       await options.queryFn();
@@ -506,6 +519,7 @@ describe('other ranking consumers', () => {
         h.page.myRanking = state;
         const html = h.render(screen, props);
         assert.doesNotMatch(html, /#2|silver|diamond/i);
+        if (screen.startsWith('my/')) assert.equal(myTier(html), '-');
       }
     });
 

@@ -53,6 +53,11 @@ export const emptyFuturesConditionalDraft: FuturesConditionalDraft = {
 const PRICE = /^\d{1,16}(\.\d{1,8})?$/;
 const validPrice = (value: string) => PRICE.test(value) && Number(value) > 0;
 const LAST = '선물 Last';
+/** 이상/이하 with its subject particle (`… 이상이 되면`, `… 이하가 되면`). */
+const TRIGGER_BECOMES: Record<FuturesConditionalTrigger, string> = {
+  at_or_above: `${TRIGGER_DIRECTION_LABEL.at_or_above}이`,
+  at_or_below: `${TRIGGER_DIRECTION_LABEL.at_or_below}가`,
+};
 
 function decided(triggerPrice: string, lastPrice: string | null): FuturesConditionalTrigger | null {
   const direction = resolveTriggerDirection(triggerPrice, lastPrice);
@@ -61,7 +66,7 @@ function decided(triggerPrice: string, lastPrice: string | null): FuturesConditi
 
 /**
  * 감시가격 · 발동 후 실행 · 주문가격: the trigger on Futures Last and how the
- * new position is entered once it fires. Rendered where the other methods
+ * entry runs once it fires. Rendered where the other methods
  * show their price field. 이상/이하 follows the watch price against the
  * fresh Futures Last when it is entered; a later move never flips it.
  */
@@ -208,10 +213,16 @@ export default function FuturesConditionalEntryForm({ accountId, instrumentId, d
       setMessage(retry ? '접수 여부를 확인해야 합니다. 동일 요청으로 다시 확인해주세요.' : conditionalErrorMessage(info.serverCode));
     } finally { locked.current = false; if (current()) { setBusy(false); onBusy(!!request.current); } else onBusy(false); }
   };
+  // What runs once triggered: it opens the direction's position or adds to the
+  // open one (two-way), so the copy names the order, never "a new position". A
+  // market entry is attempted (collateral is checked then); a limit is placed.
+  const action = limit
+    ? `${validPrice(draft.limitPrice) ? `${price(draft.limitPrice)}로 ` : ''}${side} 지정가 주문을 접수합니다.`
+    : `${side} 시장가 진입을 시도합니다.`;
   return <View style={styles.stack} testID="futures-conditional-entry">
     <Text style={styles.summary} testID="futures-conditional-summary">
       {validPrice(draft.triggerPrice) && condition
-        ? `선물 Last가 ${price(draft.triggerPrice)} ${TRIGGER_DIRECTION_LABEL[condition]}가 되면 ${side} ${limit ? (validPrice(draft.limitPrice) ? `${price(draft.limitPrice)} 지정가` : '지정가') : '시장가'}로 새 포지션에 진입합니다.`
+        ? `선물 Last가 ${price(draft.triggerPrice)} ${TRIGGER_BECOMES[condition]} 되면 ${action}`
         : '감시가격을 입력하면 발동 조건을 확인할 수 있습니다.'}
     </Text>
     <Text style={styles.hint}>등록할 때는 담보를 예약하지 않습니다.</Text>

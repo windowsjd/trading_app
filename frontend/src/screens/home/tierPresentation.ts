@@ -30,3 +30,8 @@ export function getHomeTier(tier: string | null | undefined, mode: AppearanceMod
   const entry = Object.hasOwn(TIERS, key) ? TIERS[key] : null;
   return entry ? { id: entry.id, name: entry.name, palette: entry[mode] } : null;
 }
+
+/** The display name alone (MY's text row; names do not depend on the appearance): master → Whale, unknown → null. */
+export function getHomeTierName(tier: string | null | undefined) {
+  return getHomeTier(tier, 'light')?.name ?? null;
+}

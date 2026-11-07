@@ -63,9 +63,9 @@ export default function FuturesDetailScreen(props: FuturesDetailScreenProps) {
  * switch, its 전일대비 (against its own settled 1d close of the previous UTC
  * day, never the rolling 24h ticker), its chart with the 봉 시간
  * selector at the lower left, and 숏 / 롱 at the bottom (2026-11-06; 매도하기 /
- * 매수하기 before). 롱 opens the order screen on a new 롱(Long) entry and 숏 on a
- * new 숏(Short) entry — never a reduce or close; with a position held, the order screen keeps
- * that position's terms (one-way) and says why the other side waits. The full-
+ * 매수하기 before). 롱 opens the order screen on a 롱(Long) entry and 숏 on a
+ * 숏(Short) entry — never a reduce or close; a held position of that direction
+ * is added to (two-way: the other direction is independent). The full-
  * screen chart is opened from the order screen's chart button, as for stocks.
  *
  * Prices are the contract's own Last (never Mark or a Spot price); the won

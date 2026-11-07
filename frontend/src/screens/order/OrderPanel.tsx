@@ -196,6 +196,8 @@ export default function OrderPanel({ onSideChange, ...props }: Props) {
 }
 const BUY_FEE_BUFFER = 0.002;
 const RATIO_BUTTONS = [0.25, 0.5, 0.75, 1] as const;
+const STOCK_LIMIT_WHOLE_SHARE_MESSAGE =
+  '지정가 주문은 1주 단위로 가능해요. 현재 주문 가능 금액으로는 1주를 매수할 수 없어요.';
 
 function getOrderDomainErrorMessage(
   code?: string | null,
@@ -1030,10 +1032,17 @@ export function OrderForm({
     const nextQuantity = inputAtRatio(ratio);
 
     if (!nextQuantity || Number(nextQuantity) <= 0) {
+      // A stock limit/LOC BUY takes whole shares only: when even 100% (the
+      // same capacity as 최대 수량) floors to 0, say why. A smaller ratio of
+      // an amount that does buy a share keeps the general message.
+      const wholeShareUnaffordable =
+        side === 'buy' && isStock && orderType === 'limit' && inputAtRatio(1) === null;
       setFieldError(
         isAmountBuy
           ? '계산된 매수 금액이 너무 작습니다.'
-          : '계산된 수량이 너무 작습니다.',
+          : wholeShareUnaffordable
+            ? STOCK_LIMIT_WHOLE_SHARE_MESSAGE
+            : '계산된 수량이 너무 작습니다.',
       );
       return;
     }

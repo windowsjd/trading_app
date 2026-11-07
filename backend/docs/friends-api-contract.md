@@ -77,8 +77,13 @@ portfolio. Ranking, friend search and historical public records are unchanged.
 
 Portfolio access requires an active target, an accepted friendship, the target's
 public setting, and participation in the selected current active season with a
-valid season account. Hidden/excluded participants remain hidden. Self can use
-the existing owner APIs, but gets no special bypass on this friend surface.
+valid season account. Hidden/excluded participants remain hidden. Self
+(2026-11-06): when the authenticated caller's id is `:userId` (never a
+client-sent value), friendship and the sharing setting are not required, so a
+member's own 유저 시즌 요약 shows their portfolio. The active-target,
+participation, visibility, current-active-season, season-account and post-read
+checks still apply, the payload is the same friend projection, and no other
+viewer gains access.
 Public competition information remains readable without friendship or sharing.
 The existing `/users/:userId/records/:seasonId` retains public competition
 summary only: it returns `portfolio: null` and directs current portfolio reads

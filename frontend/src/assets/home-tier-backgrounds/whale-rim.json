@@ -1,0 +1,109 @@
+{
+  "purpose": "Whale card art with a thinner outer gold rim (2026-11-06); originals unchanged",
+  "rim": {
+    "scale": 0.75,
+    "outerThreshold": 80,
+    "innerThreshold": 0,
+    "depthMargin": 1.5,
+    "transition": 16,
+    "supersample": 4
+  },
+  "light": {
+    "source": "06_Whale_Light.png",
+    "sourceSha256": "36e3de2b6b5b0a92a6533728bfe31dbdd06423a7b335cc901e0a76ab5d92c5f8",
+    "size": [
+      848,
+      533
+    ],
+    "geometry": {
+      "insets": {
+        "top": 1.45,
+        "bottom": 2.8103,
+        "left": 1.2624,
+        "right": 1.9402
+      },
+      "radii": {
+        "topLeft": 39.1,
+        "topRight": 39.23,
+        "bottomLeft": 38.45,
+        "bottomRight": 38.52
+      },
+      "thickness": {
+        "top": 9.63,
+        "bottom": 9.4353,
+        "left": 9.9838,
+        "right": 9.4187
+      },
+      "cornerThickness": {
+        "topLeft": 10.8595,
+        "topRight": 10.6231,
+        "bottomLeft": 10.8372,
+        "bottomRight": 10.3201
+      },
+      "depth": 12.3595
+    },
+    "output": "06_Whale_Light_thin-rim.png",
+    "outputSha256": "e3d9542082ed0fd72f2eab6726bd34cc4be415758d71bc062067d1564c829173",
+    "outputThickness": {
+      "top": 7.3699,
+      "bottom": 7.3201,
+      "left": 7.6547,
+      "right": 7.3206
+    },
+    "outputCornerThickness": {
+      "topLeft": 8.2883,
+      "topRight": 8.2733,
+      "bottomLeft": 8.2869,
+      "bottomRight": 8.0464
+    }
+  },
+  "dark": {
+    "source": "06_Whale_Dark.png",
+    "sourceSha256": "2dd68cb7c6c0449293569525b4ee7f3bbb3c935cd259f2f2fe124ba84a1d97b6",
+    "size": [
+      849,
+      530
+    ],
+    "geometry": {
+      "insets": {
+        "top": 2.4474,
+        "bottom": 2.7818,
+        "left": 1.6377,
+        "right": 2.1667
+      },
+      "radii": {
+        "topLeft": 37.31,
+        "topRight": 36.95,
+        "bottomLeft": 35.56,
+        "bottomRight": 36.69
+      },
+      "thickness": {
+        "top": 6.5513,
+        "bottom": 6.201,
+        "left": 5.9261,
+        "right": 6.1982
+      },
+      "cornerThickness": {
+        "topLeft": 6.6666,
+        "topRight": 6.8158,
+        "bottomLeft": 6.5722,
+        "bottomRight": 6.091
+      },
+      "depth": 8.8361
+    },
+    "output": "06_Whale_Dark_thin-rim.png",
+    "outputSha256": "859f54c9c7af759f1fdef524430e1be90f91ccd9c629a238f826323f77f241fd",
+    "outputThickness": {
+      "top": 4.9876,
+      "bottom": 4.7459,
+      "left": 4.691,
+      "right": 4.9623
+    },
+    "outputCornerThickness": {
+      "topLeft": 5.1041,
+      "topRight": 5.2318,
+      "bottomLeft": 5.3833,
+      "bottomRight": 4.7465
+    }
+  }
+}

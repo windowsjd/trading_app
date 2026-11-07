@@ -32,7 +32,11 @@ for (const accountId of ['A', 'B'])
           assert.equal(children(h.node('futures-conditional-trigger-direction')),
             direction === 'long' ? '감시 조건 · 선물 Last 110 USD 이상 도달 시' : '감시 조건 · 선물 Last 90 USD 이하 도달 시');
           assert.equal(h.node('futures-conditional-submit').props.state, 'enabled');
-          assert.match(h.node('futures-conditional-summary').props.children, direction === 'long' ? /\$110 이상가 되면 롱\(Long\)/ : /\$90 이하가 되면 숏\(Short\)/);
+          // Opens the direction's position or adds to it: the copy names the order, never "새 포지션".
+          assert.equal(children(h.node('futures-conditional-summary')), `선물 Last가 ${direction === 'long' ? '$110 이상이' : '$90 이하가'} 되면 ${
+            execution === 'limit'
+              ? `${direction === 'long' ? '$111로 롱(Long)' : '$89로 숏(Short)'} 지정가 주문을 접수합니다.`
+              : `${direction === 'long' ? '롱(Long)' : '숏(Short)'} 시장가 진입을 시도합니다.`}`);
           await h.press('futures-conditional-submit');
           assert.equal(h.requests.length, 1);
           assert.equal(h.requests[0].path, `/trading-accounts/${accountId}/futures/conditional-entries`);
@@ -67,7 +71,7 @@ test('이상/이하 follows the watch price against Futures Last; no manual choi
   assert.equal(h.node('futures-conditional-submit').props.state, 'disabled');
   await h.change('futures-conditional-trigger-price', '100');
   assert.equal(children(h.node('futures-conditional-trigger-direction')), '감시 조건 · 선물 Last 100 USD 이하 도달 시', 'below Last 102');
-  assert.match(children(h.node('futures-conditional-summary')), /\$100 이하가 되면 롱\(Long\)/);
+  assert.equal(children(h.node('futures-conditional-summary')), '선물 Last가 $100 이하가 되면 롱(Long) 시장가 진입을 시도합니다.');
   assert.equal(h.node('futures-conditional-already-met') === undefined, true);
   assert.equal(h.node('futures-conditional-submit').props.state, 'enabled');
   await h.change('futures-conditional-trigger-price', '102.5');
@@ -78,8 +82,10 @@ test('이상/이하 follows the watch price against Futures Last; no manual choi
   await h.change('futures-conditional-trigger-price', '95');
   await h.choose('발동 후 지정가 진입');
   assert.equal(h.node('futures-conditional-submit').props.state, 'disabled', 'limit execution needs its price');
+  assert.equal(children(h.node('futures-conditional-summary')), '선물 Last가 $95 이하가 되면 롱(Long) 지정가 주문을 접수합니다.');
   await h.change('futures-conditional-limit-price', '94');
   assert.equal(h.node('futures-conditional-submit').props.state, 'enabled');
+  assert.equal(children(h.node('futures-conditional-summary')), '선물 Last가 $95 이하가 되면 $94로 롱(Long) 지정가 주문을 접수합니다.');
   assert.equal(h.requests.length, 0);
 });
 

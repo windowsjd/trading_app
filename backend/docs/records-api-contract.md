@@ -564,9 +564,10 @@ The user includes `id`, `nickname`, `profileImageUrl`; the season includes
 `name` and canonical ranking `maxDrawdown` when available.
 
 `portfolioAccess` distinguishes `available`, `private`, `not_friend` and
-`unavailable`. `portfolio` is null unless the viewer is an accepted friend,
-the target is active and sharing, and the selected season/account is active
-and the target is participating and visible. It contains only aggregate
+`unavailable`. `portfolio` is null unless the viewer is the target itself (the
+authenticated caller's own summary, 2026-11-06) or an accepted friend while the
+target is sharing, and in either case the target is active, the selected
+season/account is active and the target is participating and visible. It contains only aggregate
 allocation, public holding metadata/weights, and real daily history from the
 last 30 days. No general or past-season portfolio is shared.
 

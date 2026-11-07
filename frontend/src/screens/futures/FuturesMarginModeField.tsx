@@ -12,7 +12,8 @@ import type { MarginMode } from '../../features/futures/api';
 const MARGIN_LABEL: Record<MarginMode, string> = { isolated: '격리(Isolated)', cross: '교차(Cross)' };
 
 /**
- * 증거금 모드 for a new position. The small ⓘ beside the title opens a short
+ * 증거금 모드 for the entry (an open position keeps its own for its lifetime;
+ * the screen says so). The small ⓘ beside the title opens a short
  * help sheet on 격리 and 교차; the form itself carries no explanation text.
  * The switch and the server's margin policies are unchanged.
  */

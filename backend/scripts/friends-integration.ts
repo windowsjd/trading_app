@@ -546,6 +546,29 @@ async function run() {
       r.body.data.portfolio === null,
     'public true does not allow strangers',
   );
+  // The member's own summary (2026-11-06): the token's own user id reads the
+  // portfolio without a friendship, even with sharing off; nobody else gains it,
+  // and an own hidden participation stays hidden.
+  await patch('/me', { portfolioPublic: false }, 7).expect(200);
+  r = await get(`/users/${userIds[7]}/season-summary`, 7);
+  check(
+    r.body.data.portfolioAccess === 'available' &&
+      r.body.data.portfolio !== null,
+    'owner reads own portfolio without friendship or sharing',
+  );
+  r = await summary();
+  check(
+    r.body.data.portfolioAccess === 'not_friend' &&
+      r.body.data.portfolio === null,
+    'the owner exception never reaches another viewer',
+  );
+  r = await get(`/users/${userIds[37]}/season-summary`, 37);
+  check(
+    r.body.data.portfolioAccess === 'unavailable' &&
+      r.body.data.portfolio === null,
+    'own hidden participation stays hidden',
+  );
+  await patch('/me', { portfolioPublic: true }, 7).expect(200);
   r = await post('/friends/requests', 0, { userId: userIds[7] }).expect(201);
   const id = r.body.data.requestId;
   const requestId = id as string;

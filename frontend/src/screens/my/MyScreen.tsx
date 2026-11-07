@@ -23,6 +23,7 @@ import { TEST_IDS } from '../../constants/testIds';
 import { getMe } from '../../features/me/api';
 import { useLogout } from '../../features/auth/useLogout';
 import { getRankings, getRankingTier } from '../../features/ranking/api';
+import { getHomeTierName } from '../home/tierPresentation';
 import { getMySeasonRecords } from '../../features/record/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import {
@@ -186,7 +187,8 @@ export default function MyScreen({ navigation }: Props) {
     ? {
         rank:
           myRanking ? String(myRanking.rank) : '-',
-        tier: getRankingTier(myRanking, rankType),
+        // The ranking API's code (master) under its shown name (Whale), as on 내 순위.
+        tier: getHomeTierName(getRankingTier(myRanking, rankType)) ?? '-',
       }
     : null;
   const seasonCount = recordsQuery.data.pagination.total;
