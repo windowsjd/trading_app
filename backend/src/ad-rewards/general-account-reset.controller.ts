@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
+import { AdRewardPurpose } from '../generated/prisma/client';
 import type { AdRewardCommandBody } from './ad-reward-command';
+import { AdMobRewardSessionService } from './admob-reward-session.service';
 import { GeneralAccountResetService } from './general-account-reset.service';
 
 type AuthenticatedRequest = Request & {
@@ -17,11 +19,17 @@ type AuthenticatedRequest = Request & {
  *
  * GET never writes. POST takes the same ad-command body as the top-up claim
  * (provider, opaque proof, idempotencyKey) — nothing about the reset itself is
- * client-decided.
+ * client-decided. For an AdMob session whose Google event is recorded the
+ * server resets (or refuses) it itself; this call then only reads the result,
+ * so it can never become a second consent (2026-11-08,
+ * AdMobRewardSessionService.memberCommand).
  */
 @Controller('api/v1/trading-accounts/:accountId/account-reset')
 export class GeneralAccountResetController {
-  constructor(private readonly resetService: GeneralAccountResetService) {}
+  constructor(
+    private readonly resetService: GeneralAccountResetService,
+    private readonly sessions: AdMobRewardSessionService,
+  ) {}
 
   @Get('eligibility')
   getEligibility(
@@ -37,6 +45,11 @@ export class GeneralAccountResetController {
     @Param('accountId') accountId: string,
     @Body() body: AdRewardCommandBody,
   ) {
-    return this.resetService.reset(request.user?.userId, accountId, body);
+    return this.sessions.memberCommand(
+      AdRewardPurpose.account_reset,
+      request.user?.userId,
+      accountId,
+      body,
+    );
   }
 }

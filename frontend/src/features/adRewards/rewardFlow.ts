@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { getApiErrorInfo } from '../../services/api/errorMapper.ts';
+import { getApiErrorInfo, getErrorMessageFromCode } from '../../services/api/errorMapper.ts';
 import { formatKrw } from '../../utils/format.ts';
 import type {
   AccountResetEligibilityDto,
@@ -142,22 +142,59 @@ export function rewardSheetState(input: {
 }
 
 /**
- * A command whose answer never arrived (network, timeout, a bare 5xx) may
- * still have committed: it is retried with the SAME idempotency key and
- * proof, and the server replays the first result — never re-paid, never
- * reset twice. `pending` (2026-11-07): the ad was watched but Google's signed
- * confirmation has not reached the server yet; nothing was written, the same
- * command is asked again (and the server redeems it on its own when the
- * confirmation arrives). Any other coded refusal is final for that attempt.
+ * What the app may say about a command, matching what the server will do
+ * (2026-11-08). Once Google's event is recorded the SERVER completes the
+ * command (its callback, then its recovery worker) and the app's same-key
+ * call only reads the result, so:
+ *
+ * - `pending`: Google's signed confirmation has not reached the server yet;
+ *   nothing was written, the same command is asked again.
+ * - `processing`: confirmed, and the server is still completing it after a
+ *   temporary failure (AD_REWARD_REDEMPTION_PENDING) — it may still be
+ *   applied later; never shown as a refusal.
+ * - `uncertain`: no answer (network, timeout, a bare 5xx); re-checked with the
+ *   SAME key and proof — the server replays, never re-pays or resets twice.
+ * - `refused`: any other coded answer is final — the server will not run
+ *   that command again (AD_REWARD_REDEMPTION_CLOSED included); trying again
+ *   is a new, explicit attempt with a new ad.
  */
 export function classifyRewardCommandFailure(
   failure: unknown,
-): 'pending' | 'uncertain' | 'refused' {
+): 'pending' | 'processing' | 'uncertain' | 'refused' {
   const info = getApiErrorInfo(failure);
   if (info.serverCode === 'AD_REWARD_VERIFICATION_PENDING') return 'pending';
+  if (info.serverCode === 'AD_REWARD_REDEMPTION_PENDING') return 'processing';
   if (info.serverCode && !GENERIC_SERVER_CODES.has(info.serverCode)) return 'refused';
   if (!info.hasResponse) return 'uncertain';
   return info.status !== null && info.status >= 500 ? 'uncertain' : 'refused';
+}
+
+/**
+ * The 최종 거절 line for a command the server closed (2026-11-08): the stored
+ * reason — which the member may never have seen, the callback or the worker
+ * met it — when it has fixed copy, then that this ad is not used again.
+ * Undefined for every other answer (ErrorNotice shows the code's own copy).
+ */
+export function rewardRefusalMessage(failure: unknown): string | undefined {
+  if (getApiErrorInfo(failure).serverCode !== 'AD_REWARD_REDEMPTION_CLOSED') return undefined;
+  const reasonCode = closedReasonCode(failure);
+  const reason = reasonCode && !NOT_A_REFUSAL.has(reasonCode)
+    ? getErrorMessageFromCode(reasonCode, { fallbackToGeneric: false })
+    : null;
+  return reason
+    ? `${reason} 이 광고로 요청한 처리는 다시 진행되지 않습니다.`
+    : getErrorMessageFromCode('AD_REWARD_REDEMPTION_CLOSED');
+}
+
+/** Reasons whose own copy promises a later result: never shown as a final reason. */
+const NOT_A_REFUSAL = new Set(['AD_REWARD_VERIFICATION_PENDING', 'AD_REWARD_REDEMPTION_PENDING']);
+
+/** `details.reasonCode` of a closed answer: a fixed code, or null. */
+function closedReasonCode(failure: unknown): string | null {
+  const details = (failure as { response?: { data?: { error?: { details?: unknown } } } } | null)
+    ?.response?.data?.error?.details;
+  const reasonCode = details && typeof details === 'object' ? (details as { reasonCode?: unknown }).reasonCode : null;
+  return typeof reasonCode === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/u.test(reasonCode) ? reasonCode : null;
 }
 
 /** Codes that say only "the server failed", not what happened to the command. */
@@ -182,11 +219,12 @@ export const REWARD_CONFIRM_WAIT_MS = 30_000;
 
 /**
  * Attempts whose result is not known yet (a watched ad awaiting Google's
- * confirmation, or an answer that never arrived), kept for this app session
- * per sign-in and account (`scope`), so the sheet re-checks the SAME command
- * after it closed, the account was switched away and back, or Home re-mounted
- * it. In memory only: after a restart the server's state (its own redemption
- * on Google's callback) is what the money views show.
+ * confirmation or the server's completion, or an answer that never arrived),
+ * kept for this app session per sign-in and account (`scope`), so the sheet
+ * re-checks the SAME command after it closed, the account was switched away
+ * and back, or Home re-mounted it. In memory only: after a restart the
+ * server's state (its own redemption) is what the money views show, and a
+ * new ad is refused while an earlier reset is still being completed.
  */
 const openAttempts = new Map<string, RewardAttempt>();
 

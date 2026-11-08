@@ -40,6 +40,15 @@ jest.mock('../src/generated/prisma/client', () => {
     // the category set cannot drift from schema.prisma.
     InquiryCategory: jest.requireActual('../src/generated/prisma/enums')
       .InquiryCategory,
+    // Read at request time by the ad reward commands, which the AdMob
+    // session service answers first (2026-11-08); the generated values.
+    AdRewardPurpose: jest.requireActual('../src/generated/prisma/enums')
+      .AdRewardPurpose,
+    AdRewardClaimStatus: jest.requireActual('../src/generated/prisma/enums')
+      .AdRewardClaimStatus,
+    AdRewardRedemptionStatus: jest.requireActual(
+      '../src/generated/prisma/enums',
+    ).AdRewardRedemptionStatus,
     OrderSide: {
       buy: 'buy',
       sell: 'sell',
@@ -352,6 +361,10 @@ type PrismaMock = ReturnType<typeof emptyProtectionState> & {
     findUnique: jest.Mock;
     update: jest.Mock;
   };
+  adRewardSession: {
+    findUnique: jest.Mock;
+    updateMany: jest.Mock;
+  };
   seasonRanking: {
     count: jest.Mock;
     create: jest.Mock;
@@ -660,6 +673,10 @@ describe('AppController (e2e)', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      adRewardSession: {
+        findUnique: jest.fn(),
+        updateMany: jest.fn(),
       },
       tradingAccount: {
         create: jest.fn(),
@@ -3543,6 +3560,105 @@ describe('AppController (e2e)', () => {
         });
       });
 
+    expect(prisma.adRewardClaim.create).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it('claim and account-reset only READ an AdMob session the server owns: CLOSED is final, PENDING while it completes (2026-11-08)', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    const openedAt = new Date('2026-08-01T00:00:00.000Z');
+    prisma.tradingAccount.findFirst.mockResolvedValue({
+      id: 'general-account-1',
+      userId: user.id,
+      mode: 'general',
+      status: 'active',
+      initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+      openedAt,
+      closedAt: null,
+      createdAt: openedAt,
+      updatedAt: openedAt,
+      seasonParticipant: null,
+    });
+    prisma.adRewardClaim.findUnique.mockResolvedValue(null);
+    const sessionId = '11111111-1111-4111-8111-111111111111';
+    const recorded = {
+      id: sessionId,
+      userId: user.id,
+      tradingAccountId: 'general-account-1',
+      provider: 'admob',
+      purpose: 'account_reset',
+      platform: 'android',
+      idempotencyKey: 'account_reset_e2e-1',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 1_800_000),
+      ssvTransactionId: 'tx-e2e-1',
+      ssvVerifiedAt: new Date(),
+      ssvRewardedAt: null,
+      ssvAdUnit: '3165650506',
+      ssvKeyId: '3335741209',
+      ssvRewardItem: null,
+      ssvRewardAmount: null,
+      redemptionStatus: 'refused',
+      redemptionAttemptCount: 0,
+      redemptionNextAttemptAt: null,
+      redemptionErrorCode: 'GENERAL_ACCOUNT_RESET_UNAVAILABLE',
+    };
+    prisma.adRewardSession.findUnique.mockResolvedValue(recorded);
+    const token = await createValidAccessToken();
+
+    // The app's 결과 확인 on a reset the server refused: final, never re-run.
+    await request(app.getHttpServer())
+      .post('/api/v1/trading-accounts/general-account-1/account-reset')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        provider: 'admob',
+        proof: sessionId,
+        idempotencyKey: recorded.idempotencyKey,
+      })
+      .expect(409)
+      .expect((response) => {
+        expect(response.body).toEqual({
+          success: false,
+          error: {
+            code: 'AD_REWARD_REDEMPTION_CLOSED',
+            message:
+              'This ad reward request was not applied and will not run again.',
+            details: {
+              status: 'refused',
+              reasonCode: 'GENERAL_ACCOUNT_RESET_UNAVAILABLE',
+            },
+          },
+        });
+      });
+
+    // A top-up the server is still completing: pending, nothing run.
+    prisma.adRewardSession.findUnique.mockResolvedValue({
+      ...recorded,
+      purpose: 'funding',
+      idempotencyKey: 'ad_reward_claim_e2e-1',
+      redemptionStatus: 'pending',
+      redemptionNextAttemptAt: new Date(),
+      redemptionErrorCode: 'REDEEM_FAILED',
+    });
+    await request(app.getHttpServer())
+      .post('/api/v1/trading-accounts/general-account-1/ad-rewards/claim')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        provider: 'admob',
+        proof: sessionId,
+        idempotencyKey: 'ad_reward_claim_e2e-1',
+      })
+      .expect(409)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: { code: 'AD_REWARD_REDEMPTION_PENDING' },
+        });
+      });
+
+    expect(prisma.adRewardSession.updateMany).not.toHaveBeenCalled();
     expect(prisma.adRewardClaim.create).not.toHaveBeenCalled();
     expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();

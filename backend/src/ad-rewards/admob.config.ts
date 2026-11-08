@@ -26,6 +26,14 @@ export const ADMOB_SESSION_TTL_MS = 30 * 60_000;
  */
 export const ADMOB_SESSION_EXPIRY_GRACE_MS = 2 * 60_000;
 
+/** A session that Google never confirmed is final only past its grace (above). */
+export function adMobSessionEndedUnconfirmed(
+  expiresAt: Date,
+  now: Date,
+): boolean {
+  return now.getTime() > expiresAt.getTime() + ADMOB_SESSION_EXPIRY_GRACE_MS;
+}
+
 /**
  * Server recovery (2026-11-08): a recorded event whose command did not commit
  * for a SERVER reason is run again by AdMobRedemptionWorker, even after
@@ -44,6 +52,18 @@ export const ADMOB_REDEMPTION_MAX_RETRY_DELAY_MS = 60 * 60_000;
 export const ADMOB_REDEMPTION_WINDOW_MS = 24 * 60 * 60_000;
 /** Due sessions one worker pass attempts (oldest due first). */
 export const ADMOB_REDEMPTION_BATCH_SIZE = 25;
+
+/**
+ * Written as `redemption_error_code` by every automatic attempt BEFORE it
+ * runs the command, and replaced by that attempt's outcome (2026-11-08). Still
+ * there once the attempt's time is up = its outcome was never recorded (a
+ * crash, or the database failing on the outcome write): a top-up is run again
+ * (paying at most once), a reset is settled refused with
+ * ADMOB_REDEMPTION_OUTCOME_UNKNOWN — it may have been refused for a product
+ * rule, so it never runs again without the member.
+ */
+export const ADMOB_REDEMPTION_UNSETTLED = 'ATTEMPT_UNSETTLED';
+export const ADMOB_REDEMPTION_OUTCOME_UNKNOWN = 'REDEMPTION_OUTCOME_UNKNOWN';
 
 /** The wait after failed attempt number `attempt` (1-based). */
 export function adMobRedemptionRetryDelayMs(attempt: number): number {

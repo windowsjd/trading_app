@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
+import { AdRewardPurpose } from '../generated/prisma/client';
 import {
   AdRewardService,
   type AdRewardClaimRequestBody,
@@ -64,7 +65,9 @@ export class AdRewardController {
   /**
    * Body carries ONLY the provider key and an opaque proof. Reward amount,
    * provider event id, user, account, granted time, and balances are all
-   * server-decided.
+   * server-decided. For an AdMob session whose Google event is recorded the
+   * server redeems it itself; this call then only reads the result
+   * (AdMobRewardSessionService.memberCommand, 2026-11-08).
    */
   @Post('claim')
   claim(
@@ -72,7 +75,8 @@ export class AdRewardController {
     @Param('accountId') accountId: string,
     @Body() body: AdRewardClaimRequestBody,
   ) {
-    return this.adRewardService.claim(
+    return this.sessions.memberCommand(
+      AdRewardPurpose.funding,
       this.extractUserId(request),
       accountId,
       body,

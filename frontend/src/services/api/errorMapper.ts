@@ -598,6 +598,10 @@ export function getErrorMessageFromCode(
       return '광고 시청 확인을 기다리고 있습니다. 확인되면 자동으로 처리되며 같은 광고로 두 번 처리되지 않습니다.';
     case ERROR_CODE.AD_REWARD_SESSION_LIMIT:
       return '확인을 기다리는 광고가 많습니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.AD_REWARD_REDEMPTION_PENDING:
+      return '이전에 시청한 광고의 처리가 아직 끝나지 않았습니다. 처리가 끝난 뒤 다시 시도해주세요.';
+    case ERROR_CODE.AD_REWARD_REDEMPTION_CLOSED:
+      return '이 광고로 요청한 처리는 완료되지 않았고 다시 진행되지 않습니다. 필요하면 처음부터 다시 시도해주세요.';
     case ERROR_CODE.GENERAL_ACCOUNT_RESET_BLOCKED:
       return '보유 종목, 선물 포지션, 미체결·조건 주문을 모두 정리한 뒤 초기화할 수 있습니다.';
     case ERROR_CODE.GENERAL_ACCOUNT_RESET_UNAVAILABLE:

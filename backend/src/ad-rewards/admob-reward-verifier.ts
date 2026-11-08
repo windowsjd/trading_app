@@ -1,5 +1,5 @@
 import type { PrismaService } from '../prisma/prisma.service';
-import { ADMOB_PROVIDER, ADMOB_SESSION_EXPIRY_GRACE_MS } from './admob.config';
+import { ADMOB_PROVIDER, adMobSessionEndedUnconfirmed } from './admob.config';
 import type {
   AdRewardVerificationRequest,
   AdRewardVerificationResult,
@@ -56,10 +56,7 @@ export class AdMobRewardVerifier implements AdRewardVerifier {
     if (!session.ssvTransactionId || !session.ssvVerifiedAt) {
       // Final only past the callback's own deadline plus a grace, so a
       // callback still committing is never contradicted (admob.config.ts).
-      if (
-        this.now().getTime() >
-        session.expiresAt.getTime() + ADMOB_SESSION_EXPIRY_GRACE_MS
-      )
+      if (adMobSessionEndedUnconfirmed(session.expiresAt, this.now()))
         return failure(
           'SESSION_EXPIRED',
           'The ad session ended without a confirmed reward.',

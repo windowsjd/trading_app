@@ -37,6 +37,7 @@ import {
   rememberRewardAttempt,
   REWARD_CONFIRM_POLL_MS,
   REWARD_CONFIRM_WAIT_MS,
+  rewardRefusalMessage,
   rewardSheetState,
   type RewardAttempt,
 } from '../../features/adRewards/rewardFlow';
@@ -68,8 +69,13 @@ type Step =
   | { kind: 'menu' }
   | { kind: 'confirm-reset' }
   | { kind: 'working'; purpose: RewardedAdPurpose; phase: WorkingPhase }
-  /** The ad was watched; Google's signed confirmation has not reached the server yet. */
-  | { kind: 'verifying'; attempt: RewardAttempt }
+  /**
+   * The ad was watched and its result is not final yet: Google's signed
+   * confirmation has not reached the server (`confirmation`), or it did and
+   * the server is still completing the command (`processing`). Either may
+   * still be applied later; neither is a refusal.
+   */
+  | { kind: 'verifying'; attempt: RewardAttempt; stage: 'confirmation' | 'processing' }
   | { kind: 'uncertain'; attempt: RewardAttempt; failure: unknown }
   | { kind: 'refused'; purpose: RewardedAdPurpose; failure: unknown }
   | { kind: 'ad-failed'; reason: AdFailure }
@@ -101,11 +107,16 @@ const wait = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve
  * could not succeed now — then the rewarded ad is shown with that session's
  * server-side verification options. Watching it to the end only lets the app
  * ASK: the server pays or resets once Google's signed callback confirmed the
- * session (it also does so by itself when the callback arrives, even if the
- * app closed). An answer of "not confirmed yet" is asked again with the same
- * key for a while, then shown as 확인 대기 with a 결과 확인 button; an answer
- * that never arrived is re-checked the same way. Such an attempt survives
- * closing the sheet and re-mounting it for the same sign-in and account.
+ * session (it does so by itself when the callback arrives, even if the app
+ * closed, and its recovery worker completes it after a temporary failure).
+ * From then on the same-key call only READS the server's result (2026-11-08):
+ * "not confirmed yet" or "still being completed" is asked again with the same
+ * key for a while, then shown as 확인 대기 with a 결과 확인 button — it may
+ * still be applied later; an answer that never arrived is re-checked the same
+ * way; a closed command is a final refusal with its reason. So 결과 확인 is
+ * never a new consent: redoing a refused reset is a new ad after its own
+ * confirmation. Such an attempt survives closing the sheet and re-mounting it
+ * for the same sign-in and account.
  * Without a provider (web, Expo Go, an unknown build) or a server that can
  * verify ads, both actions stay disabled and nothing is sent.
  */
@@ -127,7 +138,7 @@ export default function GeneralRewardSheet({
   const [scope] = useState(() => ({ key: `${getSessionGeneration()}:${accountId}`, generation: getSessionGeneration() }));
   const [step, setStep] = useState<Step>(() => {
     const open = rememberedRewardAttempt(scope.key);
-    return open ? { kind: 'verifying', attempt: open } : { kind: 'menu' };
+    return open ? { kind: 'verifying', attempt: open, stage: 'confirmation' } : { kind: 'menu' };
   });
   const alive = useRef(true);
   useEffect(() => {
@@ -203,13 +214,13 @@ export default function GeneralRewardSheet({
         } catch (failure) {
           const outcome = classifyRewardCommandFailure(failure);
           if (!current()) return;
-          if (outcome === 'pending') {
+          if (outcome === 'pending' || outcome === 'processing') {
             if (Date.now() < deadline) {
               await wait(REWARD_CONFIRM_POLL_MS);
               if (!current()) return;
               continue;
             }
-            setStep({ kind: 'verifying', attempt });
+            setStep({ kind: 'verifying', attempt, stage: outcome === 'processing' ? 'processing' : 'confirmation' });
             return;
           }
           if (outcome === 'uncertain') {
@@ -307,19 +318,26 @@ export default function GeneralRewardSheet({
               </View>
             ) : step.kind === 'verifying' ? (
               <View testID="reward-verifying" style={styles.result} accessibilityLiveRegion="polite">
-                <Text accessibilityRole="header" style={styles.resultTitle}>광고 시청 확인을 기다리고 있어요.</Text>
-                <Text style={styles.description}>
-                  {step.attempt.purpose === 'funding'
-                    ? `Google의 시청 확인이 도착하면 가상자금 ${amount}이 자동으로 추가돼요. 같은 광고로 두 번 지급되지 않아요.`
-                    : 'Google의 시청 확인이 도착하면 일반계정이 자동으로 초기화돼요. 같은 광고로 두 번 초기화되지 않아요.'}
+                <Text accessibilityRole="header" style={styles.resultTitle}>
+                  {step.stage === 'processing' ? '광고 시청은 확인됐고, 처리를 마무리하고 있어요.' : '광고 시청 확인을 기다리고 있어요.'}
                 </Text>
+                <Text style={styles.description}>
+                  {step.stage === 'processing'
+                    ? step.attempt.purpose === 'funding'
+                      ? `처리가 끝나면 가상자금 ${amount}이 자동으로 추가돼요. 시간이 걸릴 수 있고, 같은 광고로 두 번 지급되지 않아요.`
+                      : '처리가 끝나면 일반계정이 자동으로 초기화돼요. 그 사이 주문이나 보유 종목이 생기면 초기화되지 않으며, 같은 광고로 두 번 초기화되지 않아요.'
+                    : step.attempt.purpose === 'funding'
+                      ? `Google의 시청 확인이 도착하면 가상자금 ${amount}이 자동으로 추가돼요. 같은 광고로 두 번 지급되지 않아요.`
+                      : 'Google의 시청 확인이 도착하면 일반계정이 자동으로 초기화돼요. 같은 광고로 두 번 초기화되지 않아요.'}
+                </Text>
+                {/* Reads the server's result only: never a second ad or a new consent. */}
                 <CTAButton testID="reward-verify-check" label="결과 확인" onPress={() => void submit(step.attempt)} />
               </View>
             ) : step.kind === 'uncertain' ? (
               <View testID="reward-uncertain" style={styles.result}>
                 <Text accessibilityRole="header" style={styles.resultTitle}>결과를 확인하지 못했습니다.</Text>
                 <Text style={styles.description}>
-                  같은 요청으로 다시 확인합니다. 이미 처리되었다면 다시 지급되거나 초기화되지 않습니다.
+                  같은 요청으로 다시 확인합니다. 결과는 나중에 반영될 수 있으며, 이미 처리되었다면 다시 지급되거나 초기화되지 않습니다.
                 </Text>
                 <ErrorNotice error={step.failure} message="네트워크 상태를 확인한 뒤 결과를 다시 확인해주세요." />
                 <CTAButton testID="reward-retry" label="결과 확인" onPress={() => void submit(step.attempt)} />
@@ -376,8 +394,9 @@ export default function GeneralRewardSheet({
                     <Text style={styles.errorTitle}>
                       {step.purpose === 'funding' ? '가상자금을 추가하지 못했습니다.' : '일반계정을 초기화하지 못했습니다.'}
                     </Text>
-                    {/* The server's own reason (limit, blocked reset, verification, …). */}
-                    <ErrorNotice error={step.failure} style={styles.errorNotice} />
+                    {/* The server's own reason (limit, blocked reset, verification, …);
+                        for a command the server closed, the stored reason. */}
+                    <ErrorNotice error={step.failure} message={rewardRefusalMessage(step.failure)} style={styles.errorNotice} />
                   </View>
                 ) : null}
                 <View testID="reward-funding" style={styles.section}>

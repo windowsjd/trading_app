@@ -17,9 +17,12 @@ function resetEligibility(overrides = {}) {
   return { tradingAccountId: 'G', enabled: true, provider: 'admob', eligible: true, reason: null, blockers: [],
     targetKrwBalance: '10000000.00000000', resetCount: 0, lastResetAt: null, ...overrides };
 }
-const coded = (status, code) => Object.assign(new Error(code), { response: { status, data: { error: { code } } } });
+const coded = (status, code, details) =>
+  Object.assign(new Error(code), { response: { status, data: { error: { code, ...(details ? { details } : {}) } } } });
 /** "Google has not confirmed the watched ad yet" — the server's PENDING answer. */
 const pending = () => coded(409, 'AD_REWARD_VERIFICATION_PENDING');
+/** "Confirmed; the server is still completing it" (2026-11-08). */
+const processing = () => coded(409, 'AD_REWARD_REDEMPTION_PENDING');
 
 // A fresh sign-in generation per harness: remembered attempts never leak between tests.
 let generations = 0;
@@ -29,6 +32,7 @@ const rewardFlow = require(resolve(__dirname, '../src/features/adRewards/rewardF
 function rewardSheetHarness(options = {}) {
   const h = { requests: [], reads: [], invalidations: [], shows: [], sessions: [], funding: eligibility(options.funding),
     reset: resetEligibility(options.reset), failures: [], sessionFailures: [], pendingAnswers: options.pendingAnswers ?? 0,
+    processingAnswers: options.processingAnswers ?? 0,
     adOutcome: { status: 'earned' }, adsReady: options.adsReady ?? { canRequestAds: true, privacyOptionsRequired: false },
     privacyOpened: 0, generation: ++generations };
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -39,6 +43,7 @@ function rewardSheetHarness(options = {}) {
     const failure = h.failures.shift();
     if (failure) throw failure;
     if (h.pendingAnswers > 0) { h.pendingAnswers -= 1; throw pending(); }
+    if (h.processingAnswers > 0) { h.processingAnswers -= 1; throw processing(); }
     return path === '/ad-rewards/claim'
       ? { granted: true, duplicate: false, claimId: 'claim-1', grantedAt: new Date().toISOString(), walletBalanceAfter: '15000000.00000000' }
       : { reset: true, duplicate: false, resetId: 'reset-1', claimId: 'claim-2', sequence: 1, resetAt: new Date().toISOString(),

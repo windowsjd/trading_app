@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { createApiError } from '../common/api-error';
 
 /**
  * Error contract for the rewarded-ad endpoints (작업 6). Every code maps to
@@ -24,6 +25,20 @@ export const adRewardErrorCodes = {
   AD_REWARD_VERIFICATION_PENDING: 'AD_REWARD_VERIFICATION_PENDING',
   /** Too many ad sessions are still waiting for their confirmation. */
   AD_REWARD_SESSION_LIMIT: 'AD_REWARD_SESSION_LIMIT',
+  /**
+   * Google confirmed the ad, and the SERVER is still completing its command
+   * after a temporary failure (2026-11-08, "Server recovery"): the member's
+   * call only reads that, nothing is run or written for it — ask again later.
+   * Also the answer to a new ad session while an earlier reset is pending.
+   */
+  AD_REWARD_REDEMPTION_PENDING: 'AD_REWARD_REDEMPTION_PENDING',
+  /**
+   * The server settled this ad's command as not applied — refused, its
+   * outcome unknown, or its 24 h window over — and never runs it again
+   * (2026-11-08). `details.reasonCode` names why when it is a known code.
+   * Trying again is a NEW command (a new session and ad).
+   */
+  AD_REWARD_REDEMPTION_CLOSED: 'AD_REWARD_REDEMPTION_CLOSED',
   /** This provider event was already consumed by another user/account. */
   AD_REWARD_EVENT_ALREADY_USED: 'AD_REWARD_EVENT_ALREADY_USED',
   AD_REWARD_DAILY_COUNT_LIMIT: 'AD_REWARD_DAILY_COUNT_LIMIT',
@@ -61,6 +76,8 @@ export const adRewardErrorHttpStatus: Record<AdRewardErrorCode, HttpStatus> = {
   AD_REWARD_VERIFICATION_FAILED: HttpStatus.UNPROCESSABLE_ENTITY,
   AD_REWARD_VERIFICATION_PENDING: HttpStatus.CONFLICT,
   AD_REWARD_SESSION_LIMIT: HttpStatus.TOO_MANY_REQUESTS,
+  AD_REWARD_REDEMPTION_PENDING: HttpStatus.CONFLICT,
+  AD_REWARD_REDEMPTION_CLOSED: HttpStatus.CONFLICT,
   AD_REWARD_EVENT_ALREADY_USED: HttpStatus.CONFLICT,
   AD_REWARD_DAILY_COUNT_LIMIT: HttpStatus.TOO_MANY_REQUESTS,
   AD_REWARD_DAILY_AMOUNT_LIMIT: HttpStatus.TOO_MANY_REQUESTS,
@@ -97,4 +114,17 @@ export function throwAdRewardError(
     },
     adRewardErrorHttpStatus[code],
   );
+}
+
+/**
+ * The same code → status contract, with structured `details` the client
+ * reads (fixed codes only, never exception text), through the reviewed-copy
+ * factory: `message` must be in public-error-message.ts.
+ */
+export function throwAdRewardErrorWithDetails(
+  code: AdRewardErrorCode,
+  message: string,
+  details: Record<string, string>,
+): never {
+  throw createApiError(code, message, adRewardErrorHttpStatus[code], details);
 }

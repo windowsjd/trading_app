@@ -1298,12 +1298,14 @@ export type $AdRewardSessionPayload<ExtArgs extends runtime.Types.Extensions.Int
      */
     redemptionAttemptCount: number
     /**
-     * Set exactly while pending: when the recovery worker runs the command next.
+     * Set exactly while pending: when the recovery worker runs the command next
+     * (for an attempt in flight: when its outcome is presumed lost).
      */
     redemptionNextAttemptAt: Date | null
     /**
-     * A fixed code: the refusal (refused) or the last server failure
-     * (pending, exhausted). Never an exception message.
+     * A fixed code: the refusal (refused), the last server failure (pending,
+     * exhausted), or ATTEMPT_UNSETTLED from an attempt's reservation until its
+     * outcome is written (2026-11-08). Never an exception message.
      */
     redemptionErrorCode: string | null
   }, ExtArgs["result"]["adRewardSession"]>

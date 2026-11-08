@@ -22,10 +22,12 @@ const INTERVAL_MS = 60_000;
  * docs/general-account-and-ad-rewards-api-contract.md "Server recovery"):
  * an ad session whose Google-signed event is recorded but whose command did
  * not commit for a server reason is redeemed here through the SAME claim /
- * reset command — after Google's retries are over and whether or not the app
- * is running. Once a minute one instance (Ops lease) runs the due sessions;
- * an idle tick is one indexed read, and a run is recorded only when there
- * was work (`failed` while a server failure keeps one pending).
+ * reset command — the only path that runs it after the recording callback's
+ * first attempt, app running or not. Once a minute one instance (Ops lease)
+ * runs the due sessions; an idle tick is one indexed read, and a run is
+ * recorded only when there was work (`failed` while a confirmed ad stays
+ * unapplied for a server reason). Which failures it runs again is
+ * admob-redemption-policy.ts: a reset only after a transient database one.
  *
  * Runs only while ads are switched on with AdMob: switched off, every new
  * command is refused anyway, so pending sessions wait (their attempts are not
@@ -92,7 +94,13 @@ export class AdMobRedemptionWorker implements OnModuleInit, OnModuleDestroy {
         });
         throw caught;
       }
-      if (sweep.retrying + sweep.exhausted > 0)
+      // Ops sees every confirmed ad still unapplied for a server reason:
+      // retried later, its window over, its outcome lost (a reset closed for
+      // the member to redo) or an outcome this pass could not record.
+      if (
+        sweep.retrying + sweep.exhausted + sweep.unknown + sweep.unsettled >
+        0
+      )
         await this.runs.recordFailed(run, {
           errorCode: 'AD_REWARD_REDEMPTION_RETRYING',
           errorMessage:

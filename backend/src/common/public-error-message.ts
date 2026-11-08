@@ -227,6 +227,8 @@ const PUBLIC_MESSAGES = new Set<string>([
   // General-account reset (2026-10-20, docs/general-account-and-ad-rewards-api-contract.md).
   'Close holdings, positions and open orders before resetting the account.',
   'The account reset is temporarily unavailable. Try again shortly.',
+  // AdMob server recovery (2026-11-08, same contract "Server recovery").
+  'This ad reward request was not applied and will not run again.',
   'Futures trading is disabled.',
   'This Futures instrument is not yet available for new trades.',
   'Leverage is fixed for the open position lifetime.',

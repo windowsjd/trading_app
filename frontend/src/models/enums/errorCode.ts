@@ -136,6 +136,11 @@ export const ERROR_CODE = {
   // refusal; the same command is asked again. And too many unconfirmed ads.
   AD_REWARD_VERIFICATION_PENDING: 'AD_REWARD_VERIFICATION_PENDING',
   AD_REWARD_SESSION_LIMIT: 'AD_REWARD_SESSION_LIMIT',
+  // Server recovery (2026-11-08): Google confirmed the ad and the SERVER is
+  // still completing it (asked again, never a new ad) — and its final answer:
+  // the server will not run that ad's request again (a new attempt is a new ad).
+  AD_REWARD_REDEMPTION_PENDING: 'AD_REWARD_REDEMPTION_PENDING',
+  AD_REWARD_REDEMPTION_CLOSED: 'AD_REWARD_REDEMPTION_CLOSED',
   GENERAL_ACCOUNT_RESET_BLOCKED: 'GENERAL_ACCOUNT_RESET_BLOCKED',
   GENERAL_ACCOUNT_RESET_UNAVAILABLE: 'GENERAL_ACCOUNT_RESET_UNAVAILABLE',
   // The futures chart could not be read from the provider and nothing was cached.

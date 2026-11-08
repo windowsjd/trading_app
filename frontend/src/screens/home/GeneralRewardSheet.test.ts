@@ -115,6 +115,70 @@ describe('general home 보상 sheet (자금 관리)', () => {
     assert.deepEqual([h.sessions.length, h.shows.length], [1, 1], 'never a second session or ad');
   });
 
+  it('confirmed but still being completed by the server: 확인 대기 that says it may still be applied — never a refusal; then done', async (t) => {
+    const h = rewardSheetHarness({ processingAnswers: 1_000, confirmWaitMs: 30 });
+    await h.start(); t.after(h.close);
+    await h.press('reward-funding-start');
+    for (let i = 0; i < 10 && !h.has('reward-verifying'); i += 1) await h.flush();
+    assert.equal(h.has('reward-verifying'), true);
+    assert.equal(h.has('reward-refused'), false);
+    assert.match(h.text(), /광고 시청은 확인됐고, 처리를 마무리하고 있어요\./);
+    assert.match(h.text(), /처리가 끝나면 가상자금 500만 원이 자동으로 추가돼요\. 시간이 걸릴 수 있고, 같은 광고로 두 번 지급되지 않아요\./);
+    // The server completed it: 결과 확인 reads the same command's result.
+    h.processingAnswers = 0;
+    await h.press('reward-verify-check');
+    assert.equal(h.has('reward-done'), true);
+    assert.equal(new Set(h.requests.map((request: any) => JSON.stringify(request.body))).size, 1, 'one key and proof throughout');
+    assert.deepEqual([h.sessions.length, h.shows.length], [1, 1], 'never a second ad');
+  });
+
+  it('a reset the server closed: 결과 확인 shows a final refusal with its reason; redoing it is a new confirmation and a new ad', async (t) => {
+    const h = rewardSheetHarness({ processingAnswers: 1_000, confirmWaitMs: 30 });
+    await h.start(); t.after(h.close);
+    await h.press('reward-reset-start');
+    await h.press('reward-reset-run');
+    for (let i = 0; i < 10 && !h.has('reward-verifying'); i += 1) await h.flush();
+    assert.equal(h.has('reward-verifying'), true);
+    assert.match(h.text(), /그 사이 주문이나 보유 종목이 생기면 초기화되지 않으며/);
+    // The server settled it (refused when its epoch could not be valued): final.
+    h.processingAnswers = 0;
+    const closed = coded(409, 'AD_REWARD_REDEMPTION_CLOSED', { status: 'refused', reasonCode: 'GENERAL_ACCOUNT_RESET_UNAVAILABLE' });
+    h.failures.push(closed);
+    await h.press('reward-verify-check');
+    assert.equal(h.has('reward-refused'), true);
+    assert.match(h.text(), /일반계정을 초기화하지 못했습니다\./);
+    const [notice] = h.notices();
+    assert.equal(notice.props.error === closed, true, 'the original error stays attached');
+    assert.equal(notice.props.message,
+      '지금은 계정을 초기화할 수 없습니다. 잠시 후 다시 시도해주세요. 이 광고로 요청한 처리는 다시 진행되지 않습니다.');
+    // Nothing re-ran it: the same command was only read, no new session or ad.
+    assert.deepEqual([h.sessions.length, h.shows.length], [1, 1]);
+    assert.equal(h.has('reward-verify-check'), false, 'no 결과 확인 left for a final answer');
+    // Redoing it is the member's explicit choice: its own confirmation, a new session and ad.
+    await h.press('reward-reset-start');
+    assert.equal(h.has('reward-reset-confirm'), true);
+    assert.deepEqual([h.sessions.length, h.shows.length], [1, 1], 'nothing before the confirmation');
+    await h.press('reward-reset-run');
+    assert.deepEqual([h.sessions.length, h.shows.length], [2, 2]);
+    assert.notEqual(h.sessions[1].idempotencyKey, h.sessions[0].idempotencyKey);
+    assert.equal(h.requests.at(-1).body.proof, 'session-2');
+    assert.equal(h.has('reward-done'), true);
+  });
+
+  it('a new ad while an earlier reset is still being completed: the server refuses the session, no ad is shown', async (t) => {
+    const h = rewardSheetHarness();
+    const busy = coded(409, 'AD_REWARD_REDEMPTION_PENDING');
+    h.sessionFailures.push(busy);
+    await h.start(); t.after(h.close);
+    await h.press('reward-funding-start');
+    assert.equal(h.shows.length, 0);
+    assert.equal(h.requests.length, 0);
+    assert.equal(h.has('reward-refused'), true);
+    const [notice] = h.notices();
+    assert.equal(notice.props.error === busy, true);
+    assert.equal(notice.props.message === undefined, true, 'the code\'s own copy');
+  });
+
   it('an answer that never arrived is re-checked with the SAME key and proof, never a new ad', async (t) => {
     const h = rewardSheetHarness();
     h.failures.push(Object.assign(new Error('timeout'), { code: 'ECONNABORTED', request: {} }));
@@ -122,6 +186,7 @@ describe('general home 보상 sheet (자금 관리)', () => {
     await h.press('reward-funding-start');
     assert.equal(h.has('reward-uncertain'), true);
     assert.match(h.text(), /결과를 확인하지 못했습니다\./);
+    assert.match(h.text(), /결과는 나중에 반영될 수 있으며, 이미 처리되었다면 다시 지급되거나 초기화되지 않습니다\./);
     await h.press('reward-retry');
     assert.equal(h.shows.length, 1, 'no second ad');
     assert.equal(h.requests.length, 2);

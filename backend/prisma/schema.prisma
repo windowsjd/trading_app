@@ -164,11 +164,13 @@ enum AdRewardRedemptionStatus {
   pending
   /// The command committed (a claim exists for the session's command key).
   redeemed
-  /// The command refused it for a product rule (blocked reset, inactive
-  /// account, …): the server never runs it again on its own.
+  /// Final, not applied (2026-11-08): a product rule refused it — for a reset,
+  /// any answer of the command — or a reset's last attempt left no recorded
+  /// outcome (REDEMPTION_OUTCOME_UNKNOWN). Nothing runs it again; trying
+  /// again is a new session and ad.
   refused
-  /// Still not committed 24 h after Google's confirmation: the server stops;
-  /// the member's own command (same key) can still redeem it.
+  /// Still not committed 24 h after Google's confirmation: the server stops,
+  /// and the member's call answers it as closed.
   exhausted
 }
 
@@ -2215,10 +2217,12 @@ model AdRewardSession {
   redemptionStatus        AdRewardRedemptionStatus? @map("redemption_status")
   /// Recovery worker attempts so far (the callback's own call is not one).
   redemptionAttemptCount  Int                       @default(0) @map("redemption_attempt_count")
-  /// Set exactly while pending: when the recovery worker runs the command next.
+  /// Set exactly while pending: when the recovery worker runs the command next
+  /// (for an attempt in flight: when its outcome is presumed lost).
   redemptionNextAttemptAt DateTime?                 @map("redemption_next_attempt_at")
-  /// A fixed code: the refusal (refused) or the last server failure
-  /// (pending, exhausted). Never an exception message.
+  /// A fixed code: the refusal (refused), the last server failure (pending,
+  /// exhausted), or ATTEMPT_UNSETTLED from an attempt's reservation until its
+  /// outcome is written (2026-11-08). Never an exception message.
   redemptionErrorCode     String?                   @map("redemption_error_code") @db.VarChar(64)
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)

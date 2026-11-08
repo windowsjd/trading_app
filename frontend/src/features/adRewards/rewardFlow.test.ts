@@ -8,6 +8,7 @@ import {
   formatManwon,
   rememberedRewardAttempt,
   rememberRewardAttempt,
+  rewardRefusalMessage,
   rewardSheetState,
 } from './rewardFlow.ts';
 import { getRewardedAdProvider } from './rewardedAd.ts';
@@ -115,6 +116,43 @@ describe('보상 sheet rules', () => {
     assert.equal(rememberedRewardAttempt('1:G')?.idempotencyKey, 'k1');
     forgetRewardAttempt('1:G', attempt);
     assert.equal(rememberedRewardAttempt('1:G') === null, true);
+  });
+
+  it('confirmed but still being completed by the server is processing — may still be applied, never a refusal', () => {
+    assert.equal(classifyRewardCommandFailure({ response: { status: 409, data: { error: { code: 'AD_REWARD_REDEMPTION_PENDING' } } } }), 'processing');
+    // The server's final word on that ad's command: a refusal the app may show as final.
+    assert.equal(classifyRewardCommandFailure({ response: { status: 409, data: { error: { code: 'AD_REWARD_REDEMPTION_CLOSED' } } } }), 'refused');
+  });
+
+  it('a closed command shows the stored reason it never saw, then that this ad is not used again', () => {
+    const closed = (details?: unknown) => ({ response: { status: 409, data: { error: { code: 'AD_REWARD_REDEMPTION_CLOSED', ...(details === undefined ? {} : { details }) } } } });
+    const tail = '이 광고로 요청한 처리는 다시 진행되지 않습니다.';
+    assert.equal(rewardRefusalMessage(closed({ status: 'refused', reasonCode: 'GENERAL_ACCOUNT_RESET_UNAVAILABLE' })),
+      `지금은 계정을 초기화할 수 없습니다. 잠시 후 다시 시도해주세요. ${tail}`);
+    assert.equal(rewardRefusalMessage(closed({ status: 'refused', reasonCode: 'GENERAL_ACCOUNT_RESET_BLOCKED' }))?.endsWith(tail), true);
+    const generic = '이 광고로 요청한 처리는 완료되지 않았고 다시 진행되지 않습니다. 필요하면 처음부터 다시 시도해주세요.';
+    // No fixed copy (an internal code), a reason that promises a later result, or no/odd details: the generic final line.
+    for (const details of [
+      { status: 'refused', reasonCode: 'REDEMPTION_OUTCOME_UNKNOWN' },
+      { status: 'exhausted', reasonCode: 'REDEEM_FAILED' },
+      { status: 'refused', reasonCode: 'AD_REWARD_VERIFICATION_PENDING' },
+      { status: 'refused', reasonCode: 'not a code' },
+      'text',
+      undefined,
+    ]) assert.equal(rewardRefusalMessage(closed(details)), generic, JSON.stringify(details));
+    // Every other answer keeps the code's own copy (ErrorNotice's default).
+    assert.equal(rewardRefusalMessage({ response: { status: 409, data: { error: { code: 'GENERAL_ACCOUNT_RESET_BLOCKED' } } } }) === undefined, true);
+    assert.equal(rewardRefusalMessage(new Error('network')) === undefined, true);
+  });
+
+  it('the server contract these rules read is the backend one (codes and their status)', () => {
+    const policy = readFileSync(path.join(process.cwd(), '../backend/src/ad-rewards/ad-reward-error-policy.ts'), 'utf8');
+    for (const code of ['AD_REWARD_VERIFICATION_PENDING', 'AD_REWARD_REDEMPTION_PENDING', 'AD_REWARD_REDEMPTION_CLOSED'])
+      assert.match(policy, new RegExp(`\\n  ${code}: HttpStatus\\.CONFLICT,`), code);
+    // The member's same-key call answers PENDING while the server completes it, CLOSED once it is final.
+    const service = readFileSync(path.join(process.cwd(), '../backend/src/ad-rewards/admob-reward-session.service.ts'), 'utf8');
+    assert.match(service, /redemptionStatus === AdRewardRedemptionStatus\.pending\)\s*throwAdRewardError\(\s*adRewardErrorCodes\.AD_REWARD_REDEMPTION_PENDING/);
+    assert.match(service, /adRewardErrorCodes\.AD_REWARD_REDEMPTION_CLOSED,\s*CLOSED_MESSAGE/);
   });
 
   it('only an answer that never arrived is uncertain (re-check with the same key)', () => {
