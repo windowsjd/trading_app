@@ -58,6 +58,8 @@ export interface AssetDetailAssetDto {
   settlementCurrency: CurrencyCode;
   isActive: boolean;
   marketStatus: string;
+  /** US pre-market/after-hours while the server shows those prices (else null/absent). */
+  extendedHoursSession?: 'pre_market' | 'after_hours' | null;
   tradable: boolean;
   tradeBlockedReason?: string | null;
   metadata?: Record<string, unknown> | null;

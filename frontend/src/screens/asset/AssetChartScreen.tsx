@@ -29,6 +29,7 @@ import {
   TRIAL_PRICE_NOTICE,
 } from '../../features/asset/trialDataSource';
 import { getLastSessionCloseNotice } from '../../features/asset/lastSessionClose';
+import { getExtendedHoursNotice } from '../../features/asset/extendedHours';
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
 import { selectDisplayPrice, wonChartDisplay } from '../../features/asset/displayPricePolicy';
@@ -225,6 +226,9 @@ export function AssetMarketChart({
   const chartWon = useKrw ? wonChartDisplay(displayPrice) : null;
   const lastCloseNotice =
     displayPrice.priceLocal === null ? null : getLastSessionCloseNotice(displayPrice);
+  // US pre-market/after-hours: what the shown price is and when it was seen.
+  const extendedHoursNotice =
+    displayPrice.priceLocal === null ? null : getExtendedHoursNotice(displayPrice, asset?.extendedHoursSession);
   const chartBody = (
     <>
       {detailView ? (
@@ -291,7 +295,7 @@ export function AssetMarketChart({
           <View style={styles.marketInfo}>
             {asset && (asset.assetType === 'domestic_stock' || asset.assetType === 'us_stock') ? (
               <Text testID="asset-market-status" style={styles.marketBadge}>
-                {getStockMarketStatus(asset.marketStatus)}
+                {getStockMarketStatus(asset.marketStatus, asset.extendedHoursSession)}
               </Text>
             ) : null}
             <Text testID="asset-change-rate" style={[styles.changeRate,
@@ -368,6 +372,11 @@ export function AssetMarketChart({
       {lastCloseNotice ? (
         <Text testID="asset-last-close-notice" style={styles.notice}>
           {lastCloseNotice}
+        </Text>
+      ) : null}
+      {extendedHoursNotice ? (
+        <Text testID="asset-extended-hours-notice" style={styles.notice}>
+          {extendedHoursNotice}
         </Text>
       ) : null}
       {trialCandleNotice(candlesQuery.data?.source) ? (

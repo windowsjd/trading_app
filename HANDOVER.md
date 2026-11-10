@@ -1,5 +1,19 @@
 # 프로젝트 인수인계서
 
+## 2026-11-10 — 미국주식 프리마켓·애프터마켓 시세와 지정가 체결 (main, 미커밋)
+
+- **기준/범위:** 시작 HEAD = `c2f0c597`(작업 트리 깨끗). backend(신규 `orders/us-extended-hours.policy.ts`·`us-extended-hours.config.ts`, Tiingo writer·구간 분류, 공유 가격 선택·후보 읽기, 등락률, 자산 응답·ticker, 매처·체결 검증, 주문 능력, 부팅 검증), frontend(표시·주문 카드), 테스트(단위·PG 러너·CI 목록), 문서(`backend/docs/us-extended-hours.md` 외). **무변경:** DB 스키마·마이그레이션, 체결가·수수료·예약·원장·손익 산식, 시장가·LOC·조건주문·손절/익절, 시즌 정산·일별 확정 스냅샷·캔들, 국내주식·암호화폐·선물. 커밋·푸시·배포·Render 환경변수 변경 없음.
+- **원인(가설 검증):** 가설 1–7 모두 코드와 일치(정규장만 저장, 장 마감 시 체결용 가격 미선택, `MARKET_CLOSED`, Path A 개장 요구, 체결 재검증, Path B 정규장 5분봉, 매처 환율 미준비 — 정기 FX 1시간 주기라 60초 증거가 거의 없음, 암호화폐도 동일). **가설에 없던 결정 요인:** 시즌 정산은 종료 시각 이전 최신 `tiingo_us_reference_price`를 쓰고 시즌 0 종료(11-14 09:00 KST)는 뉴욕 애프터마켓이다 → 확장 시간 가격을 같은 이름으로 저장하면 정산이 바뀐다. 조기 폐장일 애프터마켓은 17:00 종료(NYSE)인데 기존 분류는 20:00이었다.
+- **해결(의도: 정규장 데이터·정산 기준은 바이트 단위로 유지, 확장 시간은 명시적 경로로만):**
+  - 확장 시간 tick은 별도 이름 `tiingo_us_extended_reference_price`(이름별 throttle·순서 상태, 실시간 채널 미발행). 창 정의는 정책 모듈 하나(04:00→개장, 마감→20:00/조기 폐장 17:00).
+  - 표시·실시간 평가 4개 워크플로만 현재 창의 최신 확장 가격(창 안 carry-forward, 실측상 tick이 드묾), 없으면 기존 장마감 규칙. 등락률은 직전 완료 정규장 확정 EOD 대비.
+  - 지정가: 매처 Path A가 창 안 확장 가격(수신 10초 이내·제출 이후)으로 계획, 체결 트랜잭션이 DB 시각으로 창·소스·신선도 재검증. 지정가 스위치가 켜지면 사이클당 1회 `UsdKrwRefreshService` 준비(정규장 포함, 실패 후 60초 쿨다운).
+  - 스위치 2개 기본 false: `US_STOCK_EXTENDED_HOURS_PRICE_ENABLED`(tiingo 필요), `US_STOCK_EXTENDED_HOURS_LIMIT_MATCHING_ENABLED`(시세 스위치 필요, 매처 꺼짐이면 경고).
+  - API 추가 필드: 자산·ticker `extendedHoursSession`, 주문 능력 `limitOrder.extendedHoursMarkets`. 앱은 상태 배지·가격 라벨·안내·주문 카드 문구.
+- **검증:** backend 단위 6,085 통과(로컬 `auth-email.service.spec`만 express 설치 구조로 로드 불가 — CI 통과, 무관), typecheck·build·lint(accounts/candles)·prettier·진단 게이트 통과. 신규 PG 러너 9 시나리오 통과(실제 금액·원장·예약·증거·취소 경쟁·멱등). 기존 PG 13개(매칭·종목 확대·시간 경계·실현손익·설정 변경·조건 BUY/SELL·TP/SL·주문 실행·시장가·KRX/US LOC·평가 일관성) 통과 — conditional-sell 1회 FX 신선도 실패는 WSL 시계 단계(30초 주기 journal 확인)로 단독 재실행 2/2 통과. frontend typecheck·lint 통과, 전체 테스트 3,937/3,937 통과.
+- **실측(운영 `/readiness` 읽기 전용, 2026-11-10 프리마켓):** 100종목 모두 프리마켓 수신, 29.7분 동안 종목당 분당 0.45 tick·35종목 0건 → 표시는 창 안 최신 가격+시각, 체결은 tick 직후 10초 안에서만.
+- **남은 일:** 운영 활성화(문서 순서: 백엔드 배포 → 앱 배포 → 시세 스위치 → 지정가 스위치)는 승인 필요. 초보 가이드 지정가 문장, 암호화폐 지정가 환율 준비, 야간(20:00–04:00) 거래는 범위 밖. 실기기·웹 번들 확인 미실시.
+
 ## 2026-11-08 (2) — AdMob 보상 자동 복구 안전성 보완: 최종 거절 초기화의 지연 실행 차단 · 거절 기록 실패 안전 · 앱 표시 일치 (main, 미커밋)
 
 - **기준/범위:** 시작 HEAD = `5ee063fe`(main = origin, 작업 트리 깨끗). backend(`admob-reward-session.service.ts`·신규 `admob-redemption-policy.ts`·두 명령 컨트롤러·워커 집계·오류 코드 2개·공개 문구 1개·스키마 주석과 생성 클라이언트 주석), frontend(보상 시트 표시·분류·문구), 테스트(단위·e2e·PG 러너·프런트), 문서(API 계약 "Server recovery" 재작성, `frontend/docs/admob-ads-2026-11-07.md`). **무변경:** claim/reset 금융 트랜잭션(원장·지갑·성과·차단 조건·멱등 키·행 잠금), 500만 원·무제한·쿨다운 0·`initialCapitalKrw`, 24시간 창·백오프, 광고 단위 ID·배너, 주문·체결·선물·환전·시즌·랭킹, 마이그레이션(신규 없음). 커밋·푸시·배포·운영 DB·Render/EAS·AdMob 콘솔 변경 없음.

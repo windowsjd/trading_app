@@ -37,6 +37,7 @@ export const SNAPSHOT_SELECTION_REASONS = [
   'market_calendar_unavailable',
   'market_closed',
   'effective_at_outside_current_session',
+  'effective_at_outside_extended_hours_window',
 ] as const;
 export type SnapshotSelectionReason =
   | (typeof SNAPSHOT_SELECTION_REASONS)[number]
@@ -61,6 +62,14 @@ export type CandleExclusionReason =
   | 'malformed_window'
   | 'session_invalid'
   | 'provider_mismatch';
+/** Outcome of the once-per-cycle USD/KRW preparation before US stock fills. */
+export type FxPreparationOutcome =
+  | 'already_fresh'
+  | 'refreshed'
+  | 'unavailable'
+  | 'failed'
+  | 'cooling_down'
+  | 'service_unavailable';
 export type CandleOrderExclusionReason =
   | 'before_first_boundary'
   | 'after_season_end'
@@ -217,6 +226,8 @@ export function createLimitMatchingDiagnostics() {
       errorReasons: {} as Record<string, number>,
       errorStages: {} as Partial<Record<LimitExecutionStage, number>>,
       errorsByPath: { snapshot: 0, candle: 0 },
+      // At most one preparation per cycle, before the first US stock fill.
+      fxPreparation: {} as Partial<Record<FxPreparationOutcome, number>>,
     },
     samples: [] as LimitMatchingSample[],
     samplesTruncated: false,

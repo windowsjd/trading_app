@@ -4,7 +4,11 @@ import {
   findPreviousMarketSession,
   resolveStockMarketSessionState,
   type MarketCalendarAsset,
+  type MarketSessionWindow,
+  type StockMarketSessionState,
 } from '../orders/market-calendar.policy';
+import { usExtendedHoursPriceEnabled } from '../orders/us-extended-hours.config';
+import { usExtendedHoursStateFrom } from '../orders/us-extended-hours.policy';
 import { zonedDateTimeToUtc } from '../providers/kis/candles/kis-candle-time';
 import { MARKET_DAILY_CANDLE_SOURCE } from '../providers/market-daily-candle-source';
 import { resolvePeriodWindowForDate } from '../providers/kis/candles/kis-period-candle-normalizer.service';
@@ -365,6 +369,30 @@ function isConfirmedDailyRow(
   );
 }
 
+/**
+ * Baseline of a US pre-market/after-hours price (2026-11-10, display only,
+ * extended-hours prices on): the confirmed close of the latest completed
+ * regular session — the previous session's in pre-market, the same day's in
+ * after-hours (null until Tiingo publishes it) — so the app shows the move
+ * since that close. The price must lie inside the current extended window.
+ */
+function extendedHoursBaselineSession(
+  state: StockMarketSessionState,
+  priceMs: number,
+  now: Date,
+): MarketSessionWindow | null {
+  if (state.state !== 'closed' || !usExtendedHoursPriceEnabled()) return null;
+  const extended = usExtendedHoursStateFrom(state, now);
+  if (
+    !('window' in extended) ||
+    priceMs < extended.window.startsAt.getTime() ||
+    priceMs >= extended.window.endsAt.getTime()
+  )
+    return null;
+  const baseline = state.latestCompletedSession;
+  return baseline && baseline.closeTime <= now ? baseline : null;
+}
+
 function dailyBaselineWindow(input: {
   asset: MarketCalendarAsset;
   effectiveAt: Date;
@@ -391,6 +419,24 @@ function dailyBaselineWindow(input: {
     return null;
   const state = resolveStockMarketSessionState(input.asset, input.now);
   if (!state || state.state === 'calendar_unavailable') return null;
+  const extendedBaseline = us
+    ? extendedHoursBaselineSession(state, priceMs, input.now)
+    : null;
+  if (extendedBaseline) {
+    const window = resolvePeriodWindowForDate(
+      'US',
+      extendedBaseline.localDate.replaceAll('-', ''),
+      '1d',
+    );
+    return window
+      ? {
+          openTime: window.openTime,
+          closeTime: window.closeTime,
+          completedAt: extendedBaseline.closeTime,
+          provider: MARKET_DAILY_CANDLE_SOURCE.usStock,
+        }
+      : null;
+  }
   const priceSession =
     state.state === 'open'
       ? state.currentSession

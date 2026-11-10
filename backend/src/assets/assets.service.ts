@@ -47,6 +47,11 @@ import {
 } from '../providers/market-display-price.service';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
+import { usExtendedHoursPriceEnabled } from '../orders/us-extended-hours.config';
+import {
+  usExtendedHoursStateFrom,
+  type UsExtendedHoursSegment,
+} from '../orders/us-extended-hours.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { DailyChangeRateService } from './daily-change-rate.service';
 import { TIINGO_EOD_CANDLE_SOURCE } from '../providers/tiingo/tiingo.config';
@@ -156,6 +161,13 @@ type AssetTradingUx = {
   id: string;
   changeRate: string | null;
   marketStatus: MarketStatus;
+  /**
+   * US stocks while extended-hours prices are on (2026-11-10): the current
+   * pre-market/after-hours segment, else null. Absent otherwise, so the
+   * payload is unchanged with the switch off. `marketStatus` stays the
+   * regular session's ('closed' in extended hours: no market orders).
+   */
+  extendedHoursSession?: UsExtendedHoursSegment | null;
   tradable: boolean;
   tradeBlockedReason: TradeBlockedReason | null;
 };
@@ -212,6 +224,7 @@ export type AssetTickerPriceSelection = {
   asset: {
     tradable: boolean;
     tradeBlockedReason: string | null;
+    extendedHoursSession?: UsExtendedHoursSegment | null;
     id: string;
     symbol: string;
     name: string;
@@ -2014,6 +2027,9 @@ export class AssetsService {
       isActive: asset.isActive,
       changeRate: tradingUx.changeRate,
       marketStatus: tradingUx.marketStatus,
+      ...(tradingUx.extendedHoursSession === undefined
+        ? {}
+        : { extendedHoursSession: tradingUx.extendedHoursSession }),
       tradable: tradingUx.tradable,
       tradeBlockedReason: tradingUx.tradeBlockedReason,
     };
@@ -2030,14 +2046,34 @@ export class AssetsService {
       price,
       marketStatus,
     );
+    const extendedHoursSession = this.resolveExtendedHoursSession(asset, now);
 
     return {
       id: asset.id,
       changeRate: price?.state === 'available' ? price.changeRate : null,
       marketStatus,
+      ...(extendedHoursSession === undefined ? {} : { extendedHoursSession }),
       tradable: blockedReason === null,
       tradeBlockedReason: blockedReason,
     };
+  }
+
+  /** See AssetTradingUx.extendedHoursSession. */
+  private resolveExtendedHoursSession(
+    asset: AssetRecord,
+    now: Date | undefined,
+  ): UsExtendedHoursSegment | null | undefined {
+    if (
+      asset.assetType !== AssetType.us_stock ||
+      !now ||
+      !usExtendedHoursPriceEnabled()
+    )
+      return undefined;
+    const state = usExtendedHoursStateFrom(
+      resolveStockMarketSessionState(asset, now),
+      now,
+    );
+    return 'window' in state ? state.state : null;
   }
 
   private resolveTradeBlockedReason(

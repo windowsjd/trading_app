@@ -20,7 +20,11 @@ const tiingo = { US_STOCK_PRICE_PROVIDER: 'tiingo' };
 describe('readOrderCapabilities', () => {
   it('reports every gate off by default', () => {
     expect(readOrderCapabilities(env({}))).toEqual({
-      limitOrder: { enabled: false, autoExecutionEnabled: false },
+      limitOrder: {
+        enabled: false,
+        autoExecutionEnabled: false,
+        extendedHoursMarkets: [],
+      },
       limitOnClose: {
         enabled: false,
         markets: [],
@@ -165,6 +169,50 @@ describe('readOrderCapabilities', () => {
     ).toBe(false);
   });
 
+  it('lists US extended-hours limit fills only with the switch and automatic matching on (2026-11-10)', () => {
+    const extended = {
+      ...tiingo,
+      US_STOCK_EXTENDED_HOURS_PRICE_ENABLED: 'true',
+      US_STOCK_EXTENDED_HOURS_LIMIT_MATCHING_ENABLED: 'true',
+    };
+    expect(
+      readOrderCapabilities(
+        env({
+          ...extended,
+          LIMIT_ORDER_ENABLED: 'true',
+          SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED: 'true',
+        }),
+      ).limitOrder,
+    ).toEqual({
+      enabled: true,
+      autoExecutionEnabled: true,
+      extendedHoursMarkets: ['US'],
+    });
+    // The matcher off (inert switch) or registrations off: nothing to promise.
+    for (const off of [
+      { LIMIT_ORDER_ENABLED: 'true' },
+      {
+        LIMIT_ORDER_ENABLED: 'false',
+        SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED: 'true',
+      },
+    ])
+      expect(
+        readOrderCapabilities(env({ ...extended, ...off })).limitOrder
+          .extendedHoursMarkets,
+      ).toEqual([]);
+    // Prices alone never promise extended-hours fills.
+    expect(
+      readOrderCapabilities(
+        env({
+          ...tiingo,
+          US_STOCK_EXTENDED_HOURS_PRICE_ENABLED: 'true',
+          LIMIT_ORDER_ENABLED: 'true',
+          SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED: 'true',
+        }),
+      ).limitOrder.extendedHoursMarkets,
+    ).toEqual([]);
+  });
+
   it('fails like startup validation on an invalid flag instead of reading it as off', () => {
     expect(() =>
       readOrderCapabilities(
@@ -198,7 +246,11 @@ describe('TradingAccountOrderCapabilitiesController', () => {
       success: true,
       data: {
         tradingAccountId: 'a1',
-        limitOrder: { enabled: true, autoExecutionEnabled: false },
+        limitOrder: {
+          enabled: true,
+          autoExecutionEnabled: false,
+          extendedHoursMarkets: [],
+        },
         limitOnClose: {
           enabled: true,
           markets: ['KRX'],
@@ -276,7 +328,11 @@ describe('GET /api/v1/trading-accounts/:accountId/order-capabilities (HTTP)', ()
         success: true,
         data: {
           tradingAccountId: 'a1',
-          limitOrder: { enabled: true, autoExecutionEnabled: false },
+          limitOrder: {
+            enabled: true,
+            autoExecutionEnabled: false,
+            extendedHoursMarkets: [],
+          },
           limitOnClose: {
             enabled: true,
             markets: ['KRX'],

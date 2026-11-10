@@ -1,5 +1,6 @@
 import type { AssetDetailAssetDto } from './api';
 import { getAssetNameDisplay } from '../../utils/format.ts';
+import { getExtendedHoursSessionLabel } from './extendedHours.ts';
 
 /** Binance's quote symbol stays in market data; the account settles in USD. */
 export function getTradingAssetName(
@@ -14,10 +15,11 @@ export function getTradingPair(asset: AssetDetailAssetDto) {
   return `${getTradingAssetName(asset)} / ${asset.settlementCurrency}`;
 }
 
-export function getStockMarketStatus(marketStatus: string) {
+/** A closed US market inside its pre-market/after-hours names that session. */
+export function getStockMarketStatus(marketStatus: string, extendedHoursSession?: unknown) {
   return marketStatus === 'open'
     ? '장중'
     : marketStatus === 'closed'
-      ? '장마감'
+      ? (getExtendedHoursSessionLabel(extendedHoursSession) ?? '장마감')
       : '상태 확인 불가';
 }

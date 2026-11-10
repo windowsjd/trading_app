@@ -18,7 +18,9 @@ export const tradingSessions = {
     markets: Market[] = ['KRX'],
     // US LOC evidence times are New York wall times OF this date, so the US
     // runner passes the date whose wall clock it places the window on.
-    options: { localDate?: string } = {},
+    // `openAt` (default: a day before `now`) lets a runner put `now` before
+    // the open, e.g. inside the US pre-market of `localDate` (2026-11-10).
+    options: { localDate?: string; openAt?: Date } = {},
   ) {
     for (const market of markets) {
       sessions.set(market, {
@@ -26,7 +28,7 @@ export const tradingSessions = {
         // Default: an audited Friday; fixture windows use real instants below.
         localDate: options.localDate ?? '2026-07-10',
         timeZone: market === 'KRX' ? 'Asia/Seoul' : 'America/New_York',
-        openTime: new Date(now.getTime() - 86_400_000),
+        openTime: options.openAt ?? new Date(now.getTime() - 86_400_000),
         closeTime: closeAt,
         earlyClose: false,
       });

@@ -135,6 +135,7 @@ import QuantityRatioSlider from './QuantityRatioSlider';
 import { OrderAsidePortal } from './OrderAside';
 import { OrderSummaryCard, SummaryRow, styles as asideStyles } from './StockOrderAside';
 import { formatEnteredAmount, getOrderSummaryBadge } from './stockOrderSummary';
+import { canFillLimitInExtendedHours, getExtendedHoursSessionLabel } from '../../features/asset/extendedHours';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { isTradingAccountScopeMismatchError } from '../../features/tradingAccount/accountScope';
 import type { RuntimeFacts } from '../../services/ws/runtimeDiagnostics';
@@ -702,6 +703,13 @@ export function OrderForm({
   );
   const displayedPriceAvailable = displayPrice.priceLocal !== null;
   const stockMarketClosed = isStock && asset?.marketStatus === 'closed';
+  // US pre-market/after-hours in which the server also fills limit orders.
+  const extendedLimitFills = canFillLimitInExtendedHours({
+    assetType: asset?.assetType,
+    extendedHoursSession: asset?.extendedHoursSession,
+    extendedHoursMarkets: capabilityData?.limitOrder?.extendedHoursMarkets,
+  });
+  const extendedSessionLabel = getExtendedHoursSessionLabel(asset?.extendedHoursSession);
   const tradeFeeRate = !feeQuery.isError
     ? feeQuery.data?.feePolicy?.tradeFeeRate
     : null;
@@ -791,7 +799,9 @@ export function OrderForm({
   const sessionNotice =
     stockMarketClosed && orderMethod === 'market'
       ? limitSelectable
-        ? '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
+        ? extendedLimitFills && extendedSessionLabel
+          ? `정규장 외에는 시장가 주문을 할 수 없습니다. 지정가 주문은 ${extendedSessionLabel} 시세가 지정가에 닿으면 체결될 수 있습니다.`
+          : '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
         // No 지정가 to suggest now (its server gate is closed).
         : '정규장 외에는 시장가 주문을 할 수 없습니다. 정규장에 다시 주문해주세요.'
       : stockMarketClosed && limitOnClose
@@ -1185,10 +1195,11 @@ export function OrderForm({
       : Number(positionQuantity) <= 0 ? '보유 수량이 없어 매도 설정을 등록할 수 없습니다.' : null);
   // A-2 order card (stocks): the expected order before anything is sent. The
   // badge is the expected handling under the current session (a limit order
-  // while the market is closed waits for the regular session), never an
+  // while the market is closed waits for the regular session — or, in a US
+  // pre-market/after-hours the server fills, for its price), never an
   // accepted or filled state; amounts are the same preview/quote as before.
   const maxQuantity = side === 'buy' && !isAmountBuy && !ratioDisabledReason ? inputAtRatio(1) : null;
-  const summaryBadge = stockLayout ? getOrderSummaryBadge(asset.marketStatus, orderMethod) : null;
+  const summaryBadge = stockLayout ? getOrderSummaryBadge(asset.marketStatus, orderMethod, extendedLimitFills) : null;
   // An order the session does not accept (주문 불가) shows no amounts, as before.
   const summaryPreview = summaryBadge?.tone === 'error' ? null : preview;
   const summaryPrice = orderType === 'limit'

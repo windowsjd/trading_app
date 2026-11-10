@@ -34,6 +34,11 @@ describe('AssetDetailScreen display contract', () => {
 
   it('localizes only the domestic market badge', () => {
     assert.match(chartSource, /asset.assetType === 'domestic_stock'/);
-    assert.match(chartSource, /getStockMarketStatus\(asset.marketStatus\)/);
+    // Server state only: the regular-session status and (2026-11-10) the US
+    // pre-market/after-hours session.
+    assert.match(
+      chartSource,
+      /getStockMarketStatus\(asset\.marketStatus, asset\.extendedHoursSession\)/,
+    );
   });
 });

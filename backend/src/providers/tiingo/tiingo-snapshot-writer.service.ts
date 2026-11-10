@@ -19,6 +19,7 @@ import {
   type MarketPriceEvent,
 } from '../market-price-event.service';
 import { buildProviderRawPayloadJson } from '../provider-raw-payload';
+import { usExtendedHoursPriceEnabled } from '../../orders/us-extended-hours.config';
 import { TiingoAssetMapService } from './tiingo-asset-map.service';
 import { TiingoCollectorLeaseService } from './tiingo-collector-lease.service';
 import {
@@ -29,11 +30,16 @@ import { TiingoQuoteService } from './tiingo-quote.service';
 import { classifyUsEquitySegment } from './tiingo-session';
 import { TiingoStreamService } from './tiingo-stream.service';
 import {
+  TIINGO_EXTENDED_STORED_PRICE_SOURCE,
   TIINGO_PROVIDER,
   TIINGO_STORED_PRICE_SOURCE,
   TiingoConfigService,
   toTiingoTicker,
 } from './tiingo.config';
+
+type StoredSourceName =
+  | typeof TIINGO_STORED_PRICE_SOURCE
+  | typeof TIINGO_EXTENDED_STORED_PRICE_SOURCE;
 
 const FX_CACHE_MS = 60_000;
 const TOP_UP_INTERVAL_MS = 30_000;
@@ -45,7 +51,11 @@ export type TiingoSnapshotWriterStatus = {
   written: number;
   throttled: number;
   published: number;
+  /** Rows stored under the extended-hours source name (part of `written`). */
+  writtenExtendedHours: number;
   skippedNotOwner: number;
+  /** Observations outside every stored segment: overnight, non-trading
+   * days, and pre-market/after-hours while extended prices are off. */
   skippedOutsideRegular: number;
   skippedUnmapped: number;
   skippedNotNewer: number;
@@ -81,6 +91,14 @@ type SymbolState = {
  * existing Redis provider-price channel (the stored value, so lists, detail
  * and the WebSocket show the same price). While the socket is not delivering,
  * stale symbols are topped up from the REST snapshot endpoint.
+ *
+ * With US_STOCK_EXTENDED_HOURS_PRICE_ENABLED (2026-11-10) pre-market and
+ * after-hours observations are stored too, under their own source name and
+ * with their own per-symbol throttle/ordering state, so the regular-session
+ * rows are exactly what they were without it (an after-hours tick can never
+ * take a pending regular tick's throttle slot). Extended rows are not fanned
+ * out: the realtime path is regular-session only, and the ticker's snapshot
+ * poll delivers them. No REST top-up outside the regular session.
  */
 @Injectable()
 export class TiingoSnapshotWriterService
@@ -97,6 +115,7 @@ export class TiingoSnapshotWriterService
     written: 0,
     throttled: 0,
     published: 0,
+    writtenExtendedHours: 0,
     skippedNotOwner: 0,
     skippedOutsideRegular: 0,
     skippedUnmapped: 0,
@@ -153,7 +172,8 @@ export class TiingoSnapshotWriterService
   accept(observation: TiingoReferenceObservation, nowMs = Date.now()): void {
     // A remembered session close is not a live price.
     if (observation.origin === 'rest_close') return;
-    if (observation.segment !== 'regular') {
+    const sourceName = storedSourceName(observation);
+    if (!sourceName) {
       this.status.skippedOutsideRegular += 1;
       return;
     }
@@ -161,7 +181,7 @@ export class TiingoSnapshotWriterService
       this.status.skippedNotOwner += 1;
       return;
     }
-    const state = this.stateFor(observation.symbol);
+    const state = this.stateFor(observation.symbol, sourceName);
     const throttleMs = this.config.getConfig().snapshotThrottleMs;
     const waitMs = state.lastSlotMs + throttleMs - nowMs;
     if (waitMs > 0) {
@@ -187,7 +207,12 @@ export class TiingoSnapshotWriterService
     observation: TiingoReferenceObservation,
     nowMs = Date.now(),
   ): Promise<'created' | 'skipped' | 'failed'> {
-    const state = this.stateFor(observation.symbol);
+    const sourceName = storedSourceName(observation);
+    if (!sourceName) {
+      this.status.skippedOutsideRegular += 1;
+      return 'skipped';
+    }
+    const state = this.stateFor(observation.symbol, sourceName);
     // Reserve the throttle slot before any await.
     state.lastSlotMs = nowMs;
     if (state.writing) {
@@ -199,7 +224,7 @@ export class TiingoSnapshotWriterService
     }
     state.writing = true;
     try {
-      return await this.writeOne(state, observation);
+      return await this.writeOne(state, observation, sourceName);
     } finally {
       state.writing = false;
       const next = state.timer ? null : state.pending;
@@ -213,7 +238,9 @@ export class TiingoSnapshotWriterService
   private async writeOne(
     state: SymbolState,
     observation: TiingoReferenceObservation,
+    sourceName: StoredSourceName,
   ): Promise<'created' | 'skipped' | 'failed'> {
+    const extended = sourceName === TIINGO_EXTENDED_STORED_PRICE_SOURCE;
     if (!this.lease.owned()) {
       this.status.skippedNotOwner += 1;
       return 'skipped';
@@ -237,7 +264,7 @@ export class TiingoSnapshotWriterService
           where: {
             assetId: target.assetId,
             sourceType: AssetPriceSourceType.provider_api,
-            sourceName: TIINGO_STORED_PRICE_SOURCE,
+            sourceName,
             effectiveAt: { gte: observation.effectiveAt },
           },
           orderBy: [{ effectiveAt: 'desc' }, { capturedAt: 'desc' }],
@@ -266,7 +293,7 @@ export class TiingoSnapshotWriterService
           priceKrw,
           currencyCode: CurrencyCode.USD,
           sourceType: AssetPriceSourceType.provider_api,
-          sourceName: TIINGO_STORED_PRICE_SOURCE,
+          sourceName,
           sourceTimestamp: observation.effectiveAt,
           effectiveAt: observation.effectiveAt,
           capturedAt: observation.capturedAt,
@@ -282,6 +309,7 @@ export class TiingoSnapshotWriterService
               effectiveAt: observation.effectiveAt.toISOString(),
               effectiveAtNanos: observation.effectiveAtNanos,
               priceBasis: 'tiingo_reference_price',
+              ...(extended ? { segment: observation.segment } : {}),
             },
             maxBytes: 2000,
             secrets: [config.token],
@@ -294,8 +322,10 @@ export class TiingoSnapshotWriterService
         nanos: observation.effectiveAtNanos,
       };
       this.status.written += 1;
+      if (extended) this.status.writtenExtendedHours += 1;
       this.status.lastWrittenAt = new Date().toISOString();
-      if (this.lease.owned()) await this.publish(target.assetId, observation);
+      if (!extended && this.lease.owned())
+        await this.publish(target.assetId, observation);
       return 'created';
     } catch (error) {
       this.status.failed += 1;
@@ -420,8 +450,9 @@ export class TiingoSnapshotWriterService
       : null;
   }
 
-  private stateFor(symbol: string): SymbolState {
-    const key = symbol.toUpperCase();
+  /** One throttle/ordering state per symbol AND stored source name. */
+  private stateFor(symbol: string, sourceName: StoredSourceName): SymbolState {
+    const key = `${symbol.toUpperCase()}|${sourceName}`;
     let state = this.symbols.get(key);
     if (!state) {
       state = {
@@ -436,6 +467,20 @@ export class TiingoSnapshotWriterService
     }
     return state;
   }
+}
+
+/** The source name an observation is stored under, or null (not stored). */
+function storedSourceName(
+  observation: TiingoReferenceObservation,
+): StoredSourceName | null {
+  if (observation.segment === 'regular') return TIINGO_STORED_PRICE_SOURCE;
+  if (
+    (observation.segment === 'pre_market' ||
+      observation.segment === 'after_hours') &&
+    usExtendedHoursPriceEnabled()
+  )
+    return TIINGO_EXTENDED_STORED_PRICE_SOURCE;
+  return null;
 }
 
 function isNewer(

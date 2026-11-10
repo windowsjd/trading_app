@@ -47,16 +47,19 @@ export function fitPriceFontSize(text: string, width: number, fontScale = 1) {
 /**
  * How the order would be handled under the session the screen knows, before
  * it is sent (the server still decides at quote and create time):
- * - market closed: a limit order waits for the next regular session; market
- *   and LOC orders are not accepted then;
+ * - market closed: a limit order waits for the next regular session — or for
+ *   its price, when the server fills US limit orders in the current
+ *   pre-market/after-hours (`limitFillsNow`); market and LOC orders are not
+ *   accepted then;
  * - market open: market fills now, a limit waits for its price, LOC for the
  *   close;
  * - unknown market status: no badge (only the server can tell).
  */
-export function getOrderSummaryBadge(marketStatus: string | null | undefined, method: 'market' | 'limit' | 'loc' | 'conditional'): OrderSummaryBadge | null {
+export function getOrderSummaryBadge(marketStatus: string | null | undefined, method: 'market' | 'limit' | 'loc' | 'conditional', limitFillsNow = false): OrderSummaryBadge | null {
   if (method === 'conditional') return null;
   if (marketStatus === 'closed') {
-    return method === 'limit' ? { label: '정규장 대기', tone: 'warning' } : { label: '주문 불가', tone: 'error' };
+    if (method !== 'limit') return { label: '주문 불가', tone: 'error' };
+    return { label: limitFillsNow ? '체결 대기' : '정규장 대기', tone: 'warning' };
   }
   if (marketStatus !== 'open') return null;
   if (method === 'loc') return { label: '종가 대기', tone: 'warning' };

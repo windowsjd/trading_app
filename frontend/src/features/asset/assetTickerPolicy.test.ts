@@ -307,6 +307,59 @@ describe('stock market state transitions', () => {
     assert.equal(canOverlayAssetTicker(asset, open), true);
     assert.equal(applyTickerMarketState(asset, open).tradable, true);
   });
+  it('takes a US pre-market/after-hours boundary even at the same price, and carries the session (2026-11-10)', () => {
+    const afterClose = ticker({
+      assetId: 'aapl',
+      realtime: false,
+      marketStatus: 'closed',
+      extendedHoursSession: null,
+      marketEvaluatedAt: '2026-11-10T08:59:59Z',
+      priceLocal: '100',
+      assetPriceSnapshotId: 'last-regular',
+    });
+    const preMarket = {
+      ...afterClose,
+      extendedHoursSession: 'pre_market' as const,
+      marketEvaluatedAt: '2026-11-10T09:00:02Z',
+    };
+    const state = toAssetTickerAcceptState(afterClose);
+    assert.equal(applyTicker(state, preMarket)?.ticker, preMarket);
+    // The same session again is no news.
+    const accepted = applyTicker(state, preMarket)!;
+    assert.equal(
+      applyTicker(accepted, {
+        ...preMarket,
+        marketEvaluatedAt: '2026-11-10T09:00:05Z',
+      }),
+      accepted,
+    );
+    const asset = {
+      assetType: 'us_stock',
+      marketStatus: 'closed',
+      extendedHoursSession: null as string | null,
+      tradable: false,
+    };
+    assert.equal(
+      applyTickerMarketState(asset, preMarket).extendedHoursSession,
+      'pre_market',
+    );
+    // The regular open has no extended-hours session.
+    const open = {
+      ...live,
+      assetId: 'aapl',
+      realtime: false,
+      marketEvaluatedAt: '2026-11-10T14:30:01Z',
+      tradable: true,
+      tradeBlockedReason: null,
+    };
+    assert.equal(
+      applyTickerMarketState(
+        { ...asset, extendedHoursSession: 'pre_market' },
+        open,
+      ).extendedHoursSession,
+      null,
+    );
+  });
   it('keeps crypto and an independently open US stock eligible', () => {
     assert.equal(
       canOverlayAssetTicker(

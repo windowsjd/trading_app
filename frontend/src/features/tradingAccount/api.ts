@@ -632,7 +632,12 @@ export async function getTradingAccountOrder(
  */
 export interface TradingAccountOrderCapabilitiesDto {
   tradingAccountId: string;
-  limitOrder: { enabled: boolean; autoExecutionEnabled: boolean };
+  limitOrder: {
+    enabled: boolean;
+    autoExecutionEnabled: boolean;
+    /** Markets whose limit orders also fill in pre-market/after-hours ('US'). Absent on an older server. */
+    extendedHoursMarkets?: string[];
+  };
   limitOnClose: {
     enabled: boolean;
     markets: string[];

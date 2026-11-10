@@ -809,6 +809,54 @@ describe('AssetTickerGateway', () => {
     expect(state.subscriptions.has('samsung')).toBe(true);
   });
 
+  it('carries the US extended-hours session and republishes its boundary with the same price (2026-11-10)', async () => {
+    const usStock = {
+      id: 'aapl',
+      symbol: 'AAPL',
+      name: 'Apple',
+      assetType: 'us_stock',
+      market: 'NAS',
+      priceCurrency: CurrencyCode.USD,
+      tradable: false,
+      tradeBlockedReason: 'MARKET_CLOSED',
+      extendedHoursSession: null as string | null,
+    };
+    const { gateway } = createGateway({
+      asset: usStock,
+      price: {
+        state: 'available',
+        currentPrice: '100',
+        priceCurrency: CurrencyCode.USD,
+        priceKrwState: 'available',
+        priceKrw: '140000',
+        assetPriceSnapshotId: 'last-regular',
+        priceCapturedAt: '2026-11-09T20:59:58Z',
+        priceEffectiveAt: '2026-11-09T20:59:58Z',
+        priceSource: null,
+      },
+    });
+    const { client } = attachClient(gateway, 'aapl');
+    const poll = () =>
+      (
+        gateway as unknown as { pushChangedTickers(): Promise<void> }
+      ).pushChangedTickers();
+    jest.setSystemTime(new Date('2026-11-10T08:59:58Z'));
+    await poll();
+    await poll();
+    expect(client.send).toHaveBeenCalledTimes(1);
+    // 04:00 New York: pre-market begins before any pre-market price arrives.
+    usStock.extendedHoursSession = 'pre_market';
+    jest.setSystemTime(new Date('2026-11-10T09:00:01Z'));
+    await poll();
+    expect(client.send).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(client.send.mock.calls[1][0])).toMatchObject({
+      marketStatus: 'closed',
+      extendedHoursSession: 'pre_market',
+      realtime: false,
+      assetPriceSnapshotId: 'last-regular',
+    });
+  });
+
   it.each(['NAS', 'NYS'])(
     'uses actual %s metadata at buffered delivery, independently of KRX',
     async (market) => {

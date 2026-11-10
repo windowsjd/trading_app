@@ -54,3 +54,17 @@ test('session header follows accepted ticker transitions, and rejects a legacy o
   assert.equal(getMarketSessionLabel('domestic_stock', [row], new Map([['kia', ticker]])), '정규장 · 거래 중');
   assert.equal(getMarketSessionLabel('domestic_stock', [row], new Map([['kia', { ...ticker, marketEvaluatedAt: undefined }]])), '휴장 · 거래 종료');
 });
+
+test('a US tab names the pre-market/after-hours session only when every row agrees (2026-11-10)', () => {
+  const empty = new Map();
+  const us = { ...row, id: 'aapl', assetType: 'us_stock' as const, market: 'NAS', extendedHoursSession: 'pre_market' as const };
+  assert.equal(getMarketSessionLabel('us_stock', [us, { ...us, id: 'msft' }], empty), '프리마켓 · 시간외 거래');
+  assert.equal(getMarketSessionLabel('us_stock', [{ ...us, extendedHoursSession: 'after_hours' as const }], empty), '애프터마켓 · 시간외 거래');
+  assert.equal(getMarketSessionLabel('us_stock', [us, { ...us, id: 'msft', extendedHoursSession: null }], empty), '휴장 · 거래 종료');
+  assert.equal(getMarketSessionLabel('us_stock', [{ ...us, extendedHoursSession: undefined }], empty), '휴장 · 거래 종료');
+  // A closed-market snapshot ticker carries the session boundary to the row.
+  const boundary: AssetTickerMessage = { type: 'asset_ticker', assetId: 'aapl', marketStatus: 'closed', realtime: false,
+    extendedHoursSession: 'after_hours', marketEvaluatedAt: '2026-11-10T21:00:01Z', priceLocal: '100', priceKrw: '140000',
+    priceKrwState: 'available' };
+  assert.equal(getMarketSessionLabel('us_stock', [{ ...us, extendedHoursSession: null }], new Map([['aapl', boundary]])), '애프터마켓 · 시간외 거래');
+});

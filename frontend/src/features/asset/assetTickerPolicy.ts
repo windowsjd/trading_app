@@ -15,6 +15,8 @@ export interface AssetTickerMessage {
   delayed?: boolean;
   /** Backend calendar assessment, independent of the snapshot's age. */
   marketStatus?: 'open' | 'closed' | 'unknown';
+  /** US pre-market/after-hours of a closed market (server, 2026-11-10). */
+  extendedHoursSession?: 'pre_market' | 'after_hours' | null;
   marketEvaluatedAt?: string;
   tradable?: boolean;
   tradeBlockedReason?: string | null;
@@ -155,7 +157,10 @@ export function tickerRejectionReason(
   if (isClosedMarketSnapshot(next)) {
     return next.assetPriceSnapshotId !== current?.snapshotId ||
       next.priceLocal !== current?.ticker.priceLocal ||
-      next.changeRate !== current?.ticker.changeRate
+      next.changeRate !== current?.ticker.changeRate ||
+      // A pre-market/after-hours boundary is news even at the same price.
+      (next.extendedHoursSession ?? null) !==
+        (current?.ticker.extendedHoursSession ?? null)
       ? null
       : 'unchanged_closed_snapshot';
   }
@@ -230,6 +235,8 @@ export function applyTickerMarketState<
     return {
       ...asset,
       marketStatus: 'open',
+      // The regular session has no extended-hours session.
+      ...('extendedHoursSession' in asset ? { extendedHoursSession: null } : {}),
       ...(typeof ticker.tradable === 'boolean'
         ? {
             tradable: ticker.tradable,
@@ -241,6 +248,9 @@ export function applyTickerMarketState<
   return {
     ...asset,
     marketStatus: ticker.marketStatus,
+    ...('extendedHoursSession' in ticker
+      ? { extendedHoursSession: ticker.extendedHoursSession ?? null }
+      : {}),
     tradable: false,
     tradeBlockedReason:
       asset.isActive === false

@@ -46,6 +46,8 @@ export interface MarketAssetItemDto {
   turnoverPeriod?: 'session' | 'rolling_24h' | 'last_completed_session' | null;
   isActive: boolean;
   marketStatus: string;
+  /** See AssetDetailAssetDto.extendedHoursSession. */
+  extendedHoursSession?: 'pre_market' | 'after_hours' | null;
   tradable: boolean;
   tradeBlockedReason?: string | null;
   price?: MarketAssetPriceDto | null;

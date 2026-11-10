@@ -3409,6 +3409,75 @@ describe('AssetsService', () => {
       expectNoAssetWrites(prisma);
     });
 
+    it('shows a pre-market price and its session while extended-hours prices are on, still MARKET_CLOSED', async () => {
+      const EXTENDED = 'tiingo_us_extended_reference_price';
+      // Tuesday 2026-11-10 06:00 EST: pre-market; latest session = Mon 11-09.
+      jest.setSystemTime(new Date('2026-11-10T11:00:00.000Z'));
+      const monday = {
+        ...eod('2026-11-09', '100'),
+        // EST daily window and a receipt after the 21:00Z close.
+        openTime: new Date('2026-11-09T05:00:00.000Z'),
+        closeTime: new Date('2026-11-10T05:00:00.000Z'),
+        sourceUpdatedAt: new Date('2026-11-09T22:10:00.000Z'),
+      };
+      const { prisma, service } = withCandles([monday]);
+      const extendedRow = {
+        id: 'ext-1',
+        assetId: usAsset.id,
+        price: new Prisma.Decimal('103'),
+        priceKrw: null,
+        currencyCode: CurrencyCode.USD,
+        sourceType: 'provider_api',
+        sourceName: EXTENDED,
+        effectiveAt: new Date('2026-11-10T10:42:00.000Z'),
+        capturedAt: new Date('2026-11-10T10:42:00.150Z'),
+        createdAt: new Date('2026-11-10T10:42:00.200Z'),
+      };
+      prisma.assetPriceSnapshot.findMany.mockImplementation(
+        ({ where }: { where: { sourceName?: string } }) =>
+          Promise.resolve(where.sourceName === EXTENDED ? [extendedRow] : []),
+      );
+      const saved = process.env.US_STOCK_EXTENDED_HOURS_PRICE_ENABLED;
+      process.env.US_STOCK_EXTENDED_HOURS_PRICE_ENABLED = 'true';
+      try {
+        const list = await service.getAssets('user-1');
+        expect(list.data.assets[0]).toMatchObject({
+          marketStatus: 'closed',
+          extendedHoursSession: 'pre_market',
+          tradable: false,
+          tradeBlockedReason: 'MARKET_CLOSED',
+          price: {
+            state: 'available',
+            currentPrice: '103.00000000',
+            // Against Monday's confirmed close.
+            changeRate: '3.00000000',
+            assetPriceSnapshotId: 'ext-1',
+            priceEffectiveAt: '2026-11-10T10:42:00.000Z',
+            priceSource: {
+              sourceName: EXTENDED,
+              fallbackUsed: false,
+              fallbackReason: null,
+            },
+          },
+        });
+      } finally {
+        if (saved === undefined)
+          delete process.env.US_STOCK_EXTENDED_HOURS_PRICE_ENABLED;
+        else process.env.US_STOCK_EXTENDED_HOURS_PRICE_ENABLED = saved;
+      }
+      // Switch off: the regular policy, and no new field in the payload.
+      const off = await service.getAssets('user-1');
+      expect('extendedHoursSession' in off.data.assets[0]).toBe(false);
+      expect(off.data.assets[0]).toMatchObject({
+        price: {
+          priceSource: {
+            sourceName: 'tiingo_eod',
+            fallbackReason: 'market_closed_last_close',
+          },
+        },
+      });
+    });
+
     it('never substitutes a past close during the regular session', async () => {
       // Friday 2026-10-16 11:00 EDT: open, no eligible Tiingo snapshot.
       jest.setSystemTime(new Date('2026-10-16T15:00:00.000Z'));

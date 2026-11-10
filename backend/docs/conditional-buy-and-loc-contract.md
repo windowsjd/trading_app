@@ -276,6 +276,11 @@ then the asset's market (`domestic_stock` → `KRX`, `us_stock` → `US`).
   `LOC_ORDERS_DISABLED`). It stays the BUY answer.
 - `limitOnCloseSell.enabled` = `LIMIT_ORDER_ENABLED &&` (KRX or US SELL flag)
   (2026-10-13, additive; US 2026-10-17).
+- `limitOrder.extendedHoursMarkets` (2026-11-10, additive): `["US"]` when
+  `autoExecutionEnabled` and `US_STOCK_EXTENDED_HOURS_LIMIT_MATCHING_ENABLED`
+  are both on, else `[]` — submitted US limit orders may then also fill in
+  pre-market/after-hours ([us-extended-hours.md](us-extended-hours.md)).
+  Absent on an older server: treat as `[]`.
 - It reads flags only: no DB write, no order/wallet/ledger access, no
   migration. Session, market, Season and account rules stay with quote/create,
   which remain authoritative after any flag change. A client that cannot read

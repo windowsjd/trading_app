@@ -434,6 +434,88 @@ describe('canonical daily return', () => {
       ).toBeNull();
     });
 
+    describe('extended-hours prices (2026-11-10)', () => {
+      const saved = { ...process.env };
+      beforeEach(() => {
+        process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+        process.env.US_STOCK_EXTENDED_HOURS_PRICE_ENABLED = 'true';
+      });
+      afterEach(() => {
+        process.env = { ...saved };
+      });
+      // 2026-11-09 (Mon, EST) daily window and its confirmed close.
+      const monday = () =>
+        eodRow('2026-11-09T05:00:00Z', '2026-11-10T05:00:00Z', '100');
+
+      it("measures a pre-market price against the previous session's confirmed close", async () => {
+        const now = new Date('2026-11-10T11:00:00Z'); // 06:00 EST
+        const { service, findRange } = setup([monday()]);
+        expect(
+          await service.calculate({
+            asset: us,
+            price: '103',
+            effectiveAt: new Date('2026-11-10T10:59:00Z'),
+            now,
+          }),
+        ).toBe('3.00000000');
+        expect(findRange).toHaveBeenCalledWith(
+          expect.objectContaining({ from: new Date('2026-11-09T05:00:00Z') }),
+        );
+      });
+
+      it("measures an after-hours price against the same day's close once Tiingo confirms it", async () => {
+        const now = new Date('2026-11-10T22:00:00Z'); // 17:00 EST
+        const tuesday = {
+          ...eodRow('2026-11-10T05:00:00Z', '2026-11-11T05:00:00Z', '100'),
+          sourceUpdatedAt: new Date('2026-11-10T21:40:00Z'),
+        };
+        expect(
+          await setup([tuesday]).service.calculate({
+            asset: us,
+            price: '98',
+            effectiveAt: new Date('2026-11-10T21:50:00Z'),
+            now,
+          }),
+        ).toBe('-2.00000000');
+        // Not published yet: no baseline, never an older session's close.
+        expect(
+          await setup([
+            {
+              ...tuesday,
+              sourceUpdatedAt: new Date('2026-11-11T03:00:00Z'),
+            },
+          ]).service.calculate({
+            asset: us,
+            price: '98',
+            effectiveAt: new Date('2026-11-10T21:50:00Z'),
+            now,
+          }),
+        ).toBeNull();
+      });
+
+      it('has no baseline for an earlier window or with the switch off', async () => {
+        const now = new Date('2026-11-10T11:00:00Z');
+        // Yesterday's after-hours price is not inside today's pre-market.
+        expect(
+          await setup([monday()]).service.calculate({
+            asset: us,
+            price: '103',
+            effectiveAt: new Date('2026-11-09T23:00:00Z'),
+            now,
+          }),
+        ).toBeNull();
+        delete process.env.US_STOCK_EXTENDED_HOURS_PRICE_ENABLED;
+        expect(
+          await setup([monday()]).service.calculate({
+            asset: us,
+            price: '103',
+            effectiveAt: new Date('2026-11-10T10:59:00Z'),
+            now,
+          }),
+        ).toBeNull();
+      });
+    });
+
     describe('latest session close (closed-market display only)', () => {
       // Saturday 2026-10-17 11:00 EDT: latest completed session = Fri 10-16.
       const saturday = new Date('2026-10-17T15:00:00Z');

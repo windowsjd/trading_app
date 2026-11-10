@@ -26,6 +26,14 @@ describe('stock order card rules', () => {
     assert.equal(getOrderSummaryBadge('open', 'conditional'), null);
   });
 
+  it('a closed US market whose limit orders fill in pre-market/after-hours waits for the price, not the session', () => {
+    assert.deepEqual(getOrderSummaryBadge('closed', 'limit', true), { label: '체결 대기', tone: 'warning' });
+    // Market and LOC stay regular-session only.
+    assert.deepEqual(getOrderSummaryBadge('closed', 'market', true), { label: '주문 불가', tone: 'error' });
+    assert.deepEqual(getOrderSummaryBadge('closed', 'loc', true), { label: '주문 불가', tone: 'error' });
+    assert.deepEqual(getOrderSummaryBadge('closed', 'limit', false), { label: '정규장 대기', tone: 'warning' });
+  });
+
   it('a figure longer than its row shrinks (down to 10) instead of breaking between digits', () => {
     assert.equal(fitFontSize('140,140원', 111, 1, 10, 15), 15, 'fits: unchanged');
     // 14 narrow glyphs (8.4em) + 원 = 9.4em in a 111pt row.

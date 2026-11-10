@@ -2,6 +2,8 @@ import { evidenceFloor } from '../common/pending-order-modification';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
   AssetPriceSourceType,
+  AssetType,
+  CurrencyCode,
   OrderSide,
   Prisma,
 } from '../generated/prisma/client';
@@ -9,9 +11,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RankingRefreshService } from '../ranking/ranking-refresh.service';
 import {
   isPositiveDecimal,
+  PROVIDER_SOURCE_NAMES,
   resolveAssetProviderEligibility,
   selectMarketAwareAssetPriceSnapshotBySourcePriority,
+  selectUsExtendedHoursExecutionSnapshot,
 } from '../providers/source-eligibility.policy';
+import { UsdKrwRefreshService } from '../providers/usd-krw-refresh.service';
+import { usExtendedHoursLimitMatchingEnabled } from './us-extended-hours.config';
+import {
+  resolveUsExtendedHoursWindow,
+  type UsExtendedHoursWindow,
+} from './us-extended-hours.policy';
 import {
   readLimitOrderMatchingConfig,
   type LimitOrderMatchingConfig,
@@ -39,6 +49,7 @@ import {
   observedReason,
   SNAPSHOT_SELECTION_REASONS,
   type CandleOrderExclusionReason,
+  type FxPreparationOutcome,
   type PathAReason,
   type PathBReason,
   type SnapshotSelectionReason,
@@ -48,6 +59,9 @@ import {
 const SCANS_PER_ATTEMPT = 4;
 const MAX_SCANS_PER_CYCLE = 1_000;
 const CANDIDATE_PAGE_SIZE = 200;
+/** After a failed USD/KRW preparation, the matcher waits this long before
+ * asking the FX providers again (fills keep re-selecting committed FX). */
+export const LIMIT_MATCHING_FX_RETRY_MS = 60_000;
 
 export type LimitMatchingSummary = {
   assetsScanned: number;
@@ -85,6 +99,8 @@ type FillPlanDecision = {
 export class LimitOrderMatchingService {
   private readonly logger = new Logger(LimitOrderMatchingService.name);
   private nextCandidate: LimitMatchCursor | null = null;
+  /** Earliest time the next USD/KRW preparation may call a provider. */
+  private fxRetryNotBeforeMs = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -93,6 +109,8 @@ export class LimitOrderMatchingService {
     private readonly execution: LimitOrderExecutionService,
     @Optional()
     private readonly rankingRefresh?: RankingRefreshService,
+    @Optional()
+    private readonly usdKrwRefresh?: UsdKrwRefreshService,
   ) {}
 
   private readConfig(): LimitOrderMatchingConfig {
@@ -161,6 +179,16 @@ export class LimitOrderMatchingService {
         candles: ClosedCandleEvaluation;
       }
     >();
+    // A US stock fill needs fill-time USD/KRW evidence ≤ 60 s old, which the
+    // fill transaction selects itself. With extended-hours limit matching on
+    // (its rollout switch, so both switches off keep the old behavior), the
+    // matcher prepares it once per cycle, outside every transaction, before
+    // the first US stock fill of any session (the LOC settlement pattern); a
+    // failed preparation is not retried for a minute.
+    const prepareFx = usExtendedHoursLimitMatchingEnabled();
+    let fxPreparation: Promise<void> | null = null;
+    const prepareUsdKrw = () =>
+      (fxPreparation ??= this.prepareUsdKrwForFills(diagnostics));
 
     while (scansRemaining > 0 && attemptsRemaining > 0) {
       if (input.isLockOwned && !input.isLockOwned()) {
@@ -275,6 +303,8 @@ export class LimitOrderMatchingService {
         summary.ordersConsidered += 1;
         attemptsRemaining -= 1;
         diagnostics.execution.attempts[plan.path] += 1;
+        if (prepareFx && needsUsdKrwPreparation(candidate))
+          await prepareUsdKrw();
         try {
           const outcome = await this.execution.fillLimitOrder({
             orderId: candidate.id,
@@ -428,6 +458,8 @@ export class LimitOrderMatchingService {
    * Latest VALID fresh provider snapshot for path A, or null. Reuses the exact
    * order-execute eligibility + market-session selection: admin_manual /
    * official_batch are rejected, stocks require an open session, crypto is 24h.
+   * A US stock inside its pre-market/after-hours (extended limit matching on)
+   * takes that window's fresh extended-hours price instead.
    */
   private async resolvePathASnapshot(
     asset: LimitMatchCandidate['asset'],
@@ -449,6 +481,19 @@ export class LimitOrderMatchingService {
       };
 
     const priceCurrency = asset.priceCurrency ?? asset.currencyCode;
+    const extendedWindow =
+      asset.assetType === AssetType.us_stock &&
+      usExtendedHoursLimitMatchingEnabled()
+        ? resolveUsExtendedHoursWindow(asset, now)
+        : null;
+    if (extendedWindow)
+      return this.resolveExtendedHoursPathASnapshot(
+        asset.id,
+        priceCurrency,
+        now,
+        extendedWindow,
+        eligibility.freshnessThresholdSeconds,
+      );
     const candidates = await this.prisma.assetPriceSnapshot.findMany({
       where: {
         assetId: asset.id,
@@ -501,6 +546,95 @@ export class LimitOrderMatchingService {
     };
   }
 
+  /**
+   * Path A evidence inside a US pre-market/after-hours window: the newest
+   * extended-hours rows of THIS window only (never a regular-session row,
+   * never an earlier window's), at the regular 10 s execute freshness.
+   */
+  private async resolveExtendedHoursPathASnapshot(
+    assetId: string,
+    priceCurrency: CurrencyCode,
+    now: Date,
+    window: UsExtendedHoursWindow,
+    freshnessThresholdSeconds: number,
+  ): Promise<PathASnapshotEvaluation> {
+    const candidates = await this.prisma.assetPriceSnapshot.findMany({
+      where: {
+        assetId,
+        currencyCode: priceCurrency,
+        sourceType: AssetPriceSourceType.provider_api,
+        sourceName: PROVIDER_SOURCE_NAMES.usStockTiingoExtended,
+        effectiveAt: { gte: window.startsAt, lte: now },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 10,
+      select: {
+        id: true,
+        price: true,
+        sourceType: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
+      },
+    });
+    const selection = selectUsExtendedHoursExecutionSnapshot({
+      candidates,
+      window,
+      now,
+      freshnessThresholdSeconds,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+    });
+    return {
+      snapshot:
+        selection.state === 'selected'
+          ? {
+              id: selection.snapshot.id,
+              price: selection.snapshot.price,
+              effectiveAt: selection.snapshot.effectiveAt,
+            }
+          : null,
+      reason:
+        selection.state === 'selected'
+          ? 'selected'
+          : observedReason(
+              selection.decision.rejectedProviderReason ??
+                selection.decision.fallbackReason,
+              SNAPSHOT_SELECTION_REASONS,
+            ),
+    };
+  }
+
+  /**
+   * Shared, bounded USD/KRW preparation (UsdKrwRefreshService: DB check
+   * first, one in-flight refresh at a time). It never returns a rate: the
+   * fill re-selects committed evidence ≤ 60 s old at its own DB clock and
+   * skips (order and reservation unchanged) without it.
+   */
+  private async prepareUsdKrwForFills(
+    diagnostics: LimitMatchingSummary['diagnostics'],
+  ): Promise<void> {
+    const outcome = await this.runUsdKrwPreparation();
+    countReason(diagnostics.execution.fxPreparation, outcome);
+  }
+
+  private async runUsdKrwPreparation(): Promise<FxPreparationOutcome> {
+    if (!this.usdKrwRefresh) return 'service_unavailable';
+    if (Date.now() < this.fxRetryNotBeforeMs) return 'cooling_down';
+    try {
+      const prepared = await this.usdKrwRefresh.prepare('orders_execute');
+      if (prepared.result !== 'unavailable') return prepared.result;
+      this.fxRetryNotBeforeMs = Date.now() + LIMIT_MATCHING_FX_RETRY_MS;
+      return 'unavailable';
+    } catch {
+      this.fxRetryNotBeforeMs = Date.now() + LIMIT_MATCHING_FX_RETRY_MS;
+      return 'failed';
+    }
+  }
+
   private refreshRankingAfterFill(
     seasonId: string,
     seasonParticipantId: string,
@@ -522,4 +656,15 @@ export class LimitOrderMatchingService {
         );
       });
   }
+}
+
+/**
+ * US stock fills settle in USD and attach fill-time USD/KRW evidence. Crypto
+ * (also USD) keeps its existing behavior: this change is US stocks only.
+ */
+function needsUsdKrwPreparation(candidate: LimitMatchCandidate): boolean {
+  return (
+    candidate.asset.assetType === AssetType.us_stock &&
+    candidate.currencyCode === CurrencyCode.USD
+  );
 }

@@ -1363,6 +1363,9 @@ export class AssetTickerGateway
                   ? 'closed'
                   : 'unknown',
             marketEvaluatedAt: now.toISOString(),
+            ...(asset.extendedHoursSession === undefined
+              ? {}
+              : { extendedHoursSession: asset.extendedHoursSession }),
             tradable: asset.tradable,
             tradeBlockedReason: asset.tradeBlockedReason,
             realtime: false,
@@ -1719,6 +1722,7 @@ function parseCandleSubscriptionKey(key: string): [string, string] {
 function snapshotTickerKey(ticker: {
   assetPriceSnapshotId: string | null;
   marketStatus?: string;
+  extendedHoursSession?: string | null;
   changeRate?: string | null;
   priceEffectiveAt?: string | null;
   priceLocal?: string | null;
@@ -1730,5 +1734,11 @@ function snapshotTickerKey(ticker: {
     (ticker.priceEffectiveAt
       ? `ephemeral:${ticker.priceEffectiveAt}:${ticker.priceLocal ?? ''}`
       : 'unavailable');
-  return `${ticker.marketStatus ?? ''}:${priceKey}:${ticker.changeRate ?? 'unavailable'}`;
+  // A pre-market/after-hours boundary is a market-state change even when the
+  // shown price stays the same.
+  const session =
+    ticker.extendedHoursSession === undefined
+      ? ''
+      : `:${ticker.extendedHoursSession ?? 'none'}`;
+  return `${ticker.marketStatus ?? ''}${session}:${priceKey}:${ticker.changeRate ?? 'unavailable'}`;
 }

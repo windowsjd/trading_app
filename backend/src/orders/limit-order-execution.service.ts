@@ -49,7 +49,10 @@ import {
   selectMarketAwareAssetPriceSnapshotBySourcePriority,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshotBySourcePriority,
+  selectUsExtendedHoursExecutionSnapshot,
 } from '../providers/source-eligibility.policy';
+import { usExtendedHoursLimitMatchingEnabled } from './us-extended-hours.config';
+import { resolveUsExtendedHoursWindow } from './us-extended-hours.policy';
 import {
   limitOrderErrorCodes,
   limitOrderErrorHttpStatus,
@@ -465,10 +468,20 @@ export class LimitOrderExecutionService {
       // Path A is an execution-time price; the cycle's exact evidence must
       // still be fresh and in the current stock session. Never refresh over
       // the network or silently substitute a different price in this fill.
+      // A US stock outside its regular session may fill only inside the
+      // pre-market/after-hours of the DB-clock instant (extended limit
+      // matching on), on that window's fresh extended-hours evidence.
       if (plan.path === 'snapshot') {
         stage = 'snapshot_validation';
         const market = getAssetTradingStatus(order.asset, transactionNow);
-        if (!market.tradable)
+        const extendedWindow =
+          !market.tradable &&
+          market.reason === 'MARKET_CLOSED' &&
+          order.asset.assetType === AssetType.us_stock &&
+          usExtendedHoursLimitMatchingEnabled()
+            ? resolveUsExtendedHoursWindow(order.asset, transactionNow)
+            : null;
+        if (!market.tradable && !extendedWindow)
           return { state: 'skipped', orderId, reason: 'market_not_open' };
         const eligibility = resolveAssetProviderEligibility({
           workflow: 'orders_execute',
@@ -493,15 +506,25 @@ export class LimitOrderExecutionService {
             reason: 'price_evidence_unavailable',
           };
         }
-        const selection = selectMarketAwareAssetPriceSnapshotBySourcePriority({
-          asset: order.asset,
-          workflow: 'orders_execute',
-          candidates: [evidence],
-          expectedSourceNames: eligibility.sourceNames,
-          now: transactionNow,
-          freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
-          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
-        });
+        const selection = extendedWindow
+          ? selectUsExtendedHoursExecutionSnapshot({
+              candidates: [evidence],
+              window: extendedWindow,
+              now: transactionNow,
+              freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
+              isPositiveValue: (candidate) =>
+                isPositiveDecimal(candidate.price),
+            })
+          : selectMarketAwareAssetPriceSnapshotBySourcePriority({
+              asset: order.asset,
+              workflow: 'orders_execute',
+              candidates: [evidence],
+              expectedSourceNames: eligibility.sourceNames,
+              now: transactionNow,
+              freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
+              isPositiveValue: (candidate) =>
+                isPositiveDecimal(candidate.price),
+            });
         if (selection.state !== 'selected')
           return {
             state: 'skipped',

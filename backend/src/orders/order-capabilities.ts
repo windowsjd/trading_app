@@ -4,6 +4,7 @@ import {
 } from './limit-on-close.config';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
 import { isLimitOrderEnabled } from './limit-order.config';
+import { usExtendedHoursLimitMatchingEnabled } from './us-extended-hours.config';
 
 /**
  * Read-only order feature availability for clients (2026-10-13, order UI 2nd
@@ -20,17 +21,28 @@ import { isLimitOrderEnabled } from './limit-order.config';
  * is on: `KRX` (LOC_ORDERS_ENABLED / LOC_SELL_ORDERS_ENABLED) and, since
  * 2026-10-17, `US` (LOC_US_ORDERS_ENABLED / LOC_US_SELL_ORDERS_ENABLED).
  * `enabled` is true when at least one market is listed.
+ *
+ * `limitOrder.extendedHoursMarkets` (2026-11-10, additive) lists the markets
+ * whose submitted limit orders may also fill in pre-market/after-hours:
+ * `US` while US_STOCK_EXTENDED_HOURS_LIMIT_MATCHING_ENABLED is on and
+ * automatic matching itself is on. Market and LOC orders stay regular-session
+ * only either way.
  */
 export function readOrderCapabilities(env: NodeJS.ProcessEnv = process.env) {
   const limitEnabled = isLimitOrderEnabled(env);
   const loc = readLimitOnCloseConfig(env);
   const buyMarkets = limitEnabled ? limitOnCloseMarkets(loc, 'buy') : [];
   const sellMarkets = limitEnabled ? limitOnCloseMarkets(loc, 'sell') : [];
+  const autoExecutionEnabled =
+    limitEnabled && readLimitOrderMatchingConfig(env).matchingEnabled;
   return {
     limitOrder: {
       enabled: limitEnabled,
-      autoExecutionEnabled:
-        limitEnabled && readLimitOrderMatchingConfig(env).matchingEnabled,
+      autoExecutionEnabled,
+      extendedHoursMarkets:
+        autoExecutionEnabled && usExtendedHoursLimitMatchingEnabled(env)
+          ? (['US'] as const)
+          : ([] as const),
     },
     limitOnClose: {
       enabled: buyMarkets.length > 0,

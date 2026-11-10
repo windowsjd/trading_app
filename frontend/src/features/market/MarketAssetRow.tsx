@@ -13,6 +13,7 @@ import {
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy';
 import { getMarketChangeDisplay, getMarketException } from './marketPresentation';
 import { getLastSessionCloseLabel } from '../asset/lastSessionClose';
+import { getExtendedHoursPriceLabel } from '../asset/extendedHours';
 import type { AssetPriceErrorDto, MarketAssetItemDto } from './api';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
@@ -60,9 +61,11 @@ function MarketAssetRowComponent({
   const change = getMarketChangeDisplay(displayItem);
   const exception = getMarketException(displayItem);
   // A closed US market's last confirmed close is named 종가 (no date), never "live".
+  // ...and a pre-market/after-hours price is named by its session.
   const lastClose =
     displayItem.price?.state === 'available'
-      ? getLastSessionCloseLabel(displayItem.price)
+      ? (getLastSessionCloseLabel(displayItem.price) ??
+        getExtendedHoursPriceLabel(displayItem.price, displayItem.extendedHoursSession))
       : null;
 
   return (

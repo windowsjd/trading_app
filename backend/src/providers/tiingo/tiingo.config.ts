@@ -28,6 +28,14 @@ export const TIINGO_REFERENCE_PRICE_SOURCE = 'tiingo_equity_reference_price';
  * PROVIDER_SOURCE_NAMES.usStockTiingo.
  */
 export const TIINGO_STORED_PRICE_SOURCE = 'tiingo_us_reference_price';
+/**
+ * A pre-market/after-hours observation of the same reference price, stored
+ * only with US_STOCK_EXTENDED_HOURS_PRICE_ENABLED (2026-11-10). Never the
+ * regular name: Season settlement, daily snapshots, LOC and candles read the
+ * regular name only. Equals PROVIDER_SOURCE_NAMES.usStockTiingoExtended.
+ */
+export const TIINGO_EXTENDED_STORED_PRICE_SOURCE =
+  'tiingo_us_extended_reference_price';
 /** Statistical liquidity estimate (`lq*`, WebSocket thresholdLevel 4). Never an exchange book. */
 export const TIINGO_LIQUIDITY_SOURCE = 'tiingo_equity_liquidity_estimate';
 /** Historical intraday bars (`/tiingo/equity/intraday/<ticker>/prices`). */

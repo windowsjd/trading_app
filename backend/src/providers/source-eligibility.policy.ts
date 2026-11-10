@@ -1,6 +1,14 @@
 import { CurrencyCode, Prisma } from '../generated/prisma/client';
 import type { AssetType } from '../generated/prisma/client';
-import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
+import {
+  resolveStockMarketSessionState,
+  type StockMarketSessionState,
+} from '../orders/market-calendar.policy';
+import { usExtendedHoursPriceEnabled } from '../orders/us-extended-hours.config';
+import {
+  usExtendedHoursStateFrom,
+  type UsExtendedHoursWindow,
+} from '../orders/us-extended-hours.policy';
 import { readUsStockPriceProvider } from './us-stock-price-provider.config';
 
 export const PROVIDER_SOURCE_NAMES = {
@@ -16,6 +24,12 @@ export const PROVIDER_SOURCE_NAMES = {
   /** Tiingo reference price (`tngoLast`) stored in official mode (2026-10-17);
    * the trial's display-only value keeps `tiingo_equity_reference_price`. */
   usStockTiingo: 'tiingo_us_reference_price',
+  /** The same Tiingo reference price observed in US pre-market/after-hours
+   * (2026-11-10). A distinct name keeps it out of every regular-session read
+   * (Season settlement, daily snapshots, LOC, candles, conditional triggers):
+   * only the extended-hours display/live-valuation reads and the extended
+   * limit matcher ask for it. */
+  usStockTiingoExtended: 'tiingo_us_extended_reference_price',
 } as const;
 
 export {
@@ -455,6 +469,129 @@ export const CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS: ReadonlySet<ProviderWorkflow
   ]);
 
 /**
+ * Reads that may show a US stock's pre-market/after-hours price while
+ * US_STOCK_EXTENDED_HOURS_PRICE_ENABLED is on (2026-11-10): display and live
+ * valuation (home, positions, live portfolio and the current ranking). Daily
+ * snapshots, Season settlement and every order/trigger workflow never do —
+ * the extended limit matcher selects its own evidence explicitly.
+ */
+export const EXTENDED_HOURS_PRICE_WORKFLOWS: ReadonlySet<ProviderWorkflow> =
+  new Set([
+    'assets_with_price',
+    'home_live_valuation',
+    'positions_live_valuation',
+    'live_portfolio_valuation',
+  ]);
+
+/**
+ * The extended-hours window whose prices this read may show now, or null:
+ * a US stock, an extended-hours workflow, the price switch on, and `now`
+ * inside the pre-market/after-hours of the CURRENT New York trading date.
+ */
+export function resolveExtendedHoursPriceWindow(input: {
+  asset: Pick<ProviderAssetCandidate, 'assetType' | 'market'>;
+  workflow: ProviderWorkflow;
+  now: Date;
+  marketState: StockMarketSessionState | null;
+}): UsExtendedHoursWindow | null {
+  if (
+    input.asset.assetType !== 'us_stock' ||
+    !EXTENDED_HOURS_PRICE_WORKFLOWS.has(input.workflow) ||
+    !usExtendedHoursPriceEnabled()
+  )
+    return null;
+  const state = usExtendedHoursStateFrom(input.marketState, input.now);
+  return 'window' in state ? state.window : null;
+}
+
+/**
+ * The newest positive extended-hours price inside `window` (never an earlier
+ * window's: yesterday's after-hours is not today's pre-market). Like the
+ * closed-market carry-forward it has no capturedAt limit — extended-hours
+ * trading is sparse, and the app labels the price with its session and time
+ * — but it is never a regular-session price, never an order price (orders
+ * use selectUsExtendedHoursExecutionSnapshot, 10 s fresh) and it ends with
+ * its window.
+ */
+export function selectExtendedHoursDisplaySnapshot<
+  T extends ProviderSnapshotCandidate,
+>(input: {
+  candidates: readonly T[];
+  window: UsExtendedHoursWindow;
+  now: Date;
+  isPositiveValue: (candidate: T) => boolean;
+}): ProviderSnapshotSelection<T> {
+  const sourceName = PROVIDER_SOURCE_NAMES.usStockTiingoExtended;
+  const candidates = input.candidates.filter((candidate) =>
+    isInsideExtendedWindow(candidate, input.window, input.now),
+  );
+  const selection = selectProviderSnapshotAtOrBeforeBySourcePriority({
+    candidates,
+    expectedSourceNames: [sourceName],
+    valuationAt: input.now,
+    isPositiveValue: input.isPositiveValue,
+  });
+  if (selection.state !== 'selected') return selection;
+  return {
+    ...selection,
+    decision: {
+      ...selection.decision,
+      freshnessAgeSeconds: Math.max(
+        0,
+        Math.floor(
+          (input.now.getTime() - selection.snapshot.capturedAt.getTime()) /
+            1000,
+        ),
+      ),
+    },
+  };
+}
+
+/**
+ * Execution evidence for an extended-hours limit fill: a positive
+ * extended-hours price of the CURRENT window, received at most
+ * `freshnessThresholdSeconds` ago (the regular order-execute 10 s policy).
+ * The caller decides that extended matching applies at all.
+ */
+export function selectUsExtendedHoursExecutionSnapshot<
+  T extends ProviderSnapshotCandidate,
+>(input: {
+  candidates: readonly T[];
+  window: UsExtendedHoursWindow;
+  now: Date;
+  freshnessThresholdSeconds: number;
+  isPositiveValue: (candidate: T) => boolean;
+}): ProviderSnapshotSelection<T> {
+  const candidates = input.candidates.filter((candidate) =>
+    isInsideExtendedWindow(candidate, input.window, input.now),
+  );
+  if (candidates.length === 0 && input.candidates.length > 0)
+    return notSelectedForMarket('effective_at_outside_extended_hours_window');
+  return selectFreshProviderSnapshotBySourcePriority({
+    candidates,
+    expectedSourceNames: [PROVIDER_SOURCE_NAMES.usStockTiingoExtended],
+    now: input.now,
+    freshnessThresholdSeconds: input.freshnessThresholdSeconds,
+    isPositiveValue: input.isPositiveValue,
+  });
+}
+
+function isInsideExtendedWindow(
+  candidate: ProviderSnapshotCandidate,
+  window: UsExtendedHoursWindow,
+  now: Date,
+): boolean {
+  const effectiveAt = candidate.effectiveAt.getTime();
+  return (
+    candidate.sourceName === PROVIDER_SOURCE_NAMES.usStockTiingoExtended &&
+    effectiveAt >= window.startsAt.getTime() &&
+    effectiveAt < window.endsAt.getTime() &&
+    effectiveAt <= now.getTime() &&
+    candidate.capturedAt.getTime() <= now.getTime()
+  );
+}
+
+/**
  * Shared stock-price selection policy for reads, valuations, snapshots,
  * ranking, health, and orders.
  *
@@ -463,7 +600,10 @@ export const CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS: ReadonlySet<ProviderWorkflow
  *   effectiveAt inside the current session;
  * - an eligible closed-market read/valuation may use only a price whose
  *   effectiveAt lies inside the latest completed session;
- * - order workflows never carry a completed-session price forward.
+ * - order workflows never carry a completed-session price forward;
+ * - with extended-hours prices on, a US display/live-valuation read inside
+ *   the current pre-market/after-hours first takes that window's newest
+ *   extended price (EXTENDED_HOURS_PRICE_WORKFLOWS), else the rules above.
  */
 export function selectMarketAwareAssetPriceSnapshotBySourcePriority<
   T extends ProviderSnapshotCandidate,
@@ -499,6 +639,22 @@ export function selectMarketAwareAssetPriceSnapshotBySourcePriority<
       ...input,
       candidates: sessionCandidates,
     });
+  }
+
+  const extendedWindow = resolveExtendedHoursPriceWindow({
+    asset: input.asset,
+    workflow: input.workflow,
+    now: input.now,
+    marketState,
+  });
+  if (extendedWindow) {
+    const extended = selectExtendedHoursDisplaySnapshot({
+      candidates: input.candidates,
+      window: extendedWindow,
+      now: input.now,
+      isPositiveValue: input.isPositiveValue,
+    });
+    if (extended.state === 'selected') return extended;
   }
 
   if (!CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS.has(input.workflow)) {

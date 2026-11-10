@@ -23,6 +23,7 @@ import { Prisma } from '../../generated/prisma/client';
 import { PROVIDER_PRICE_PUBSUB_CHANNEL } from '../fx-rate-update-event';
 import { PROVIDER_SOURCE_NAMES } from '../source-eligibility.policy';
 import {
+  TIINGO_EXTENDED_STORED_PRICE_SOURCE,
   TIINGO_REFERENCE_PRICE_SOURCE,
   TIINGO_STORED_PRICE_SOURCE,
 } from './tiingo.config';
@@ -344,5 +345,158 @@ describe('TiingoSnapshotWriterService (official mode persistence)', () => {
     finish();
     expect(await first).toBe(1);
     expect(fixture.refreshRegularReference).toHaveBeenCalledTimes(1);
+  });
+
+  describe('extended-hours prices (US_STOCK_EXTENDED_HOURS_PRICE_ENABLED, 2026-11-10)', () => {
+    const previous = { ...process.env };
+    beforeEach(() => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+      process.env.US_STOCK_EXTENDED_HOURS_PRICE_ENABLED = 'true';
+    });
+    afterEach(() => {
+      process.env = { ...previous };
+    });
+
+    it('uses a name of its own, never the regular or trial name', () => {
+      expect(TIINGO_EXTENDED_STORED_PRICE_SOURCE).toBe(
+        PROVIDER_SOURCE_NAMES.usStockTiingoExtended,
+      );
+      expect(TIINGO_EXTENDED_STORED_PRICE_SOURCE).not.toBe(
+        TIINGO_STORED_PRICE_SOURCE,
+      );
+      expect(TIINGO_EXTENDED_STORED_PRICE_SOURCE).not.toBe(
+        TIINGO_REFERENCE_PRICE_SOURCE,
+      );
+    });
+
+    it('stores pre-market and after-hours ticks under the extended name with their segment, without fan-out', async () => {
+      const fixture = setup();
+      expect(
+        await fixture.writer.write(observation({ segment: 'pre_market' }), T0),
+      ).toBe('created');
+      expect(
+        await fixture.writer.write(
+          observation({
+            segment: 'after_hours',
+            effectiveAt: new Date(T0 + 60_000),
+            capturedAt: new Date(T0 + 60_100),
+          }),
+          T0 + 60_000,
+        ),
+      ).toBe('created');
+      // Provider time and receipt time of each tick, never moved forward.
+      for (const [index, effectiveAt, capturedAt] of [
+        [0, T0, T0 + 120],
+        [1, T0 + 60_000, T0 + 60_100],
+      ]) {
+        const data = createdRow(fixture.create, index);
+        expect(data.sourceName).toBe('tiingo_us_extended_reference_price');
+        expect(data.effectiveAt.getTime()).toBe(effectiveAt);
+        expect(data.capturedAt.getTime()).toBe(capturedAt);
+      }
+      expect(
+        JSON.stringify(createdRow(fixture.create, 0).rawPayloadJson),
+      ).toContain('"segment":"pre_market"');
+      // The realtime path is regular-session only; the snapshot poll shows it.
+      expect(fixture.publish).not.toHaveBeenCalled();
+      expect(fixture.localPublish).not.toHaveBeenCalled();
+      expect(fixture.writer.getStatus()).toMatchObject({
+        written: 2,
+        writtenExtendedHours: 2,
+        published: 0,
+      });
+    });
+
+    it('still never stores overnight, non-trading-day or remembered-close values', async () => {
+      const fixture = setup();
+      for (const segment of ['overnight', 'non_trading_day'] as const)
+        fixture.writer.accept(observation({ segment }), T0);
+      fixture.writer.accept(
+        observation({ origin: 'rest_close', segment: 'after_hours' }),
+        T0,
+      );
+      await Promise.resolve();
+      expect(fixture.create).not.toHaveBeenCalled();
+      expect(fixture.writer.getStatus().skippedOutsideRegular).toBe(2);
+    });
+
+    it('keeps its own throttle: an after-hours tick never takes a pending regular tick’s slot', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(T0);
+      const fixture = setup();
+      fixture.writer.accept(observation(), T0);
+      await Promise.resolve();
+      await Promise.resolve();
+      // The session's last regular tick waits in the throttle window...
+      fixture.writer.accept(
+        observation({
+          price: '175.9',
+          effectiveAt: new Date(T0 + 2_000),
+          capturedAt: new Date(T0 + 2_100),
+        }),
+        T0 + 2_000,
+      );
+      // ...when the first after-hours tick arrives.
+      fixture.writer.accept(
+        observation({
+          price: '176.4',
+          segment: 'after_hours',
+          effectiveAt: new Date(T0 + 3_000),
+          capturedAt: new Date(T0 + 3_100),
+        }),
+        T0 + 3_000,
+      );
+      await jest.advanceTimersByTimeAsync(5_000);
+      const rows = fixture.create.mock.calls.map((_, index) =>
+        createdRow(fixture.create, index),
+      );
+      expect(rows.map((row) => [row.sourceName, row.price]).sort()).toEqual(
+        [
+          ['tiingo_us_extended_reference_price', '176.4'],
+          ['tiingo_us_reference_price', '175.5'],
+          ['tiingo_us_reference_price', '175.9'],
+        ].sort(),
+      );
+    });
+
+    it('orders each source by itself and checks the stored rows of that source after a restart', async () => {
+      const restarted = setup({ stored: new Date(T0 + 5_000) });
+      expect(
+        await restarted.writer.write(
+          observation({ segment: 'pre_market' }),
+          T0,
+        ),
+      ).toBe('skipped');
+      const [[lookup]] = restarted.findFirst.mock.calls as Array<
+        [{ where: { sourceName: string } }]
+      >;
+      expect(lookup.where.sourceName).toBe(
+        'tiingo_us_extended_reference_price',
+      );
+      const fixture = setup();
+      expect(
+        await fixture.writer.write(observation({ segment: 'pre_market' }), T0),
+      ).toBe('created');
+      // An equal or older extended tick is a duplicate/out-of-order: refused.
+      expect(
+        await fixture.writer.write(
+          observation({
+            segment: 'pre_market',
+            capturedAt: new Date(T0 + 9_000),
+          }),
+          T0 + 9_000,
+        ),
+      ).toBe('skipped');
+      expect(fixture.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('stores nothing outside the regular session with the switch off', async () => {
+      delete process.env.US_STOCK_EXTENDED_HOURS_PRICE_ENABLED;
+      const fixture = setup();
+      expect(
+        await fixture.writer.write(observation({ segment: 'pre_market' }), T0),
+      ).toBe('skipped');
+      expect(fixture.create).not.toHaveBeenCalled();
+    });
   });
 });

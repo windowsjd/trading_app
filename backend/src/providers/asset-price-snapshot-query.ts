@@ -2,6 +2,8 @@ import { Prisma } from '../generated/prisma/client';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import {
   CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS,
+  PROVIDER_SOURCE_NAMES,
+  resolveExtendedHoursPriceWindow,
   type ProviderAssetCandidate,
   type ProviderWorkflow,
 } from './source-eligibility.policy';
@@ -49,6 +51,9 @@ export function closedMarketPriceScope(input: PriceRead) {
  * Bound the DB query BEFORE limiting candidates. One positive row per source
  * preserves source priority without a newer source crowding another out.
  * Open markets and crypto keep their existing candidate/freshness policy.
+ * Inside a US pre-market/after-hours window an extended-hours read
+ * (resolveExtendedHoursPriceWindow) also gets that window's newest extended
+ * price; nothing else reads the extended source name.
  */
 export async function findMarketAwareAssetPriceCandidates(
   client: Pick<Prisma.TransactionClient, 'assetPriceSnapshot'>,
@@ -113,22 +118,44 @@ export async function findMarketAwareAssetPriceCandidates(
     ).flat();
     return eligible.length > 0 ? [...eligible, ...recent] : recent;
   }
-  const candidates = (
-    await Promise.all(
-      input.sourceNames.map((sourceName) =>
-        client.assetPriceSnapshot.findMany({
-          ...query,
-          where: {
-            ...query.where,
-            ...scope.where,
-            sourceName,
-            price: { gt: 0 },
-          },
-          take: 1,
-        }),
-      ),
-    )
-  ).flat();
+  const extendedWindow = resolveExtendedHoursPriceWindow({
+    asset: input.asset,
+    workflow: input.workflow,
+    now: input.now,
+    marketState: scope.marketState,
+  });
+  const extended = extendedWindow
+    ? ((await client.assetPriceSnapshot.findMany({
+        ...query,
+        where: {
+          ...query.where,
+          sourceName: PROVIDER_SOURCE_NAMES.usStockTiingoExtended,
+          effectiveAt: { gte: extendedWindow.startsAt, lte: input.now },
+          capturedAt: { lte: input.now },
+          price: { gt: 0 },
+        },
+        take: 1,
+      })) ?? [])
+    : [];
+  const candidates = [
+    ...extended,
+    ...(
+      await Promise.all(
+        input.sourceNames.map((sourceName) =>
+          client.assetPriceSnapshot.findMany({
+            ...query,
+            where: {
+              ...query.where,
+              ...scope.where,
+              sourceName,
+              price: { gt: 0 },
+            },
+            take: 1,
+          }),
+        ),
+      )
+    ).flat(),
+  ];
   if (candidates.length > 0) return candidates;
   // Failure diagnostics retain the newest rejected evidence. The shared
   // selector still rejects it; this is never an older-session fallback.

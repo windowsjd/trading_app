@@ -27,6 +27,7 @@ import {
   independentTpSlEnabled,
 } from '../conditional/conditional-sell.config';
 import { readLimitOnCloseConfig } from '../orders/limit-on-close.config';
+import { readUsExtendedHoursConfig } from '../orders/us-extended-hours.config';
 import { readDatabaseStorageMonitorConfig } from '../ops/database-storage-monitor.config';
 import { assetPriceSnapshotRetentionConfig } from '../providers/asset-price-snapshot-retention.config';
 import { cryptoOrderBookHistoryConfig } from '../providers/crypto-order-book-history.config';
@@ -99,6 +100,9 @@ export function validateEnv(
         'US_STOCK_PRICE_PROVIDER=tiingo requires TIINGO_ENABLED=true and TIINGO_TRIAL_MODE=false with a valid Tiingo configuration',
       );
   });
+  // US_STOCK_EXTENDED_HOURS_* (2026-11-10): strict switches; prices need
+  // the Tiingo provider, extended limit fills need extended prices.
+  const extendedHours = collect(errors, () => readUsExtendedHoursConfig(env));
   collect(errors, () => readGeneralFxFeeRate(env));
   // GUEST_MARKET_DATA_ASSET_TYPES (2026-10-30): the market data a signed-out
   // visitor may read. Unset is every market, `none` is nothing; an unknown
@@ -136,6 +140,19 @@ export function validateEnv(
         event: 'limit_order_matching_without_registration',
         message:
           'SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=true while LIMIT_ORDER_ENABLED=false: no new limit orders can be registered, but existing submitted orders will still be auto-filled.',
+      }),
+    );
+  }
+
+  // Extended-hours limit fills ride the existing matcher: with the matcher
+  // off they are inert (a legitimate emergency stop of all matching), so this
+  // is flagged rather than fatal.
+  if (extendedHours?.limitMatchingEnabled && !matching?.matchingEnabled) {
+    console.warn(
+      JSON.stringify({
+        event: 'us_extended_hours_limit_matching_inert',
+        message:
+          'US_STOCK_EXTENDED_HOURS_LIMIT_MATCHING_ENABLED=true while SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=false: no limit order is matched, in any session.',
       }),
     );
   }

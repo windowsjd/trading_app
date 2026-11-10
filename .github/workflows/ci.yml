@@ -196,6 +196,10 @@ jobs:
       # times): BUY/SELL decisions, shared per-symbol reads, deadline, FX,
       # races, lifecycle and the post-final audit, next to KRX.
       LIMIT_ON_CLOSE_US_DB_INTEGRATION: "1"
+      # US pre-market/after-hours limit fills (2026-11-10): fresh extended
+      # evidence only, money/ledger/evidence exactness, FX preparation,
+      # session boundaries, cancel race and lifecycle blocks.
+      US_EXTENDED_HOURS_DB_INTEGRATION: "1"
       # 2026-10-17 stock universe (US 100 / KRX 70): representative new stocks
       # registered by the seed's own upsert ride the existing market/limit
       # paths on their provider prices; stale/missing prices are refused.
@@ -275,6 +279,7 @@ jobs:
           src/orders/pending-order-modification.integration.spec.ts
           src/orders/limit-on-close.integration.spec.ts
           src/orders/limit-on-close-us.integration.spec.ts
+          src/orders/us-extended-hours.integration.spec.ts
           src/orders/stock-expansion-orders.integration.spec.ts
           src/futures/futures-limit.integration.spec.ts
           src/futures/futures-conditional-entry.integration.spec.ts

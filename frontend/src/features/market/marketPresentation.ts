@@ -2,6 +2,7 @@ import { financial } from '../../theme/financialColors.ts';
 import { semantic } from '../../theme/tokens.ts';
 import { formatPercent } from '../../utils/format.ts';
 import { getAssetTradingWarning } from '../asset/tradingUx.ts';
+import { getExtendedHoursSessionLabel } from '../asset/extendedHours.ts';
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy';
 import type { AssetType, MarketAssetItemDto } from './api';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker.ts';
@@ -33,13 +34,19 @@ export function getMarketException(item: MarketAssetItemDto): string | null {
 /** Consensus of authoritative loaded rows, using the same accepted overlay as each row.
  * No clock/calendar inference, or assumption that one symbol speaks for the tab. */
 export function getMarketSessionLabel(assetType: AssetType, items: readonly MarketAssetItemDto[], tickers: ReadonlyMap<string, AssetTickerMessage>): string {
-  const states = new Set(items.filter((item) => item.assetType === assetType)
-    .map((item) => mergeMarketAssetTicker(item, tickers.get(item.id)).marketStatus));
+  const rows = items.filter((item) => item.assetType === assetType)
+    .map((item) => mergeMarketAssetTicker(item, tickers.get(item.id)));
+  const states = new Set(rows.map((row) => row.marketStatus));
   if (!states.size) return '시장 상태 확인 중';
   if (states.has('unknown')) return '시장 상태 확인 불가';
   if (states.size !== 1) return '시장 상태 확인 중';
   if (assetType === 'crypto') return states.has('always_open') ? '24시간 거래' : '시장 상태 확인 불가';
   if (states.has('open')) return '정규장 · 거래 중';
-  if (states.has('closed')) return '휴장 · 거래 종료';
+  if (states.has('closed')) {
+    // US pre-market/after-hours, only when every row agrees (server state).
+    const sessions = new Set(rows.map((row) => row.extendedHoursSession ?? null));
+    const extended = sessions.size === 1 ? getExtendedHoursSessionLabel([...sessions][0]) : null;
+    return extended ? `${extended} · 시간외 거래` : '휴장 · 거래 종료';
+  }
   return '시장 상태 확인 불가';
 }

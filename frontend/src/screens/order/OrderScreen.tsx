@@ -37,6 +37,7 @@ import {
   TRIAL_ORDER_NOTICE,
 } from '../../features/asset/trialDataSource';
 import { getLastSessionCloseLabel } from '../../features/asset/lastSessionClose';
+import { getExtendedHoursPriceLabel } from '../../features/asset/extendedHours';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import AccountHoldings from '../asset/AccountHoldings';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -195,9 +196,13 @@ export function OrderTradingScreen({
     displayPrice.priceKrwState === 'available' &&
     displayPrice.priceKrw !== null;
   const converted = showKrw && asset.priceCurrency !== 'KRW';
-  // A closed US market's last confirmed close is labeled 종가 (no date), not 현재가.
+  // A closed US market's last confirmed close is labeled 종가 (no date), not 현재가;
+  // a pre-market/after-hours price is labeled with its session.
   const lastCloseLabel =
-    displayPrice.priceLocal === null ? null : getLastSessionCloseLabel(displayPrice);
+    displayPrice.priceLocal === null
+      ? null
+      : (getLastSessionCloseLabel(displayPrice) ??
+        getExtendedHoursPriceLabel(displayPrice, asset.extendedHoursSession));
   const priceText = converted
     ? krwAvailable
       ? `₩${formatKrw(displayPrice.priceKrw)}`
@@ -357,7 +362,7 @@ export function OrderTradingScreen({
               {asset.assetType === 'domestic_stock' ||
               asset.assetType === 'us_stock' ? (
                 <Text testID="asset-market-status" style={styles.marketBadge}>
-                  {getStockMarketStatus(asset.marketStatus)}
+                  {getStockMarketStatus(asset.marketStatus, asset.extendedHoursSession)}
                 </Text>
               ) : null}
             </View>

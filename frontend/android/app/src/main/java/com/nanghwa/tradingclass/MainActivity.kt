@@ -11,7 +11,7 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 import expo.modules.ReactActivityDelegateWrapper
 
-class MainActivity : ReactActivity() {
+class df : ReactActivity() {
   /**
    * Hands every Back (button or gesture) to JavaScript, which closes a sheet,
    * pops a screen, returns to the previous tab or asks before leaving.
