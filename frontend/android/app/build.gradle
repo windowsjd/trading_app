@@ -97,7 +97,7 @@ android {
         // it into this native project; appVersionSource remote manages versionCode only).
         // The update notice compares this value with the store's, so it must move with
         // every release (appRelease/appVersionSource.test.ts checks they match).
-        versionName "1.0.2"
+        versionName "1.0.3"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
