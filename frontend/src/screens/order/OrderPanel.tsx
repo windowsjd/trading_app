@@ -105,9 +105,12 @@ import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
 import { useStaleRecheck } from '../../features/asset/useStaleRecheck';
 import {
   amountBuyPreview,
+  amountSellPreview,
   buyAmountAtRatio,
-  indicativeBuyQuantity,
+  estimatedAmountForQuantity,
+  indicativeQuantityForAmount,
   isPositiveInput,
+  sellQuantityAtRatio,
   formatPreviewMoney,
   isPreviewPriceAvailable,
   orderPreview,
@@ -347,6 +350,9 @@ export function OrderForm({
     null,
   );
   const [chosenRatio, setChosenRatio] = useState<number | null>(null);
+  // A crypto SELL ratio pick: the exact sellable share it sells (sent as the
+  // quantity), while the amount field shows its estimate. Typing clears it.
+  const [sellRatioQuantity, setSellRatioQuantity] = useState<string | null>(null);
   const { fontScale } = useWindowDimensions();
   // Every new form (asset, side, account, session or a return) starts at 시장가.
   const [orderMethod, setOrderMethod] = useState<OrderMethod>(DEFAULT_ORDER_METHOD);
@@ -488,6 +494,7 @@ export function OrderForm({
             orderType: action.request.payload.limitOnClose ? 'loc' : action.request.payload.orderType ?? 'market', summary: '주문 결과가 서버에서 확인됐어요.' });
           if (!claimed) setSuccessState(captureOrderSuccess(data.result, data.quote));
           setOrderInput('');
+          setSellRatioQuantity(null);
           setTpSlDrafts([]);
           setQuotedPreview(null);
           setFieldError(null);
@@ -594,6 +601,7 @@ export function OrderForm({
     quoteRevisionRef.current += 1;
 
     setOrderInput('');
+    setSellRatioQuantity(null);
     setLimitPrice('');
     setOrderMethod(DEFAULT_ORDER_METHOD);
     setMethodSheetOpen(false);
@@ -618,6 +626,11 @@ export function OrderForm({
       )
     : undefined;
   const isAmountBuy = asset?.assetType === 'crypto' && side === 'buy';
+  // A crypto Spot SELL is entered by its amount too (2026-11-10): the expected
+  // proceeds before fees, sold as the quantity the server's quote derives from
+  // it. A ratio pick sells its exact share of the sellable quantity instead
+  // (100% = every unit other orders do not reserve), as before.
+  const isAmountSell = asset?.assetType === 'crypto' && side === 'sell';
   const isStock =
     asset?.assetType === 'domestic_stock' || asset?.assetType === 'us_stock';
   // Domestic and US stocks use the A-2 order card: this column keeps the
@@ -670,11 +683,11 @@ export function OrderForm({
   // A method the server stopped allowing stays shown but cannot submit.
   const methodReady = !!selectedMethodOption && isOrderMethodSelectable(selectedMethodOption);
   const inputInvalidReason = useMemo(() => {
-    if (isAmountBuy) {
+    if (isAmountBuy || isAmountSell) {
       return (
         (isPositiveInput(orderInput, 8)
           ? null
-          : '매수 금액은 0보다 큰 숫자와 소수점 이하 최대 8자리로 입력해주세요.') ??
+          : `${isAmountBuy ? '매수' : '매도'} 금액은 0보다 큰 숫자와 소수점 이하 최대 8자리로 입력해주세요.`) ??
         limitPriceInvalidReason
       );
     }
@@ -687,7 +700,7 @@ export function OrderForm({
         : null) ??
       limitPriceInvalidReason
     );
-  }, [orderInput, isAmountBuy, isStock, orderType, limitPriceInvalidReason]);
+  }, [orderInput, isAmountBuy, isAmountSell, isStock, orderType, limitPriceInvalidReason]);
   const price = asset?.price;
   const displayPrice = selectDisplayPrice({
     latestTicker: latestTicker?.assetId === assetId ? latestTicker : null,
@@ -713,13 +726,23 @@ export function OrderForm({
   const tradeFeeRate = !feeQuery.isError
     ? feeQuery.data?.feePolicy?.tradeFeeRate
     : null;
+  // The price an amount converts at: the limit price, else the shown price
+  // while it is fresh (the quote uses its own).
+  const amountPrice = orderType === 'limit'
+    ? limitPrice.trim()
+    : previewPriceAvailable
+      ? displayPrice.priceLocal
+      : null;
+  const amountSellTyped = isAmountSell && sellRatioQuantity === null;
   const indicativePreview =
     !inputInvalidReason
       ? isAmountBuy
         ? amountBuyPreview(orderInput.trim(), tradeFeeRate)
-        : orderPreview({
+        : amountSellTyped
+          ? amountSellPreview(orderInput.trim(), tradeFeeRate)
+          : orderPreview({
             side,
-            quantity: orderInput.trim(),
+            quantity: sellRatioQuantity ?? orderInput.trim(),
             price:
               orderType === 'limit'
                 ? limitPrice.trim()
@@ -740,18 +763,13 @@ export function OrderForm({
     : indicativePreview;
   const estimatedQuantity =
     quotedPreview?.quantity ??
-    (isAmountBuy
-      ? indicativeBuyQuantity(
-          orderInput.trim(),
-          orderType === 'limit'
-            ? limitPrice.trim()
-            : previewPriceAvailable
-              ? displayPrice.priceLocal
-              : null,
-        )
-      : null);
+    (isAmountSell && sellRatioQuantity !== null
+      ? sellRatioQuantity
+      : isAmountBuy || isAmountSell
+        ? indicativeQuantityForAmount(orderInput.trim(), amountPrice)
+        : null);
   const previewNotice =
-    !isAmountBuy && orderType === 'market' && !previewPriceAvailable
+    !isAmountBuy && !amountSellTyped && orderType === 'market' && !previewPriceAvailable
       ? displayedPriceAvailable
         ? '현재 화면 시세가 오래되어 예상 금액을 표시할 수 없습니다.'
         : '현재 화면 시세가 없어 예상 금액을 표시할 수 없습니다.'
@@ -834,23 +852,39 @@ export function OrderForm({
 
   const positionUnavailable =
     positionQuery.isError || positionQuery.data?.state === 'unavailable';
-  const sellBlockedReason =
+  // What this SELL would sell, as the form knows it: the typed quantity, a
+  // ratio's exact quantity, or an amount's estimate at the shown price (an
+  // amount without a price is the quote's to judge).
+  const sellQuantity = !isAmountSell
+    ? orderInput.trim()
+    : sellRatioQuantity ?? indicativeQuantityForAmount(orderInput.trim(), amountPrice);
+  const sellPositionBlockedReason =
     side === 'sell' && positionQuery.isLoading
       ? '보유 수량을 확인하는 중입니다.'
       : side === 'sell' && positionUnavailable
         ? '보유 수량을 확인할 수 없어 매도할 수 없습니다.'
         : side === 'sell' && Number(positionQuantity) <= 0
           ? '보유 수량이 없어 매도할 수 없습니다.'
-          : side === 'sell' && !automationForm && Number(orderInput) > Number(positionQuantity)
-            ? '보유 수량을 초과하여 매도할 수 없습니다.'
-            : side === 'sell' && limitOnClose && positionAvailable !== null && Number(positionAvailable) < 1
-              ? 'LOC 매도로 접수할 수 있는 수량이 없습니다. 다른 주문이 보유 수량을 예약하고 있습니다.'
-              // A market sell, and a limit SELL (it reserves its quantity at
-              // submission), can use only what other orders have not reserved.
-              : side === 'sell' && (orderMethod === 'market' || orderMethod === 'limit') && positionAvailable !== null
-                && Number(orderInput) > Number(positionAvailable)
-                ? '매도 가능 수량을 초과했습니다. 다른 주문이 예약한 수량은 매도할 수 없습니다.'
-                : null;
+          : null;
+  // Input-dependent: the entered quantity or amount does not fit the holding.
+  const sellInputBlockedReason =
+    side !== 'sell' || sellPositionBlockedReason
+      ? null
+      : isAmountSell && orderInput.trim() && sellQuantity !== null && Number(sellQuantity) <= 0
+        ? '매도 금액이 너무 작아 매도할 수량이 없습니다.'
+        : !automationForm && sellQuantity !== null && Number(sellQuantity) > Number(positionQuantity)
+          ? isAmountSell ? '보유 수량으로 매도할 수 있는 금액을 초과했습니다.' : '보유 수량을 초과하여 매도할 수 없습니다.'
+          : limitOnClose && positionAvailable !== null && Number(positionAvailable) < 1
+            ? 'LOC 매도로 접수할 수 있는 수량이 없습니다. 다른 주문이 보유 수량을 예약하고 있습니다.'
+            // A market sell, and a limit SELL (it reserves its quantity at
+            // submission), can use only what other orders have not reserved.
+            : (orderMethod === 'market' || orderMethod === 'limit') && positionAvailable !== null
+              && sellQuantity !== null && Number(sellQuantity) > Number(positionAvailable)
+              ? isAmountSell
+                ? '매도 가능 금액을 초과했습니다. 다른 주문이 예약한 수량은 매도할 수 없습니다.'
+                : '매도 가능 수량을 초과했습니다. 다른 주문이 예약한 수량은 매도할 수 없습니다.'
+              : null;
+  const sellBlockedReason = sellPositionBlockedReason ?? sellInputBlockedReason;
 
   const preOrderBlockedReason =
     accountBlockedReason ?? assetHardBlockedReason ?? sellBlockedReason;
@@ -906,6 +940,11 @@ export function OrderForm({
       if (positionUnavailable) return '보유 수량을 확인할 수 없습니다.';
       if (!positionQuantityValue) return '보유 수량이 없습니다.';
       if (!sellCapacityValue) return '다른 주문이 예약해 매도 가능한 수량이 없습니다.';
+      // The amount field shows a ratio's proceeds at the shown price.
+      if (isAmountSell && !amountPrice)
+        return displayedPriceAvailable
+          ? '현재 화면 시세가 오래되어 비율 금액을 계산할 수 없습니다.'
+          : '현재가가 없어 비율 금액을 계산할 수 없습니다.';
       return null;
     }
 
@@ -935,6 +974,8 @@ export function OrderForm({
     return null;
   }, [
     isAmountBuy,
+    isAmountSell,
+    amountPrice,
     displayedPriceAvailable,
     stockMarketClosed,
     buyAvailable,
@@ -1010,8 +1051,13 @@ export function OrderForm({
     !buyInsufficientReason &&
     !successData &&
     !orderActionRef.current?.completed;
-  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType: orderMethod, methodSheetOpen, amountValid: !inputInvalidReason && !buyInsufficientReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason,
-    insufficientBalance: buyInsufficientReason ?? undefined, transferFunding: !!transferAction && !orderPending, fundingOpen: !!funding }, enabled);
+  // An entry that does not fit (a short balance, more than the holding) keeps
+  // the guide on its amount step with the form's own words; only a real block
+  // (account, asset, holding unknown or empty) is one.
+  const inputShortReason = buyInsufficientReason ?? sellInputBlockedReason;
+  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType: orderMethod, methodSheetOpen, amountValid: !inputInvalidReason && !inputShortReason, canExecute, pending: orderPending,
+    blocked: !!(accountBlockedReason ?? assetHardBlockedReason ?? sellPositionBlockedReason),
+    insufficientBalance: inputShortReason ?? undefined, transferFunding: !!transferAction && !orderPending, fundingOpen: !!funding }, enabled);
   const inputErrorMessage =
     fieldError ?? (orderInput.trim() ? inputInvalidReason : null);
 
@@ -1025,6 +1071,7 @@ export function OrderForm({
         ((ratioPriceValue ?? 0) * (1 + Math.max(BUY_FEE_BUFFER, Number(tradeFeeRate) || 0)));
   const inputAtRatio = (ratio: number) => {
     if (isAmountBuy) return buyAmountAtRatio(buyAvailable, tradeFeeRate, ratio);
+    if (isAmountSell) return estimatedAmountForQuantity(sellQuantityAtRatio(sellCapacity, ratio), amountPrice);
     const value = quantityAtRatio(ratio);
     return formatQuantityInput(
       isStock && orderType === 'limit' ? Math.floor(value) : value,
@@ -1037,13 +1084,25 @@ export function OrderForm({
     chosenRatio !== null &&
     (chosenRatio === 0
       ? orderInput === ''
-      : inputAtRatio(chosenRatio) === orderInput)
+      // A SELL ratio holds while its quantity is still that share of what is
+      // sellable now (a price move changes only its estimate).
+      : isAmountSell
+        ? sellRatioQuantity !== null && sellQuantityAtRatio(sellCapacity, chosenRatio) === sellRatioQuantity
+        : inputAtRatio(chosenRatio) === orderInput)
       ? chosenRatio
       : null;
-  const capacity = isAmountBuy ? Number(inputAtRatio(1)) : quantityAtRatio(1);
+  // A ratio's amount is its exact quantity's estimate at the price shown now;
+  // the quantity it sends never changes. Typing replaces both.
+  const amountInput = isAmountSell && sellRatioQuantity !== null
+    ? estimatedAmountForQuantity(sellRatioQuantity, amountPrice) ?? orderInput
+    : orderInput;
+  const capacity = isAmountBuy || isAmountSell ? Number(inputAtRatio(1)) : quantityAtRatio(1);
+  // The sellable quantity's estimated proceeds at the shown price (crypto SELL).
+  const sellCapacityAmount = isAmountSell && !positionQuery.isLoading && !positionUnavailable
+    ? estimatedAmountForQuantity(sellCapacity, amountPrice) : null;
   const inputRatio =
     !ratioDisabledReason && Number.isFinite(capacity) && capacity > 0
-      ? Math.min(1, (parsePositiveDecimal(orderInput) ?? 0) / capacity)
+      ? Math.min(1, (parsePositiveDecimal(amountInput) ?? 0) / capacity)
       : 0;
   const displayedRatio = activeRatio ?? inputRatio;
 
@@ -1058,7 +1117,22 @@ export function OrderForm({
 
     if (ratio === 0) {
       setOrderInput('');
+      setSellRatioQuantity(null);
       setChosenRatio(0);
+      resetOrderActionState();
+      return;
+    }
+
+    if (isAmountSell) {
+      const quantity = sellQuantityAtRatio(sellCapacity, ratio);
+      const amount = estimatedAmountForQuantity(quantity, amountPrice);
+      if (!quantity || !amount) {
+        setFieldError('계산된 매도 금액이 너무 작습니다.');
+        return;
+      }
+      setOrderInput(amount);
+      setSellRatioQuantity(quantity);
+      setChosenRatio(ratio);
       resetOrderActionState();
       return;
     }
@@ -1116,7 +1190,10 @@ export function OrderForm({
           side,
           ...(isAmountBuy
             ? { amount: orderInput.trim() }
-            : { quantity: orderInput.trim() }),
+            : isAmountSell
+              // A ratio sells its exact quantity; a typed amount its own amount.
+              ? sellRatioQuantity !== null ? { quantity: sellRatioQuantity } : { amount: orderInput.trim() }
+              : { quantity: orderInput.trim() }),
           ...(orderType === 'limit'
             ? { orderType: 'limit', limitPrice: limitPrice.trim() }
             : {}),
@@ -1167,6 +1244,7 @@ export function OrderForm({
     if (submitLockRef.current) return;
     update();
     setChosenRatio(null);
+    setSellRatioQuantity(null);
     resetOrderActionState();
   };
   const selectMethod = (next: OrderMethod) => {
@@ -1317,7 +1395,7 @@ export function OrderForm({
       ) : null}
       {ordinaryForm ? (
         <>
-      <View style={styles.group}>
+      <View ref={questGuideTarget('order-price')} collapsable={false} style={styles.group}>
         <Text style={styles.label}>
           {limitOnClose ? 'LOC 지정가격' : '가격'} ({asset.settlementCurrency})
         </Text>
@@ -1340,19 +1418,19 @@ export function OrderForm({
       </View>
       <View ref={questGuideTarget('order-input')} collapsable={false} style={styles.group}>
         <Text style={styles.label}>
-          {isAmountBuy ? `매수 금액 (${asset.settlementCurrency})` : '수량'}
+          {isAmountBuy ? `매수 금액 (${asset.settlementCurrency})` : isAmountSell ? `매도 금액 (${asset.settlementCurrency})` : '수량'}
         </Text>
         <OrderNumberInput
           testID={TEST_IDS.order.quantityInput}
           accessibilityLabel={
-            isAmountBuy ? `매수 금액 ${asset.settlementCurrency}` : '주문 수량'
+            isAmountBuy ? `매수 금액 ${asset.settlementCurrency}` : isAmountSell ? `매도 금액 ${asset.settlementCurrency}` : '주문 수량'
           }
           editable={!pending}
           style={styles.input}
-          value={orderInput}
+          value={amountInput}
           onChangeText={(value) => resetInput(() => setOrderInput(value))}
           keyboardType="decimal-pad"
-          placeholder={isAmountBuy ? '매수 금액 입력' : '수량 입력'}
+          placeholder={isAmountBuy ? '매수 금액 입력' : isAmountSell ? '매도 금액 입력' : '수량 입력'}
           unit={stockLayout ? '주' : undefined}
           onFieldFocus={onInputFocus}
           onBlur={onInputBlur}
@@ -1386,15 +1464,22 @@ export function OrderForm({
           {`예상 수량 약 ${formatDisplayDecimal(estimatedQuantity)} ${asset.symbol?.replace(/USDT$/, '') ?? ''}`}
         </Text>
       ) : null}
+      {isAmountSell && estimatedQuantity && Number(estimatedQuantity) > 0 ? (
+        <Text style={styles.helper} testID="order-estimated-quantity">
+          {`${sellRatioQuantity !== null && !quotedPreview ? '매도 수량' : '예상 매도 수량 약'} ${formatDisplayDecimal(estimatedQuantity)} ${asset.symbol?.replace(/USDT$/, '') ?? ''}`}
+        </Text>
+      ) : null}
       {/* The paying wallet's state stands on its own: an estimate beside it does not hide it. */}
       {fundingProduct && fundingState ? (
         <WalletFundingNotice testID="order-wallet-funding" product={fundingProduct}
           message={walletFundingMessage(fundingProduct, fundingState)} onAction={openFunding} disabled={pending} />
       ) : null}
+      {/* The amount's own controls, spotlighted with its input (beginner guide). */}
+      <View ref={questGuideTarget('order-ratio')} collapsable={false} style={styles.ratioControls}>
       <View style={styles.group}>
         <View style={styles.ratioLabel}>
           <Text style={styles.label}>
-            {isAmountBuy ? '매수 금액 비율' : '수량 비율'}
+            {isAmountBuy ? '매수 금액 비율' : isAmountSell ? '매도 금액 비율' : '수량 비율'}
           </Text>
           <Text
             style={[
@@ -1407,7 +1492,7 @@ export function OrderForm({
           </Text>
         </View>
         <QuantityRatioSlider
-          accessibilityLabel={isAmountBuy ? '매수 금액 비율' : '주문 수량 비율'}
+          accessibilityLabel={isAmountBuy ? '매수 금액 비율' : isAmountSell ? '매도 금액 비율' : '주문 수량 비율'}
           tint={stockLayout ? side === 'buy' ? BUY_COLOR : SELL_COLOR : undefined}
           value={displayedRatio}
           disabled={pending || !!ratioDisabledReason}
@@ -1420,7 +1505,7 @@ export function OrderForm({
           <ActionPressable
             key={ratio}
             accessibilityRole="button"
-            accessibilityLabel={`${isAmountBuy ? '매수 금액' : '주문 가능 수량'} ${getRatioLabel(ratio)}`}
+            accessibilityLabel={`${isAmountBuy ? '매수 금액' : isAmountSell ? '매도 가능 수량의 금액' : '주문 가능 수량'} ${getRatioLabel(ratio)}`}
             aria-pressed={activeRatio === ratio}
             testID={`order-ratio-${Math.round(ratio * 100)}`}
             style={[
@@ -1448,6 +1533,7 @@ export function OrderForm({
           </ActionPressable>
         ))}
       </View>
+      </View>
         </>
       ) : null}
       {!automationForm && stockLayout ? (
@@ -1473,9 +1559,9 @@ export function OrderForm({
         <Text style={styles.helper} testID="order-available-helper">
           {side === 'buy'
             ? `주문 가능 ${walletsQuery.isError ? '-' : formatCurrency(buyAvailable, settlementCurrency)} ${settlementCurrency ?? ''}`
-            : positionAvailable !== null && positionReserved !== null && Number(positionReserved) > 0
+            : `${positionAvailable !== null && positionReserved !== null && Number(positionReserved) > 0
               ? `보유 ${formatDisplayDecimal(positionQuantity)} · 매도 가능 ${formatDisplayDecimal(positionAvailable)} (다른 주문 예약 ${formatDisplayDecimal(positionReserved)})`
-              : `보유 ${formatDisplayDecimal(positionQuantity)}`}
+              : `보유 ${formatDisplayDecimal(positionQuantity)}`}${sellCapacityAmount ? ` · 약 ${formatPreviewMoney(sellCapacityAmount, asset.settlementCurrency)}` : ''}`}
         </Text>
       ) : null}
       {/* After the amount controls: plans ride on the new limit BUY (activated by its fill). */}
@@ -1611,7 +1697,7 @@ export function OrderForm({
               {preview ? (
                 <>
                   <Amount
-                    label={isAmountBuy ? '매수 원금' : '예상 주문금액'}
+                    label={isAmountBuy ? '매수 원금' : side === 'sell' ? '예상 매도대금' : '예상 주문금액'}
                     value={formatPreviewMoney(
                       preview.grossAmount,
                       asset.settlementCurrency,
@@ -1638,6 +1724,12 @@ export function OrderForm({
                 previewProblem
               )}
             </View>
+          ) : null}
+          {isAmountSell && preview ? (
+            // An estimate, never shown as a guaranteed receipt (2026-11-10).
+            <Text style={styles.helper} testID="order-sell-amount-notice">
+              예상 매도대금은 수수료 차감 전 금액이에요. 실제 수령액은 체결가격에 따라 달라질 수 있어요.
+            </Text>
           ) : null}
         </>
       ) : null}
@@ -1699,6 +1791,8 @@ function Amount({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   panel: { minWidth: 0, gap: 12 },
+  // The slider and the ratio buttons as one guide target, spaced as the panel.
+  ratioControls: { minWidth: 0, gap: 12 },
   formFade: { minWidth: 0 },
   buyActive: { backgroundColor: BUY_COLOR },
   sellActive: { backgroundColor: SELL_COLOR },

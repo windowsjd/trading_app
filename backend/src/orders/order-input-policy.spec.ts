@@ -118,7 +118,7 @@ import {
 } from '../generated/prisma/client';
 import {
   assertOrderInputPolicy,
-  quantityFromBuyAmount,
+  quantityFromAmount,
 } from './order-input-policy';
 import { computeOrderQuoteRequestHash } from '../providers/durable-quote.policy';
 import { assertOrderSessionAllowed } from './market-hours.policy';
@@ -193,6 +193,48 @@ for (const assetType of [AssetType.domestic_stock, AssetType.us_stock]) {
   }
 }
 it.each([OrderType.market, OrderType.limit])(
+  'crypto %s SELL takes an amount or a quantity, never both or neither; a position-bound exit its quantity only',
+  (orderType) => {
+    const sell = (
+      quantity: string | null,
+      amount: string | null,
+      positionBoundExit = false,
+    ) =>
+      code(() =>
+        assertOrderInputPolicy(
+          {
+            assetType: AssetType.crypto,
+            side: OrderSide.sell,
+            orderType,
+            quantity: quantity === null ? null : d(quantity),
+            amount: amount === null ? null : d(amount),
+          },
+          { positionBoundExit },
+        ),
+      );
+    expect(sell(null, '100')).toBeNull();
+    expect(sell('0.125', null)).toBeNull();
+    expect(sell('0.125', '100')).toBe('INVALID_ORDER_INPUT');
+    expect(sell(null, null)).toBe('INVALID_ORDER_INPUT');
+    expect(sell('0.125', null, true)).toBeNull();
+    expect(sell(null, '100', true)).toBe('INVALID_ORDER_INPUT');
+    // Stocks keep quantity only, on both sides.
+    for (const assetType of [AssetType.domestic_stock, AssetType.us_stock]) {
+      expect(
+        code(() =>
+          assertOrderInputPolicy({
+            assetType,
+            side: OrderSide.sell,
+            orderType,
+            quantity: null,
+            amount: d('100'),
+          }),
+        ),
+      ).toBe('INVALID_ORDER_INPUT');
+    }
+  },
+);
+it.each([OrderType.market, OrderType.limit])(
   'crypto %s accepts fractional sells and amount buys only',
   (orderType) => {
     expect(
@@ -236,19 +278,26 @@ it.each([
   ['40', '763.79', '0.052370'],
   ['1', '3', '0.333333'],
 ])('amount %s / price %s floors to %s', (amount, price, expected) => {
-  const quantity = quantityFromBuyAmount(d(amount), d(price));
+  const quantity = quantityFromAmount(d(amount), d(price));
   expect(quantity.toFixed(6)).toBe(expected);
   expect(quantity.mul(price).lte(amount)).toBe(true);
   expect(d(amount).sub(quantity.mul(price)).lt(d(price).mul('0.000001'))).toBe(
     true,
   );
 });
+it('a SELL amount never sells more than asked: the notional at the quoted price stays within it', () => {
+  // 2026-11-10: the same flooring sizes a crypto SELL by its expected proceeds.
+  const quantity = quantityFromAmount(d('250'), d('97123.45'));
+  expect(quantity.toFixed(6)).toBe('0.002574');
+  expect(quantity.mul('97123.45').lte('250')).toBe(true);
+  expect(quantity.add('0.000001').mul('97123.45').gt('250')).toBe(true);
+});
 it('rejects zero-sized and overflow quantities', () => {
   for (const [amount, price] of [
     ['0.00000001', '100'],
     ['9999999999999999', '0.00000001'],
   ]) {
-    expect(code(() => quantityFromBuyAmount(d(amount), d(price)))).toBe(
+    expect(code(() => quantityFromAmount(d(amount), d(price)))).toBe(
       'INVALID_AMOUNT',
     );
   }

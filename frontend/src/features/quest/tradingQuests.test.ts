@@ -274,7 +274,8 @@ test('short of usable cash: the card says the form’s own reason with its 이�
   const at = (form: Record<string, unknown>) => resolveGuideView(session, 'order', { wallet: null, fx: null, transfer: null, practice: { order: orderForm(form) } });
   const short = at({ amountValid: false, insufficientBalance: '잔액이 부족합니다.', transferFunding: true });
   if (short.kind !== 'spotlight') assert.fail('the amount step stays up');
-  assert.deepEqual(short.targets, ['order-input']);
+  // The amount with its own ratio slider and buttons (2026-11-10).
+  assert.deepEqual(short.targets, ['order-input', 'order-ratio']);
   assert.equal(short.card.stepLabel, '5/8');
   assert.equal(short.card.notice, '잔액이 부족합니다.', 'exactly the form’s line');
   assert.deepEqual(short.card.actions, ['transfer', 'exit']);
@@ -304,4 +305,51 @@ test('short of usable cash: the card says the form’s own reason with its 이�
   const selling = resolveGuideView(sell, 'order', { wallet: null, fx: null, transfer: null, practice: { order: orderForm({ side: 'sell', amountValid: false }) } });
   if (selling.kind !== 'spotlight') assert.fail('the sell amount step');
   assert.deepEqual([selling.card.notice, selling.card.actions], [null, ['exit']]);
+});
+// 2026-11-10: a step spotlights every control it asks for (QUEST 06 both
+// prices, the ratio slider and buttons, a futures entry's amount), essential first.
+test('amount steps spotlight their price and ratio controls with the input; 다음 waits for both values', () => {
+  const at = (quest: 'limitBuy' | 'marketSell' | 'marketBuy', form: Record<string, unknown>) => {
+    const progress = questProgress(quest === 'limitBuy' ? 5 : quest === 'marketSell' ? 4 : 2);
+    const session = { ...startGuideSession(1, account, quest, progress)!, step: quest === 'marketSell' ? 3 : 4 };
+    return resolveGuideView(session, 'order', { wallet: null, fx: null, transfer: null, practice: { order: orderForm(form) } });
+  };
+  const limit = at('limitBuy', { orderType: 'limit', amountValid: false });
+  if (limit.kind !== 'spotlight') assert.fail('the QUEST 06 amount step');
+  assert.deepEqual(limit.targets, ['order-input', 'order-price', 'order-ratio']);
+  assert.equal(limit.card.title, '지정가격과 매수 금액');
+  assert.match(limit.card.body, /지정가격과 매수 금액을 모두 입력/);
+  assert.equal(limit.card.next, 'disabled', 'one value alone (or none) is not enough');
+  assert.equal(limit.card.hint, '지정가격과 매수 금액을 모두 입력하면 다음을 누를 수 있어요.');
+  const both = at('limitBuy', { orderType: 'limit', amountValid: true });
+  if (both.kind !== 'spotlight') assert.fail('the QUEST 06 amount step');
+  assert.deepEqual([both.card.next, both.card.hint], ['enabled', null]);
+  assert.equal(both.anchor, limit.anchor, 'the same card, updated in place');
+  // QUEST 05 sells by amount now; the card says what that amount means.
+  const sell = at('marketSell', { side: 'sell', amountValid: false });
+  if (sell.kind !== 'spotlight') assert.fail('the QUEST 05 amount step');
+  assert.deepEqual(sell.targets, ['order-input', 'order-ratio']);
+  assert.equal(sell.card.title, '매도 금액');
+  assert.match(sell.card.body, /매도할 금액\(USD\)/);
+  assert.match(sell.card.body, /수수료를 빼기 전의 예상 매도대금/);
+  assert.match(sell.card.body, /100%는 매도 가능한 수량 전체/);
+  assert.equal(sell.card.hint, '매도 금액을 입력하거나 비율을 선택하면 다음을 누를 수 있어요.');
+  const market = at('marketBuy', { amountValid: false });
+  if (market.kind !== 'spotlight') assert.fail('the QUEST 03 amount step');
+  assert.deepEqual(market.targets, ['order-input', 'order-ratio']);
+  assert.match(market.card.body, /아래 비율로 정해/);
+  // Steps without a value to enter keep their single target and no hint.
+  const marketType = resolveGuideView({ ...startGuideSession(1, account, 'marketBuy', questProgress(2))!, step: 3 }, 'order',
+    { wallet: null, fx: null, transfer: null, practice: { order: orderForm() } });
+  if (marketType.kind !== 'spotlight') assert.fail('the 주문방식 step');
+  assert.deepEqual([marketType.targets, marketType.card.hint], [['order-type'], null]);
+});
+test('a futures entry spotlights the amount field with 진입, the button first', () => {
+  for (const quest of ['futuresLong', 'futuresShort'] as const) {
+    const step = TRADING_GUIDE_STEPS[quest][4];
+    assert.deepEqual([step.target, step.targets], ['futures-submit', ['futures-submit', 'futures-input']]);
+    assert.match(step.body, /주문 금액을 입력하거나 비율로 정하고/);
+  }
+  // Every other futures step keeps one target (leverage sits in futures-margin).
+  assert.deepEqual(TRADING_GUIDE_STEPS.futuresLong.filter((step) => step.targets).map((step) => step.target), ['futures-submit']);
 });

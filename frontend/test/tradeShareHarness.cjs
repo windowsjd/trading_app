@@ -29,7 +29,7 @@ function spotTrade(overrides = {}) {
     averageSellPrice: '75000.00000000', displayPriceDecimals: null, ...overrides };
 }
 
-/** @param {{ platform?: string, appId?: string | null, supported?: boolean, trades?: object[], accountId?: string }} options */
+/** @param {{ platform?: string, supported?: boolean, trades?: object[], accountId?: string }} options */
 function tradeShareHarness(options = {}) {
   const h = {
     accountId: options.accountId ?? 'season-1',
@@ -37,8 +37,6 @@ function tradeShareHarness(options = {}) {
     trades: options.trades ?? [futuresTrade(), spotTrade()],
     reads: [],
     calls: [],
-    /** Installed apps by Android package or iOS scheme. */
-    installed: new Set(['com.instagram.android', 'com.kakao.talk', 'org.telegram.messenger', 'instagram-stories://share', 'kakaotalk://', 'tg://']),
     /** Per native call: an outcome string, a function returning a promise, or an Error to throw. */
     answers: {},
   };
@@ -51,10 +49,7 @@ function tradeShareHarness(options = {}) {
   const shareImage = {
     SHARE_CAPTURE_SUPPORTED: options.supported ?? true,
     captureShareCard: (ref) => { h.calls.push({ name: 'capture', target: ref?.current?.testID ?? null }); return answer('capture', { uri: `file:///cache/card-${h.calls.length}.png` }); },
-    isShareAppInstalled: async (app) => { h.calls.push({ name: 'installed', app }); return h.installed.has(app.packageName ?? app.scheme); },
-    shareToInstagramStory: (image, appId) => { h.calls.push({ name: 'instagram', image, appId }); return answer('instagram', 'opened'); },
-    shareToTelegram: (image) => { h.calls.push({ name: 'telegram', image }); return answer('telegram', 'opened'); },
-    openShareSheet: (image, hint) => { h.calls.push({ name: 'sheet', image, hint }); return answer('sheet', 'shared'); },
+    openShareSheet: (...args) => { h.calls.push({ name: 'sheet', image: args[0], args: args.length }); return answer('sheet', 'shared'); },
     saveToPhotos: (image) => { h.calls.push({ name: 'save', image }); return answer('save', 'saved'); },
   };
   const native = Object.fromEntries(['View', 'Text', 'ScrollView', 'Pressable', 'Image', 'RefreshControl'].map((name) => [name, name]));
@@ -83,7 +78,6 @@ function tradeShareHarness(options = {}) {
     },
     '../../features/me/api': { getMe: async () => { if (h.meFailure) throw h.meFailure; return h.me; } },
     '../../features/share/shareImage': shareImage,
-    '../../features/share/shareConfig': { META_APP_ID: options.appId === undefined ? '123456789012345' : options.appId },
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
     '../../components/states/ErrorNotice': { default: 'ErrorNotice', __esModule: true },
   }).default;

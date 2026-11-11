@@ -6,6 +6,7 @@ import CTAButton from '../../components/common/CTAButton';
 import InlineBottomSheet from '../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../components/common/ScreenSheetHost';
 import QuestTarget from '../../features/quest/QuestTarget';
+import { questGuideTarget } from '../../features/quest/questGuideBridge';
 import { FUTURES_LEVERAGE_PRESETS, isFuturesLeverage } from '../../features/futures/orderSizing';
 import OrderNumberInput, { orderInputStyle } from '../order/OrderNumberInput';
 import QuantityRatioSlider from '../order/QuantityRatioSlider';
@@ -50,7 +51,7 @@ export default function FuturesLeverageSelect({ leverage, onChange, disabled, sh
       <SheetPortal>
         <InlineBottomSheet testID="futures-leverage-sheet" title="레버리지" floating visible={sheet === 'list'} onClose={() => onSheetChange(null)}>
           <View style={styles.sheetBody}>
-            <ScrollView testID="futures-leverage-list" style={styles.scroll} bounces={false}>
+            <ScrollView testID="futures-leverage-list" ref={questGuideTarget('futures-leverage-viewport')} style={styles.scroll} bounces={false}>
               <View accessibilityRole="radiogroup" accessibilityLabel="레버리지 배수" style={styles.list}>
                 {FUTURES_LEVERAGE_PRESETS.map((value) => {
                   const selected = value === leverage;

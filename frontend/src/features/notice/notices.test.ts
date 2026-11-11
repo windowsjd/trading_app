@@ -33,7 +33,7 @@ it('the order-method notice is newest and states how each method fills', () => {
   assert.equal(notices[0].id, NOTICE_IDS.orderMethodsAndExecution);
   const notice = findNotice(NOTICE_IDS.orderMethodsAndExecution)!;
   assert.equal(notice.title, '주문방식 및 체결 기준 안내');
-  assert.equal(notice.publishedOn, '2026-11-07');
+  assert.equal(notice.publishedOn, '2026-11-10');
   assert.deepEqual(notice.sections.map((section) => section.heading), ['시장가', '지정가', '조건주문', 'LOC 주문', '손절가/익절가 설정', '선물']);
   const text = notice.sections.flatMap((section) => [section.heading, ...section.paragraphs]).join('\n');
   // 2026-11-07 (3): the stock SELL limit is chosen again, only while limits are matched; crypto Spot still has none.
@@ -56,7 +56,17 @@ it('the order-method notice is newest and states how each method fills', () => {
     '정규장 외 시간으로 보지 않고',
     '감시 방향(이상·이하)을 직접 고르지 않습니다',
     '매수·매도(선물은 롱·숏) 모두 같은 비교 원칙을 사용합니다',
-    '미국 주식의 프리마켓·애프터마켓 거래는 지원하지 않습니다',
+    // 2026-11-10: US limits may fill in pre-market/after-hours only while the service runs it; market orders never.
+    '미국 주식의 프리마켓·애프터마켓에도 시장가 주문은 체결되지 않습니다',
+    '한국 주식은 장이 닫혀 있을 때 등록하면 다음 정규장을 기다리고, 정규장 시세로만 체결됩니다',
+    '서비스가 미국 주식 확장시간 체결을 운영하는 동안에는',
+    '운영하지 않을 때는 한국 주식처럼 다음 정규장을 기다립니다',
+    '자동으로 체결하지 않고',
+    // 2026-11-10: crypto Spot 매도 by amount, a pre-fee estimate; 100% sells everything unreserved.
+    '암호화폐 현물은 매도도 금액(USD)으로 입력합니다',
+    '수수료를 빼기 전의 예상 매도대금',
+    '실제 매도대금과 수령액은 최종 체결가격에 따라 달라질 수 있습니다',
+    '비율 100%는 다른 주문이 예약하지 않은 보유 수량 전체를 매도합니다',
     '서비스에서 열려 있을 때만 선택할 수 있습니다',
     '뉴욕 시간 기준 그날 정규장의 확정 종가로 판정합니다',
     '뉴욕 시간 21:10 이후',
@@ -97,6 +107,8 @@ it('the order-method notice is newest and states how each method fills', () => {
   ]) {
     assert.equal(text.includes(required), true, required);
   }
+  // Never an unconditional promise of US extended-hours trading (the switches may be off).
+  assert.equal(/미국 주식의 프리마켓·애프터마켓 거래는 지원하지 않습니다|한국·미국 주식은 장이 닫혀 있을 때 등록하면 다음 정규장을 기다리고/u.test(text), false);
   // Nothing says the SELL limit engine is gone, and no setting is said to reserve while it watches.
   assert.equal(/지정가 매도(?:는|가)? (?:종료|폐지|제거)|지정가 매도 엔진/u.test(text), false);
   assert.equal(/감시(?:하는 동안| 중에)[^.]*예약합니다/u.test(text), false);
@@ -137,7 +149,7 @@ it('merges published important notices by KST date without replacing app notices
   assert.equal(kstDate('2026-10-19T15:30:00.000Z'), '2026-10-20');
   assert.equal(kstDate('2026-10-19T14:59:00.000Z'), '2026-10-19');
   const merged = mergeNotices(notices, [
-    { id: 'server-1', title: '점검', publishedAt: '2026-11-07T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
+    { id: 'server-1', title: '점검', publishedAt: '2026-11-10T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
     { id: 'draft', title: '초안', publishedAt: null, sections: [] },
     { id: NOTICE_IDS.executionGapProtection, title: '덮어쓰기', publishedAt: '2026-10-18T00:00:00.000Z', sections: [] },
   ]);

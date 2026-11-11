@@ -26,6 +26,7 @@ import BottomSheetBackdrop from '../common/BottomSheetBackdrop';
 import CTAButton from '../common/CTAButton';
 import ErrorNotice from '../states/ErrorNotice';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import { restartBackgroundTabs } from '../../app/navigation/accountSwitchTabs';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { getCurrentSeason } from '../../features/season/api';
@@ -136,14 +137,18 @@ export default function AccountSwitcher({
     seasonQuery.isSuccess ? seasonQuery.data : null,
   );
 
+  // A switch drops the previous account's screens from the other tabs (an
+  // order form there is bound to that account); batched with the selection.
+  const switched = () => {
+    setOpen(false);
+    restartBackgroundTabs(rootNavigation);
+  };
   // First doorway to 일반 투자 for a user who only ever joined seasons
   // (작업 13 §7): the sheet offers STARTING the general account when none
   // exists. The card is an action, not an account — no synthetic id, no row
   // pretending to be a selectable account, and nothing financial is read
   // until the server has actually answered with the created account.
-  const startGeneral = useOpenGeneralAccount({
-    onOpened: () => setOpen(false),
-  });
+  const startGeneral = useOpenGeneralAccount({ onOpened: switched });
 
   if (isLoading) {
     return (
@@ -260,15 +265,19 @@ export default function AccountSwitcher({
               account={account}
               selected={account.id === selectedAccountId}
               onSelect={() => {
+                if (account.id === selectedAccountId) {
+                  setOpen(false);
+                  return;
+                }
                 selectAccount(account.id);
-                setOpen(false);
+                switched();
               }}
             />
           ))}
 
           {!accounts.some(account => account.mode === 'beginner') ? (
             <View style={styles.startBox}>
-              <BeginnerAccountEntry onEntered={() => setOpen(false)} />
+              <BeginnerAccountEntry onEntered={switched} />
             </View>
           ) : null}
 

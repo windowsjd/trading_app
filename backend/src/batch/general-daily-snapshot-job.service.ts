@@ -78,6 +78,13 @@ import {
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Prices for the daily CONFIRMED snapshot: the live valuation's sources and
+ * closed-market carry-forward, never a US pre-market/after-hours price
+ * (2026-11-10). Home, positions and the live ranking keep showing those.
+ */
+const DAILY_SNAPSHOT_WORKFLOW = 'general_daily_snapshot' as const;
+
 const GENERAL_ACCOUNT_SELECT = {
   id: true,
   userId: true,
@@ -245,10 +252,11 @@ export class GeneralDailySnapshotJobService {
           account,
           valuationAt: input.capturedAt,
           client: this.prisma,
+          workflow: DAILY_SNAPSHOT_WORKFLOW,
           sourceReads: {
             client: this.prisma,
             valuationAtMs: +input.capturedAt,
-            workflow: 'home_live_valuation',
+            workflow: DAILY_SNAPSHOT_WORKFLOW,
             assetPrices: new Map(),
             futuresMarks: input.futuresMarks,
             futuresMarkBoundary: input.capturedAt,
@@ -314,10 +322,11 @@ export class GeneralDailySnapshotJobService {
             account: reloaded,
             valuationAt: capturedAt,
             client: tx,
+            workflow: DAILY_SNAPSHOT_WORKFLOW,
             sourceReads: {
               client: tx,
               valuationAtMs: +capturedAt,
-              workflow: 'home_live_valuation',
+              workflow: DAILY_SNAPSHOT_WORKFLOW,
               assetPrices: new Map(),
               futuresMarks: input.futuresMarks,
               futuresMarkBoundary: input.futuresMarkBoundary,

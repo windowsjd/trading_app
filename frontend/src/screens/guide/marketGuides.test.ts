@@ -441,7 +441,9 @@ describe('new guide chapters preserve downward learning flow', () => {
         assert.match(h.text('closed-market-more-text'), /야간 가상 예약은 거래소 접수가 아닙니다/);
         assert.match(h.text('closed-market-more-text'), /예약주문의 접수 시간과 처리 방식은 이용하는 증권사에서 확인/);
         assert.match(h.text('closed-market-more-text'), /정규장과 별도의 시간외 거래.*0건은 개장 단일가 체결만/s);
-        assert.match(h.text('closed-market-more-text'), /Trading Class에서 장이 닫혀 있을 때 낸 지정가 매수는 다음 정규장을 기다립니다.*시세가 지정가에 닿으면 체결.*그 시세 또는 지정가.*경쟁하는 개장 단일가는 없습니다/s);
+        assert.match(h.text('closed-market-more-text'), /Trading Class에서 장이 닫혀 있을 때 낸 한국 주식 지정가 매수는 다음 정규장을 기다립니다.*시세가 지정가에 닿으면 체결.*그 시세 또는 지정가.*경쟁하는 개장 단일가는 없습니다/s);
+        // 2026-11-10: US limits may fill in extended hours only while the service runs it; market orders never.
+        assert.match(h.text('closed-market-more-text'), /미국 주식 지정가는 서비스가 확장시간 체결을 운영하는 동안.*운영하지 않을 때는 다음 정규장을 기다립니다.*시세가 오래되었거나 없으면 체결하지 않으며, 시장가는 정규장에서만 체결됩니다/s);
       }
       assert.equal(h.text('closed-market-1'), close);
       assert.equal(h.text('closed-market-2'), night);

@@ -45,3 +45,5 @@ export const Alert = {
 export function useWindowDimensions() {
   return { ...Native.useWindowDimensions(), fontScale: scale };
 }
+// Android only (AndroidExitConfirm's "한 번 더 누르면 종료" toast); React Native Web has none.
+export const ToastAndroid = { SHORT: 0, LONG: 1, show: () => {} };

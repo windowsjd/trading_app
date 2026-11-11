@@ -16,20 +16,23 @@ const season = {
 function setup(t: TestContext, accounts: Array<Record<string, unknown>> = [season]) {
   const ui = interactionHarness('android');
   ui.dimensions = { width: 360, height: 844, fontScale: 1.5 };
-  const h: any = { starts: 0, beginnerStarts: 0, general: { isPending: false, error: null }, beginner: { isPending: false, error: null } };
+  const h: any = { starts: 0, beginnerStarts: 0, general: { isPending: false, error: null }, beginner: { isPending: false, error: null },
+    selected: [] as string[], resets: [] as unknown[], rootState: null as unknown };
   const Switcher = ui.load('src/components/tradingAccount/AccountSwitcher.tsx', {
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }) },
     '@tanstack/react-query': { useQuery: () => ({ isSuccess: false }) },
     '../../features/season/api': { getCurrentSeason: () => {} },
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({
-      accounts, selectedAccount: accounts[0], selectedAccountId: accounts[0].id, selectAccount() {},
+      accounts, selectedAccount: accounts[0], selectedAccountId: accounts[0].id, selectAccount(id: string) { h.selected.push(id); },
       isLoading: false, isError: false, isEmpty: false, refetchAccounts() {},
     }) },
     '../../features/tradingAccount/useOpenGeneralAccount': {
       useOpenGeneralAccount: () => ({ ...h.general, start: () => { h.starts++; } }),
       useOpenBeginnerAccount: () => ({ ...h.beginner, start: () => { h.beginnerStarts++; } }),
     },
-    '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate() {} }) },
+    // The header's own stack navigation; its parent chain reaches the root navigator.
+    '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate() {}, getParent: () => ({
+      getParent: () => undefined, getState: () => h.rootState, reset: (state: unknown) => { h.resets.push(state); } }) }) },
     '../common/ActionPressable': { default: ui.ActionPressable, __esModule: true },
     '../common/CTAButton': { default: 'CTAButton', __esModule: true },
     '../states/ErrorNotice': { default: 'ErrorNotice', __esModule: true },
@@ -107,4 +110,25 @@ it('grows the sheet to the window minus the system bars, scrolling inside', (t) 
   const maxHeight = flatten(sheet.props.style).maxHeight;
   assert.equal(maxHeight, accountSheetMaxHeight(844, { top: 47, bottom: 34 }));
   assert.ok(maxHeight > Math.min(480, 844 * 0.7), `${maxHeight}`);
+});
+
+it('switching accounts restarts the other tabs with the selection; the current account changes nothing', (t) => {
+  const general = { ...season, id: 'general-1', mode: 'general', season: null };
+  const h = setup(t, [season, general]);
+  // Saved stacks: Home focused, an order of the current (season) account left in 마켓.
+  h.rootState = { index: 0, routes: [{ name: 'MainTabs', state: { index: 0, routes: [
+    { name: 'HomeTab', state: { routes: [{ name: 'Home' }] } },
+    { name: 'MarketTab', state: { index: 1, routes: [{ name: 'Market' }, { name: 'Order', params: { assetId: 'BTC', accountId: 'season-1' } }] } },
+  ] } }] };
+  const row = (id: string) => h.renderer.root.findByProps({ testID: TEST_IDS.tradingAccount.switcherOption(id) });
+  act(() => row('season-1').props.onPress());
+  assert.deepEqual(h.selected, [], 'the selected account is not switched to again');
+  assert.equal(h.resets.length, 0, 'and no screen is dropped');
+  act(() => h.renderer.root.findByProps({ testID: TEST_IDS.tradingAccount.switcherTrigger }).props.onPress());
+  act(() => row('general-1').props.onPress());
+  assert.deepEqual(h.selected, ['general-1']);
+  assert.equal(h.resets.length, 1);
+  const tabs = (h.resets[0] as any).routes[0].state.routes;
+  assert.deepEqual(tabs[1], { name: 'MarketTab' }, 'the season order form does not survive the switch');
+  assert.deepEqual(tabs[0], { name: 'HomeTab', state: { routes: [{ name: 'Home' }] } }, 'the focused Home stays');
 });

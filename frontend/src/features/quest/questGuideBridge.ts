@@ -28,15 +28,20 @@ export type QuestGuideTargetId =
   | 'asset-viewport' | 'asset-price' | 'asset-buy' | 'asset-sell' | 'asset-holdings' | 'asset-protection'
   | 'protection-editor' | 'protection-submit' | 'limit-review'
   | 'order-viewport' | 'order-type' | 'order-method-market' | 'order-method-limit' | 'order-input' | 'order-preview' | 'order-submit'
+  // The limit price field and the amount's ratio slider + 25–100% buttons (2026-11-10).
+  | 'order-price' | 'order-ratio'
   | 'futures-viewport' | 'futures-funding' | 'futures-instrument' | 'futures-direction'
   | 'futures-margin' | 'futures-input' | 'futures-submit' | 'futures-position'
   | 'futures-leverage-suggested'
+  // The scrolling part of a bottom sheet the guide points into.
+  | 'order-method-viewport' | 'tp-sl-viewport' | 'futures-leverage-viewport'
   | 'wallet-viewport'
   | 'wallet-exchange'
   | 'wallet-transfer'
   | 'fx-viewport'
   | 'fx-direction'
   | 'fx-amount'
+  | 'fx-ratio'
   | 'fx-preview'
   | 'fx-quote-title'
   | 'fx-rate-row'
@@ -48,8 +53,24 @@ export type QuestGuideTargetId =
   | 'transfer-source'
   | 'transfer-destination'
   | 'transfer-amount'
+  | 'transfer-ratio'
   | 'transfer-available'
   | 'transfer-submit';
+
+/**
+ * Targets drawn in a bottom sheet over their screen, with the sheet's own
+ * scrolling viewport. The sheet layer covers the tab bar and the screen's
+ * bottom edge, so clipping such a target to the screen behind it cut the
+ * control (2026-11-10: the 주문방식 sheet's 지정가 row, the TP/SL sheet's
+ * fields and 등록하기); its sheet shows what is visible of it.
+ */
+export const SHEET_VIEWPORT: Partial<Record<QuestGuideTargetId, QuestGuideTargetId>> = {
+  'order-method-market': 'order-method-viewport',
+  'order-method-limit': 'order-method-viewport',
+  'protection-editor': 'tp-sl-viewport',
+  'protection-submit': 'tp-sl-viewport',
+  'futures-leverage-suggested': 'futures-leverage-viewport',
+};
 
 export interface QuestGuideMeasurable {
   measureInWindow(callback: (x: number, y: number, width: number, height: number) => void): void;
@@ -110,8 +131,10 @@ export type TradeGuideFacts = { [S in TradeGuideScreen]: {
   leverageSheet?: 'list' | 'custom';
   /**
    * The order form's own live balance check, as the form shows it: the
-   * fee-included total is above the AVAILABLE balance. Absent while the
-   * amount, price, fee or balance is unknown, invalid or enough.
+   * fee-included total is above the AVAILABLE balance — or, for a SELL
+   * (2026-11-10), the entered quantity or amount is more than the sellable
+   * holding. Absent while the amount, price, fee or balance is unknown,
+   * invalid or enough.
    */
   insufficientBalance?: string;
   /** The paying wallet takes a USD transfer: 이체하기 opens the form's own sheet. */
@@ -139,6 +162,7 @@ const targets = new Map<QuestGuideTargetId, MeasurableNode>();
 const refCallbacks = new Map<QuestGuideTargetId, (node: MeasurableNode | null) => (() => void) | undefined>();
 const facts = new Map<QuestGuideScreen, QuestGuideFacts>();
 const reveals = new Map<QuestGuideScreen, (node: QuestGuideMeasurable) => void>();
+const sheetReveals = new Map<QuestGuideTargetId, (node: QuestGuideMeasurable) => void>();
 const fundings = new Map<QuestGuideScreen, () => void>();
 const listeners = new Set<Listener>();
 let version = 0;
@@ -249,11 +273,24 @@ export function getQuestGuideTarget(id: QuestGuideTargetId): QuestGuideMeasurabl
   return 'getNativeScrollRef' in node ? node.getNativeScrollRef() : node;
 }
 
+/**
+ * A sheet's own scroll-into-view for the targets it draws (SHEET_VIEWPORT):
+ * small screens and large text push a sheet's 등록하기 below its fold. The
+ * disposer removes only this registration.
+ */
+export function registerQuestGuideSheetReveal(viewport: QuestGuideTargetId, reveal: (node: QuestGuideMeasurable) => void) {
+  sheetReveals.set(viewport, reveal);
+  return () => {
+    if (sheetReveals.get(viewport) === reveal) sheetReveals.delete(viewport);
+  };
+}
+
 export function revealQuestGuideTarget(screen: QuestGuideScreen, id: QuestGuideTargetId) {
-  // Rows of the 주문방식 sheet float above the screen; scrolling it moves nothing they need.
-  if (id === 'order-method-market' || id === 'order-method-limit') return;
+  // A sheet floats above the screen: only the sheet's own scroll view brings
+  // its rows into sight; scrolling the screen behind it moves nothing it shows.
+  const sheet = SHEET_VIEWPORT[id];
   const node = getQuestGuideTarget(id);
-  const reveal = reveals.get(screen);
+  const reveal = sheet ? sheetReveals.get(sheet) : reveals.get(screen);
   if (node && reveal) reveal(node);
 }
 

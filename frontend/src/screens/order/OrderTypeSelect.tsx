@@ -1,6 +1,7 @@
 import LearningLock from '../../features/quest/LearningLock';
 import { QUEST_LOCK_CAPTION } from '../../features/quest/questProgress';
 import QuestTarget from '../../features/quest/QuestTarget';
+import { questGuideTarget } from '../../features/quest/questGuideBridge';
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { ScrollView, Text, View } from '../../theme/native';
@@ -86,7 +87,7 @@ export default function OrderTypeSelect({ method, options, disabled, open, onOpe
       <SheetPortal>
         <InlineBottomSheet testID="order-method-sheet" title="주문방식" floating visible={open} onClose={onClose}>
           {/* Small screens and large fonts scroll the list inside the sheet's max height. */}
-          <ScrollView testID="order-method-list" style={styles.scroll} bounces={false}>
+          <ScrollView testID="order-method-list" ref={questGuideTarget('order-method-viewport')} style={styles.scroll} bounces={false}>
             <View accessibilityRole="radiogroup" accessibilityLabel="주문방식" style={styles.list}>
               {options.map((option) => (
                 <MethodRow key={option.method} option={option} selected={option.method === method}

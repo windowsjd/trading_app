@@ -449,6 +449,76 @@ describe('QuestGuideOverlay', () => {
     assert.equal(h.find('quest-guide-celebration-title').props.children, '실습을 완료했어요.');
     assert.equal(h.renderer.root.findAll((n: any) => n.props.testID === 'quest-confetti-piece').length, 0);
   });
+
+  // 2026-11-10: a bottom sheet lies over its screen and the tab bar; its rows
+  // were cut at the screen's own edge (주문방식 지정가, TP/SL 등록하기).
+  it('rings a sheet row as its sheet shows it, never cut at the screen behind the sheet', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness();
+    const rects: Record<string, { x: number; y: number; width: number; height: number }> = {
+      // The order screen ends above the tab bar; the 주문방식 list reaches below it.
+      screen: { x: 0, y: 100, width: 390, height: 600 },
+      list: { x: 20, y: 560, width: 350, height: 240 },
+      limit: { x: 28, y: 676, width: 334, height: 60 },
+    };
+    const measured = (key: string) => ({ measureInWindow: (callback: (...args: number[]) => void) => {
+      const rect = rects[key];
+      callback(rect.x, rect.y, rect.width, rect.height);
+    } });
+    const screenReveals: unknown[] = [];
+    h.cleanups.push(bridge.questGuideTarget('order-viewport')(measured('screen')),
+      bridge.questGuideTarget('order-method-viewport')(measured('list')),
+      bridge.questGuideTarget('order-method-limit')(measured('limit')));
+    bridge.registerQuestGuideReveal('order', (node: unknown) => screenReveals.push(node));
+    t.after(() => bridge.registerQuestGuideReveal('order', null));
+    const row = { kind: 'spotlight', key: '1:order:3:choose', anchor: '1:order:3:order-method-limit', screen: 'order', step: 3,
+      targets: ['order-method-limit'], placement: 'auto', card: { ...card, next: null } };
+    await h.render(row);
+    t.after(h.close);
+    await tick(t);
+    const ring = () => { const style = flat(h.find('quest-guide-ring').props.style); return [style.left, style.top, style.width, style.height]; };
+    // The whole row (6px around it), although it reaches past the screen's 700.
+    assert.deepEqual(ring(), [22, 670, 346, 72]);
+    // Scrolled partly out of the sheet's list: only what the list shows.
+    rects.limit = { x: 28, y: 770, width: 334, height: 60 };
+    await tick(t);
+    await tick(t);
+    assert.deepEqual(ring(), [22, 764, 346, 42], 'the 6px ring below the list edge (800), never past what the sheet shows');
+    assert.deepEqual(screenReveals, [], 'the screen behind a sheet is never scrolled for it');
+    // The card may use the whole screen (above the sheet), never the row.
+    await measureCard(h, 90);
+    await Renderer.act(async () => { t.mock.timers.tick(600); });
+    const placed = flat(h.find('quest-guide-card').props.style);
+    assert.equal((placed.top as number) + 230 <= 764 && (placed.top as number) >= 47, true, 'above the ring, inside the safe area');
+  });
+
+  it('lets a step’s extra controls give way, last first, when together they leave the card no place', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness();
+    // An amount (fx-amount) with an extra control far below (fx-quote-title):
+    // together they fill the screen.
+    h.rects.target = { x: 24, y: 110, width: 300, height: 60 };
+    h.rects.quote = { x: 24, y: 640, width: 300, height: 100 };
+    const both = spotlight('1:fx:2:both', { anchor: '1:fx:2:fx-amount,fx-quote-title', targets: ['fx-amount', 'fx-quote-title'] });
+    await h.render(both);
+    t.after(h.close);
+    await tick(t);
+    const ring = () => { const style = flat(h.find('quest-guide-ring').props.style); return [style.top, style.height]; };
+    assert.deepEqual(ring(), [104, 642], 'both at first');
+    await measureCard(h, 200);
+    // Room is asked for once (the topmost target), then the extra control gives way.
+    await Renderer.act(async () => { t.mock.timers.tick(600); });
+    await tick(t);
+    await tick(t);
+    assert.deepEqual(ring(), [104, 72], 'only the amount, the first and essential target');
+    const placed = flat(h.find('quest-guide-card').props.style);
+    assert.equal((placed.top as number) >= 104 + 72, true, 'the card now sits beside it');
+    // A one-target step never gives its target away.
+    await h.render(spotlight('1:fx:2:one', { anchor: '1:fx:2:fx-quote-title', targets: ['fx-quote-title'] }));
+    await tick(t);
+    await tick(t);
+    assert.deepEqual(ring(), [634, 112]);
+  });
 });
 
 describe('QuestGuideOverlay: a held move', () => {

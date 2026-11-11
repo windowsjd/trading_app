@@ -80,7 +80,7 @@ describe('QUEST 01 spotlight follows the real exchange screen', () => {
   it('walks direction → amount → quote → fee → submit with the screen state', () => {
     const steps = [1, 2, 3, 4, 5].map(step => spot(resolveGuideView(session({ step }), 'fx', facts())));
     assert.deepEqual(steps.map(view => view.targets), [
-      ['fx-direction'], ['fx-amount'], ['fx-quote-title', 'fx-rate-row'], ['fx-fee-row', 'fx-net-row'], ['fx-submit'],
+      ['fx-direction'], ['fx-amount', 'fx-ratio'], ['fx-quote-title', 'fx-rate-row'], ['fx-fee-row', 'fx-net-row'], ['fx-submit'],
     ]);
     assert.deepEqual(steps.map(view => view.card.stepLabel), ['2/6', '3/6', '4/6', '5/6', '6/6']);
     assert.deepEqual(steps.map(view => view.card.next), ['enabled', 'enabled', 'enabled', 'enabled', null]);
@@ -128,7 +128,7 @@ describe('QUEST 02 spotlight follows the real transfer screen', () => {
     assert.deepEqual(spot(resolveGuideView(session(quest), 'wallet', facts())).targets, ['wallet-transfer']);
     const steps = [1, 2, 3, 4, 5].map(step => spot(resolveGuideView(session({ ...quest, step }), 'transfer', facts())));
     assert.deepEqual(steps.map(view => view.targets), [
-      ['transfer-source'], ['transfer-destination'], ['transfer-amount'], ['transfer-amount', 'transfer-available'], ['transfer-submit'],
+      ['transfer-source'], ['transfer-destination'], ['transfer-amount', 'transfer-ratio'], ['transfer-amount', 'transfer-available'], ['transfer-submit'],
     ]);
     assert.match(steps[2].card.body, /통화를 바꾸지 않아서 환전 수수료가 없어요/);
     assert.match(steps[3].card.body, /같은 금액만큼 늘어요/);
@@ -331,12 +331,21 @@ describe('step card placement', () => {
     assert.deepEqual(longMessage, { x: 12, y: 12, maxHeight: 416, overlaps: false });
   });
 
-  it('reports overlap only when not even the actions and two lines fit', () => {
+  it('reports overlap only when not even the actions and two lines fit, then covers as little as it can', () => {
     const tiny = { x: 0, y: 0, width: 320, height: 200 };
-    const placed = placeGuideCard({ area: tiny, hole: { x: 10, y: 60, width: 300, height: 80 }, card, placement: 'auto' });
+    const hole = { x: 10, y: 60, width: 300, height: 80 };
+    const placed = placeGuideCard({ area: tiny, hole, card, placement: 'auto' });
     assert.equal(placed.overlaps, true);
-    assert.equal(placed.maxHeight, null);
-    assert.equal(placed.y >= 0 && placed.y + card.height <= 200, true);
+    // The smallest card (its text scrolls; this one has no smaller form), never more.
+    assert.equal(placed.maxHeight, card.height);
+    assert.equal(placed.y >= 12 && placed.y + (placed.maxHeight ?? 0) <= 200 - 12, true);
+    // A control taller than the screen (2026-11-10, 320 px at 2× text): the
+    // smallest card at the roomier edge, not a full card over what it explains.
+    const screen = { x: 0, y: 64, width: 320, height: 610 };
+    const tall = placeGuideCard({ area: screen, hole: { x: 6, y: 70, width: 308, height: 560 }, card: { width: 296, height: 540, minHeight: 150 }, placement: 'auto' });
+    assert.deepEqual(tall, { x: 12, y: 64 + 610 - 12 - 150, maxHeight: 150, overlaps: true }, 'at the bottom, where there is more room');
+    const upper = placeGuideCard({ area: screen, hole: { x: 6, y: 110, width: 308, height: 560 }, card: { width: 296, height: 540, minHeight: 150 }, placement: 'auto' });
+    assert.deepEqual(upper, { x: 12, y: 64 + 12, maxHeight: 150, overlaps: true }, 'at the top, where there is more room');
   });
 
   it('highlights a list below its scrolling header while a row of it remains', () => {

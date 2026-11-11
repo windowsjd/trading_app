@@ -9,6 +9,15 @@ import { monetaryScale, roundDecimalHalfUp } from '../fx/fx-decimal-policy';
 
 export const orderInputQuantityScale = 6;
 
+/**
+ * What an order may be sized by:
+ * - crypto Spot BUY: an amount only (the spend, fees excluded);
+ * - crypto Spot SELL: an amount (the expected proceeds before fees, sold as
+ *   the quantity the quote derives from it, 2026-11-10) or a quantity — one,
+ *   never both. A position-bound exit (a protection child) sells its own
+ *   quantity only;
+ * - stocks, both sides: a quantity only.
+ */
 export function assertOrderInputPolicy(
   input: {
     assetType: AssetType;
@@ -19,18 +28,24 @@ export function assertOrderInputPolicy(
   },
   options?: { positionBoundExit: boolean },
 ): void {
-  const amountBuy =
-    input.assetType === AssetType.crypto && input.side === OrderSide.buy;
+  const crypto = input.assetType === AssetType.crypto;
+  const amountBuy = crypto && input.side === OrderSide.buy;
+  const eitherSell =
+    crypto && input.side === OrderSide.sell && !options?.positionBoundExit;
   if (
     amountBuy
       ? !input.amount || input.quantity !== null
-      : !!input.amount || !input.quantity
+      : eitherSell
+        ? !input.amount === !input.quantity
+        : !!input.amount || !input.quantity
   ) {
     reject(
       'INVALID_ORDER_INPUT',
       amountBuy
         ? 'Crypto BUY requires amount without quantity.'
-        : 'This order requires quantity without amount.',
+        : eitherSell
+          ? 'Crypto SELL requires an amount or a quantity, never both.'
+          : 'This order requires quantity without amount.',
     );
   }
   if (
@@ -48,10 +63,13 @@ export function assertOrderInputPolicy(
   }
 }
 
-/** Gross principal intent, excluding fees. Never round the spend upward.
- * Local precision covers two Decimal(24,8) values without changing the shared
- * Prisma Decimal arithmetic/fee policy elsewhere in the application. */
-export function quantityFromBuyAmount(
+/** Gross principal intent, excluding fees: a BUY's spend or a crypto SELL's
+ * expected proceeds. The quantity floors to 6 decimals, so the notional at
+ * `price` never exceeds the amount (a BUY never overspends, a SELL never
+ * sells more than asked). Local precision covers two Decimal(24,8) values
+ * without changing the shared Prisma Decimal arithmetic/fee policy elsewhere
+ * in the application. */
+export function quantityFromAmount(
   amount: Prisma.Decimal,
   price: Prisma.Decimal,
 ): Prisma.Decimal {

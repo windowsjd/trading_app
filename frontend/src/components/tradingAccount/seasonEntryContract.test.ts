@@ -17,7 +17,10 @@ describe('AccountSwitcher season entry wiring', () => {
     assert.match(switcher, /queryKey: QUERY_KEYS\.season\.current,\s*queryFn: getCurrentSeason,\s*enabled: open/);
     assert.match(switcher, /buildModeSelectionModel\(\s*accounts,\s*seasonQuery\.isSuccess \? seasonQuery\.data : null/);
     assert.doesNotMatch(switcher, /if\s*\([^)]*seasonQuery\./);
-    assert.match(switcher, /accounts\.map\(\(account\) => \([\s\S]*?account=\{account\}[\s\S]*?selectAccount\(account\.id\);\s*setOpen\(false\)/);
+    // A row selects and then closes the sheet (switched() also restarts the
+    // other tabs; behaviour in AccountSwitcherSheet.test.ts).
+    assert.match(switcher, /accounts\.map\(\(account\) => \([\s\S]*?account=\{account\}[\s\S]*?selectAccount\(account\.id\);\s*switched\(\)/);
+    assert.match(switcher, /const switched = \(\) => \{\s*setOpen\(false\);\s*restartBackgroundTabs\(rootNavigation\);\s*\}/);
     assert.doesNotMatch(switcher, /\bjoinSeason\b|\buseMutation\b|\.mutate\(|apiClient\.(post|put|patch)/);
   });
 

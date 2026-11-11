@@ -544,6 +544,22 @@ describe('GeneralDailySnapshotJobService', () => {
     expect(result.accounts).toMatchObject({ existing: 1, created: 0 });
   });
 
+  it('values the confirmed snapshot without US pre-market/after-hours prices, in a run and a dry run', async () => {
+    // 2026-11-10: home and live valuation may show an extended-hours price;
+    // the daily confirmed row reads the snapshot purpose, never home's.
+    for (const dryRun of [false, true]) {
+      const { service, setAccounts, performanceService } = createService();
+      setAccounts([account('account-1')]);
+      await runAndGetResult(service, { snapshotDate: SNAPSHOT_DATE, dryRun });
+      const [[call]] = performanceService.buildOrdinarySnapshotValues.mock
+        .calls as unknown as [
+        [{ workflow: string; sourceReads: { workflow: string } }],
+      ];
+      expect(call.workflow).toBe('general_daily_snapshot');
+      expect(call.sourceReads.workflow).toBe('general_daily_snapshot');
+    }
+  });
+
   it('reports a dry run without opening a transaction or writing anything', async () => {
     const { service, prisma, setAccounts } = createService();
     setAccounts([account('account-1'), account('account-2', 'suspended')]);

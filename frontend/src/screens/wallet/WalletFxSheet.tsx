@@ -739,7 +739,8 @@ export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onG
           </View>
         ) : null}
 
-        <View style={styles.ratio}>
+        {/* The beginner guide spotlights these with the amount (QUEST 01). */}
+        <View ref={questGuideTarget('fx-ratio')} collapsable={false} style={styles.ratio}>
           <OrderRatioControls
             testID="wallet-fx-ratio"
             label="환전 비율"

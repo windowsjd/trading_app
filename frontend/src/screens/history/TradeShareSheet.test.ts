@@ -108,108 +108,92 @@ test('nothing can be shared or saved before every picture of the card is drawn',
   await h.start();
   t.after(h.close);
   await h.press(`completed-trade-${FUTURES}-share`);
-  for (const id of ['trade-share-target-instagram_story', 'trade-share-target-more', 'trade-share-save'])
+  for (const id of ['trade-share-open', 'trade-share-save'])
     assert.equal(disabled(h, id), true, id);
   assert.equal(h.has('trade-share-preparing'), true);
   await h.loadPictures();
-  assert.equal(disabled(h, 'trade-share-target-more'), false);
+  assert.equal(disabled(h, 'trade-share-open'), false);
   assert.equal(h.has('trade-share-preparing'), false);
 });
 
-test('인스타그램 스토리: the captured card and the App ID go to Instagram; the message never claims a post', async (t) => {
+test('exactly two actions, 공유하기 and 이미지 저장: no per-app buttons', async (t) => {
   const h = await opened(t);
-  await h.press('trade-share-target-instagram_story');
-  assert.equal(names(h), 'installed,capture,instagram');
-  assert.equal(h.calls[0].app.packageName, 'com.instagram.android');
-  assert.equal(h.calls[1].target, 'trade-share-card', 'the card view on screen is what is captured');
-  assert.equal(h.calls[2].appId, '123456789012345');
-  assert.equal(h.calls[2].image.uri, 'file:///cache/card-2.png');
-  assert.match(h.status() ?? '', /게시는 인스타그램에서 직접 완료해 주세요/u);
-  h.answers.instagram = 'failed';
-  await h.press('trade-share-target-instagram_story');
-  assert.match(h.status() ?? '', /인스타그램을 열지 못했어요/u);
+  const buttons = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'button'
+    && /^trade-share-(?:open|save|target-)/u.test(n.props.testID ?? ''));
+  assert.deepEqual(buttons.map((n: any) => n.props.testID), ['trade-share-open', 'trade-share-save']);
+  assert.equal(h.text(h.node('trade-share-open')), '공유하기');
+  assert.equal(h.text(h.node('trade-share-save')), '이미지 저장');
+  const sheetText = h.text(h.node('trade-share-body'));
+  assert.equal(/인스타그램 스토리|카카오톡|텔레그램|더보기/u.test(sheetText), false, 'no app names promise a direct share');
 });
 
-test('without a Meta App ID Instagram is never opened, and the sheet says so', async (t) => {
-  const h = await opened(t, { appId: null });
-  await h.press('trade-share-target-instagram_story');
-  assert.equal(names(h), '');
-  assert.match(h.status() ?? '', /아직 준비 중이에요/u);
-});
-
-test('an app that is not installed is reported before anything is captured or opened', async (t) => {
+test('공유하기: the captured card goes to the system share sheet; nothing is said for a finished share', async (t) => {
   const h = await opened(t);
-  h.installed.delete('com.kakao.talk');
-  await h.press('trade-share-target-kakaotalk');
-  assert.equal(names(h), 'installed');
-  assert.equal(h.status(), '카카오톡이 설치되어 있지 않아요. 더보기로 다른 앱에 공유할 수 있어요.');
+  await h.press('trade-share-open');
+  assert.equal(names(h), 'capture,sheet');
+  assert.equal(h.calls[0].target, 'trade-share-card', 'the card view on screen is what is captured');
+  assert.equal(h.calls[1].image.uri, 'file:///cache/card-1.png');
+  assert.equal(h.calls[1].args, 1, 'no app is preselected');
+  assert.equal(h.status() === null, true);
 });
 
-test('카카오톡 opens the system sheet with its pick hint; a dismissed sheet is not an error', async (t) => {
+test('a dismissed share sheet is not an error; a sheet that cannot open says so', async (t) => {
   const h = await opened(t);
   h.answers.sheet = 'cancelled';
-  await h.press('trade-share-target-kakaotalk');
-  assert.equal(names(h), 'installed,capture,sheet');
-  assert.equal(h.calls[2].hint, '공유 목록에서 카카오톡을 선택해 주세요.');
+  await h.press('trade-share-open');
   assert.equal(h.status() === null, true, 'a cancel shows no error');
   h.answers.sheet = 'failed';
-  await h.press('trade-share-target-more');
-  assert.equal(h.calls.at(-1).hint === null, true);
+  await h.press('trade-share-open');
   assert.equal(h.status(), '공유를 열지 못했어요. 잠시 후 다시 시도해 주세요.');
-});
-
-test('텔레그램: straight to the app on Android; the system sheet with a hint on iOS', async (t) => {
-  const android = await opened(t);
-  await android.press('trade-share-target-telegram');
-  assert.equal(names(android), 'installed,capture,telegram');
-  assert.match(android.status() ?? '', /텔레그램으로 보냈어요/u);
-  const ios = await opened(t, { platform: 'ios' });
-  await ios.press('trade-share-target-telegram');
-  assert.equal(names(ios), 'installed,capture,sheet');
-  assert.equal(ios.calls[0].app.scheme, 'tg://');
-  assert.equal(ios.calls[2].hint, '공유 목록에서 텔레그램을 선택해 주세요.');
+  // The next attempt starts clean: a later cancel clears the old failure line.
+  h.answers.sheet = 'cancelled';
+  await h.press('trade-share-open');
+  assert.equal(h.status() === null, true);
 });
 
 test('a double tap opens one share sheet; every action waits for the one in flight', async (t) => {
   const h = await opened(t);
   const pending = deferred();
   h.answers.sheet = () => pending.promise;
-  await h.doublePress('trade-share-target-more');
+  await h.doublePress('trade-share-open');
   assert.equal(names(h), 'capture,sheet');
-  for (const id of ['trade-share-target-kakaotalk', 'trade-share-save', 'trade-share-metric-rate'])
+  assert.equal(h.text(h.node('trade-share-open')), '여는 중…');
+  for (const id of ['trade-share-open', 'trade-share-save', 'trade-share-metric-rate'])
     assert.equal(disabled(h, id), true, id);
-  await h.press('trade-share-target-instagram_story');
-  assert.equal(names(h), 'capture,sheet', 'a press on a disabled target does nothing');
+  await h.press('trade-share-save');
+  assert.equal(names(h), 'capture,sheet', 'a press on a disabled action does nothing');
   pending.resolve('shared');
   await h.flush();
-  assert.equal(disabled(h, 'trade-share-target-kakaotalk'), false);
+  assert.equal(disabled(h, 'trade-share-save'), false);
+  assert.equal(h.text(h.node('trade-share-open')), '공유하기');
 });
 
 test('one capture per shown card: reused while unchanged, taken again after the figure changes', async (t) => {
   const h = await opened(t);
-  await h.press('trade-share-target-more');
+  await h.press('trade-share-open');
   await h.press('trade-share-save');
   assert.equal(names(h), 'capture,sheet,save');
   assert.equal(h.calls[2].image.uri, h.calls[1].image.uri);
   await h.press('trade-share-metric-rate');
-  await h.press('trade-share-target-more');
+  await h.press('trade-share-open');
   assert.equal(names(h), 'capture,sheet,save,capture,sheet');
   assert.notEqual(h.calls[4].image.uri, h.calls[1].image.uri);
 });
 
 test('a share call that throws (e.g. a build without the native module) is a reported failure, and the sheet stays usable', async (t) => {
   const h = await opened(t);
-  h.answers.instagram = new Error('native module missing');
-  await h.press('trade-share-target-instagram_story');
-  assert.equal(names(h), 'installed,capture,instagram');
-  assert.match(h.status() ?? '', /인스타그램을 열지 못했어요/u);
-  assert.equal(disabled(h, 'trade-share-target-more'), false, 'the lock is released');
+  h.answers.sheet = new Error('native module missing');
+  await h.press('trade-share-open');
+  assert.equal(names(h), 'capture,sheet');
+  assert.equal(h.status(), '공유를 열지 못했어요. 잠시 후 다시 시도해 주세요.');
+  assert.equal(disabled(h, 'trade-share-open'), false, 'the lock is released');
+  assert.equal(disabled(h, 'trade-share-save'), false);
 });
 
 test('a failed capture shares nothing', async (t) => {
   const h = await opened(t);
   h.answers.capture = new Error('blank snapshot');
-  await h.press('trade-share-target-more');
+  await h.press('trade-share-open');
   assert.equal(names(h), 'capture');
   assert.equal(h.status(), '공유 이미지를 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
 });
@@ -230,7 +214,7 @@ test('closing the sheet while the card is captured drops the share', async (t) =
   const h = await opened(t);
   const pending = deferred();
   h.answers.capture = () => pending.promise;
-  await h.press('trade-share-target-more');
+  await h.press('trade-share-open');
   await h.closeSheet();
   assert.equal(h.has('trade-share-body'), false);
   pending.resolve({ uri: 'file:///cache/late.png' });
@@ -242,7 +226,7 @@ test('a sign-out or another sign-in during an action drops the share', async (t)
   const h = await opened(t);
   const pending = deferred();
   h.answers.capture = () => pending.promise;
-  await h.press('trade-share-target-more');
+  await h.press('trade-share-open');
   session.invalidateSession(session.getSessionGeneration());
   pending.resolve({ uri: 'file:///cache/late.png' });
   await h.flush();
@@ -253,7 +237,8 @@ test('without the app (web) the card previews, and actions say they need the app
   const h = await opened(t, { supported: false });
   assert.equal(card(h, 'headline'), '+152.34');
   assert.equal(h.has('trade-share-unsupported'), true);
-  assert.equal(disabled(h, 'trade-share-target-more'), true);
+  assert.equal(disabled(h, 'trade-share-open'), true);
+  assert.equal(disabled(h, 'trade-share-save'), true);
 });
 
 test('no profile, no card: the sheet offers a retry instead of a card without the member', async (t) => {

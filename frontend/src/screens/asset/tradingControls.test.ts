@@ -95,9 +95,12 @@ test('all sell ratios use selected position and empty holdings stays quiet until
   await h.mount();
   t.after(h.close);
   await h.press(TEST_IDS.assetDetail.sellButton);
+  // Crypto SELL is entered by amount: each ratio is that share of the 4 BNB
+  // holding, shown at 763.79 and sold as the exact quantity.
   for (const percent of [25, 50, 75, 100]) {
     await h.press(`order-ratio-${percent}`);
-    assert.equal(h.node(qty).props.value, String(percent / 25));
+    assert.equal(h.node(qty).props.value, new Decimal(percent / 25).mul('763.79').toFixed(2));
+    assert.match(text(h), new RegExp(`매도 수량 ${percent / 25} BNB`));
   }
   h.positions.general = '0';
   await h.input(qty, '');
@@ -110,9 +113,10 @@ test('all sell ratios use selected position and empty holdings stays quiet until
   await h.input(qty, '1');
   assert.match(text(h), /보유 수량이 없어 매도할 수 없습니다/);
   h.positions.general = '1';
-  await h.input(qty, '2');
+  // Two units' worth from a holding of one.
+  await h.input(qty, '1527.58');
   await h.update();
-  assert.match(text(h), /보유 수량을 초과/);
+  assert.match(text(h), /보유 수량으로 매도할 수 있는 금액을 초과/);
 });
 for (const scenario of ['zero', 'wallet', 'price', 'limit', 'position']) {
   test(`ratio ${scenario}: press explains inability without inventing quantity`, async (t) => {
@@ -143,37 +147,46 @@ for (const scenario of ['zero', 'wallet', 'price', 'limit', 'position']) {
     assert.equal(h.requests.length, 0);
   });
 }
-for (const quantity of ['1', '4'])
+for (const [quantity, percent] of [['1', 25], ['4', 100]] as const)
   test(`sell quantity ${quantity}: partial/full holding and canonical quote strings`, async (t) => {
     const h = inlineTradingHarness();
-    // Sell is market-only for new orders; create still takes the quote's
-    // canonical quantity string for a partial or full holding.
+    // Sell is market-only for new orders. A crypto SELL ratio sends its exact
+    // share of the holding (4) as the quantity, never an amount; create still
+    // takes the quote's canonical quantity string.
     h.quoteOverride = { quantity: quantity + '.000000' };
     await h.mount();
     t.after(h.close);
     await h.press(TEST_IDS.assetDetail.sellButton);
-    await h.input(qty, quantity);
+    await h.press(`order-ratio-${percent}`);
     await h.press(submit);
     await h.flush();
     assert.equal(h.requests[0].body.quantity, quantity);
+    assert.equal(h.requests[0].body.amount === undefined, true);
     assert.equal(h.requests[1].body.quantity, quantity + '.000000');
+    assert.equal(h.requests[1].body.amount === undefined, true);
     assert.equal(h.requests[1].body.orderType, undefined);
     assert.equal(h.requests[1].body.limitPrice, undefined);
   });
-for (const mismatch of [
-  { asset: { id: 'other' } },
-  { side: 'buy' },
-  { quantity: '2' },
-  { orderType: 'limit' },
-  { tradingAccountId: 'other' },
-])
-  test(`sell quote binding rejects ${JSON.stringify(mismatch)}`, async (t) => {
+// A typed crypto SELL amount binds the quote's amount (and needs a quantity
+// derived from it); a ratio binds its exact quantity and takes no amount back.
+for (const [entry, mismatch] of [
+  ['amount', { asset: { id: 'other' } }],
+  ['amount', { side: 'buy' }],
+  ['amount', { amount: '2' }],
+  ['amount', { quantity: '0' }],
+  ['amount', { orderType: 'limit' }],
+  ['amount', { tradingAccountId: 'other' }],
+  ['ratio', { quantity: '2' }],
+  ['ratio', { amount: '1' }],
+] as const)
+  test(`sell ${entry} quote binding rejects ${JSON.stringify(mismatch)}`, async (t) => {
     const h = inlineTradingHarness();
     h.quoteOverride = mismatch;
     await h.mount();
     t.after(h.close);
     await h.press(TEST_IDS.assetDetail.sellButton);
-    await h.input(qty, '1');
+    if (entry === 'amount') await h.input(qty, '1');
+    else await h.press('order-ratio-25');
     await h.press(submit);
     await h.flush();
     assert.equal(h.requests.length, 1);

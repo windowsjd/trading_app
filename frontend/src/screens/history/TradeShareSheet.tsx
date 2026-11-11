@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PixelRatio, Platform, ScrollView, Text, View, useWindowDimensions } from '../../theme/native';
+import { PixelRatio, ScrollView, Text, View, useWindowDimensions } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import InlineBottomSheet from '../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../components/common/ScreenSheetHost';
@@ -8,28 +8,18 @@ import SegmentedControl from '../../components/common/SegmentedControl';
 import ActionPressable from '../../components/common/ActionPressable';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import TradeShareCard, { SHARE_CARD_DESIGN, type ShareCardReadiness } from '../../components/share/TradeShareCard';
-import ShareTargetIcon from '../../components/share/ShareTargetIcon';
+import ShareActionIcon from '../../components/share/ShareActionIcon';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { getMe } from '../../features/me/api';
 import type { CompletedTrade } from '../../features/tradingAccount/api';
-import { META_APP_ID } from '../../features/share/shareConfig';
 import {
   SHARE_CAPTURE_SUPPORTED,
   captureShareCard,
-  isShareAppInstalled,
   openShareSheet,
   saveToPhotos,
-  shareToInstagramStory,
-  shareToTelegram,
   type CapturedShareImage,
 } from '../../features/share/shareImage';
-import {
-  SHARE_TARGETS,
-  planShareTarget,
-  shareOutcomeMessage,
-  type ShareOutcome,
-  type ShareTarget,
-} from '../../features/share/shareTargets';
+import { shareOutcomeMessage, type ShareAction, type ShareOutcome } from '../../features/share/shareTargets';
 import {
   canShareReturnRate,
   describeShareCard,
@@ -39,15 +29,13 @@ import {
 } from '../../features/share/tradeShareDisplay';
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
 
-type Action = ShareTarget | 'save';
-
 /**
- * 수익 공유: the card of one completed trade, its 수익금액/수익률 choice, the app
- * row (인스타그램 스토리 · 카카오톡 · 텔레그램 · 더보기) and 이미지 저장. The
- * choice is screen state only; nothing is sent to the server. One action runs
- * at a time, each on a fresh capture of exactly the card on screen; closing the
- * sheet, leaving the screen or a session change drops an action in flight
- * before anything is shared.
+ * 수익 공유: the card of one completed trade, its 수익금액/수익률 choice, 공유하기
+ * (the system share sheet, where the user picks KakaoTalk, Instagram, Telegram
+ * or any other app) and 이미지 저장. The choice is screen state only; nothing is
+ * sent to the server. One action runs at a time, each on a capture of exactly
+ * the card on screen; closing the sheet, leaving the screen or a session change
+ * drops an action in flight before anything is shared.
  */
 export default function TradeShareSheet({ accountId, trade, onClose }: {
   accountId: string;
@@ -68,15 +56,13 @@ export default function TradeShareSheet({ accountId, trade, onClose }: {
 }
 
 function ShareBody({ trade, onBusyChange }: { trade: CompletedTrade; onBusyChange: (busy: boolean) => void }) {
-  const { width: windowWidth, height: windowHeight, fontScale } = useWindowDimensions();
-  // Four apps across while a five-letter label fits its column; two by two at large text sizes.
-  const targetWidth = 60 * fontScale <= (windowWidth - 44) / 4 ? '25%' : '50%';
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const me = useQuery({ queryKey: QUERY_KEYS.me, queryFn: getMe, staleTime: 60_000 });
   const [requested, setRequested] = useState<ShareMetric>('amount');
   const metric = resolveShareMetric(trade, requested);
   const card = useMemo(() => getTradeShareCard(trade, metric), [trade, metric]);
   const [readiness, setReadiness] = useState<ShareCardReadiness>('loading');
-  const [running, setRunning] = useState<Action | null>(null);
+  const [running, setRunning] = useState<ShareAction | null>(null);
   const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
   const cardRef = useRef<View>(null);
   const lock = useRef(false);
@@ -102,7 +88,7 @@ function ShareBody({ trade, onBusyChange }: { trade: CompletedTrade; onBusyChang
   const rateAvailable = canShareReturnRate(trade);
   const actionsReady = SHARE_CAPTURE_SUPPORTED && !!profile && readiness === 'ready';
 
-  const run = useCallback(async (action: Action) => {
+  const run = useCallback(async (action: ShareAction) => {
     if (lock.current || !profile) return;
     lock.current = true;
     setRunning(action);
@@ -111,14 +97,10 @@ function ShareBody({ trade, onBusyChange }: { trade: CompletedTrade; onBusyChang
     const current = () => alive.current && isCurrentSession(owner);
     const say = (outcome: ShareOutcome) => {
       const text = current() ? shareOutcomeMessage(outcome, action) : null;
-      setStatus(text ? { text, error: !['opened', 'saved'].includes(outcome) } : null);
+      setStatus(text ? { text, error: outcome !== 'saved' } : null);
     };
     try {
-      const plan = action === 'save' ? null : planShareTarget(action, Platform.OS, META_APP_ID);
-      if (!SHARE_CAPTURE_SUPPORTED || plan?.kind === 'unsupported') return say('unsupported');
-      if (plan?.kind === 'unconfigured') return say('unconfigured');
-      const app = plan && 'app' in plan ? plan.app : null;
-      if (app && !(await isShareAppInstalled(app))) return say('not_installed');
+      if (!SHARE_CAPTURE_SUPPORTED) return say('unsupported');
       let image = capture.current?.key === contentKey ? capture.current.image : null;
       if (!image) {
         try {
@@ -129,16 +111,9 @@ function ShareBody({ trade, onBusyChange }: { trade: CompletedTrade; onBusyChang
         capture.current = { key: contentKey, image };
       }
       if (!current()) return;
-      if (plan?.kind === 'sheet' && plan.hint) setStatus({ text: plan.hint, error: false });
-      const outcome =
-        action === 'save' ? await saveToPhotos(image)
-        : plan?.kind === 'instagram_story' ? await shareToInstagramStory(image, plan.appId)
-        : plan?.kind === 'direct' ? await shareToTelegram(image)
-        : await openShareSheet(image, plan?.kind === 'sheet' ? plan.hint : null);
-      // A finished or dismissed share sheet needs no message (and the pick-an-app hint is done).
-      if (outcome === 'shared' || outcome === 'cancelled') {
-        if (current()) setStatus(null);
-      } else say(outcome);
+      const outcome = action === 'save' ? await saveToPhotos(image) : await openShareSheet(image);
+      // A finished or dismissed share sheet needs no message: closing it is not a failure.
+      say(outcome);
     } catch {
       // The device layer answers outcomes; anything it throws is still a failure, never silence.
       say('failed');
@@ -185,29 +160,21 @@ function ShareBody({ trade, onBusyChange }: { trade: CompletedTrade; onBusyChang
           이 거래는 수익률을 계산할 기준 금액이 없어 수익금액만 공유할 수 있어요.
         </Text>
       )}
-      <View style={styles.targets} accessibilityRole="toolbar" accessibilityLabel="공유할 앱">
-        {SHARE_TARGETS.map(({ target, label, accessibilityLabel }) => (
-          <ActionPressable key={target} testID={`trade-share-target-${target}`} accessibilityRole="button" accessibilityLabel={accessibilityLabel}
-            accessibilityState={{ disabled: !actionsReady || !!running, busy: running === target }} aria-disabled={!actionsReady || !!running}
-            aria-busy={running === target} disabled={!actionsReady || !!running} onPress={() => void run(target)}
-            style={[styles.target, { width: targetWidth }, (!actionsReady || (running && running !== target)) && styles.dimmed]}>
-            <ShareTargetIcon target={target} />
-            {/* Words stay whole: 인스타그램 / 스토리 rather than a break inside a word. */}
-            <Text style={styles.targetLabel}>{running === target ? '여는 중…' : label.split(' ').join('\n')}</Text>
+      <View style={styles.actions}>
+        {ACTIONS.map(({ action, testID, label, busyLabel, accessibilityLabel }) => (
+          <ActionPressable key={action} testID={testID} accessibilityRole="button" accessibilityLabel={accessibilityLabel}
+            accessibilityState={{ disabled: !actionsReady || !!running, busy: running === action }} aria-disabled={!actionsReady || !!running}
+            aria-busy={running === action} disabled={!actionsReady || !!running} onPress={() => void run(action)}
+            style={[styles.action, action === 'share' && styles.primary, (!actionsReady || (running && running !== action)) && styles.dimmed]}>
+            <ShareActionIcon action={action} />
+            <Text style={[styles.actionText, action === 'share' && styles.primaryText]}>{running === action ? busyLabel : label}</Text>
           </ActionPressable>
         ))}
       </View>
-      <ActionPressable testID="trade-share-save" accessibilityRole="button" accessibilityLabel="이미지 저장"
-        accessibilityState={{ disabled: !actionsReady || !!running, busy: running === 'save' }} aria-disabled={!actionsReady || !!running}
-        aria-busy={running === 'save'} disabled={!actionsReady || !!running} onPress={() => void run('save')}
-        style={[styles.save, (!actionsReady || (running && running !== 'save')) && styles.dimmed]}>
-        <ShareTargetIcon target="save" size={28} />
-        <Text style={styles.saveText}>{running === 'save' ? '저장하는 중…' : '이미지 저장'}</Text>
-      </ActionPressable>
       {status ? (
         <Text testID="trade-share-status" accessibilityLiveRegion="polite" style={status.error ? styles.error : styles.helper}>{status.text}</Text>
       ) : !SHARE_CAPTURE_SUPPORTED ? (
-        <Text testID="trade-share-unsupported" style={styles.helper}>{shareOutcomeMessage('unsupported', 'more')}</Text>
+        <Text testID="trade-share-unsupported" style={styles.helper}>{shareOutcomeMessage('unsupported', 'share')}</Text>
       ) : readiness === 'failed' ? (
         <Text testID="trade-share-art-failed" style={styles.error}>카드 이미지를 불러오지 못했어요. 시트를 닫았다가 다시 열어 주세요.</Text>
       ) : readiness === 'loading' ? (
@@ -220,6 +187,11 @@ function ShareBody({ trade, onBusyChange }: { trade: CompletedTrade; onBusyChang
   );
 }
 
+const ACTIONS: ReadonlyArray<{ action: ShareAction; testID: string; label: string; busyLabel: string; accessibilityLabel: string }> = [
+  { action: 'share', testID: 'trade-share-open', label: '공유하기', busyLabel: '여는 중…', accessibilityLabel: '공유하기, 공유할 앱 선택' },
+  { action: 'save', testID: 'trade-share-save', label: '이미지 저장', busyLabel: '저장하는 중…', accessibilityLabel: '이미지 저장' },
+];
+
 // Plain objects: harnesses load sheets with minimal native mocks. Labels wrap
 // at large font sizes instead of clipping; the card itself never scales text.
 const styles = {
@@ -227,13 +199,13 @@ const styles = {
   content: { paddingTop: 4, paddingBottom: 8 },
   body: { gap: 14, minWidth: 0 },
   preview: { alignSelf: 'center', overflow: 'hidden', borderRadius: 18, backgroundColor: '#011733' },
-  targets: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 },
-  target: { minWidth: 0, minHeight: 44, alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 2, borderRadius: 12 },
-  targetLabel: { fontSize: 12, lineHeight: 17, fontWeight: '600', color: semantic.text, textAlign: 'center' },
+  actions: { gap: 8 },
   dimmed: { opacity: 0.45 },
-  save: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 12,
-    borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.raised, paddingHorizontal: 16 },
-  saveText: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: semantic.text },
+  action: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 12,
+    borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.raised, paddingHorizontal: 16, paddingVertical: 6 },
+  primary: { borderColor: semantic.info },
+  actionText: { flexShrink: 1, fontSize: 15, lineHeight: 22, fontWeight: '700', color: semantic.text, textAlign: 'center' },
+  primaryText: { color: semantic.info },
   helper: { fontSize: 13, lineHeight: 20, color: semantic.secondary },
   error: { fontSize: 13, lineHeight: 20, color: semantic.error },
   footnote: { fontSize: 12, lineHeight: 18, color: semantic.secondary },

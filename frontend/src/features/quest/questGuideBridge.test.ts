@@ -9,7 +9,9 @@ import {
   publishQuestGuideFacts,
   questGuideTarget,
   registerQuestGuideReveal,
+  registerQuestGuideSheetReveal,
   revealQuestGuideTarget,
+  SHEET_VIEWPORT,
   setQuestGuideCommandSink,
   subscribeQuestGuide,
   type QuestGuideCommand,
@@ -107,5 +109,41 @@ describe('quest guide bridge', () => {
     assert.equal(revealed.length, 1);
     assert.equal(revealed[0] === target, true);
     cleanup?.();
+  });
+
+  it('knows every sheet-drawn target by its sheet, and never scrolls the screen behind a sheet for it (2026-11-10)', () => {
+    assert.deepEqual(SHEET_VIEWPORT, {
+      'order-method-market': 'order-method-viewport',
+      'order-method-limit': 'order-method-viewport',
+      'protection-editor': 'tp-sl-viewport',
+      'protection-submit': 'tp-sl-viewport',
+      'futures-leverage-suggested': 'futures-leverage-viewport',
+    });
+    const revealed: QuestGuideMeasurable[] = [];
+    registerQuestGuideReveal('order', view => revealed.push(view));
+    const cleanups = Object.keys(SHEET_VIEWPORT).map(id => questGuideTarget(id as keyof typeof SHEET_VIEWPORT)(node()));
+    for (const id of Object.keys(SHEET_VIEWPORT)) revealQuestGuideTarget('order', id as keyof typeof SHEET_VIEWPORT);
+    assert.equal(revealed.length, 0);
+    const onScreen = questGuideTarget('order-input')(node());
+    revealQuestGuideTarget('order', 'order-input');
+    assert.equal(revealed.length, 1, 'a target on the screen itself is still revealed');
+    // A sheet that registers its own scroll view brings its rows into sight.
+    const inSheet: QuestGuideMeasurable[] = [];
+    const first = registerQuestGuideSheetReveal('tp-sl-viewport', view => inSheet.push(view));
+    revealQuestGuideTarget('order', 'protection-submit');
+    revealQuestGuideTarget('order', 'order-method-limit');
+    assert.equal(inSheet.length, 1, 'only that sheet\'s targets, through that sheet');
+    assert.equal(revealed.length, 1, 'never the screen behind it');
+    // A newer sheet body's registration survives the older one's disposal.
+    const newer: QuestGuideMeasurable[] = [];
+    const second = registerQuestGuideSheetReveal('tp-sl-viewport', view => newer.push(view));
+    first();
+    revealQuestGuideTarget('order', 'protection-editor');
+    assert.equal(newer.length === 1 && inSheet.length === 1, true);
+    second();
+    revealQuestGuideTarget('order', 'protection-editor');
+    assert.equal(newer.length, 1, 'nothing once the sheet is gone');
+    for (const cleanup of [...cleanups, onScreen]) cleanup?.();
+    registerQuestGuideReveal('order', null);
   });
 });

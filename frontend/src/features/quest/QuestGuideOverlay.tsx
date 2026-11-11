@@ -19,6 +19,7 @@ import { primaryGradient, semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
 import TabBarIcon from '../../components/navigation/TabBarIcon';
 import {
+  SHEET_VIEWPORT,
   getQuestGuideTarget,
   revealQuestGuideTarget,
   type QuestGuideMeasurable,
@@ -147,18 +148,33 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
   const measuring = view.kind === 'spotlight' || view.kind === 'message';
   const viewKey = measuring ? view.anchor : null;
   const screen = measuring ? view.screen : null;
-  const targetList = view.kind === 'spotlight' ? view.targets.join(',') : '';
-  const firstTarget = view.kind === 'spotlight' ? view.targets[0] : null;
+  // A step's extra controls (an amount's ratio slider and buttons, a futures
+  // entry's amount field) give way, last first, while the step's controls
+  // together leave its card no place but on top of them (small screens, large
+  // text). Its first target always stays.
+  const [crowded, setCrowded] = useState<{ anchor: string; drop: number } | null>(null);
+  const drop = view.kind === 'spotlight' && crowded?.anchor === view.anchor ? crowded.drop : 0;
+  const shownTargets = view.kind === 'spotlight' ? view.targets.slice(0, Math.max(1, view.targets.length - drop)) : [];
+  const targetList = shownTargets.join(',');
+  // The topmost shown target, as last measured: revealing it shows the rest below.
+  const topTarget = useRef<QuestGuideTargetId | null>(null);
+  const firstTarget = shownTargets[0] ?? null;
   const headerTarget = view.kind === 'spotlight' && view.targets.length === 1 ? HEADER_TARGET[view.targets[0]] ?? null : null;
+  // A target in a bottom sheet: the sheet (over the screen and its tab bar)
+  // decides what of it is visible, and the card may use the whole screen.
+  const sheetTarget = view.kind === 'spotlight' ? SHEET_VIEWPORT[view.targets[0]] ?? null : null;
 
   // Once per step: before shrinking a card that does not fit, let the screen
   // scroll the control toward the top to make room for it.
   const requestRoom = useCallback(() => {
     if (!viewKey || !screen || !firstTarget || roomRequested.current.has(viewKey)) return false;
     roomRequested.current.add(viewKey);
-    revealQuestGuideTarget(screen, firstTarget);
+    revealQuestGuideTarget(screen, topTarget.current ?? firstTarget);
     return true;
   }, [viewKey, screen, firstTarget]);
+  const anchor = view.kind === 'spotlight' ? view.anchor : null;
+  const giveWay = useCallback(() => setCrowded(current => anchor === null ? current
+    : { anchor, drop: (current?.anchor === anchor ? current.drop : 0) + 1 }), [anchor]);
 
   useEffect(() => {
     if (!viewKey || !screen) {
@@ -172,10 +188,11 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
     let revealed = false;
     // Resolves whether the target held still since the previous measurement.
     const follow = async (): Promise<boolean> => {
-      const [root, viewport, header, ...parts] = await Promise.all([
+      const [root, viewport, header, sheet, ...parts] = await Promise.all([
         measure(rootRef.current as QuestGuideMeasurable | null),
-        measure(getQuestGuideTarget(VIEWPORT_TARGET[screen])),
+        measure(sheetTarget ? null : getQuestGuideTarget(VIEWPORT_TARGET[screen])),
         measure(headerTarget ? getQuestGuideTarget(headerTarget) : null),
+        measure(sheetTarget ? getQuestGuideTarget(sheetTarget) : null),
         ...targets.map(id => measure(getQuestGuideTarget(id))),
       ]);
       if (!active) return true;
@@ -191,16 +208,21 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
         : { x: 0, y: insets.top, width: root.width, height: Math.max(0, root.height - insets.top - insets.bottom) };
       const keyboard = keyboardTop.current - root.y;
       if (keyboard < area.y + area.height) area = { ...area, height: Math.max(0, keyboard - area.y) };
+      // What of the target can be seen: the screen's area, or its sheet's.
+      const clip = sheet ? intersectRects(local(sheet), area) : area;
       let hole: GuideRect | null = null;
-      let union = unionRects(parts.filter((part): part is GuideRect => !!part).map(local));
+      const rects = parts.filter((part): part is GuideRect => !!part).map(local);
+      const top = rects.reduce((best, rect, index) => rect.y < rects[best].y ? index : best, 0);
+      topTarget.current = targets[top] ?? null;
+      let union = unionRects(rects);
       if (union && header) union = clipBelow(union, local(header), MIN_LIST_HEIGHT);
       if (union) {
-        const visible = intersectRects(union, area);
+        const visible = clip ? intersectRects(union, clip) : null;
         if ((!visible || !sameRect(visible, union)) && !revealed) {
           // Let the screen scroll its own content once, then measure again.
           revealed = true;
           last = null;
-          revealQuestGuideTarget(screen, targets[0]);
+          revealQuestGuideTarget(screen, targets[top]);
           return false;
         }
         hole = visible ? intersectRects(inflateRect(visible, HOLE_PADDING), area) : null;
@@ -229,7 +251,7 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
       active = false;
       clearTimeout(timer);
     };
-  }, [viewKey, screen, targetList, headerTarget, keyboardRevision, insets.top, insets.bottom]);
+  }, [viewKey, screen, targetList, headerTarget, sheetTarget, keyboardRevision, insets.top, insets.bottom]);
 
   const held = notice ? <HeldNotice onExit={() => onAction('exit', null)} /> : null;
   if (view.kind === 'none') return held ? <View pointerEvents="box-none" style={styles.root}>{held}</View> : null;
@@ -254,6 +276,7 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
           shownAnchor={shownAnchor}
           onAction={onAction}
           requestRoom={requestRoom}
+          onCrowded={shownTargets.length > 1 ? giveWay : undefined}
         />
       ) : null}
       {held}
@@ -305,7 +328,7 @@ function SpotlightDim({ root, hole, fadeIn }: { root: GuideRect; hole: GuideRect
   );
 }
 
-function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, requestRoom }: {
+function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, requestRoom, onCrowded }: {
   frame: Frame;
   view: Extract<GuideView, { kind: 'spotlight' | 'message' }>;
   quest: BeginnerQuestKey;
@@ -314,6 +337,8 @@ function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, request
   shownAnchor: React.MutableRefObject<string | null>;
   onAction: (action: GuideAction, step: number | null) => void;
   requestRoom: () => boolean;
+  /** No place for the card but on the spotlit controls (after any room was made): drop one. */
+  onCrowded?: () => void;
 }) {
   const { colors, mode } = useAppearance();
   const initial = useRef(fadeIn).current;
@@ -354,6 +379,14 @@ function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, request
   const placedOnce = useRef(false);
   if (placed !== null && (!cramped || roomSettled)) placedOnce.current = true;
   const ready = placed !== null && placedOnce.current;
+  // Said once per spotlit area: the overlay then shows fewer controls (a new area).
+  const crowdedFor = useRef<GuideRect | null>(null);
+  const crowdedNow = !!placed?.overlaps && !!hole && (!cramped || roomSettled);
+  useEffect(() => {
+    if (!crowdedNow || !hole || crowdedFor.current === hole) return;
+    crowdedFor.current = hole;
+    onCrowded?.();
+  }, [crowdedNow, hole, onCrowded]);
   useEffect(() => {
     if (!cramped || roomSettled || placedOnce.current) return;
     if (!requestRoom()) {

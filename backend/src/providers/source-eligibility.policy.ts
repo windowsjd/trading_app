@@ -82,6 +82,12 @@ export type ProviderEligibleWorkflow =
   | 'home_live_valuation'
   | 'positions_live_valuation'
   | 'daily_portfolio_snapshot'
+  /**
+   * The general/beginner account's daily confirmed snapshot: the sources and
+   * closed-market carry-forward of home_live_valuation (the live performance
+   * it continues), but never a pre-market/after-hours price (2026-11-10).
+   */
+  | 'general_daily_snapshot'
   | 'season_settlement';
 
 export type ProviderDeniedWorkflow =
@@ -147,6 +153,7 @@ const ALLOWED_WORKFLOWS: ReadonlySet<ProviderEligibleWorkflow> = new Set([
   'home_live_valuation',
   'positions_live_valuation',
   'daily_portfolio_snapshot',
+  'general_daily_snapshot',
   'season_settlement',
 ]);
 
@@ -466,14 +473,16 @@ export const CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS: ReadonlySet<ProviderWorkflow
     'home_live_valuation',
     'positions_live_valuation',
     'daily_portfolio_snapshot',
+    'general_daily_snapshot',
   ]);
 
 /**
  * Reads that may show a US stock's pre-market/after-hours price while
  * US_STOCK_EXTENDED_HOURS_PRICE_ENABLED is on (2026-11-10): display and live
  * valuation (home, positions, live portfolio and the current ranking). Daily
- * snapshots, Season settlement and every order/trigger workflow never do —
- * the extended limit matcher selects its own evidence explicitly.
+ * snapshots (Season: daily_portfolio_snapshot; general/beginner:
+ * general_daily_snapshot), Season settlement and every order/trigger workflow
+ * never do — the extended limit matcher selects its own evidence explicitly.
  */
 export const EXTENDED_HOURS_PRICE_WORKFLOWS: ReadonlySet<ProviderWorkflow> =
   new Set([
@@ -1084,7 +1093,8 @@ function isDisplayFreshnessWorkflow(
     workflow === 'home_live_valuation' ||
     workflow === 'positions_live_valuation' ||
     workflow === 'live_portfolio_valuation' ||
-    workflow === 'daily_portfolio_snapshot'
+    workflow === 'daily_portfolio_snapshot' ||
+    workflow === 'general_daily_snapshot'
   );
 }
 

@@ -3,6 +3,7 @@ import { ScrollView, View } from '../../../theme/native';
 import InlineBottomSheet from '../../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../../components/common/ScreenSheetHost';
 import { useFocusedInputScroll } from '../../../hooks/useFocusedInputScroll';
+import { questGuideTarget, registerQuestGuideSheetReveal } from '../../quest/questGuideBridge';
 import type { EntryTpSlDraftDto, EntryTpSlEntryType } from '../entryTpSlApi';
 import { SPOT_TP_SL_TITLE, TP_SL_TITLE, type TpSlDirection } from '../tpSlModel';
 import SpotHoldingTpSl from './SpotHoldingTpSl';
@@ -96,8 +97,13 @@ function SheetScroll({ onBusyChange, children }: { onBusyChange: (busy: boolean)
   const report = useCallback((busy: boolean) => onBusyChange(busy), [onBusyChange]);
   // A body that goes away is never "busy" (its sheet may close again).
   useEffect(() => () => onBusyChange(false), [onBusyChange]);
+  // The guide scrolls this sheet (never the screen behind it) to a field or
+  // 등록하기 below its fold (small screens, large text).
+  const { revealView } = scroll;
+  useEffect(() => registerQuestGuideSheetReveal('tp-sl-viewport', node => revealView(node)), [revealView]);
   return (
-    <View style={styles.viewport}>
+    // The beginner guide's 익절가/손절가 fields and 등록하기 are seen through this (QUEST 04).
+    <View style={styles.viewport} ref={questGuideTarget('tp-sl-viewport')} collapsable={false}>
       <ScrollView testID="tp-sl-scroll" ref={scroll.scrollRef} onLayout={scroll.revealFocusedInput}
         onContentSizeChange={scroll.revealFocusedInput} onScroll={scroll.onScroll} scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="none" style={styles.scroll} contentContainerStyle={styles.content}>

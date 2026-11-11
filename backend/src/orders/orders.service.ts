@@ -173,7 +173,7 @@ import {
 } from './market-hours.policy';
 import {
   assertOrderInputPolicy,
-  quantityFromBuyAmount,
+  quantityFromAmount,
 } from './order-input-policy';
 import { isLimitOrderEnabled } from './limit-order.config';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
@@ -1066,7 +1066,7 @@ export class OrdersService {
     const request: PricedOrderRequest = {
       ...inputRequest,
       quantity: inputRequest.amount
-        ? quantityFromBuyAmount(inputRequest.amount, inputRequest.limitPrice)
+        ? quantityFromAmount(inputRequest.amount, inputRequest.limitPrice)
         : inputRequest.quantity!,
     };
     if (
@@ -1269,7 +1269,7 @@ export class OrdersService {
     const request: PricedOrderRequest = {
       ...inputRequest,
       quantity: inputRequest.amount
-        ? quantityFromBuyAmount(inputRequest.amount, inputRequest.limitPrice)
+        ? quantityFromAmount(inputRequest.amount, inputRequest.limitPrice)
         : inputRequest.quantity!,
     };
     const settlementCurrency = this.getAssetSettlementCurrency(asset);
@@ -2551,7 +2551,7 @@ export class OrdersService {
         amount,
       });
       const quantity = amount
-        ? quantityFromBuyAmount(amount, limitPrice)
+        ? quantityFromAmount(amount, limitPrice)
         : requested!;
       // Again under the locks: a retry racing its own first attempt.
       if (await isReplayedModification(tx, { ...replay, requestHash }))
@@ -3533,6 +3533,12 @@ export class OrdersService {
       order,
       executedAt,
     );
+    // A BUY by amount spends at most its amount at the final price. A crypto
+    // SELL by amount (2026-11-10) sells exactly the quantity its quote derived
+    // from the amount: it executes like a quantity SELL, so its proceeds
+    // follow the final price and it never sells more than was quoted.
+    const spendAmount =
+      order.side === OrderSide.buy ? quote.sourceAmount : null;
     const marketExecution = this.marketExecutionEvidenceAdapter
       ? decideMarketExecution(
           this.marketExecutionEvidenceAdapter,
@@ -3548,7 +3554,7 @@ export class OrdersService {
             side: order.side,
             executedAt,
           },
-          { quantity: order.quantity, amount: quote.sourceAmount },
+          { quantity: order.quantity, amount: spendAmount },
         )
       : undefined;
     const priceContext = marketExecution
@@ -3584,8 +3590,8 @@ export class OrdersService {
     });
     const quantity =
       marketExecution?.quantity ??
-      (quote.sourceAmount
-        ? quantityFromBuyAmount(quote.sourceAmount, priceContext.price)
+      (spendAmount
+        ? quantityFromAmount(spendAmount, priceContext.price)
         : order.quantity);
     const grossAmount =
       marketExecution?.grossAmount ??
@@ -4012,12 +4018,13 @@ export class OrdersService {
           order.currencyCode,
         ) ||
       quote.requestHash !== expectedHash ||
+      // Amount intent: crypto Spot only (BUY, and SELL since 2026-11-10),
+      // bound to the quantity derived at the quoted price.
       (quote.sourceAmount != null &&
         (order.asset.assetType !== AssetType.crypto ||
-          order.side !== OrderSide.buy ||
           !quote.quotedPrice ||
           !quote.quantity.eq(
-            quantityFromBuyAmount(quote.sourceAmount, quote.quotedPrice),
+            quantityFromAmount(quote.sourceAmount, quote.quotedPrice),
           ))) ||
       !quote.quotedPrice
     ) {
@@ -6131,7 +6138,7 @@ export class OrdersService {
     const request: PricedOrderRequest = {
       ...inputRequest,
       quantity: inputRequest.amount
-        ? quantityFromBuyAmount(inputRequest.amount, priceContext.price)
+        ? quantityFromAmount(inputRequest.amount, priceContext.price)
         : inputRequest.quantity!,
     };
     const grossAmount = roundDecimalHalfUp(
@@ -6540,7 +6547,7 @@ export class OrdersService {
     );
     const canonicalQuantity =
       input.request.amount && quote.quotedPrice
-        ? quantityFromBuyAmount(input.request.amount, quote.quotedPrice)
+        ? quantityFromAmount(input.request.amount, quote.quotedPrice)
         : input.request.quantity;
     const expectedRequestHash = computeOrderQuoteRequestHash({
       userId: input.userId,

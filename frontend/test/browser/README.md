@@ -1,5 +1,18 @@
 # Trading UI browser regression
 
+퀘스트 강조 영역(2026-11-10)은 `NODE_PATH=/path/to/browser-tools/node_modules BROWSER_EXECUTABLE_PATH=…
+node test/browser/questSpotlightBrowser.cjs` (`QUEST_SPOTLIGHT_CONFIGS=base,nav3,compact,mid`, 기본 전부; 출력
+`QUEST_SPOTLIGHT_OUTPUT`). 전체 앱 fixture(`mainTabHeadersFixture.jsx` + `beginnerMocks.js`)로 10개 퀘스트를 모든 단계까지 실제
+화면·버튼으로 진행한다(390×844 · 390×844 상단 24/하단 48 inset · 320×740 글꼴 2배 Dark Reduced Motion · 360×780 글꼴 1.3배
+inset 24). 스크립트는 단계마다 그 단계가 멈춰 표본이 찍힐 때까지 기다리고, 0.5초 이상 보인 단계가 표본 없이 지나가면 실패다.
+표본마다 링이 보이는 대상 전체(상자와 그 안에 그려진 내용, 스크롤 뷰·시트로 잘린 만큼)를 감싸는지, 링이 화면 안인지, 카드가
+화면 안이고 대상과 겹치지 않는지를 확인한다. 예외는 하나: 화면보다 큰 대상 옆에 가장 작은 카드조차 들어갈 자리가 없을 때(화면
+기준으로 따로 계산) 그 카드가 여유가 큰 쪽 가장자리에 놓이는 것 — `↘ last resort`로 출력한다. 작은 화면에서 양보한 추가
+대상(`↘ gave way`)과, 현재 단계가 1초 이상 아무것도 그리지 않은 경우(`◌ blank while current`, 예: 입력 포커스 스크롤로 대상이
+화면 밖)도 출력한다. 빌드 때만 esbuild onLoad로 overlay의 현재 view와 bridge의 대상 조회를 `globalThis`에 노출한다. 웹 fixture에서만
+홈 헤더 퀘스트 배지(HEAD에서도 화면 밖 8px)에 포커스가 가면 가로 스크롤이 생길 수 있어 퀘스트마다 되돌린다. 키보드는 웹에서 재현할
+수 없다.
+
 수익 공유 카드·시트(2026-11-06)는 `NODE_PATH=/path/to/browser-tools/node_modules BROWSER_EXECUTABLE_PATH=…
 node test/browser/tradeShareBrowser.cjs` (`TRADE_SHARE_QUICK=1`: 카드 3개·시트 320/390px만). 실제 TradeShareCard를
 `tradeShareFixture.jsx`로 공유 이미지와 같은 1080×1920 격자(DPR 1)에 9개 시나리오(시안, 수익률, 대규모 손실·Short·125x·소수 가격,

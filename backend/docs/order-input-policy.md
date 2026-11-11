@@ -11,7 +11,8 @@ after a fractional Market reduction without changing the normal order form.
 - 주식 소수 수량은 시장가에서만 허용한다. 지정가는 Decimal 정수 판정으로 검증하여 `1.000000`은 허용한다.
 - 확정 CLOSED에서도 정수 주식 지정가를 등록한다. 이는 다음 정규장 evidence를 기다리는 GTC-style 예약이며 실제 After Market/NXT 체결이 아니다. 시장가 CLOSED 및 모든 주문의 calendar unavailable은 차단한다.
 - Crypto BUY 요청은 수수료 제외 원금 `amount`를 사용한다. 서버가 `amount / price`를 수량 scale 6으로 내림한다. 시장가는 실행 가격에서 다시 계산하고 지정가는 등록 수량을 유지한다.
-- `Quote.sourceAmount`는 `quoteType=order`의 crypto BUY에서 입력 원금이다. FX의 source currency amount 의미는 그대로다. `currencyCode`가 주문 amount 통화이며 FX의 from/toCurrency와 targetAmount는 채우지 않는다. quotedGrossAmount/quotedFeeAmount/quotedReservedAmount는 계속 계산된 지정가 예약 기준이다. 별도 schema migration이 필요 없다.
+- Crypto SELL(2026-11-10)은 `quantity` 또는 수수료 차감 전 예상 매도대금 `amount` 중 하나만 받는다(둘 다·둘 다 없음은 `INVALID_ORDER_INPUT`). 견적 가격(지정가는 지정가)으로 `floor6(amount / price)` 수량을 정하고, 실행은 그 수량 그대로의 수량 SELL이다(시장가 재계산 없음). 보호 주문 자식 등 내부 SELL과 구버전 앱은 계속 quantity를 보낸다. 상세는 [orders-api-contract.md](orders-api-contract.md#crypto-spot-sell-by-amount-2026-11-10-additive).
+- `Quote.sourceAmount`는 `quoteType=order`의 crypto BUY에서 입력 원금, crypto SELL에서 입력 예상 매도대금(2026-11-10)이다. FX의 source currency amount 의미는 그대로다. `currencyCode`가 주문 amount 통화이며 FX의 from/toCurrency와 targetAmount는 채우지 않는다. quotedGrossAmount/quotedFeeAmount/quotedReservedAmount는 계속 계산된 지정가 예약 기준이다. 별도 schema migration이 필요 없다.
 - amount를 Quote hash와 Create idempotency hash에 포함한다. 다른 주문의 quantity 기반 v1 hash는 유지한다. Create는 durable amount, 수량 계산 결과, Quote TTL 및 소유권을 검증한다.
 - Matcher Path A는 제출 이후 snapshot의 effectiveAt만 사용한다. Path B는 제출 이후 첫 전체 5분봉 규칙을 유지한다. 두 경로 모두 미래 evidence 및 calendar unavailable을 거절한다.
 - Frontend preview는 정보 표시 및 비율 계산용이다. 수동 입력의 서버 Quote 요청 권한은 preview 가격이나 수수료 조회 성공에 의존하지 않는다.

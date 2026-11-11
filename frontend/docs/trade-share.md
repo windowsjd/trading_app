@@ -8,24 +8,38 @@ Status 2026-11-06: **not run on any device or simulator.** Verified on Node test
 RN-Web (Chromium) only — see "Verified so far". Every native share/save path below is
 unverified until a new EAS build is installed.
 
+**2026-11-10: two actions only — 공유하기 and 이미지 저장.** The per-app row (인스타그램
+스토리 · 카카오톡 · 텔레그램 · 더보기) was removed: Instagram Stories needs a Meta App ID the
+app does not have (the button never worked), and 카카오톡 could only open the system share
+sheet anyway, so the buttons promised direct shares they could not make. 공유하기 opens the
+system share sheet with the card image (the same `openShareSheet` the old 더보기 used);
+the user picks KakaoTalk, Instagram, Telegram or any other app there. 이미지 저장 is
+unchanged. Kept: the card, its quality (1080 × 1920 capture), the 수익금액/수익률 choice,
+one action at a time, a fresh capture per shown card, drop-on-close/sign-out, and no error
+for a dismissed share sheet. Removed with the row: `planShareTarget`, the installed-app
+checks, the Instagram/Telegram senders, the brand icons and `shareConfig.ts`
+(`EXPO_PUBLIC_META_APP_ID` is no longer read). The native settings the removed paths used —
+Android `<queries>` (3 packages) and iOS `LSApplicationQueriesSchemes` — were left in place
+(harmless; remove them with a later native build if wanted). `react-native-share`,
+`react-native-view-shot` and `expo-media-library` stay (share sheet, capture, save).
+
 ## Where it is
 
 거래 내역 (Wallet › 거래 내역, or a season record › 거래 내역 보기) › `현물 | 선물 | 거래 완료`.
 거래 완료 lists the pinned account's completed trades (the same 거래 완료 종목 policy a
 friend's season shows): a Spot holding sold to zero, or a closed futures lifetime. Each row
-has 공유, which opens the 수익 공유 sheet: card preview, 수익금액 | 수익률, the app row
-(인스타그램 스토리 · 카카오톡 · 텔레그램 · 더보기) and 이미지 저장.
+has 공유, which opens the 수익 공유 sheet: card preview, 수익금액 | 수익률, 공유하기 and
+이미지 저장 (2026-11-10; the per-app row is gone).
 
 | Piece | File |
 | --- | --- |
 | list | `src/screens/history/CompletedTrades.tsx` |
 | sheet + action flow | `src/screens/history/TradeShareSheet.tsx` |
 | card (1080 × 1920 design grid) | `src/components/share/TradeShareCard.tsx` |
-| app icons | `src/components/share/ShareTargetIcon.tsx` (Simple Icons 16.36.0 glyphs, CC0) |
+| action icons (공유하기 · 이미지 저장) | `src/components/share/ShareActionIcon.tsx` |
 | display rules | `src/features/share/tradeShareDisplay.ts` |
-| per-platform target plan | `src/features/share/shareTargets.ts` |
-| device layer (capture/share/save) | `src/features/share/shareImage.native.ts` (web/test stub: `shareImage.ts`) |
-| Meta App ID | `src/features/share/shareConfig.ts` (`EXPO_PUBLIC_META_APP_ID`) |
+| outcome messages | `src/features/share/shareTargets.ts` |
+| device layer (capture/share sheet/save) | `src/features/share/shareImage.native.ts` (web/test stub: `shareImage.ts`) |
 | API | `getCompletedTrades` in `src/features/tradingAccount/api.ts` |
 
 ## From an order's success screen (2026-11-06)
@@ -76,29 +90,21 @@ that is not 9:16 is refused. The capture waits until the whale/wave art and the 
 lines and then an ellipsis. Key content stays inside y 250–1670 (Instagram's controls cover
 the rest).
 
-## Share targets (what each button really does)
+## Actions (what each button really does, 2026-11-10)
 
 | Button | Android | iOS |
 | --- | --- | --- |
-| 인스타그램 스토리 | `react-native-share` `INSTAGRAM_STORIES` → `com.instagram.share.ADD_TO_STORY` with `source_application` = Meta App ID (after a package check) | `instagram-stories://share?source_application=…` + pasteboard background image (after `canOpenURL`) |
-| 카카오톡 | system share sheet, chooser titled "공유 목록에서 카카오톡을 선택해 주세요." (only when KakaoTalk is installed) | system share sheet + the same hint in the sheet |
-| 텔레그램 | direct intent to `org.telegram.messenger` | system share sheet + hint (no public way to target one app with an image) |
-| 더보기 | system share sheet | system share sheet |
+| 공유하기 | `react-native-share` `Share.open` with the PNG (`failOnCancel: false`); the system chooser titled "수익 공유" | the system share sheet (activity view) with the PNG |
 | 이미지 저장 | `expo-media-library` `saveToLibraryAsync`; Android 13+ no permission, 12 and below storage write | add-only photo permission (사진 추가) |
 
-"Opened" is reported only when the app actually left the foreground within 3 s; posting is
-always the user's action in the target app. A dismissed share sheet is not an error.
-KakaoTalk direct sharing would need Kakao's SDK and a registered Kakao native app key
-(Kakao Developers: app, Android key hash, iOS bundle id) — not in this build.
+Posting is always the user's action in the app they pick. A dismissed share sheet is not
+an error (no message); a thrown share call is "공유를 열지 못했어요".
+Direct per-app sharing (Instagram Stories with a Meta App ID, KakaoTalk with Kakao's SDK
+and app key) would be a separate, explicit product decision.
 
 ## Required outside this repository
 
-1. **Meta App ID (Instagram Stories).** Since January 2023 Instagram refuses Stories shares
-   without the sharing app's Facebook App ID ("The app you shared from doesn't currently
-   support sharing to Stories"). Register the app on developers.facebook.com, then set
-   `EXPO_PUBLIC_META_APP_ID=<numeric App ID>` in the EAS environment(s) of the builds that
-   should share to Stories. Unset (today) → the button explains that direct Stories sharing
-   is not ready and points to 더보기. No placeholder ID is shipped.
+1. ~~Meta App ID (Instagram Stories)~~ — no longer needed (2026-11-10: no Stories button).
 2. **A new native build.** New native modules: `react-native-share` 12.3.1,
    `react-native-view-shot` 4.0.3, `expo-media-library` ~55.0.21. JS-only updates cannot add
    them; an older build running this JS fails the share actions only (modules are imported on
@@ -117,15 +123,13 @@ KakaoTalk direct sharing would need Kakao's SDK and a registered Kakao native ap
 | --- | --- | --- |
 | Q1 | 거래 내역 › 거래 완료 on a season, general and beginner account | Only that account's trades; same figures as a friend sees for the season account |
 | Q2 | Open 공유, switch 수익금액/수익률 | Preview changes at once; one figure only; rate disabled for a trade without one |
-| Q3 | 더보기 → pick KakaoTalk/Telegram/Messages | The PNG (1080 × 1920) arrives; cancel shows no error |
-| Q4 | 인스타그램 스토리 with `EXPO_PUBLIC_META_APP_ID` set, Instagram installed | Instagram opens the story editor with the card as background; nothing posts by itself |
-| Q5 | Same without Instagram installed / without the App ID | "설치되어 있지 않아요" / "준비 중" message; Instagram never opens |
-| Q6 | 텔레그램 on Android | Telegram's chat picker with the image |
+| Q3 | 공유하기 → pick KakaoTalk / Instagram / Telegram / Messages in the system sheet | The PNG (1080 × 1920) arrives in that app; cancel (closing the sheet) shows no error |
+| Q4–Q6 | (removed 2026-11-10 with the per-app buttons) | — |
 | Q7 | 이미지 저장: first time, denied, allowed | iOS asks 사진 추가 once; denied → explanation; saved → in Photos/Gallery |
-| Q8 | Double-tap any target | One share UI only |
+| Q8 | Double-tap 공유하기 or 이미지 저장 | One share UI / one save only |
 | Q9 | Close the sheet or sign out right after tapping | Nothing opens afterwards |
 | Q10 | Profile photo set / none / very slow network | Photo / default avatar / default avatar after 6 s |
-| Q11 | System font 200%, 320 dp phone | Sheet scrolls; icons 2 × 2; the saved image unchanged |
+| Q11 | System font 200%, 320 dp phone | Sheet scrolls; the two buttons wrap their labels; the saved image unchanged |
 | Q12 | Saved image in the Instagram story editor | Nothing important under Instagram's top/bottom controls |
 
 ## Verified so far

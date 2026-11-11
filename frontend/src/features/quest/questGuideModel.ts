@@ -195,7 +195,8 @@ function exchangeView(session: GuideSession, fx: FxGuideFacts | null): GuideView
     }));
   }
   if (step === 2) {
-    return spotlight(session, 'fx', 2, fx.amountValid ? 'ok' : 'empty', ['fx-amount'], card(c.amount, {
+    // The amount and the ratio slider and buttons that can size it (2026-11-10).
+    return spotlight(session, 'fx', 2, fx.amountValid ? 'ok' : 'empty', ['fx-amount', 'fx-ratio'], card(c.amount, {
       hint: fx.amountValid ? null : c.amount.hint,
       next: fx.amountValid ? 'enabled' : 'disabled',
     }));
@@ -242,7 +243,7 @@ function transferView(session: GuideSession, transfer: TransferGuideFacts | null
         card(c.amount, { body: c.amount.empty, tone: 'warning' }));
     }
     const ok = transfer.amountValid && transfer.amountFits;
-    return spotlight(session, 'transfer', 3, ok ? 'ok' : 'invalid', ['transfer-amount'], card(c.amount, {
+    return spotlight(session, 'transfer', 3, ok ? 'ok' : 'invalid', ['transfer-amount', 'transfer-ratio'], card(c.amount, {
       hint: ok ? null : c.amount.hint, next: ok ? 'enabled' : 'disabled',
     }));
   }
@@ -386,7 +387,8 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
     hint = `이 종목에는 ${practiceDirection === 'short' ? '숏' : '롱'} 포지션이 이미 있어요. 이 퀘스트는 새 포지션의 진입부터 종료까지 연습해야 해요. ${session.replay
       ? '이 포지션을 전량 종료하거나 다른 종목을 선택해 주세요.' : '이 포지션을 먼저 전량 종료해 주세요.'}`;
   }
-  const view = spotlight(session, screen, index, `${ready ? 'ready' : 'practice'}${notice ? ':short' : ''}`, [step.target],
+  if (!ready && step.next && step.pendingHint) hint ??= step.pendingHint;
+  const view = spotlight(session, screen, index, `${ready ? 'ready' : 'practice'}${notice ? ':short' : ''}`, step.targets ?? [step.target],
     card(step, { next: step.next ? ready ? 'enabled' : 'disabled' : null, hint, notice, actions }));
   if (view.kind === 'spotlight') view.card.stepLabel = `${index + 1}/${steps.length}`;
   return view;
@@ -601,5 +603,8 @@ export function placeGuideCard(input: {
   // Too tall for either side: the roomier side, with the text scrolling inside.
   const room = Math.max(roomBelow, roomAbove);
   if (room >= minHeight) return roomBelow >= roomAbove ? at(x, below, roomBelow) : at(x, top, roomAbove);
-  return at(x, clampY(roomBelow >= roomAbove ? below : hole.y - gap - card.height));
+  // Not even the smallest card fits beside it (a control taller than the
+  // screen, large text): the smallest card, its text scrolling, at the edge
+  // with more room, so it covers as little of the control as it can.
+  return roomBelow >= roomAbove ? at(x, Math.max(top, bottom - minHeight), minHeight) : at(x, top, minHeight);
 }

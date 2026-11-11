@@ -360,6 +360,8 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
                     {available !== null ? '이체 가능 금액: USD ' + formatDisplayDecimal(available)
                       : futures.isFetching ? '이체 가능 금액을 확인하고 있습니다.' : '현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다.'}
                   </Text>}
+                  {/* The beginner guide spotlights these with the amount (QUEST 02). */}
+                  <View ref={questGuideTarget('transfer-ratio')} collapsable={false}>
                   <OrderRatioControls
                     testID="wallet-transfer-ratio"
                     label="이체 비율"
@@ -372,6 +374,7 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
                     notice={ratioNotice}
                     onChange={applyRatio}
                   />
+                  </View>
                   {sourceIsFutures && available === null && !futures.isFetching ? <CTAButton label="이체 가능 금액 다시 확인" variant="neutral" state={locked ? 'disabled' : 'enabled'} onPress={() => void futures.refetch()} /> : null}
                   {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
                     : balanceReady && canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>잔액이 부족합니다.</Text> : null}

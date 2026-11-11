@@ -63,8 +63,12 @@ describe('Order screen lifecycle with real React and query mutations', () => {
             `/trading-accounts/${accountId}/orders`,
           );
           assert.equal(h.requests[1].body.side, side);
-          assert.equal(h.requests[1].body[side === 'buy' ? 'amount' : 'quantity'], '0.125');
-          assert.equal(h.requests[1].body[side === 'buy' ? 'quantity' : 'amount'], undefined);
+          // Crypto is entered by amount on both sides (SELL since 2026-11-10);
+          // the quote and the create carry the typed amount, never a quantity.
+          assert.equal(h.requests[0].body.amount, '0.125');
+          assert.equal(h.requests[0].body.quantity === undefined, true);
+          assert.equal(h.requests[1].body.amount, '0.125');
+          assert.equal(h.requests[1].body.quantity === undefined, true);
           assert.equal(h.requests[1].body.orderType ?? 'market', type);
           assert.equal(
             h.requests[1].body.limitPrice,
@@ -74,11 +78,9 @@ describe('Order screen lifecycle with real React and query mutations', () => {
           assert.ok(h.requests[1].body.idempotencyKey);
           assert.ok(!('currencyCode' in h.requests[1].body));
           assert.equal(h.success().visible, true);
-          if (side === 'sell') assert.equal(h.success().quote.quantity, '0.125');
-          else {
-            assert.equal(h.success().quote.amount, '0.125');
-            assert.ok(Number(h.success().quote.quantity) > 0);
-          }
+          // The server's quote derives the quantity from the amount.
+          assert.equal(h.success().quote.amount, '0.125');
+          assert.ok(Number(h.success().quote.quantity) > 0);
           assert.ok(
             h.invalidations.some((key: any[]) => key.includes(accountId)),
           );
@@ -272,20 +274,30 @@ describe('Order screen lifecycle with real React and query mutations', () => {
     const h = inlineTradingHarness();
     await h.mount();
     t.after(h.close);
+    const text = () => JSON.stringify(h.renderer.toJSON());
     await h.press(sell);
     await h.press('order-ratio-100');
-    assert.equal(h.node(qty).props.value, '4');
+    // Crypto SELL is entered by amount: 100% is the whole general holding
+    // (4 BNB at 763.79), sent as that exact quantity.
+    assert.equal(h.node(qty).props.value, '3055.16');
+    assert.match(text(), /매도 수량 4 BNB/);
     h.accountId = 'season';
       h.routeAccountId = 'season';
     await h.update();
     await h.press(sell);
     await h.press('order-ratio-100');
-    assert.equal(h.node(qty).props.value, '1');
-    await h.input(qty, '2');
+    assert.equal(h.node(qty).props.value, '763.79');
+    assert.match(text(), /매도 수량 1 BNB/);
+    // Two units' worth from a season holding of one.
+    await h.input(qty, '1527.58');
     assert.equal(h.node(submit).props.state, 'disabled');
+    assert.match(text(), /보유 수량으로 매도할 수 있는 금액을 초과했습니다/);
+    // Half a unit's worth fits the holding; the suspended account still blocks.
+    await h.input(qty, '381.89');
+    assert.notEqual(h.node(submit).props.state, 'disabled');
     h.accounts[1].status = 'suspended';
     await h.update();
-    await h.input(qty, '0.5');
+    await h.input(qty, '381.89');
     assert.equal(h.node(submit).props.state, 'disabled');
   });
   it('keeps old account holdings and quotes away after switching A → B → A', async (t) => {

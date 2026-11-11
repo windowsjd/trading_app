@@ -41,7 +41,7 @@ evidence distinguishes them. Matcher Path A/B diagnostics belong to 2-C.
 | --- | --- | --- | --- |
 | domestic_stock / us_stock BUY and SELL | Positive quantity, up to 6 decimal places | Positive integer quantity + limitPrice | Market rejected; limit allowed |
 | Crypto BUY | Gross principal amount, excluding fees | Gross principal amount + limitPrice | 24h |
-| Crypto SELL | Positive quantity, up to 6 decimal places | Positive quantity + limitPrice | 24h |
+| Crypto SELL | Positive quantity, up to 6 decimal places, OR (2026-11-10) the expected proceeds before fees as `amount` | Positive quantity OR `amount`, + limitPrice | 24h |
 
 Stock `1.0` and `1.000000` are integers (Decimal.isInteger); fractional limit
 orders return `FRACTIONAL_LIMIT_ORDER_NOT_SUPPORTED` (400). Stock market orders
@@ -96,6 +96,36 @@ a display price or local fee preview. Server quote quantity takes precedence
 over indicative quantity. Crypto BUY ratios use available settlement cash and
 the existing account fee policy; stock BUY ratios still need a usable price.
 See [order-input-policy.md](order-input-policy.md) for intent and validation.
+
+### Crypto Spot SELL by amount (2026-11-10, additive)
+
+A crypto Spot SELL may send `amount` — the expected proceeds BEFORE fees, in
+the settlement currency (USD) — instead of `quantity`, on market and limit
+orders. Exactly one of the two: both, or neither, returns `INVALID_ORDER_INPUT`
+(400). A position-bound exit (protection child) and every internal SELL
+(TP/SL, conditional SELL settings, LOC) keep sending `quantity`; a quantity
+SELL from an older app is unchanged, including its hash bytes.
+
+- Quote: `quantity = floor6(amount / quotePrice)` (the limit price for a limit
+  SELL), so the notional at that price never exceeds the amount. `Quote.sourceAmount`
+  keeps the amount and the order quote requestHash binds it, as for a BUY. The
+  available-quantity check (holding minus other orders' reservations, plus the
+  order's own releasable protection child) is the existing one:
+  `INSUFFICIENT_QUANTITY` (409) when the derived quantity does not fit.
+  An amount too small for one 6th-decimal unit is `INVALID_AMOUNT` (400).
+- Create: the SAME amount + `quoteId` + `idempotencyKey` (+ the same
+  `limitPrice`). A different amount, or the same quantity sent as `quantity`,
+  is `QUOTE_MISMATCH`; a committed key with another amount is
+  `ORDER_IDEMPOTENCY_CONFLICT`. Validation, TTL and replay are the BUY amount's.
+- Execution: unlike a BUY (which spends at most its amount at the final price),
+  a SELL by amount sells EXACTLY the quoted quantity, i.e. it executes as a
+  quantity SELL: the existing price selection, maxChangeBps guard, fee pin,
+  wallet credit, ledger, position decrement and realized PnL. Its proceeds
+  follow the final price, so the amount is an estimate, never a guaranteed
+  receipt. A limit SELL by amount reserves and fills its derived quantity;
+  modification, cancel and fill are the quantity order's.
+- The app sends `amount` for a typed amount and `quantity` for a ratio pick
+  (25–100% of the sellable quantity; 100% = every unreserved unit).
 
 
 ## One-shot market execution result (B2-1, 2026-10-02)

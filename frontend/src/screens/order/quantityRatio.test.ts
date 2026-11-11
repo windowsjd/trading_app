@@ -38,17 +38,24 @@ for (const screen of ['inline', 'standalone'])
             await h.selectOrderType('limit');
             await h.input(TEST_IDS.order.limitPriceInput, '50');
           }
+          // Crypto SELL is entered by amount (2026-11-10): 100% is the holding
+          // at the shown price (100), and a ratio is its exact share of the
+          // holding (six decimals, floored) shown as that share's estimate.
           const capacity =
             side === 'buy'
               ? 100.2 / 1.001
-              : Number(h.positions[account]);
+              : Number(h.positions[account]) * 100;
+          const sellQuantityAt = (percent: number) =>
+            new Decimal(h.positions[account]).mul(percent / 100).toDecimalPlaces(6, Decimal.ROUND_DOWN);
           const valueAt = (percent: number) => side === 'buy'
             ? new Decimal('100.2').mul(percent / 100).div('1.001').toDecimalPlaces(8, Decimal.ROUND_DOWN).toFixed(8)
-            : String(Math.floor(((capacity * percent) / 100) * 1e6) / 1e6);
+            : sellQuantityAt(percent).mul('100').toDecimalPlaces(2, Decimal.ROUND_DOWN).toFixed(2);
           for (const percent of [25, 50, 75, 100]) {
             await h.press(`order-ratio-${percent}`);
             const expected = valueAt(percent);
             assert.equal(h.node(qty).props.value, expected);
+            if (side === 'sell')
+              assert.match(json(h), new RegExp(`매도 수량 ${sellQuantityAt(percent).toFixed().replace('.', '\\.')} BNB`));
             assert.equal(h.node(slider).props.value, percent);
             assert.deepEqual(selected(h), [percent]);
             for (const other of [25, 50, 75, 100]) {
@@ -88,7 +95,7 @@ for (const screen of ['inline', 'standalone'])
           );
           assert.doesNotMatch(
             json(h),
-            /0보다 큰 수량|수량을 입력해주세요|계산된 수량이 너무 작습니다/,
+            /0보다 큰 수량|0보다 큰 숫자|수량을 입력해주세요|계산된 수량이 너무 작습니다|계산된 매(수|도) 금액이 너무 작습니다/,
           );
           await h.slide(-10);
           assert.equal(h.node(qty).props.value, '');
@@ -102,21 +109,72 @@ for (const screen of ['inline', 'standalone'])
 test('six-decimal flooring preserves the selected ratio; rejected tiny quantity does not move the controls', async (t) => {
   const h = inlineTradingHarness();
   h.positions.general = '0.000007';
+  // Crypto SELL is entered by amount: at this price the 0.000007 holding is
+  // worth $7.00, so every step below stays above a cent.
+  h.assets.bnb.price.currentPrice = '1000000';
   await h.mount();
   t.after(h.close);
   await h.press(TEST_IDS.assetDetail.sellButton);
   await h.press('order-ratio-50');
-  assert.equal(h.node(qty).props.value, '0.000003');
+  // 50% floors to 0.000003 (not 0.0000035): its $3.00, still selected as 50%.
+  assert.equal(h.node(qty).props.value, '3.00');
+  assert.match(json(h), /매도 수량 0\.000003 BNB/);
   assert.equal(h.node(slider).props.value, 50);
   await h.slide(1);
-  assert.equal(h.node(qty).props.value, '0.000003');
+  assert.equal(h.node(qty).props.value, '3.00');
   assert.deepEqual(selected(h), [50]);
-  assert.match(json(h), /계산된 수량이 너무 작습니다/);
-  await h.input(qty, '0.000003');
+  assert.match(json(h), /계산된 매도 금액이 너무 작습니다/);
+  await h.input(qty, '3');
   assert.equal(h.node(slider).props.value, 43);
   assert.deepEqual(selected(h), []);
   await h.slide(0);
-  assert.doesNotMatch(json(h), /계산된 수량이 너무 작습니다/);
+  assert.doesNotMatch(json(h), /계산된 매도 금액이 너무 작습니다/);
+  // The preset sends its exact floored quantity, not an amount.
+  await h.press('order-ratio-50');
+  await h.press(TEST_IDS.order.executeSubmit);
+  await h.flush();
+  assert.equal(h.requests[0].body.quantity, '0.000003');
+  assert.equal(h.requests[0].body.amount === undefined, true);
+});
+
+test('crypto SELL by amount: a ratio keeps its exact quantity; the price moves only its estimate; a holding or reservation change drops the selection', async (t) => {
+  const h = inlineTradingHarness();
+  h.assets.bnb.price.currentPrice = '100';
+  await h.mount();
+  t.after(h.close);
+  await h.press(TEST_IDS.assetDetail.sellButton);
+  await h.press('order-ratio-50');
+  assert.equal(h.node(qty).props.value, '200.00');
+  // A price move re-estimates the same 2 BNB; the selection stays.
+  h.assets.bnb = { ...h.assets.bnb, price: { ...h.assets.bnb.price, currentPrice: '200' } };
+  await h.update();
+  assert.equal(h.node(qty).props.value, '400.00');
+  assert.match(json(h), /매도 수량 2 BNB/);
+  assert.deepEqual(selected(h), [50]);
+  assert.equal(h.node(slider).props.value, 50);
+  // A larger holding: 2 BNB is no longer 50%; it is still what would be sold.
+  h.positions.general = '8';
+  await h.update();
+  assert.deepEqual(selected(h), []);
+  assert.equal(h.node(slider).props.value, 25);
+  assert.match(json(h), /매도 수량 2 BNB/);
+  // Other orders reserve 7 of the 8: the re-picked 4 BNB is no longer 50% of
+  // what is sellable (1) and does not fit; the form says so, never sells less.
+  await h.press('order-ratio-50');
+  assert.match(json(h), /매도 수량 4 BNB/);
+  h.positionAvailable = { general: '1' };
+  h.positionReserved = { general: '7' };
+  await h.update();
+  assert.deepEqual(selected(h), []);
+  assert.match(json(h), /매도 가능 금액을 초과했습니다/);
+  assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'disabled');
+  // Typing replaces the ratio: the amount is sent as typed, never a quantity.
+  await h.input(qty, '150');
+  assert.match(json(h), /예상 매도 수량 약 0\.75 BNB/);
+  await h.press(TEST_IDS.order.executeSubmit);
+  await h.flush();
+  assert.equal(h.requests[0].body.amount, '150');
+  assert.equal(h.requests[0].body.quantity === undefined, true);
 });
 
 test('manual edits, price, reservations, limit changes and side/account changes never retain stale selection', async (t) => {

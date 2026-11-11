@@ -2,12 +2,16 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { selectDisplayPrice } from '../asset/displayPricePolicy.ts';
 import {
+  amountSellPreview,
+  estimatedAmountForQuantity,
   formatPreviewMoney,
   fxPreview,
+  indicativeQuantityForAmount,
   isPositiveInput,
   isPreviewFxAvailable,
   isPreviewPriceAvailable,
   orderPreview,
+  sellQuantityAtRatio,
 } from './indicativePreview.ts';
 import type { FxRateDto } from '../wallet/api';
 
@@ -241,4 +245,39 @@ test('sell preview subtracts the same decimal fee from proceeds without changing
   assert.equal(sell.feeAmount,buy.feeAmount);
   assert.equal(sell.totalAmount,'123.48124319');
   assert.equal(buy.totalAmount,'123.72845289');
+});
+
+test('crypto SELL by amount: the amount is pre-fee proceeds, the fee comes out of them (2026-11-10)', () => {
+  assert.deepEqual(amountSellPreview('123.45', '0.001'), {
+    grossAmount: '123.45000000',
+    feeAmount: '0.12345000',
+    totalAmount: '123.32655000',
+  });
+  // Same rounding chain as the server quote for the quantity it derives.
+  assert.equal(indicativeQuantityForAmount('123.45', '100'), '1.234500');
+  assert.equal(indicativeQuantityForAmount('250', '97123.45'), '0.002574');
+  assert.equal(indicativeQuantityForAmount('0.00001', '100'), '0.000000', 'too small to sell a unit: zero, never rounded up');
+  for (const bad of ['', '0', '-1', '1.123456789', 'abc'])
+    assert.equal(amountSellPreview(bad, '0.001') === null, true, bad);
+  assert.equal(amountSellPreview('10', null) === null, true, 'no fee policy, no preview');
+});
+
+test('a SELL ratio is that share of the sellable quantity, exact at 100% (no float flooring)', () => {
+  // 0.767497 × 1e6 is not an integer in binary floating point; decimals keep it.
+  assert.equal(sellQuantityAtRatio('0.767497', 1), '0.767497');
+  assert.equal(sellQuantityAtRatio('2.767497', 1), '2.767497');
+  assert.equal(sellQuantityAtRatio('2.767497', 0.25), '0.691874');
+  assert.equal(sellQuantityAtRatio('2.767497', 0.5), '1.383748');
+  assert.equal(sellQuantityAtRatio('0.000001', 0.25) === null, true, 'nothing below one unit');
+  assert.equal(sellQuantityAtRatio('4', 0.25), '1', 'canonical, no trailing zeros');
+  assert.equal(sellQuantityAtRatio('0.000007', 0.5), '0.000003');
+  assert.equal(sellQuantityAtRatio('4', 0.37), '1.48');
+  for (const bad of [null, '', '0', '-1'])
+    assert.equal(sellQuantityAtRatio(bad, 1) === null, true, String(bad));
+  assert.equal(sellQuantityAtRatio('1', 0) === null, true);
+  assert.equal(sellQuantityAtRatio('1', 1.5) === null, true);
+  // The amount field shows the estimate in cents, never rounded up.
+  assert.equal(estimatedAmountForQuantity('0.767497', '100.2'), '76.90');
+  assert.equal(estimatedAmountForQuantity('0.000001', '100') === null, true, 'under a cent');
+  assert.equal(estimatedAmountForQuantity('1', null) === null, true);
 });

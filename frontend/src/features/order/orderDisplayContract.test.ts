@@ -157,7 +157,14 @@ describe('order quote display and safety contract', () => {
   it('leaves order and FX raw input state unformatted while typing', () => {
     const walletScreen = read('screens/wallet/WalletFxSheet.tsx');
 
-    assert.match(orderScreen, /value=\{orderInput\}/u);
+    // Typed text verbatim; only a held crypto SELL ratio (cleared by any
+    // typing) shows its computed estimate, like the FX sheet's other field.
+    assert.match(orderScreen, /value=\{amountInput\}/u);
+    assert.match(
+      orderScreen,
+      /const amountInput = isAmountSell && sellRatioQuantity !== null\s*\? estimatedAmountForQuantity\(sellRatioQuantity, amountPrice\) \?\? orderInput\s*: orderInput;/u,
+    );
+    assert.match(orderScreen, /onChangeText=\{\(value\) => resetInput\(\(\) => setOrderInput\(value\)\)\}/u);
     assert.match(orderScreen, /value=\{limitPrice\}/u);
     // Both FX fields: the typed one verbatim, the other computed (resolveFxAmounts).
     assert.match(walletScreen, /value=\{amounts\.fields\.KRW\}/u);

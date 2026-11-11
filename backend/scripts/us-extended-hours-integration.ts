@@ -33,6 +33,9 @@ import {
 } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
+import { GeneralAccountPerformanceService } from '../src/portfolio/general-account-performance.service';
+import { GeneralExternalFundingService } from '../src/portfolio/general-external-funding.service';
+import { GeneralAccountsService } from '../src/trading-accounts/general-accounts.service';
 import { RankingRefreshService } from '../src/ranking/ranking-refresh.service';
 import { OrderReservationService } from '../src/orders/order-reservation.service';
 import { LimitOrderCreateService } from '../src/orders/limit-order-create.service';
@@ -72,6 +75,12 @@ const reservation = new OrderReservationService();
 const createService = new LimitOrderCreateService(prisma, reservation);
 const cancelService = new LimitOrderCancelService(prisma, reservation);
 const portfolioValuation = new PortfolioValuationService(prisma);
+const performance = new GeneralAccountPerformanceService(
+  prisma,
+  portfolioValuation,
+  new GeneralExternalFundingService(prisma),
+);
+const generalAccounts = new GeneralAccountsService(prisma, performance);
 const ranking = new RankingRefreshService(prisma, portfolioValuation);
 const orders = new OrdersService(prisma, ranking, createService, cancelService);
 const candidateRepo = new LimitOrderCandidateRepository(prisma);
@@ -157,6 +166,10 @@ async function main(): Promise<void> {
       testLifecycleBlocks,
     );
     await run('repeated cycles never fill an order twice', testRepeatedCycles);
+    await run(
+      'the general daily confirmed snapshot keeps the regular close while home shows the after-hours price',
+      testDailySnapshotKeepsRegularClose,
+    );
     console.log('us extended hours integration ok');
   } finally {
     tradingSessions.reset();
@@ -652,6 +665,100 @@ type Scenario = {
   assetId: string;
   now: Date;
 };
+
+/**
+ * 2026-11-10 (2): the general/beginner daily confirmed snapshot values with
+ * its own workflow (general_daily_snapshot), never the live valuation's
+ * extended-hours price. Exactly the call the daily job makes, against real
+ * price rows; nothing is written (the job itself lists every general
+ * account of a shared database, and its wiring is unit-tested).
+ */
+async function testDailySnapshotKeepsRegularClose(): Promise<void> {
+  const now = new Date();
+  afterHours(now);
+  await createFx(now);
+  const user = await prisma.user.create({
+    data: {
+      email: `${PREFIX}-daily-${randomUUID()}@example.com`,
+      passwordHash: 'integration-test-only',
+      nickname: `ux-${randomUUID()}`.slice(0, 40),
+    },
+    select: { id: true },
+  });
+  createdUserIds.push(user.id);
+  const accountId = (await generalAccounts.openGeneralAccount(user.id)).data
+    .account.id;
+  const asset = await prisma.asset.create({
+    data: {
+      symbol: `UXD${randomUUID().replace(/-/gu, '').slice(0, 11).toUpperCase()}`,
+      name: `${PREFIX}-daily`,
+      market: 'NAS',
+      assetType: AssetType.us_stock,
+      currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  createdAssetIds.push(asset.id);
+  await prisma.position.create({
+    data: {
+      tradingAccountId: accountId,
+      assetId: asset.id,
+      quantity: '2',
+      reservedQuantity: ZERO,
+      averageCost: '90.00000000',
+      currencyCode: CurrencyCode.USD,
+    },
+  });
+  const s = { assetId: asset.id } as Scenario;
+  // The last regular-session price (before the close 30 s ago), then an after-hours tick.
+  await createSnapshot(s, '100.00000000', ago(31_000), REGULAR);
+  await createSnapshot(s, '110.00000000', ago(2_000));
+  const at = new Date();
+  const live = await portfolioValuation.calculateTradingAccountValuation(
+    accountId,
+    at,
+    'home_live_valuation',
+  );
+  const account = await prisma.tradingAccount.findUniqueOrThrow({
+    where: { id: accountId },
+    select: {
+      id: true,
+      userId: true,
+      mode: true,
+      status: true,
+      initialCapitalKrw: true,
+      seasonParticipant: { select: { id: true } },
+    },
+  });
+  const { valuation: confirmed } =
+    await performance.buildOrdinarySnapshotValues({
+      account,
+      valuationAt: at,
+      client: prisma,
+      workflow: 'general_daily_snapshot',
+      sourceReads: {
+        client: prisma,
+        valuationAtMs: +at,
+        workflow: 'general_daily_snapshot',
+        assetPrices: new Map(),
+        futuresMarks: new Map(),
+        futuresMarkBoundary: at,
+      },
+    });
+  // 2 shares × USD/KRW 1,400: home at the after-hours 110, the confirmed row at the regular close 100.
+  assert.equal(Number(live.usStockValueKrw), 2 * 110 * 1400);
+  assert.equal(Number(confirmed.usStockValueKrw), 2 * 100 * 1400);
+  // Nothing was written by the confirmed-snapshot computation.
+  assert.equal(
+    await prisma.dailyPortfolioSnapshot.count({
+      where: { tradingAccountId: accountId },
+    }),
+    0,
+  );
+}
 
 const ago = (ms: number) => new Date(Date.now() - ms);
 

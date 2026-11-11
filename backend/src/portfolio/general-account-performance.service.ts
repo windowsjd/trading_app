@@ -406,6 +406,8 @@ export class GeneralAccountPerformanceService {
     valuationAt?: Date;
     client?: PerformanceClient;
     sourceReads?: PortfolioValuationSourceReads;
+    /** The daily confirmed snapshot never values with pre/after-hours prices. */
+    workflow?: 'home_live_valuation' | 'general_daily_snapshot';
   }): Promise<GeneralLivePerformance> {
     const client = input.client ?? this.prisma;
     const valuationAt = input.valuationAt ?? new Date();
@@ -419,7 +421,7 @@ export class GeneralAccountPerformanceService {
       await this.valuationService.calculateTradingAccountValuation(
         input.account.id,
         valuationAt,
-        'home_live_valuation',
+        input.workflow ?? 'home_live_valuation',
         client,
         ...(input.sourceReads ? ([input.sourceReads] as const) : []),
       );
@@ -444,6 +446,7 @@ export class GeneralAccountPerformanceService {
     valuationAt: Date;
     client: PerformanceClient;
     sourceReads?: PortfolioValuationSourceReads;
+    workflow?: 'home_live_valuation' | 'general_daily_snapshot';
   }): Promise<{
     values: GeneralSnapshotWriteValues;
     valuation: PortfolioValuationResult;
@@ -453,6 +456,7 @@ export class GeneralAccountPerformanceService {
       valuationAt: input.valuationAt,
       client: input.client,
       ...(input.sourceReads ? { sourceReads: input.sourceReads } : {}),
+      ...(input.workflow ? { workflow: input.workflow } : {}),
     });
 
     return {

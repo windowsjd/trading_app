@@ -182,13 +182,56 @@ export function amountBuyPreview(amount: string, feeRate?: string | null) {
   };
 }
 
-export function indicativeBuyQuantity(amount: string, price?: string | null) {
+/**
+ * Crypto SELL by amount (2026-11-10): the amount is the expected proceeds
+ * BEFORE fees and the fee comes out of them (예상 수령액 = amount − fee). Like
+ * the BUY preview it is indicative: the quote sells the quantity it derives at
+ * its own price, and the fill's price decides the final proceeds.
+ */
+export function amountSellPreview(amount: string, feeRate?: string | null) {
+  if (!isPositiveInput(amount, 8) || !validFee(feeRate)) return null;
+  const gross = new D(amount);
+  const fee = gross.mul(feeRate).toDecimalPlaces(8);
+  return {
+    grossAmount: money(gross),
+    feeAmount: money(fee),
+    totalAmount: money(gross.sub(fee)),
+  };
+}
+
+/**
+ * The quantity an amount buys or sells at `price`, floored to 6 decimals —
+ * the server's own rule (a BUY never overspends, a SELL never sells more
+ * than asked). Indicative: the quote uses its own price.
+ */
+export function indicativeQuantityForAmount(amount: string, price?: string | null) {
   if (!isPositiveInput(amount, 8) || !price || !isPositiveInput(price, 8))
     return null;
   return new D(amount)
     .div(price)
     .toDecimalPlaces(6, Decimal.ROUND_DOWN)
     .toFixed(6);
+}
+
+/**
+ * A crypto SELL ratio (2026-11-10): that share of the sellable quantity
+ * (holding minus other orders' reservations), floored to 6 decimals in
+ * decimal arithmetic, so 100% is exactly every sellable unit. The order is
+ * sent by this quantity (canonical, no trailing zeros, as the quantity ratios
+ * were); the amount field only shows its estimate.
+ */
+export function sellQuantityAtRatio(sellable: string | null | undefined, ratio: number) {
+  if (!sellable || !isPositiveInput(sellable, 8) || !Number.isFinite(ratio) || ratio <= 0 || ratio > 1)
+    return null;
+  const quantity = new D(sellable).mul(ratio).toDecimalPlaces(6, Decimal.ROUND_DOWN);
+  return quantity.gt(0) ? quantity.toFixed() : null;
+}
+
+/** The estimated proceeds of `quantity` at `price` for the amount field: cents, never rounded up. */
+export function estimatedAmountForQuantity(quantity: string | null | undefined, price?: string | null) {
+  if (!quantity || !isPositiveInput(quantity, 8) || !price || !isPositiveInput(price, 8)) return null;
+  const amount = new D(quantity).mul(price).toDecimalPlaces(2, Decimal.ROUND_DOWN);
+  return amount.gt(0) ? amount.toFixed(2) : null;
 }
 
 /** Reserve fee headroom using the account's real fee policy, not a constant. */

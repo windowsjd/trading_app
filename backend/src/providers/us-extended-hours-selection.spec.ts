@@ -101,6 +101,7 @@ describe('US extended-hours price selection (2026-11-10)', () => {
       'orders_quote',
       'orders_execute',
       'daily_portfolio_snapshot',
+      'general_daily_snapshot',
       'season_settlement',
     ] as ProviderWorkflow[]) {
       const eligibility = resolveAssetProviderEligibility({
@@ -132,6 +133,24 @@ describe('US extended-hours price selection (2026-11-10)', () => {
     expect(
       selectedId(select('daily_portfolio_snapshot', PRE, [pre, lastRegular])),
     ).toBe('regular-1109');
+    // The general/beginner daily confirmed snapshot (2026-11-10): the same
+    // regular close in pre-market and after-hours, while home shows extended.
+    const after = row('after-1', EXTENDED, '2026-11-10T22:40:00.000Z', '104');
+    const todayClose = row(
+      'regular-1110',
+      REGULAR,
+      '2026-11-10T20:59:59.000Z',
+      '102',
+    );
+    expect(
+      selectedId(select('general_daily_snapshot', PRE, [pre, lastRegular])),
+    ).toBe('regular-1109');
+    expect(
+      selectedId(select('general_daily_snapshot', AFTER, [after, todayClose])),
+    ).toBe('regular-1110');
+    expect(
+      selectedId(select('home_live_valuation', AFTER, [after, todayClose])),
+    ).toBe('after-1');
     for (const workflow of ['orders_quote', 'orders_execute'] as const) {
       const selection = select(workflow, PRE, [pre, lastRegular], 10);
       expect(selection).toMatchObject({
@@ -215,6 +234,51 @@ describe('US extended-hours price selection (2026-11-10)', () => {
       isPositiveValue: () => true,
     });
     expect(krx.state === 'selected' ? krx.snapshot.id : null).toBe('krx');
+  });
+
+  it('values the general daily snapshot from the live read’s sources, not the Season snapshot’s', () => {
+    // Only the extended-hours price differs from home_live_valuation: KRX keeps
+    // KOSCOM alone (no KIS fallback, unlike daily_portfolio_snapshot).
+    const sources = (workflow: ProviderWorkflow) => {
+      const eligibility = resolveAssetProviderEligibility({
+        workflow,
+        asset: {
+          assetType: AssetType.domestic_stock,
+          market: 'KRX',
+          currencyCode: CurrencyCode.KRW,
+        },
+      });
+      return eligibility.eligible ? eligibility.sourceNames : null;
+    };
+    expect(sources('general_daily_snapshot')).toEqual(
+      sources('home_live_valuation'),
+    );
+    expect(sources('general_daily_snapshot')).toEqual([
+      'koscom_krx_realtime_price',
+    ]);
+    expect(sources('daily_portfolio_snapshot')).toEqual([
+      'koscom_krx_realtime_price',
+      'kis_krx_realtime_trade',
+    ]);
+    // Closed-market carry-forward and display freshness, like the live read.
+    const closedKrx = (workflow: ProviderWorkflow) =>
+      selectMarketAwareAssetPriceSnapshotBySourcePriority({
+        asset: { assetType: AssetType.domestic_stock, market: 'KRX' },
+        workflow,
+        candidates: [
+          row(
+            'krx-close',
+            'koscom_krx_realtime_price',
+            '2026-11-10T06:29:00.000Z',
+          ),
+        ],
+        expectedSourceNames: ['koscom_krx_realtime_price'],
+        now: AFTER,
+        freshnessThresholdSeconds: 300,
+        isPositiveValue: () => true,
+      });
+    expect(selectedId(closedKrx('general_daily_snapshot'))).toBe('krx-close');
+    expect(selectedId(closedKrx('home_live_valuation'))).toBe('krx-close');
   });
 
   describe('execution evidence', () => {
@@ -312,6 +376,7 @@ describe('US extended-hours price selection (2026-11-10)', () => {
     it('adds nothing for daily snapshots, overnight, or with the switch off', async () => {
       for (const [workflow, now] of [
         ['daily_portfolio_snapshot', PRE],
+        ['general_daily_snapshot', PRE],
         ['assets_with_price', OVERNIGHT],
       ] as const) {
         const c = client();

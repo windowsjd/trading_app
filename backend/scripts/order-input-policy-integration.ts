@@ -3,6 +3,8 @@ import {
   prepareLearnedBeginner,
   cleanupLearningPractice,
   releaseLearningAssets,
+  practiceFoundation,
+  practiceOrder,
 } from './lib/beginner-quest-practice';
 import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
@@ -499,7 +501,7 @@ async function cryptoAmount(mode: TradingAccountMode) {
         .eq(actual.netAmount!),
     );
 
-    // Sell remains quantity based; reserve/cancel never reduces owned quantity.
+    // A quantity SELL (older apps, internal exits) keeps working; reserve/cancel never reduces owned quantity.
     await refresh(s, '600');
     const sell = await request(s, {
       side: 'sell',
@@ -528,6 +530,326 @@ async function cryptoAmount(mode: TradingAccountMode) {
     await cleanup(s);
   }
 }
+/** 2026-11-10: a crypto Spot SELL by its expected proceeds (before fees). */
+async function cryptoSellAmount(mode: TradingAccountMode) {
+  const s = await fixture(mode);
+  try {
+    await refresh(s);
+    await create(s, (await request(s, { side: 'buy', amount: '500' })).body);
+    assert.ok((await position(s)).quantity.eq(5));
+
+    // The quote derives the quantity from the amount at its own price.
+    const q = await request(s, { side: 'sell', amount: '123.45' });
+    assert.equal(q.quote.amount, '123.45000000');
+    assert.equal(q.quote.quantity, '1.234500');
+    assert.equal(q.quote.grossAmount, '123.45000000');
+    assert.equal(q.quote.feeAmount, '0.12345000');
+    assert.equal(q.quote.netAmount, '123.32655000');
+    const stored = await prisma.quote.findUniqueOrThrow({
+      where: { id: q.quote.quoteId! },
+    });
+    assert.ok(stored.sourceAmount!.eq('123.45'));
+    assert.ok(stored.quantity!.eq('1.2345'));
+    // Another intent on the same quote is refused before anything moves.
+    const before = await wallet(s);
+    const held = await position(s);
+    await rejected(
+      create(s, { ...q.body, amount: '123.46' }),
+      'QUOTE_MISMATCH',
+    );
+    await rejected(
+      create(s, {
+        assetId: s.asset.id,
+        side: 'sell',
+        quantity: '1.2345',
+        quoteId: q.body.quoteId,
+        idempotencyKey: q.body.idempotencyKey,
+      }),
+      'QUOTE_MISMATCH',
+    );
+    await rejected(
+      create(s, { ...q.body, quantity: '1.2345' }),
+      'INVALID_ORDER_INPUT',
+    );
+    assert.ok((await wallet(s)).balanceAmount.eq(before.balanceAmount));
+    assert.ok((await position(s)).quantity.eq(held.quantity));
+
+    // The final price moved (within the quote guard): exactly the quoted
+    // quantity sells, at that price; proceeds follow it, never more is sold.
+    await refresh(s, '100.2');
+    const sold = await create(s, q.body);
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: sold.data.order.orderId },
+    });
+    assert.equal(order.status, 'executed');
+    assert.equal(order.side, 'sell');
+    assert.ok(order.quantity.eq('1.2345'));
+    assert.ok(order.executedPrice!.eq('100.2'));
+    assert.ok(order.grossAmount!.eq('123.6969'));
+    assert.ok(order.feeAmount!.eq('0.1236969'));
+    assert.ok(order.netAmount!.eq(order.grossAmount!.sub(order.feeAmount!)));
+    assert.ok(
+      order.realizedPnl !== null,
+      'realized PnL is stored as for any SELL',
+    );
+    assert.ok(
+      (await wallet(s)).balanceAmount
+        .sub(before.balanceAmount)
+        .eq(order.netAmount!),
+    );
+    assert.ok((await position(s)).quantity.eq(held.quantity.sub('1.2345')));
+    const credit = await prisma.walletTransaction.findFirstOrThrow({
+      where: { referenceId: order.id },
+    });
+    assert.ok(credit.amount.eq(order.netAmount!));
+    assert.equal(credit.direction, 'credit');
+
+    // Replay: same key and intent returns the same order; another amount conflicts.
+    const afterSale = await wallet(s);
+    const replay = await create(s, { ...q.body, amount: '123.45000000' });
+    assert.equal(replay.data.order.orderId, order.id);
+    await rejected(
+      create(s, { ...q.body, amount: '123' }),
+      'ORDER_IDEMPOTENCY_CONFLICT',
+    );
+    assert.equal(
+      await prisma.walletTransaction.count({
+        where: { referenceId: order.id },
+      }),
+      1,
+    );
+    assert.ok((await wallet(s)).balanceAmount.eq(afterSale.balanceAmount));
+
+    // More than the holding covers at the quote price is refused at quote.
+    const remaining = (await position(s)).quantity;
+    assert.ok(remaining.eq('3.7655'));
+    await rejected(
+      request(s, { side: 'sell', amount: '400' }),
+      'INSUFFICIENT_QUANTITY',
+    );
+    // Another order's reservation is never sold by an amount.
+    const reserving = await request(s, {
+      side: 'sell',
+      orderType: 'limit',
+      quantity: '2',
+      limitPrice: '150',
+    });
+    const reservedOrder = await create(s, reserving.body);
+    assert.ok((await position(s)).reservedQuantity.eq(2));
+    await rejected(
+      request(s, { side: 'sell', amount: '200' }),
+      'INSUFFICIENT_QUANTITY',
+    );
+    const fits = await request(s, { side: 'sell', amount: '100' });
+    assert.equal(fits.quote.quantity, '0.998003');
+    await create(s, fits.body);
+    assert.ok((await position(s)).quantity.eq('2.767497'));
+    assert.ok((await position(s)).reservedQuantity.eq(2));
+    // 100% (the ratio button) sends the available quantity, as before: every
+    // unreserved unit is sold, nothing more.
+    const available = (await position(s)).quantity.sub(
+      (await position(s)).reservedQuantity,
+    );
+    await create(
+      s,
+      (await request(s, { side: 'sell', quantity: available.toFixed(6) })).body,
+    );
+    assert.ok((await position(s)).quantity.eq(2));
+    assert.ok((await position(s)).reservedQuantity.eq(2));
+    await orders.cancelOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      reservedOrder.data.order.orderId,
+    );
+    assert.ok((await position(s)).reservedQuantity.eq(0));
+
+    // Limit SELL by amount: the quantity at the LIMIT price is reserved,
+    // released on cancel, and filled as a quantity order.
+    const limit = await request(s, {
+      side: 'sell',
+      orderType: 'limit',
+      amount: '60',
+      limitPrice: '120',
+    });
+    assert.equal(limit.quote.quantity, '0.500000');
+    assert.equal(limit.quote.amount, '60.00000000');
+    const first = await create(s, limit.body);
+    assert.equal(first.data.order.status, 'submitted');
+    assert.ok((await position(s)).reservedQuantity.eq('0.5'));
+    await orders.cancelOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      first.data.order.orderId,
+    );
+    assert.ok((await position(s)).reservedQuantity.eq(0));
+    assert.ok((await position(s)).quantity.eq(2));
+    const again = await request(s, {
+      side: 'sell',
+      orderType: 'limit',
+      amount: '60',
+      limitPrice: '120',
+    });
+    const waiting = await create(s, again.body);
+    const beforeFill = await wallet(s);
+    await refresh(s, '120');
+    const filled = await execution.fillLimitOrder({
+      orderId: waiting.data.order.orderId,
+      plan: {
+        path: 'snapshot',
+        executedPrice: d('120'),
+        assetPriceSnapshotId: s.price.id,
+      },
+    });
+    assert.equal(filled.state, 'filled');
+    const limitOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: waiting.data.order.orderId },
+    });
+    assert.ok(limitOrder.quantity.eq('0.5'));
+    assert.ok(limitOrder.grossAmount!.eq(60));
+    assert.ok((await position(s)).quantity.eq('1.5'));
+    assert.ok((await position(s)).reservedQuantity.eq(0));
+    assert.ok(
+      (await wallet(s)).balanceAmount
+        .sub(beforeFill.balanceAmount)
+        .eq(limitOrder.netAmount!),
+    );
+
+    // Too small to sell even one unit of the 6th decimal.
+    await refresh(s, '100');
+    await rejected(
+      request(s, { side: 'sell', amount: '0.00001' }),
+      'INVALID_AMOUNT',
+    );
+    console.log(
+      `PASS ${mode}: crypto SELL by amount — quote-derived quantity, mismatch/both refused, fill at the final price, replay, over-sell and reservation guards, 100% by quantity, limit reserve/cancel/fill`,
+    );
+  } finally {
+    await cleanup(s);
+  }
+}
+
+/**
+ * QUEST 05 (2026-11-10): the app now sells crypto by amount. A beginner at the
+ * QUEST 05 step sells part of the practice holding by amount, and that fill —
+ * the first market SELL after the TP/SL evidence — is the quest's evidence.
+ */
+async function beginnerQuestFiveByAmount() {
+  const flags = [
+    'CONDITIONAL_ORDERS_ENABLED',
+    'INDEPENDENT_TP_SL_ORDERS_ENABLED',
+    'CONDITIONAL_SELL_ORDERS_ENABLED',
+  ];
+  const saved = flags.map((name) => process.env[name]);
+  for (const name of flags) process.env[name] = 'true';
+  const now = await dbNow();
+  setSession(now);
+  const user = await prisma.user.create({
+    data: {
+      email: `order-input-q5-${randomUUID()}@example.com`,
+      passwordHash: 'test-only',
+      nickname: `q5-${randomUUID().slice(0, 8)}`,
+    },
+  });
+  const accountId = (await general.openBeginnerAccount(user.id)).data.account
+    .id;
+  const asset = await prisma.asset.create({
+    data: {
+      symbol: `Q${randomUUID().slice(0, 20)}`,
+      name: 'quest 05 amount fixture',
+      isActive: true,
+      assetType: 'crypto',
+      market: 'BINANCE',
+      currencyCode: 'USD',
+      priceCurrency: 'USD',
+      settlementCurrency: 'USD',
+    },
+  });
+  const price = await prisma.assetPriceSnapshot.create({
+    data: {
+      assetId: asset.id,
+      price: '100',
+      currencyCode: 'USD',
+      sourceType: 'provider_api',
+      sourceName: 'binance_spot_ws_ticker',
+      effectiveAt: now,
+      capturedAt: now,
+    },
+  });
+  const rate = await prisma.fxRateSnapshot.create({
+    data: {
+      baseCurrency: 'USD',
+      quoteCurrency: 'KRW',
+      rate: '1400',
+      sourceType: 'provider_api',
+      sourceName: 'korea_exim_exchange_rate',
+      effectiveAt: now,
+      capturedAt: now,
+    },
+  });
+  const s = {
+    userId: user.id,
+    accountId,
+    season: null,
+    participant: null,
+    asset,
+    price,
+    rate,
+  };
+  let amountSale: string | null = null;
+  try {
+    await practiceFoundation(
+      prisma,
+      user.id,
+      accountId,
+      asset.id,
+      async (stage, app) => {
+        await refresh(s);
+        const progress = async () =>
+          (await app.quests.getQuestProgress(user.id, accountId)).data;
+        if (stage === 4) {
+          assert.notEqual((await progress()).quests[4].status, 'completed');
+          const sold = await practiceOrder(app, user.id, accountId, {
+            assetId: asset.id,
+            side: 'sell',
+            orderType: 'market',
+            amount: '30',
+          });
+          assert.equal(sold.data.order.status, 'executed');
+          assert.equal(sold.data.order.quantity, '0.300000');
+          amountSale = sold.data.order.orderId;
+          const quest = (await progress()).quests[4];
+          assert.equal(quest.status, 'completed');
+          assert.equal(quest.steps[0].referenceId, amountSale);
+        }
+        if (stage === 5) {
+          // The rest sold by quantity afterwards does not replace the evidence.
+          assert.equal(
+            (await progress()).quests[4].steps[0].referenceId,
+            amountSale,
+          );
+        }
+      },
+      { protection: 'independent' },
+    );
+    assert.ok(amountSale);
+    console.log('PASS beginner: QUEST 05 completed by a market SELL by amount');
+  } finally {
+    // The practice's own rows (acknowledgements, the TP/SL setting) first.
+    const where = { tradingAccountId: accountId };
+    await prisma.beginnerQuestAcknowledgement.deleteMany({ where });
+    await prisma.conditionalSellOrder.deleteMany({ where });
+    await prisma.protectionChild.deleteMany({ where: { group: where } });
+    await prisma.protectionLeg.deleteMany({ where: { group: where } });
+    await prisma.protectionGroup.deleteMany({ where });
+    await prisma.protectionCommand.deleteMany({ where });
+    await cleanup(s);
+    flags.forEach((name, index) => {
+      if (saved[index] === undefined) delete process.env[name];
+      else process.env[name] = saved[index];
+    });
+  }
+}
+
 async function stockPolicy(
   mode: TradingAccountMode,
   assetType: 'domestic_stock' | 'us_stock',
@@ -771,9 +1093,11 @@ async function main() {
   try {
     for (const mode of modes) {
       await cryptoAmount(mode);
+      await cryptoSellAmount(mode);
       await stockPolicy(mode, 'domestic_stock');
       await stockPolicy(mode, 'us_stock');
     }
+    await beginnerQuestFiveByAmount();
     console.log('order input policy db integration ok');
   } finally {
     await prisma.$disconnect();

@@ -166,7 +166,7 @@ describe('QuestGuideProvider', () => {
     await h.act(() => bridge.publishQuestGuideFacts('fx', fxFacts));
     assert.deepEqual(h.view().targets, ['fx-direction']);
     await h.act(() => h.overlay.onAction('next', 1));
-    assert.deepEqual(h.view().targets, ['fx-amount']);
+    assert.deepEqual(h.view().targets, ['fx-amount', 'fx-ratio']);
 
     // The screen's own successful command: adopted once, then the server decides.
     let adopted = false;
