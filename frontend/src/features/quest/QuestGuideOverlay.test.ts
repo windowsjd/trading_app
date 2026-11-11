@@ -492,32 +492,69 @@ describe('QuestGuideOverlay', () => {
     assert.equal((placed.top as number) + 230 <= 764 && (placed.top as number) >= 47, true, 'above the ring, inside the safe area');
   });
 
-  it('lets a step’s extra controls give way, last first, when together they leave the card no place', async t => {
+  it('points at a step’s controls one at a time, top to bottom, when together they leave the card no place — none is left out', async t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = harness();
     // An amount (fx-amount) with an extra control far below (fx-quote-title):
-    // together they fill the screen.
+    // together they fill the screen. The step lists the lower one first, so the
+    // order follows the screen, not the list.
     h.rects.target = { x: 24, y: 110, width: 300, height: 60 };
     h.rects.quote = { x: 24, y: 640, width: 300, height: 100 };
-    const both = spotlight('1:fx:2:both', { anchor: '1:fx:2:fx-amount,fx-quote-title', targets: ['fx-amount', 'fx-quote-title'] });
+    const both = spotlight('1:fx:2:both', { anchor: '1:fx:2:fx-quote-title,fx-amount', targets: ['fx-quote-title', 'fx-amount'] });
     await h.render(both);
     t.after(h.close);
     await tick(t);
     const ring = () => { const style = flat(h.find('quest-guide-ring').props.style); return [style.top, style.height]; };
     assert.deepEqual(ring(), [104, 642], 'both at first');
+    assert.equal(h.has('quest-guide-show-next'), false, 'together: nothing to move between');
     await measureCard(h, 200);
-    // Room is asked for once (the topmost target), then the extra control gives way.
+    // Room is asked for once (the topmost target); still crowded, the step
+    // then points at one control at a time instead of dropping any.
     await Renderer.act(async () => { t.mock.timers.tick(600); });
     await tick(t);
     await tick(t);
-    assert.deepEqual(ring(), [104, 72], 'only the amount, the first and essential target');
+    assert.deepEqual(ring(), [104, 72], 'the top one first: the amount');
+    // Each control shown in turn has its own card layer (measured afresh, room made once for it).
+    await measureCard(h, 200);
+    await Renderer.act(async () => { t.mock.timers.tick(600); });
+    await tick(t);
     const placed = flat(h.find('quest-guide-card').props.style);
     assert.equal((placed.top as number) >= 104 + 72, true, 'the card now sits beside it');
-    // A one-target step never gives its target away.
+    const pager = () => h.find('quest-guide-show-next');
+    const label = () => { const read = (node: any): string => typeof node === 'string' ? node : (node?.children ?? []).map(read).join(''); return read(pager()); };
+    assert.equal(label(), '다른 항목 보기 1/2');
+    assert.equal(pager().props.accessibilityLabel, '2개 중 1번째, 환전 금액 입력칸. 다른 항목 보기');
+    // 다른 항목 보기: the ring moves on to the next control, the card follows it.
+    const reveals = h.reveals.length;
+    await Renderer.act(async () => { pager().props.onPress(); });
+    await tick(t);
+    await tick(t);
+    assert.deepEqual(ring(), [634, 112], 'then the control below');
+    assert.equal(label(), '다른 항목 보기 2/2');
+    await measureCard(h, 200);
+    await Renderer.act(async () => { t.mock.timers.tick(600); });
+    await tick(t);
+    assert.equal(h.reveals.length >= reveals, true);
+    const moved = flat(h.find('quest-guide-card').props.style);
+    assert.equal((moved.top as number) + 200 <= 634, true, 'the card stays clear of it (above)');
+    assert.equal(h.actions.length, 0, 'moving the ring is not a guide action (the step and its 다음 stay)');
+    await Renderer.act(async () => { pager().props.onPress(); });
+    await tick(t);
+    await tick(t);
+    assert.deepEqual(ring(), [104, 72], 'and round again');
+    await measureCard(h, 200);
+    await Renderer.act(async () => { t.mock.timers.tick(600); });
+    await tick(t);
+    // The same step keeps pointing one at a time when its state changes (an amount becoming valid).
+    await h.render({ ...both, key: '1:fx:2:both-ok', card: { ...card, next: 'enabled' } });
+    await tick(t);
+    assert.equal(label(), '다른 항목 보기 1/2');
+    // A one-target step has no 다른 항목 보기 and never gives its target away.
     await h.render(spotlight('1:fx:2:one', { anchor: '1:fx:2:fx-quote-title', targets: ['fx-quote-title'] }));
     await tick(t);
     await tick(t);
     assert.deepEqual(ring(), [634, 112]);
+    assert.equal(h.has('quest-guide-show-next'), false);
   });
 });
 

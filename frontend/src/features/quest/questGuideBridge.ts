@@ -31,7 +31,8 @@ export type QuestGuideTargetId =
   // The limit price field and the amount's ratio slider + 25–100% buttons (2026-11-10).
   | 'order-price' | 'order-ratio'
   | 'futures-viewport' | 'futures-funding' | 'futures-instrument' | 'futures-direction'
-  | 'futures-margin' | 'futures-input' | 'futures-submit' | 'futures-position'
+  // The entry's amount input and its ratio slider + quick ratios, each its own target (2026-11-11).
+  | 'futures-margin' | 'futures-amount' | 'futures-ratio' | 'futures-submit' | 'futures-position'
   | 'futures-leverage-suggested'
   // The scrolling part of a bottom sheet the guide points into.
   | 'order-method-viewport' | 'tp-sl-viewport' | 'futures-leverage-viewport'

@@ -7,8 +7,9 @@ export type TradingGuideStep = {
   /**
    * Every control the step asks for, spotlighted together (2026-11-10): an
    * amount step also shows its limit price and its ratio slider and buttons, a
-   * futures entry its amount field. Essential first: on a small screen with
-   * large text the last ones give way to the card. Default: `target`.
+   * futures entry its amount input and ratio controls. When together they leave
+   * the card no place (small screen, large text), the guide points at them one
+   * at a time, top to bottom, none left out (2026-11-11). Default: `target`.
    */
   targets?: QuestGuideTargetId[];
   title: string;
@@ -38,7 +39,7 @@ const futures = (short: boolean): TradingGuideStep[] => [
   { screen: 'futures', target: 'futures-instrument', title: '선물 종목', body: '거래 가능한 선물 상품을 선택해 주세요. 같은 종목에서 롱과 숏 포지션을 각각 보유할 수 있어요. 같은 방향으로 추가 진입하면 기존 포지션에 합산돼요.', next: true },
   { screen: 'futures', target: 'futures-direction', title: short ? 'Short · 숏' : 'Long · 롱', body: short ? '숏은 가격이 하락하면 이익, 상승하면 손실이 발생해요. Short를 선택해 주세요.' : '롱은 가격이 상승하면 이익, 하락하면 손실이 발생해요. Long을 선택해 주세요.', next: true },
   { screen: 'futures', target: 'futures-margin', title: '레버리지와 격리마진', body: '낮은 레버리지(예: 2배)와 Isolated 격리마진을 권장해요. 적은 증거금으로 큰 포지션을 만들 수 있지만 손실과 청산 위험도 커져요.', next: true },
-  { screen: 'futures', target: 'futures-submit', targets: ['futures-submit', 'futures-input'], title: '포지션 진입',
+  { screen: 'futures', target: 'futures-submit', targets: ['futures-submit', 'futures-amount', 'futures-ratio'], title: '포지션 진입',
     body: '주문 금액을 입력하거나 비율로 정하고 수량·증거금·수수료를 확인한 뒤 진입해 주세요. 이 실습은 1배보다 높은 레버리지로 진입해야 해요.' },
   { screen: 'futures', target: 'futures-position', title: '손익과 청산가격', body: '같은 포지션의 미실현손익과 청산가격을 확인해 주세요. 포지션 카드의 포지션 종료를 누르고, 열린 화면에서 100%로 포지션 종료를 실행해 주세요. 강제청산은 종료 실습에 포함되지 않아요.' },
 ];

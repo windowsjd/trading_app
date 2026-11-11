@@ -15,7 +15,7 @@ const FORM_ID = 'futures-amount';
  * and the 주문가능 line. The screen owns the amount, the ratio and their rules.
  */
 export default function FuturesAmountField({ testID = FORM_ID, label, amount, onChange, editable, estimate, ratioLabel, ratio, activeRatio,
-  ratioDisabled, ratioReason, onRatio, available, availableTarget, onInputFocus, onInputBlur }: {
+  ratioDisabled, ratioReason, onRatio, available, availableTarget, amountTarget, ratioTarget, onInputFocus, onInputBlur }: {
   /** The trade form's ids by default; another field (the 포지션 종료 sheet's) names its own. */
   testID?: string;
   label: string;
@@ -34,6 +34,14 @@ export default function FuturesAmountField({ testID = FORM_ID, label, amount, on
   available: string;
   /** The beginner guide's 선물 지갑 준비 step points at the 주문가능 line. */
   availableTarget?: React.Ref<View>;
+  /**
+   * The guide's entry step points at the amount input and at the ratio slider
+   * with its quick ratios, each on its own (2026-11-11): together they can be
+   * taller than a small screen with large text, where one block left the
+   * guide's card no place but over the amount input itself.
+   */
+  amountTarget?: React.Ref<View>;
+  ratioTarget?: React.Ref<View>;
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
 }) {
@@ -46,7 +54,7 @@ export default function FuturesAmountField({ testID = FORM_ID, label, amount, on
   };
   return (
     <View style={styles.stack} testID={`${testID}-field`}>
-      <View style={styles.group}>
+      <View ref={amountTarget} collapsable={false} style={styles.group}>
         <Text style={styles.label}>{label}</Text>
         <OrderNumberInput
           accessibilityLabel={label}
@@ -66,6 +74,7 @@ export default function FuturesAmountField({ testID = FORM_ID, label, amount, on
           {estimate.map((line) => <Text key={line} style={styles.helper}>{line}</Text>)}
         </View>
       ) : null}
+      <View ref={ratioTarget} collapsable={false} style={styles.ratioTarget}>
       <View style={styles.group}>
         <View style={styles.ratioLabel}>
           <Text style={styles.label}>{ratioLabel}</Text>
@@ -106,6 +115,7 @@ export default function FuturesAmountField({ testID = FORM_ID, label, amount, on
         })}
       </View>
       {ratioReason ? <Text style={styles.helper} testID={ids.reason} accessibilityLiveRegion="polite">{ratioReason}</Text> : null}
+      </View>
       <View ref={availableTarget} collapsable={false} style={styles.group}>
         <Text style={styles.helper} testID={ids.available}>{available}</Text>
       </View>
@@ -116,6 +126,8 @@ export default function FuturesAmountField({ testID = FORM_ID, label, amount, on
 // The spot order form's ratio controls (OrderPanel), for one familiar look.
 const styles = StyleSheet.create({
   stack: { gap: 12, minWidth: 0 },
+  // The ratio controls as one target, laid out as they were in the stack.
+  ratioTarget: { gap: 12, minWidth: 0 },
   group: { gap: 4, minWidth: 0 },
   label: { fontSize: 12, color: semantic.muted },
   helper: { fontSize: 12, lineHeight: 18, color: semantic.secondary, flexShrink: 1 },

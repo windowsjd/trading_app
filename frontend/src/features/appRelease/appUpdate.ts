@@ -90,6 +90,32 @@ export function compareVersions(left: string, right: string): number | null {
   return 0;
 }
 
+/** A manifest read older than this is read again when the app comes back to the front. */
+export const RELEASE_RECHECK_MS = 30 * 60_000;
+/** A failed read is tried again on the next return to the app, but not sooner than this. */
+export const RELEASE_RETRY_MS = 5 * 60_000;
+
+/**
+ * Back in the foreground (2026-11-11): read the manifest again only when the
+ * last read is old enough to have missed a release published meanwhile, or
+ * failed a while ago — never on every switch back, never while a read runs.
+ * (React Query's own focus refetch is not wired to AppState in this app.)
+ */
+export function shouldRecheckRelease(read: {
+  now: number;
+  /** When the last successful read landed (0 = never). */
+  dataUpdatedAt: number;
+  /** When the last failed read landed (0 = never). */
+  errorUpdatedAt: number;
+  /** The latest read failed. */
+  failed: boolean;
+  fetching: boolean;
+}): boolean {
+  if (read.fetching) return false;
+  if (read.failed) return read.now - read.errorUpdatedAt >= RELEASE_RETRY_MS;
+  return read.dataUpdatedAt === 0 || read.now - read.dataUpdatedAt >= RELEASE_RECHECK_MS;
+}
+
 /** The notice this installed build should get, or null. */
 export function decideAppUpdate(manifest: AppReleaseManifest, installed: InstalledApp): AppUpdateNotice | null {
   if (!installed.production || !installed.version || !installed.applicationId) return null;

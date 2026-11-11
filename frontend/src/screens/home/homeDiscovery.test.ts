@@ -93,6 +93,47 @@ it('HOT uses the Market turnover DESC result and stable order for each category,
   for (const key of keys) { assert.ok(key.includes('preview')); assert.ok(key.includes('turnover')); assert.ok(key.includes(5)); assert.ok(!key.includes('season')); }
 });
 
+it('HOT tabs: a tap the device\'s Pressable dropped still switches; quick switches end on the last one; a failed market keeps its tab and says so', async t => {
+  const h = setup(); t.after(h.close); await flush();
+  const tab = (type: string) => h.node(`home-hot-tab-${type}`);
+  const selected = () => ['domestic_stock', 'us_stock', 'crypto'].filter(type => tab(type).props.accessibilityState.selected);
+  const touch = (x: number, y: number) => ({ nativeEvent: { identifier: 1, pageX: x, pageY: y, touches: [{ identifier: 1, pageX: x, pageY: y }], changedTouches: [{ identifier: 1, pageX: x, pageY: y }] } });
+  const lift = (x: number, y: number) => ({ nativeEvent: { identifier: 1, pageX: x, pageY: y, touches: [], changedTouches: [{ identifier: 1, pageX: x, pageY: y }] } });
+  // The 2026-11-11 device video: the press shows, onPress never comes, the finger lifts in place.
+  act(() => tab('crypto').props.onTouchStart(touch(250, 1330)));
+  act(() => tab('crypto').props.onTouchEnd(lift(251, 1331)));
+  await flush();
+  assert.deepEqual(selected(), ['crypto']);
+  assert.deepEqual(h.hotRows().map(n => n.props.testID), h.markets.crypto.map(a => `home-hot-item-${a.id}`));
+  // A scroll that started on a tab switches nothing (the native ScrollView cancels the touch).
+  act(() => tab('us_stock').props.onTouchStart(touch(160, 1330)));
+  act(() => tab('us_stock').props.onTouchCancel(lift(160, 1290)));
+  await flush();
+  assert.deepEqual(selected(), ['crypto']);
+  // Quick switches while every read is still on its way: the last tab wins, and the
+  // earlier answers, arriving late, never relabel it.
+  let release: () => void = () => {}; const gate = new Promise<void>(resolve => { release = resolve; });
+  h.beforeRead = async (r: any) => { if (r.section === 'hot') await gate; };
+  h.client.removeQueries({ queryKey: ['market'] });
+  for (const type of ['us_stock', 'domestic_stock', 'us_stock', 'domestic_stock']) act(() => tab(type).props.onPress());
+  await flush();
+  assert.deepEqual(selected(), ['domestic_stock']);
+  await act(async () => release()); await flush();
+  assert.deepEqual(selected(), ['domestic_stock']);
+  assert.deepEqual(h.hotRows().map(n => n.props.testID), h.markets.domestic_stock.map(a => `home-hot-item-${a.id}`));
+  // A market that fails to load keeps its tab selected and shows the error, never another market's rows.
+  h.beforeRead = async (r: any) => { if (r.section === 'hot' && r.assetType === 'us_stock') throw new Error('offline'); };
+  h.client.removeQueries({ queryKey: ['market'] });
+  await h.press('home-hot-tab-us_stock');
+  assert.deepEqual(selected(), ['us_stock']);
+  assert.equal(h.hotRows().length, 0);
+  const error = h.renderer.root.findAllByType('ErrorState').find((n: any) => n.props.title === 'HOT 종목을 불러오지 못했습니다.');
+  assert.ok(error);
+  h.beforeRead = async () => {};
+  await act(async () => error.props.onRetry()); await flush();
+  assert.deepEqual(h.hotRows().map(n => n.props.testID), h.markets.us_stock.map(a => `home-hot-item-${a.id}`));
+});
+
 it('HOT omits unavailable, invalid and inactive turnover without refilling; zero is valid', async t => {
   const h = setup(); t.after(h.close);
   h.markets.domestic_stock = [asset(0, 'domestic_stock'), { ...asset(1, 'domestic_stock'), turnover: '0' },

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { compareVersions, decideAppUpdate, parseAppReleaseManifest, type InstalledApp } from './appUpdate.ts';
+import { RELEASE_RECHECK_MS, RELEASE_RETRY_MS, compareVersions, decideAppUpdate, parseAppReleaseManifest, shouldRecheckRelease, type InstalledApp } from './appUpdate.ts';
 
 const manifest = parseAppReleaseManifest({
   android: { packageName: 'com.nanghwa.tradingclass', latestVersion: '1.0.2', notes: '주문 화면이 더 빨라졌어요.' },
@@ -64,5 +64,21 @@ describe('앱 업데이트 안내 rules', () => {
     // Notes are optional and short; too long is dropped, the notice stays.
     const long = parseAppReleaseManifest({ android: { packageName: 'com.nanghwa.tradingclass', latestVersion: '1.0.2', notes: 'x'.repeat(301) } });
     assert.equal(decideAppUpdate(long, android)?.notes, null);
+  });
+
+  it('back in the foreground: read again only after 30 minutes, or 5 minutes after a failure; never during a read', () => {
+    const now = 10_000_000;
+    const read = (overrides: Partial<Parameters<typeof shouldRecheckRelease>[0]>) =>
+      shouldRecheckRelease({ now, dataUpdatedAt: 0, errorUpdatedAt: 0, failed: false, fetching: false, ...overrides });
+    assert.equal(RELEASE_RECHECK_MS, 30 * 60_000);
+    assert.equal(RELEASE_RETRY_MS, 5 * 60_000);
+    assert.equal(read({}), true, 'never read yet');
+    assert.equal(read({ dataUpdatedAt: now - 60_000 }), false, 'read a minute ago: switching apps does not ask again');
+    assert.equal(read({ dataUpdatedAt: now - RELEASE_RECHECK_MS + 1 }), false);
+    assert.equal(read({ dataUpdatedAt: now - RELEASE_RECHECK_MS }), true, 'a release may have been published meanwhile');
+    assert.equal(read({ failed: true, errorUpdatedAt: now - 60_000 }), false, 'a recent failure is not retried at once');
+    assert.equal(read({ failed: true, errorUpdatedAt: now - RELEASE_RETRY_MS }), true);
+    assert.equal(read({ failed: true, errorUpdatedAt: now - RELEASE_RETRY_MS, dataUpdatedAt: now - 1 }), true, 'a failed re-read is retried on its own clock');
+    assert.equal(read({ fetching: true }), false);
   });
 });

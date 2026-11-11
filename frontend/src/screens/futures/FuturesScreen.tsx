@@ -1104,8 +1104,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         />
                       </View>
                     ) : null}
-                    {/* The beginner entry step spotlights the amount with its ratio controls (QUEST 09·10). */}
-                    <View ref={questGuideTarget('futures-input')} collapsable={false} style={styles.amountTarget}>
+                    {/* The beginner entry step spotlights the amount and its ratio controls (QUEST 09·10). */}
                     <FuturesAmountField
                       label={amountLabel}
                       amount={amount}
@@ -1120,10 +1119,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                       onRatio={applyRatio}
                       available={availableText}
                       availableTarget={questGuideTarget('futures-funding')}
+                      amountTarget={questGuideTarget('futures-amount')}
+                      ratioTarget={questGuideTarget('futures-ratio')}
                       onInputFocus={inputScroll.onInputFocus}
                       onInputBlur={inputScroll.onInputBlur}
                     />
-                    </View>
                     {amount.trim() && inputError ? (
                       <Text testID="futures-amount-error" accessibilityLiveRegion="polite" style={styles.error}>{inputError}</Text>
                     ) : null}
@@ -1371,7 +1371,6 @@ function hasNoFreeCollateral(value: string | null) {
 
 const styles = StyleSheet.create({
   // The amount field as one guide target; never wider than its column (RN Web).
-  amountTarget: { minWidth: 0 },
   screen: { flex: 1, backgroundColor: semantic.screen },
   // The spot order screen's spacing (12px sides, 12px between sections).
   content: {

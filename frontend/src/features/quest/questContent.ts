@@ -163,4 +163,24 @@ export const QUEST_GUIDE_COPY = {
   celebrationNote: '퀘스트 목록으로 이동할게요.',
   held: '안내 종료 후 이용할 수 있어요.',
   actions: { next: '다음', exit: '안내 종료', retry: '다시 확인', back: '퀘스트로 돌아가기', transfer: '이체하기' },
+  /** A step whose controls are pointed at one at a time (2026-11-11): the card moves the ring on. */
+  focus: { next: '다른 항목 보기' },
 } as const;
+
+/**
+ * What each control of a several-control step is, read out with 다른 항목 보기
+ * so a screen reader user hears which one the ring is on (2026-11-11).
+ */
+export const QUEST_TARGET_NAMES: Readonly<Record<string, string>> = {
+  'order-input': '금액·수량 입력칸',
+  'order-price': '지정가격 입력칸',
+  'order-ratio': '비율 조절바와 비율 버튼',
+  'fx-amount': '환전 금액 입력칸',
+  'fx-ratio': '비율 조절바와 비율 버튼',
+  'transfer-amount': '이체 금액 입력칸',
+  'transfer-ratio': '비율 조절바와 비율 버튼',
+  'transfer-available': '이체 가능 금액',
+  'futures-amount': '주문 금액 입력칸',
+  'futures-ratio': '비율 조절바와 비율 버튼',
+  'futures-submit': '진입 버튼',
+};

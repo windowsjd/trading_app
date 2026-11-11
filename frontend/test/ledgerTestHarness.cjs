@@ -145,6 +145,8 @@ function load(file, mocks) {
     if (file.includes('/features/ranking/') && name === './api') return mocks['../../features/ranking/api'] ?? load(resolve(dirname(file), 'api.ts'), mocks);
     // Expo's native constants (the embedded app config): empty unless a test passes its own.
     if (name === 'expo-constants') return { __esModule: true, default: { expoConfig: { extra: {} } } };
+    // Expo's installed-app facts (native version/build): unknown unless a test passes its own.
+    if (name === 'expo-application') return mocks['expo-application'] ?? { __esModule: true, nativeApplicationVersion: null, nativeBuildVersion: null, applicationId: null };
     if (name.startsWith('.')) {
       const tsx = resolve(dirname(file), name + '.tsx');
       if (existsSync(tsx)) return load(tsx, mocks);

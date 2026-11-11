@@ -35,7 +35,7 @@ const baseMe: MeDto = {
   portfolioPublic: true,
 };
 
-function settingsHarness(portfolioPublic = true, constants?: unknown) {
+function settingsHarness(portfolioPublic = true, constants?: unknown, application?: unknown) {
   const h = {
     serverMe: { ...baseMe, portfolioPublic },
     nextResponse: null as MeDto | null,
@@ -104,6 +104,8 @@ function settingsHarness(portfolioPublic = true, constants?: unknown) {
     },
     // The embedded app config (EAS build stamp); the loader's empty config otherwise.
     ...(constants ? { 'expo-constants': constants } : {}),
+    // The installed build's native version and build number; unknown otherwise.
+    ...(application ? { 'expo-application': application } : {}),
   }).default;
 
   const element = () =>
@@ -152,6 +154,17 @@ describe('Settings 앱 정보', () => {
     t.after(local.close);
     await local.mount();
     assert.equal(local.node('settings-build').props.children, '개발 빌드');
+  });
+
+  it('shows the installed build\'s own version and build number, never a fixed one', async (t) => {
+    const installed = settingsHarness(true, undefined, { __esModule: true, nativeApplicationVersion: '1.0.2', nativeBuildVersion: '14' });
+    t.after(installed.close);
+    await installed.mount();
+    assert.equal(installed.node('settings-version').props.children, '앱 버전 1.0.2 (빌드 14)');
+    const unknown = settingsHarness(true);
+    t.after(unknown.close);
+    await unknown.mount();
+    assert.equal(unknown.node('settings-version').props.children, '앱 버전 확인 불가', 'web or unreadable: said so');
   });
 });
 

@@ -344,10 +344,11 @@ test('amount steps spotlight their price and ratio controls with the input; 다�
   if (marketType.kind !== 'spotlight') assert.fail('the 주문방식 step');
   assert.deepEqual([marketType.targets, marketType.card.hint], [['order-type'], null]);
 });
-test('a futures entry spotlights the amount field with 진입, the button first', () => {
+test('a futures entry spotlights its amount input and ratio controls with 진입, each its own target', () => {
   for (const quest of ['futuresLong', 'futuresShort'] as const) {
     const step = TRADING_GUIDE_STEPS[quest][4];
-    assert.deepEqual([step.target, step.targets], ['futures-submit', ['futures-submit', 'futures-input']]);
+    // Separate targets (2026-11-11): one at a time, each fits beside the card on a small screen.
+    assert.deepEqual([step.target, step.targets], ['futures-submit', ['futures-submit', 'futures-amount', 'futures-ratio']]);
     assert.match(step.body, /주문 금액을 입력하거나 비율로 정하고/);
   }
   // Every other futures step keeps one target (leverage sits in futures-margin).

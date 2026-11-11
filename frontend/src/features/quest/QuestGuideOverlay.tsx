@@ -26,7 +26,7 @@ import {
   type QuestGuideScreen,
   type QuestGuideTargetId,
 } from './questGuideBridge';
-import { QUEST_CARDS, QUEST_GUIDE_COPY } from './questContent';
+import { QUEST_CARDS, QUEST_GUIDE_COPY, QUEST_TARGET_NAMES } from './questContent';
 import {
   HEADER_TARGET,
   VIEWPORT_TARGET,
@@ -148,33 +148,54 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
   const measuring = view.kind === 'spotlight' || view.kind === 'message';
   const viewKey = measuring ? view.anchor : null;
   const screen = measuring ? view.screen : null;
-  // A step's extra controls (an amount's ratio slider and buttons, a futures
-  // entry's amount field) give way, last first, while the step's controls
-  // together leave its card no place but on top of them (small screens, large
-  // text). Its first target always stays.
-  const [crowded, setCrowded] = useState<{ anchor: string; drop: number } | null>(null);
-  const drop = view.kind === 'spotlight' && crowded?.anchor === view.anchor ? crowded.drop : 0;
-  const shownTargets = view.kind === 'spotlight' ? view.targets.slice(0, Math.max(1, view.targets.length - drop)) : [];
+  // A step's several controls (an amount and its ratio slider and buttons, a
+  // limit price, a futures entry and its amount field) are spotlit together.
+  // When together they leave the card no place but on top of them (small
+  // screens, large text), the step points at them ONE AT A TIME, top to bottom,
+  // and its card offers 다른 항목 보기 to move the ring on (2026-11-11): none is
+  // left out (before, the last ones gave way for good and were never shown).
+  // `visit` counts the controls shown so far: each one gets its own card layer,
+  // which first lets the screen make room beside that control.
+  const [sequence, setSequence] = useState<{ anchor: string; order: QuestGuideTargetId[]; focus: number; visit: number } | null>(null);
+  const inSequence = view.kind === 'spotlight' && sequence !== null && sequence.anchor === view.anchor;
+  const shownTargets = view.kind === 'spotlight'
+    ? inSequence ? [sequence.order[sequence.focus]] : view.targets
+    : [];
   const targetList = shownTargets.join(',');
+  const layerKey = viewKey && inSequence ? `${viewKey}|${targetList}|${sequence.visit}` : viewKey;
+  // Where each target was last measured (window y): the one-at-a-time order.
+  const targetTops = useRef<Partial<Record<QuestGuideTargetId, number>>>({});
   // The topmost shown target, as last measured: revealing it shows the rest below.
   const topTarget = useRef<QuestGuideTargetId | null>(null);
   const firstTarget = shownTargets[0] ?? null;
-  const headerTarget = view.kind === 'spotlight' && view.targets.length === 1 ? HEADER_TARGET[view.targets[0]] ?? null : null;
+  const headerTarget = shownTargets.length === 1 ? HEADER_TARGET[shownTargets[0]] ?? null : null;
   // A target in a bottom sheet: the sheet (over the screen and its tab bar)
   // decides what of it is visible, and the card may use the whole screen.
-  const sheetTarget = view.kind === 'spotlight' ? SHEET_VIEWPORT[view.targets[0]] ?? null : null;
+  const sheetTarget = firstTarget ? SHEET_VIEWPORT[firstTarget] ?? null : null;
 
-  // Once per step: before shrinking a card that does not fit, let the screen
-  // scroll the control toward the top to make room for it.
+  // Once per step (and per control shown in turn): before shrinking a card
+  // that does not fit, let the screen scroll the control toward the top to
+  // make room for it.
   const requestRoom = useCallback(() => {
-    if (!viewKey || !screen || !firstTarget || roomRequested.current.has(viewKey)) return false;
-    roomRequested.current.add(viewKey);
+    if (!layerKey || !screen || !firstTarget || roomRequested.current.has(layerKey)) return false;
+    roomRequested.current.add(layerKey);
     revealQuestGuideTarget(screen, topTarget.current ?? firstTarget);
     return true;
-  }, [viewKey, screen, firstTarget]);
+  }, [layerKey, screen, firstTarget]);
   const anchor = view.kind === 'spotlight' ? view.anchor : null;
-  const giveWay = useCallback(() => setCrowded(current => anchor === null ? current
-    : { anchor, drop: (current?.anchor === anchor ? current.drop : 0) + 1 }), [anchor]);
+  const allTargets = view.kind === 'spotlight' ? view.targets.join(',') : '';
+  // Together they crowd the card out: one at a time from now on in this step,
+  // top to bottom as last measured (the step's order breaks ties).
+  const splitUp = useCallback(() => {
+    if (anchor === null) return;
+    const ids = allTargets ? allTargets.split(',') as QuestGuideTargetId[] : [];
+    if (ids.length < 2) return;
+    const order = ids.map((id, index) => ({ id, index, top: targetTops.current[id] ?? Number.POSITIVE_INFINITY }))
+      .sort((a, b) => a.top - b.top || a.index - b.index).map(item => item.id);
+    setSequence(current => current?.anchor === anchor ? current : { anchor, order, focus: 0, visit: 0 });
+  }, [anchor, allTargets]);
+  const showNext = useCallback(() => setSequence(current => current && current.anchor === anchor
+    ? { ...current, focus: (current.focus + 1) % current.order.length, visit: current.visit + 1 } : current), [anchor]);
 
   useEffect(() => {
     if (!viewKey || !screen) {
@@ -212,6 +233,7 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
       const clip = sheet ? intersectRects(local(sheet), area) : area;
       let hole: GuideRect | null = null;
       const rects = parts.filter((part): part is GuideRect => !!part).map(local);
+      targets.forEach((id, index) => { if (rects[index]) targetTops.current[id] = rects[index].y; });
       const top = rects.reduce((best, rect, index) => rect.y < rects[best].y ? index : best, 0);
       topTarget.current = targets[top] ?? null;
       let union = unionRects(rects);
@@ -268,7 +290,7 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
       {dim && quest ? <SpotlightDim root={dim.root} hole={current?.hole ?? null} fadeIn={fadeIn} /> : null}
       {current && quest ? (
         <GuideLayer
-          key={view.anchor}
+          key={layerKey ?? view.anchor}
           frame={current}
           view={view}
           quest={quest}
@@ -276,7 +298,9 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, notice =
           shownAnchor={shownAnchor}
           onAction={onAction}
           requestRoom={requestRoom}
-          onCrowded={shownTargets.length > 1 ? giveWay : undefined}
+          onCrowded={!inSequence && shownTargets.length > 1 ? splitUp : undefined}
+          sequence={inSequence ? { index: sequence.focus, count: sequence.order.length, target: sequence.order[sequence.focus] } : null}
+          onShowNext={showNext}
         />
       ) : null}
       {held}
@@ -328,7 +352,9 @@ function SpotlightDim({ root, hole, fadeIn }: { root: GuideRect; hole: GuideRect
   );
 }
 
-function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, requestRoom, onCrowded }: {
+type GuideSequence = { index: number; count: number; target: QuestGuideTargetId };
+
+function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, requestRoom, onCrowded, sequence, onShowNext }: {
   frame: Frame;
   view: Extract<GuideView, { kind: 'spotlight' | 'message' }>;
   quest: BeginnerQuestKey;
@@ -337,8 +363,11 @@ function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, request
   shownAnchor: React.MutableRefObject<string | null>;
   onAction: (action: GuideAction, step: number | null) => void;
   requestRoom: () => boolean;
-  /** No place for the card but on the spotlit controls (after any room was made): drop one. */
+  /** No place for the card but on the spotlit controls (after any room was made): point at them one at a time. */
   onCrowded?: () => void;
+  /** The control pointed at now, of the step's several (one at a time). */
+  sequence: GuideSequence | null;
+  onShowNext: () => void;
 }) {
   const { colors, mode } = useAppearance();
   const initial = useRef(fadeIn).current;
@@ -445,6 +474,7 @@ function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, request
         }]}
       >
         <GuideCardContent card={view.card} quest={quest} compact={compact} scrolls={placed?.maxHeight != null}
+          sequence={sequence} onShowNext={onShowNext}
           onHeadLayout={keep(setHeadHeight)} onTextLayout={keep(setTextHeight)} onActionsLayout={keep(setActionsHeight)}
           onAction={action => onAction(action, view.kind === 'spotlight' ? view.step : null)} />
       </Animated.View>
@@ -459,11 +489,13 @@ const ACTION_LABEL: Record<Exclude<GuideAction, 'next'>, string> = {
   transfer: QUEST_GUIDE_COPY.actions.transfer,
 };
 
-function GuideCardContent({ card, quest, compact, scrolls, onHeadLayout, onTextLayout, onActionsLayout, onAction }: {
+function GuideCardContent({ card, quest, compact, scrolls, sequence, onShowNext, onHeadLayout, onTextLayout, onActionsLayout, onAction }: {
   card: GuideCard;
   quest: BeginnerQuestKey;
   compact: boolean;
   scrolls: boolean;
+  sequence: GuideSequence | null;
+  onShowNext: () => void;
   onHeadLayout: (event: LayoutChangeEvent) => void;
   onTextLayout: (event: LayoutChangeEvent) => void;
   onActionsLayout: (event: LayoutChangeEvent) => void;
@@ -499,6 +531,14 @@ function GuideCardContent({ card, quest, compact, scrolls, onHeadLayout, onTextL
           <Text style={styles.formNotice} testID="quest-guide-form-notice" accessibilityLiveRegion="polite">{card.notice}</Text>
         ) : null}
         {card.busy ? <WhaleLoader size={20} /> : null}
+        {sequence ? (
+          // One of the step's controls at a time: move the ring to the next one.
+          <ActionPressable testID="quest-guide-show-next" accessibilityRole="button"
+            accessibilityLabel={`${sequence.count}개 중 ${sequence.index + 1}번째, ${QUEST_TARGET_NAMES[sequence.target] ?? '강조 항목'}. ${QUEST_GUIDE_COPY.focus.next}`}
+            onPress={onShowNext} style={styles.textButton}>
+            <Text style={[styles.textButtonLabel, styles.showNextLabel]}>{QUEST_GUIDE_COPY.focus.next} {sequence.index + 1}/{sequence.count}</Text>
+          </ActionPressable>
+        ) : null}
         {card.actions.map(action => (
           <ActionPressable key={action} testID={`quest-guide-${action}`} accessibilityRole="button"
             accessibilityLabel={ACTION_LABEL[action as Exclude<GuideAction, 'next'>]}
@@ -547,6 +587,7 @@ const styles = StyleSheet.create({
   textButton: { minHeight: 44, minWidth: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   textButtonLabel: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.secondary, textAlign: 'center' },
   fundingLabel: { fontWeight: '700', color: semantic.info },
+  showNextLabel: { color: semantic.info },
   formNotice: { flexBasis: '100%', fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.warning },
   nextButton: {
     minHeight: 44,

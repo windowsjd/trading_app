@@ -7,25 +7,31 @@
 // step card must stay on screen without covering the shown targets — except
 // the documented last resort, listed, where a target is taller than the screen
 // and not even the smallest card fits beside it. Every step shown must hold
-// still long enough to be sampled (the script waits for it). A step's extra
-// targets that gave way to the card (small screens, large text), and a current
-// step that drew nothing for a second or more, are listed. Build-time only, this script exposes the overlay's current view and
+// still long enough to be sampled (the script waits for it). A step whose
+// controls together crowd its card out points at them one at a time (2026-11-11):
+// the script presses 다른 항목 보기 through every one, samples each, and fails
+// a step any of whose controls was never ringed. A current step that drew
+// nothing for a second or more is listed. Build-time only, this script exposes the overlay's current view and
 // the bridge's target lookup on globalThis (an esbuild onLoad patch).
 //
 // NODE_PATH=<playwright+esbuild> BROWSER_EXECUTABLE_PATH=<chromium> node test/browser/questSpotlightBrowser.cjs
-//   QUEST_SPOTLIGHT_CONFIGS=base,nav3,compact,mid (default all) · QUEST_SPOTLIGHT_OUTPUT=<dir>
+//   QUEST_SPOTLIGHT_CONFIGS=base,nav3,compact,mid,small,wide,large (default all) · QUEST_SPOTLIGHT_OUTPUT=<dir>
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const assert = require('node:assert/strict');
 const esbuild = require('esbuild'), { chromium } = require('playwright');
 const front = path.resolve(__dirname, '../..');
 const browserDir = __dirname;
 const out = process.env.QUEST_SPOTLIGHT_OUTPUT ?? '/tmp/trading-quest-spotlight';
-const configs = (process.env.QUEST_SPOTLIGHT_CONFIGS ?? 'base,nav3,compact,mid').split(',');
+const configs = (process.env.QUEST_SPOTLIGHT_CONFIGS ?? 'base,nav3,compact,mid,small,wide,large').split(',');
 const CONFIG = {
   base: { width: 390, height: 844, query: '' },
   nav3: { width: 390, height: 844, query: 'topInset=24&bottomInset=48' },
   compact: { width: 320, height: 740, query: 'fontScale=2&theme=dark', reduced: true },
   mid: { width: 360, height: 780, query: 'fontScale=1.3&bottomInset=24&topInset=24' },
+  // 2026-11-11: the narrowest phone at normal text, the widest, and large text on Android's 3-button bar.
+  small: { width: 320, height: 640, query: 'topInset=24&bottomInset=48' },
+  wide: { width: 430, height: 932, query: 'topInset=24&bottomInset=48' },
+  large: { width: 390, height: 844, query: 'fontScale=1.5&topInset=24&bottomInset=48' },
 };
 
 const patch = { name: 'audit-hooks', setup(b) {
@@ -94,14 +100,18 @@ function sampler() {
   const loop = () => {
     try {
       const view = globalThis.__questView;
-      if (view?.kind === 'spotlight') { window.__seen ??= {}; window.__seen[view.anchor] = (window.__seen[view.anchor] ?? 0) + 1; }
+      const shownNow = typeof globalThis.__questShown === 'string' && globalThis.__questShown ? globalThis.__questShown : view?.targets?.join(',');
+      // One sample per control shown: a step pointing at its controls one at a time has one per control.
+      const sampleKey = view?.kind === 'spotlight' ? `${view.anchor}|${shownNow}` : null;
+      window.__sampleKey = sampleKey;
+      if (view?.kind === 'spotlight') { window.__seen ??= {}; window.__seen[sampleKey] = (window.__seen[sampleKey] ?? 0) + 1; }
       const ring = document.querySelector('[data-testid="quest-guide-ring"]');
       const card = document.querySelector('[data-testid="quest-guide-card"]');
       // The current step drawing nothing (its targets scrolled out of sight, a transition).
-      if (view?.kind === 'spotlight' && !card) { window.__blank ??= {}; window.__blank[view.anchor] = (window.__blank[view.anchor] ?? 0) + 1; }
+      if (view?.kind === 'spotlight' && !card) { window.__blank ??= {}; window.__blank[sampleKey] = (window.__blank[sampleKey] ?? 0) + 1; }
       if (view?.kind === 'spotlight' && card && opacity(card) > 0.99 && !ring) {
         window.__noRing ??= {};
-        window.__noRing[view.anchor] = (window.__noRing[view.anchor] ?? 0) + 1;
+        window.__noRing[sampleKey] = (window.__noRing[sampleKey] ?? 0) + 1;
       }
       if (view?.kind === 'spotlight' && ring && card && opacity(card) > 0.99 && opacity(ring) > 0.99) {
         const shownIds = typeof globalThis.__questShown === 'string' && globalThis.__questShown ? globalThis.__questShown.split(',') : view.targets;
@@ -127,7 +137,8 @@ function sampler() {
           const cardBox = R(card.getBoundingClientRect());
           const text = card.querySelector('[data-testid="quest-guide-text"]');
           const sample = {
-            anchor: view.anchor, targetIds: view.targets, shownIds, dropped: view.targets.filter((id) => !shownIds.includes(id)),
+            anchor: view.anchor, key: sampleKey, targetIds: view.targets, shownIds, oneAtATime: shownIds.length < view.targets.length,
+            pager: card.querySelector('[data-testid="quest-guide-show-next"]')?.textContent ?? null,
             pageScrollX: scrollX, docWidth: document.documentElement.scrollWidth, step: card.querySelector('[data-testid="quest-guide-step"]')?.textContent ?? null,
             title: view.card.title, body: view.card.body.slice(0, 40), next: view.card.next,
             targets, drawn, ring: ringBox, card: cardBox,
@@ -150,10 +161,10 @@ function sampler() {
             && (cardBox.top + cardBox.bottom < ringBox.top + ringBox.bottom) === (roomAbove >= roomBelow);
           sample.room = { above: roomAbove, below: roomBelow };
           const round = (r) => [r.left, r.top, r.right, r.bottom].map(Math.round);
-          const key = JSON.stringify([sample.anchor, round(sample.targets), round(sample.ring), round(sample.card)]);
+          const key = JSON.stringify([sample.key, round(sample.targets), round(sample.ring), round(sample.card)]);
           stable = key === last ? stable + 1 : 0;
           last = key;
-          if (stable === 20) window.__audit[view.anchor] = sample;
+          if (stable === 20) window.__audit[sampleKey] = sample;
         }
       } else { last = null; stable = 0; }
     } catch (error) { window.__auditError = String(error?.stack ?? error); }
@@ -187,18 +198,44 @@ async function runConfig(name, browser, base) {
       let o = 1; for (let n = card; n; n = n.parentElement) o *= Number(getComputedStyle(n).opacity);
       return o > 0.99;
     }, undefined, { timeout: 4000 }).catch(() => undefined);
-    // The current spotlight step has held still long enough to be sampled.
-    await page.waitForFunction(() => {
+    // The current spotlight step (the control shown now) has held still long enough to be sampled.
+    const sampled = () => page.waitForFunction(() => {
       const view = globalThis.__questView;
-      return view?.kind !== 'spotlight' || !!window.__audit?.[view.anchor];
+      return view?.kind !== 'spotlight' || !!window.__audit?.[window.__sampleKey];
     }, undefined, { timeout: 4000 }).catch(() => undefined);
+    await sampled();
     await page.waitForTimeout(450);
+    // A step pointing at its controls one at a time: show and sample every one, then come back to the first.
+    const pager = page.getByTestId('quest-guide-show-next').filter({ visible: true });
+    if (await pager.count()) {
+      const count = Number((await pager.first().textContent())?.match(/\/(\d+)/)?.[1] ?? 1);
+      for (let index = 1; index <= count; index += 1) {
+        // A pointer press can land on the dimmed screen's control under the card at large text; a keyboard press cannot.
+        // Focus without scrolling: a browser focus may scroll an overflow-hidden container sideways (web only).
+        await pager.first().evaluate((el) => el.focus({ preventScroll: true })); await page.keyboard.press('Enter');
+        await page.waitForTimeout(300);
+        await sampled();
+        await page.waitForTimeout(150);
+      }
+    }
   };
   const next = async () => {
     await id('quest-guide-next').waitFor();
     await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="quest-guide-next"]')].some(el => el.checkVisibility() && el.getAttribute('aria-disabled') !== 'true'));
     await settle(450);
     await id('quest-guide-next').click();
+  };
+  // A step shown one control at a time: bring the ring to the control about to be pressed, as a user does
+  // with 다른 항목 보기 (the card beside another control may sit over it).
+  const showControl = async (target) => {
+    for (let index = 0; index < 4; index += 1) {
+      const shown = await page.evaluate(() => (typeof globalThis.__questShown === 'string' ? globalThis.__questShown : ''));
+      if (!shown || shown.split(',').includes(target)) return;
+      const pager = page.getByTestId('quest-guide-show-next').filter({ visible: true });
+      if (!(await pager.count())) return;
+      await pager.first().evaluate((el) => el.focus({ preventScroll: true })); await page.keyboard.press('Enter');
+      await page.waitForTimeout(700);
+    }
   };
   const open = async (query) => { await page.goto(`${base}/?${query}${cfg.query ? '&' + cfg.query : ''}`); await id('home-account-title').waitFor(); };
   // The beginner's 퀘스트 is a hidden tab opened from Home's header (2026-11-07): navigate as that button does.
@@ -275,7 +312,8 @@ async function runConfig(name, browser, base) {
     await id('futures-leverage-select').click(); await id('futures-leverage-option-2').waitFor(); await settle(900); await shot(`${key}-leverage`);
     await id('futures-leverage-option-2').click(); await page.waitForFunction(() => !document.querySelector('[data-testid="futures-leverage-sheet"]'));
     await next(); await settle(); await shot(`${key}-submit-empty`);
-    await id('futures-amount').fill('102'); await settle(); await shot(`${key}-submit`); await id('futures-submit').click();
+    await id('futures-amount').fill('102'); await settle(); await shot(`${key}-submit`);
+    await showControl('futures-submit'); await id('futures-submit').click();
     await settle(900); await shot(`${key}-position`);
     // The position card can be taller than the screen: press as a keyboard user would (the guide card may sit over it).
     const close = page.getByRole('button', { name: '포지션 종료', exact: true }).filter({ visible: true }).first();
@@ -292,6 +330,7 @@ async function runConfig(name, browser, base) {
 }
 
 (async () => {
+  if (process.env.QUEST_SPOTLIGHT_REPORT) return summarize(JSON.parse(fs.readFileSync(process.env.QUEST_SPOTLIGHT_REPORT, 'utf8')));
   await build();
   const server = http.createServer((req, res) => {
     const script = req.url.startsWith('/app.js');
@@ -310,24 +349,41 @@ async function runConfig(name, browser, base) {
     }
   } finally { await browser.close(); server.close(); }
   fs.writeFileSync(path.join(out, 'quest-spotlight.json'), JSON.stringify(report, null, 2));
+  summarize(report);
+})().catch((e) => { console.error(e); process.exit(1); });
+
+function summarize(report) {
   let failed = false;
   for (const r of report) {
     if (r.failed) { console.log(`CONFIG ${r.name} FAILED: ${r.failed}`); failed = true; continue; }
     const samples = Object.values(r.samples);
     const bad = samples.filter((s) => !s.ringCoversTargets || !s.ringCoversDrawn || !s.ringOnScreen || !s.cardOnScreen || (s.cardCoversTarget && !s.lastResort));
-    console.log(`CONFIG ${r.name}: quests ${r.done.length}/10 [${r.done.join(',')}], steps sampled ${samples.length}, problems ${bad.length}, pageErrors ${r.errors.length}${r.auditError ? ', auditError ' + r.auditError.slice(0, 200) : ''}`);
-    for (const s of samples.filter((x) => x.dropped.length)) console.log('  ↘ gave way', s.anchor, '→ dropped', s.dropped.join(','));
+    console.log(`CONFIG ${r.name}: quests ${r.done.length}/10 [${r.done.join(',')}], steps ${new Set(samples.map((s) => s.anchor)).size}, samples ${samples.length}, problems ${bad.length}, pageErrors ${r.errors.length}${r.auditError ? ', auditError ' + r.auditError.slice(0, 200) : ''}`);
+    // Every control of every step must have been ringed (together, or in its turn).
+    const steps = new Map();
+    for (const s of samples) { const step = steps.get(s.anchor) ?? { targets: s.targetIds, ringed: new Set(), turns: 0 }; s.shownIds.forEach((id) => step.ringed.add(id)); if (s.oneAtATime) step.turns += 1; steps.set(s.anchor, step); }
+    const missed = [...steps].filter(([, step]) => step.targets.some((id) => !step.ringed.has(id)));
+    for (const [anchor, step] of missed) console.log('  ✗ never ringed', anchor, '→', step.targets.filter((id) => !step.ringed.has(id)).join(','));
+    for (const [anchor, step] of [...steps].filter(([, step]) => step.turns)) console.log('  ↘ one at a time', anchor, `(${step.targets.length} controls, ${step.turns} sampled in turn)`);
+    r.missed = missed.length;
     for (const s of samples.filter((x) => x.cardCoversTarget && x.lastResort)) console.log('  ↘ last resort', s.anchor, `smallest card over a target taller than the screen (room above ${Math.round(s.room.above)}, below ${Math.round(s.room.below)}, card ${Math.round(s.card.bottom - s.card.top)})`);
     const unsampled = Object.keys(r.noRing ?? {}).filter((a) => !r.samples[a]);
     if (unsampled.length) console.log('  ○ card without ring (never sampled):', unsampled.join(' | '));
-    // Shown for about half a second or more (30 frames) yet never sampled: never verified.
-    const neverSampled = Object.entries(r.seen ?? {}).filter(([a, frames]) => frames >= 30 && !r.samples[a]).map(([a]) => a);
+    // Shown for about half a second or more (30 frames) yet never sampled: never verified. A step that
+    // went one at a time was first current with all its controls together while its card waited for
+    // room (hidden, never placed over them): that together phase is listed, not counted.
+    const togetherFirst = ([key]) => { const [anchor, shown] = key.split('|'); const step = steps.get(anchor);
+      return !!step && step.turns > 0 && shown === step.targets.join(','); };
+    const notSampled = Object.entries(r.seen ?? {}).filter(([a, frames]) => frames >= 30 && !r.samples[a]);
+    const neverSampled = notSampled.filter((entry) => !togetherFirst(entry)).map(([a]) => a);
+    const waited = notSampled.filter(togetherFirst).map(([a, frames]) => `${a.split('|')[0]} (${frames} frames)`);
+    if (waited.length) console.log('  · together before one at a time (card held back while crowded):', waited.join(' | '));
     if (neverSampled.length) console.log('  ✗ shown but never sampled:', neverSampled.join(' | '));
     // Informational: a current step that drew nothing for a second or more (e.g. typing scrolled its control away).
     for (const [a, frames] of Object.entries(r.blank ?? {}).filter(([, frames]) => frames >= 60)) console.log('  ◌ blank while current', a, `${frames} frames`);
-    if (bad.length || neverSampled.length || r.done.length !== 10 || r.errors.length || r.auditError) failed = true;
+    if (bad.length || neverSampled.length || r.missed || r.done.length !== 10 || r.errors.length || r.auditError) failed = true;
     for (const s of bad) console.log('  ✗', s.anchor, JSON.stringify({ scrollX: s.pageScrollX, docWidth: s.docWidth, title: s.title, targetIds: s.targetIds, coversTargets: s.ringCoversTargets, coversDrawn: s.ringCoversDrawn, ringOnScreen: s.ringOnScreen, cardOnScreen: s.cardOnScreen, cardCoversTarget: s.cardCoversTarget, ring: s.ring, targets: s.targets, drawn: s.drawn }));
   }
   if (failed) process.exitCode = 1;
   else console.log('quest spotlight browser checks passed');
-})().catch((e) => { console.error(e); process.exit(1); });
+}

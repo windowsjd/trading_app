@@ -35,7 +35,7 @@ it('lists the execution gap notice collapsed, and its header toggles the content
   const toggle = h.find(`notice-${id}-toggle`);
   assert.equal(toggle.props.accessibilityRole, 'button');
   assert.equal(toggle.props.accessibilityState.expanded, false);
-  assert.equal(toggle.props.accessibilityLabel, '체결괴리 방지시스템 안내, 2026.10.12');
+  assert.equal(toggle.props.accessibilityLabel, '체결괴리 방지시스템 안내, 2026.11.11');
   assert.equal(h.find(`notice-${id}-body`) === undefined, true);
   act(() => toggle.props.onPress());
   assert.equal(h.find(`notice-${id}-toggle`).props.accessibilityState.expanded, true);
@@ -59,15 +59,15 @@ it('a link with noticeId opens that notice and scrolls to it, also when the scre
 const published = {
   id: '0190a2b4-0000-7000-8000-000000000001',
   title: '서버 점검 안내',
-  // 2026-11-11 00:30 KST: newer than every app notice (the newest is 2026-11-10).
-  publishedAt: '2026-11-10T15:30:00.000Z',
+  // 2026-11-12 00:30 KST: newer than every app notice (the newest is 2026-11-11).
+  publishedAt: '2026-11-11T15:30:00.000Z',
   sections: [{ heading: '점검 시간', paragraphs: ['10월 21일 02:00–03:00'] }],
 };
 
 it('lists an important notice published by an operator, newest first and marked', (t) => {
   const h = setup(t, undefined, { notices: [published] });
   const toggle = h.find(`notice-${published.id}-toggle`);
-  assert.equal(toggle.props.accessibilityLabel, '중요 공지, 서버 점검 안내, 2026.11.11');
+  assert.equal(toggle.props.accessibilityLabel, '중요 공지, 서버 점검 안내, 2026.11.12');
   const ids = h.renderer.root
     .findAll((node: any) => typeof node.type === 'string' && /^notice-[^]+-toggle$/.test(node.props.testID ?? ''))
     .map((node: any) => node.props.testID);

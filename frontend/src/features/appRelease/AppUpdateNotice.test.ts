@@ -14,6 +14,14 @@ const store = { platform: 'android', applicationId: 'com.nanghwa.tradingclass', 
 function noticeHarness(options: { installed?: unknown; manifest?: unknown; manifestError?: unknown } = {}) {
   const ui = interactionHarness('android');
   const h: any = { reads: 0, opened: [] as string[], openFailures: new Set<string>(), guide: null as unknown };
+  h.appListeners = new Set<(state: string) => void>();
+  ui.native.AppState = {
+    currentState: 'active',
+    addEventListener: (_type: string, listener: (state: string) => void) => {
+      h.appListeners.add(listener);
+      return { remove: () => h.appListeners.delete(listener) };
+    },
+  };
   ui.native.Linking = {
     openURL: async (url: string) => {
       h.opened.push(url);
@@ -25,8 +33,8 @@ function noticeHarness(options: { installed?: unknown; manifest?: unknown; manif
     './api': {
       getAppRelease: async () => {
         h.reads += 1;
-        if (options.manifestError) throw options.manifestError;
-        return options.manifest ?? release;
+        if (h.failNext ?? options.manifestError) throw h.failNext ?? options.manifestError;
+        return h.manifest ?? options.manifest ?? release;
       },
     },
     '../quest/QuestGuideProvider': { useQuestGuide: () => (h.guide ? { active: h.guide } : null) },
@@ -54,6 +62,14 @@ function noticeHarness(options: { installed?: unknown; manifest?: unknown; manif
     return read(h.node(id));
   };
   h.press = async (id: string) => { await act(async () => { await h.node(id).props.onPress(); }); await h.settle(); };
+  // The app goes to the background and comes back.
+  h.foreground = async () => { await act(async () => { for (const listener of [...h.appListeners]) listener('background'); for (const listener of [...h.appListeners]) listener('active'); }); await h.settle(); };
+  // The last read (or failure) happened this long ago.
+  h.age = (ms: number) => {
+    const query = h.client.getQueryCache().getAll()[0];
+    query.setState({ ...(query.state.dataUpdatedAt ? { dataUpdatedAt: query.state.dataUpdatedAt - ms } : {}),
+      ...(query.state.errorUpdatedAt ? { errorUpdatedAt: query.state.errorUpdatedAt - ms } : {}) });
+  };
   return h;
 }
 
@@ -116,5 +132,48 @@ describe('앱 업데이트 안내', () => {
     h.guide = null;
     await h.update();
     assert.equal(h.open(), true);
+  });
+
+  it('reads again when the app comes back after a while, so a version published meanwhile is heard of once', async (t) => {
+    const same = parseAppReleaseManifest({ android: { packageName: 'com.nanghwa.tradingclass', latestVersion: '1.0.1' }, ios: null });
+    const h = noticeHarness({ manifest: same });
+    await h.mount(); t.after(h.close);
+    assert.equal(h.reads, 1);
+    assert.equal(h.open(), false, 'the store has the installed version: nothing to say');
+    await h.foreground();
+    assert.equal(h.reads, 1, 'a quick switch back reads nothing');
+    // The operator records 1.0.3 once it is live on Google Play.
+    h.manifest = parseAppReleaseManifest({ android: { packageName: 'com.nanghwa.tradingclass', latestVersion: '1.0.3' }, ios: null });
+    h.age(30 * 60_000);
+    await h.foreground();
+    assert.equal(h.reads, 2, 'back after 30 minutes: read again');
+    assert.equal(h.open(), true);
+    assert.match(h.text('app-update-latest'), /새 버전\s*1\.0\.3/);
+    await h.press('app-update-later');
+    h.age(30 * 60_000);
+    await h.foreground();
+    assert.equal(h.reads, 3);
+    assert.equal(h.open(), false, 'the same version is not repeated in this run');
+  });
+
+  it('a failed read is tried again on a later return, not at once; builds that never ask never listen', async (t) => {
+    const h = noticeHarness();
+    h.failNext = Object.assign(new Error('Network Error'), { isAxiosError: true });
+    await h.mount(); t.after(h.close);
+    assert.equal(h.reads, 1);
+    assert.equal(h.open(), false);
+    await h.foreground();
+    assert.equal(h.reads, 1, 'just failed: no immediate retry');
+    h.failNext = undefined;
+    h.age(5 * 60_000);
+    await h.foreground();
+    assert.equal(h.reads, 2);
+    assert.equal(h.open(), true);
+
+    const dev = noticeHarness({ installed: { ...store, production: false } });
+    await dev.mount(); t.after(dev.close);
+    assert.equal(dev.appListeners.size, 0, 'development, preview and web builds do not even listen');
+    await dev.foreground();
+    assert.equal(dev.reads, 0);
   });
 });

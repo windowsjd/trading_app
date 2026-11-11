@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Linking, Text, View } from '../../theme/native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AppState, Linking, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import InlineBottomSheet from '../../components/common/InlineBottomSheet';
@@ -8,17 +8,21 @@ import { SheetPortal } from '../../components/common/ScreenSheetHost';
 import CTAButton from '../../components/common/CTAButton';
 import { useQuestGuide } from '../quest/QuestGuideProvider';
 import { getAppRelease } from './api';
-import { decideAppUpdate, type AppUpdateNotice as Notice, type InstalledApp } from './appUpdate';
+import { RELEASE_RECHECK_MS, decideAppUpdate, shouldRecheckRelease, type AppUpdateNotice as Notice, type InstalledApp } from './appUpdate';
 import { readInstalledApp } from './installedApp';
 
 /** Shown once per platform and version for the whole app run (a remount does not repeat it). */
 const shownThisRun = new Set<string>();
 
 /**
- * 앱 업데이트 안내 after the app's normal entry (inside MainTabs): a newer
- * version the store actually publishes (appUpdate.ts), never forced. It waits
- * while a beginner guide is on screen, and any failure (no manifest, no store
- * app, a read error) simply shows nothing or says so, never blocking the app.
+ * 앱 업데이트 안내 after the app's normal entry (inside MainTabs, signed in or
+ * browsing as a guest): a newer version the store actually publishes
+ * (appUpdate.ts), never forced. Read when the app starts and again when it
+ * comes back to the front after a while (shouldRecheckRelease), so a release
+ * published while the app sat in the background is still heard of in this
+ * run. It waits while a beginner guide is on screen, and any failure (no
+ * manifest, no store app, a read error) simply shows nothing or says so,
+ * never blocking the app.
  */
 export default function AppUpdateNotice() {
   const guiding = !!useQuestGuide()?.active;
@@ -34,9 +38,23 @@ export default function AppUpdateNotice() {
     queryKey: QUERY_KEYS.appRelease,
     queryFn: ({ signal }) => getAppRelease(signal),
     enabled: eligible,
-    staleTime: 30 * 60_000,
+    staleTime: RELEASE_RECHECK_MS,
     retry: false,
   });
+  // Read live from the cache when the app comes back: a result object kept
+  // from a render can be stale (React Query re-renders only for fields read).
+  const queryClient = useQueryClient();
+  const { refetch } = release;
+  useEffect(() => {
+    if (!eligible) return undefined;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      const read = queryClient.getQueryState(QUERY_KEYS.appRelease);
+      if (shouldRecheckRelease({ now: Date.now(), dataUpdatedAt: read?.dataUpdatedAt ?? 0, errorUpdatedAt: read?.errorUpdatedAt ?? 0,
+        failed: read?.status === 'error', fetching: read?.fetchStatus === 'fetching' })) void refetch();
+    });
+    return () => subscription.remove();
+  }, [eligible, queryClient, refetch]);
   const notice = useMemo(() => (installed && release.data ? decideAppUpdate(release.data, installed) : null), [installed, release.data]);
   const [open, setOpen] = useState<Notice | null>(null);
   useEffect(() => {

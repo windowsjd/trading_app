@@ -125,6 +125,48 @@ describe('SegmentedControl', () => {
     assert.equal(node('seg-c').props.accessibilityState.selected, true);
   });
 
+  it('selects a stationary tap that Android\'s Pressable showed but did not activate (홈 HOT), once per gesture', (t) => {
+    const { h, Segmented } = segmented();
+    const changes: string[] = [];
+    const choices = [...options.slice(0, 2), { ...options[2], disabled: true }];
+    const render = (value: string, list = options) => React.createElement(Segmented, { testID: 'seg', value, options: list, onChange: (key: string) => changes.push(key) });
+    const renderer = h.render(render('b'));
+    t.after(() => act(() => renderer.unmount()));
+    const node = (id: string) => renderer.root.findAll((n: any) => n.props.testID === id && n.type === 'Pressable')[0];
+    const touch = (x: number, y: number, id = 1) => ({ nativeEvent: { identifier: id, pageX: x, pageY: y, touches: [{ identifier: id, pageX: x, pageY: y }], changedTouches: [{ identifier: id, pageX: x, pageY: y }] } });
+    const lift = (x: number, y: number, id = 1) => ({ nativeEvent: { identifier: id, pageX: x, pageY: y, touches: [], changedTouches: [{ identifier: id, pageX: x, pageY: y }] } });
+    // The device (2026-11-11 video): the press shows, Pressable never calls onPress, the finger lifts where it went down.
+    act(() => node('seg-c').props.onTouchStart(touch(250, 1330)));
+    act(() => node('seg-c').props.onTouchMove(touch(251, 1329)));
+    act(() => node('seg-c').props.onTouchEnd(lift(251, 1330)));
+    assert.deepEqual(changes, ['c']);
+    // The usual order: Pressable's release (onPress), then the touch end — one change.
+    act(() => node('seg-a').props.onTouchStart(touch(80, 1330)));
+    act(() => node('seg-a').props.onPress());
+    act(() => node('seg-a').props.onTouchEnd(lift(80, 1330)));
+    assert.deepEqual(changes, ['c', 'a']);
+    // A scroll took the touch (the native ScrollView cancels it) or the finger slid across: nothing.
+    act(() => node('seg-c').props.onTouchStart(touch(250, 1330)));
+    act(() => node('seg-c').props.onTouchCancel(lift(250, 1300)));
+    act(() => node('seg-c').props.onTouchEnd(lift(250, 1300)));
+    act(() => node('seg-c').props.onTouchStart(touch(250, 1330)));
+    act(() => node('seg-c').props.onTouchMove(touch(150, 1330)));
+    act(() => node('seg-c').props.onTouchEnd(lift(150, 1330)));
+    assert.deepEqual(changes, ['c', 'a']);
+    // The selected segment reports nothing, by touch either.
+    act(() => node('seg-b').props.onTouchStart(touch(160, 1330)));
+    act(() => node('seg-b').props.onTouchEnd(lift(160, 1330)));
+    assert.deepEqual(changes, ['c', 'a']);
+    // Keyboard and screen readers: onPress alone selects.
+    act(() => node('seg-c').props.onPress());
+    assert.deepEqual(changes, ['c', 'a', 'c']);
+    // A disabled choice is never chosen by its touch end.
+    act(() => renderer.update(render('b', choices)));
+    act(() => node('seg-c').props.onTouchStart(touch(250, 1330)));
+    act(() => node('seg-c').props.onTouchEnd(lift(250, 1330)));
+    assert.deepEqual(changes, ['c', 'a', 'c']);
+  });
+
   it('reverses mid-slide from its momentum without passing the new target', (t) => {
     let now = 1000;
     t.mock.method(performance, 'now', () => now);

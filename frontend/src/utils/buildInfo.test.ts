@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
-import { describeBuild } from './buildInfo.ts';
+import { describeAppVersion, describeBuild } from './buildInfo.ts';
 
 const require = createRequire(import.meta.url);
 const withAppConfig = require('../../app.config.js') as (input: { config: Record<string, unknown> }) => { extra: Record<string, unknown> };
@@ -34,6 +34,16 @@ describe('build identification (MY › 설정 › 앱 정보)', () => {
         if (saved[index] === undefined) delete process.env[key];
         else process.env[key] = saved[index];
       });
+    }
+  });
+
+  it('the version line is the installed build\'s own version and build number, never a fixed number', () => {
+    assert.equal(describeAppVersion('1.0.2', '14'), '앱 버전 1.0.2 (빌드 14)');
+    assert.equal(describeAppVersion('1.0', '1'), '앱 버전 1.0 (빌드 1)');
+    assert.equal(describeAppVersion(' 1.0.2 ', null), '앱 버전 1.0.2');
+    assert.equal(describeAppVersion('1.0.2', 'abc'), '앱 버전 1.0.2', 'a malformed build number is left out');
+    for (const version of [null, undefined, '', 'latest', '1.0.2-beta', 102]) {
+      assert.equal(describeAppVersion(version, '1'), '앱 버전 확인 불가', String(version));
     }
   });
 });
