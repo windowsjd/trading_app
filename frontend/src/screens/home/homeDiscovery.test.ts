@@ -93,22 +93,15 @@ it('HOT uses the Market turnover DESC result and stable order for each category,
   for (const key of keys) { assert.ok(key.includes('preview')); assert.ok(key.includes('turnover')); assert.ok(key.includes(5)); assert.ok(!key.includes('season')); }
 });
 
-it('HOT tabs: a tap the device\'s Pressable dropped still switches; quick switches end on the last one; a failed market keeps its tab and says so', async t => {
+it('HOT tabs: a press switches market and rows; quick switches end on the last one; a failed market keeps its tab and says so', async t => {
   const h = setup(); t.after(h.close); await flush();
   const tab = (type: string) => h.node(`home-hot-tab-${type}`);
   const selected = () => ['domestic_stock', 'us_stock', 'crypto'].filter(type => tab(type).props.accessibilityState.selected);
-  const touch = (x: number, y: number) => ({ nativeEvent: { identifier: 1, pageX: x, pageY: y, touches: [{ identifier: 1, pageX: x, pageY: y }], changedTouches: [{ identifier: 1, pageX: x, pageY: y }] } });
-  const lift = (x: number, y: number) => ({ nativeEvent: { identifier: 1, pageX: x, pageY: y, touches: [], changedTouches: [{ identifier: 1, pageX: x, pageY: y }] } });
-  // The 2026-11-11 device video: the press shows, onPress never comes, the finger lifts in place.
-  act(() => tab('crypto').props.onTouchStart(touch(250, 1330)));
-  act(() => tab('crypto').props.onTouchEnd(lift(251, 1331)));
-  await flush();
+  await h.press('home-hot-tab-crypto');
   assert.deepEqual(selected(), ['crypto']);
   assert.deepEqual(h.hotRows().map(n => n.props.testID), h.markets.crypto.map(a => `home-hot-item-${a.id}`));
-  // A scroll that started on a tab switches nothing (the native ScrollView cancels the touch).
-  act(() => tab('us_stock').props.onTouchStart(touch(160, 1330)));
-  act(() => tab('us_stock').props.onTouchCancel(lift(160, 1290)));
-  await flush();
+  // Pressing the selected tab again changes nothing.
+  await h.press('home-hot-tab-crypto');
   assert.deepEqual(selected(), ['crypto']);
   // Quick switches while every read is still on its way: the last tab wins, and the
   // earlier answers, arriving late, never relabel it.

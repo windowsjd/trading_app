@@ -4,7 +4,6 @@ import { semantic } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import ActionPressable from './ActionPressable';
-import { createStationaryTap, type StationaryTap, type TapTouchEvent } from './stationaryTap';
 
 /**
  * The selection slide is a critically damped spring, shared with the 매수/매도
@@ -94,23 +93,12 @@ export type SegmentOption<K extends string> = {
   accessory?: React.ReactNode;
 };
 
-// Development builds on a device only: the 2026-11-11 HOT report's open
-// question is how far Pressable's measured rectangle is from the finger there.
-const diagnoseDroppedTaps = typeof __DEV__ !== 'undefined' && __DEV__ && Platform.OS !== 'web';
-type Measured = { x: number; y: number; width: number; height: number };
-type MeasurableTarget = { measure?: (callback: (x: number, y: number, width: number, height: number, pageX: number, pageY: number) => void) => void };
-
 /**
  * One box for mutually exclusive choices. The caller owns `value`; the pill
  * only follows it, so a guarded choice (learning lock) never moves the pill
  * and the pill and the selected label can never disagree. Labels switch at
  * once, the track never re-lays out, and a rapid second tap continues from
  * the pill's current point.
- *
- * A segment is chosen by Pressable's onPress, or by a stationary tap's own
- * touch end when Android's Pressable showed the press but dropped it
- * (stationaryTap.ts, 2026-11-11: Home's HOT tabs on a device). One gesture
- * chooses once; a scroll, a slide or a second finger chooses nothing.
  */
 export default function SegmentedControl<K extends string>({ options, value, onChange, testID, accessibilityLabel, style, compact = false }: {
   options: readonly SegmentOption<K>[];
@@ -125,10 +113,6 @@ export default function SegmentedControl<K extends string>({ options, value, onC
   const reduced = useReducedMotion();
   const { mode } = useAppearance();
   const [trackWidth, setTrackWidth] = useState(0);
-  const tapRef = useRef<StationaryTap<K> | null>(null);
-  tapRef.current ??= createStationaryTap<K>();
-  const tap = tapRef.current;
-  const touchStart = useRef<{ x: number; y: number; measured: Measured | null } | null>(null);
   const index = Math.max(0, options.findIndex(option => option.key === value));
   const progress = useSelectionMotion(index, reduced);
 
@@ -157,7 +141,6 @@ export default function SegmentedControl<K extends string>({ options, value, onC
       ) : null}
       {options.map(option => {
         const selected = option.key === value;
-        const choose = () => { if (!selected) onChange(option.key); };
         return (
           <ActionPressable
             key={option.key}
@@ -172,27 +155,7 @@ export default function SegmentedControl<K extends string>({ options, value, onC
             hitSlop={compact ? { top: 3, bottom: 3 } : undefined}
             // Before the track is measured there is no pill; the selected segment paints its own.
             style={[styles.segment, compact && styles.compact, thumbWidth === 0 && selected && { backgroundColor: thumbColor }]}
-            onPress={() => { if (tap.press(option.key)) choose(); }}
-            onTouchStart={(event) => {
-              const touch: TapTouchEvent = event.nativeEvent;
-              tap.start(option.key, touch);
-              if (!diagnoseDroppedTaps) return;
-              const start = { x: touch.pageX ?? NaN, y: touch.pageY ?? NaN, measured: null as Measured | null };
-              touchStart.current = start;
-              (event.currentTarget as unknown as MeasurableTarget | null)?.measure?.((_x, _y, width, height, pageX, pageY) => {
-                start.measured = { x: pageX, y: pageY, width, height };
-              });
-            }}
-            onTouchMove={(event) => tap.move(event.nativeEvent)}
-            onTouchEnd={(event) => {
-              if (tap.end(event.nativeEvent) !== option.key || option.disabled) return;
-              if (diagnoseDroppedTaps) {
-                // Pressable answers a release before onTouchEnd; reaching here it did not.
-                console.warn('[SegmentedControl] Pressable did not select this tap; selected on its touch end.', touchStart.current);
-              }
-              choose();
-            }}
-            onTouchCancel={() => tap.cancel()}
+            onPress={() => { if (!selected) onChange(option.key); }}
           >
             <View style={styles.labelRow}>
               {option.accessory}
