@@ -2,35 +2,80 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  HORIZONTAL_PAN_SLOP_PX,
+  CHART_PAN_ACTIVATION_PX,
+  TAP_SLOP_PX,
+  VERTICAL_PAN_ENGAGE_PX,
   classifyWheelIntent,
   createChartGestureSession,
   createWheelGestureSession,
-  isHorizontalPanIntent,
   isWithinChartBounds,
   pinchScale,
+  reduceCrosshair,
   resolveWheelHandling,
+  shouldEngageVerticalPan,
   wheelZoomScale,
+  type CrosshairInput,
+  type CrosshairState,
 } from './candlestickGesturePolicy.ts';
 
-describe('isHorizontalPanIntent', () => {
-  it('claims clearly horizontal drags', () => {
-    assert.equal(isHorizontalPanIntent(20, 2), true);
-    assert.equal(isHorizontalPanIntent(-20, 2), true);
+const RELEASE: CrosshairInput = { type: 'release' };
+
+describe('crosshair: show, pin, release, clear (2026-11-13)', () => {
+  // Anchors are plain labels here; the chart stores a candle time and a price.
+  const anchorOf = (point: { x: number; y: number }) => `${point.x},${point.y}`;
+  const step = (state: CrosshairState<string>, input: CrosshairInput, shown = true) => reduceCrosshair(state, input, anchorOf, shown);
+  const at = (x: number, y: number) => ({ x, y });
+
+  it('a tap pins one where it lands; the next simple tap clears it', () => {
+    const pinned = step(null, { type: 'tap', point: at(10, 20) });
+    assert.deepEqual(pinned, { anchor: '10,20', mode: 'pinned' });
+    assert.equal(step(pinned, { type: 'tap', point: at(50, 60) }), null);
   });
 
-  it('leaves vertical drags to the parent ScrollView', () => {
-    assert.equal(isHorizontalPanIntent(20, 30), false);
-    assert.equal(isHorizontalPanIntent(2, 40), false);
+  it('a pinned one panned out of view is not cleared by a tap: the tap pins a new one', () => {
+    const pinned = step(null, { type: 'tap', point: at(10, 20) });
+    assert.deepEqual(step(pinned, { type: 'tap', point: at(50, 60) }, false), { anchor: '50,60', mode: 'pinned' });
   });
 
-  it('ignores small tremors below the slop', () => {
-    assert.equal(isHorizontalPanIntent(HORIZONTAL_PAN_SLOP_PX - 1, 0), false);
-    assert.equal(isHorizontalPanIntent(0, 0), false);
+  it('a long press scrubs (even over a pinned one) and stays where it is lifted', () => {
+    const pinned = step(null, { type: 'tap', point: at(10, 20) });
+    const scrub = step(pinned, { type: 'scrub', point: at(30, 40) });
+    assert.deepEqual(scrub, { anchor: '30,40', mode: 'scrub' });
+    const held = step(scrub, RELEASE);
+    assert.deepEqual(held, { anchor: '30,40', mode: 'pinned' });
+    assert.equal(step(held, RELEASE), held, 'a second release changes nothing');
   });
 
-  it('is safe with non-finite input', () => {
-    assert.equal(isHorizontalPanIntent(Number.NaN, 0), false);
+  it('a mouse hover follows the pointer and goes on leaving, but never moves or clears a pinned one', () => {
+    const hover = step(null, { type: 'hover', point: at(5, 5) });
+    assert.deepEqual(hover, { anchor: '5,5', mode: 'hover' });
+    assert.equal(step(hover, { type: 'leave' }), null);
+    const pinned = step(hover, { type: 'tap', point: at(7, 7) });
+    assert.deepEqual(pinned, { anchor: '7,7', mode: 'pinned' }, 'a click pins at the click');
+    assert.equal(step(pinned, { type: 'hover', point: at(9, 9) }), pinned);
+    assert.equal(step(pinned, { type: 'leave' }), pinned, 'leaving the chart keeps a pinned crosshair');
+    const scrub = step(null, { type: 'scrub', point: at(1, 1) });
+    assert.equal(step(scrub, { type: 'hover', point: at(2, 2) }), scrub);
+  });
+
+  it('a point the chart cannot anchor (no candles) changes nothing', () => {
+    assert.equal(reduceCrosshair(null, { type: 'tap', point: at(1, 1) }, () => null, false), null);
+  });
+
+  it('activation distances stay below the platforms’ scroll slop; a tap allows a small tremor', () => {
+    assert.equal(CHART_PAN_ACTIVATION_PX < 8, true);
+    assert.equal(TAP_SLOP_PX >= CHART_PAN_ACTIVATION_PX, true);
+  });
+});
+
+describe('vertical move from the automatic price fit', () => {
+  it('engages only for a clearly vertical or diagonal drag of at least the threshold', () => {
+    assert.equal(shouldEngageVerticalPan(0, VERTICAL_PAN_ENGAGE_PX), true);
+    assert.equal(shouldEngageVerticalPan(0, -VERTICAL_PAN_ENGAGE_PX), true);
+    assert.equal(shouldEngageVerticalPan(0, VERTICAL_PAN_ENGAGE_PX - 1), false, 'a tremor keeps the fit');
+    assert.equal(shouldEngageVerticalPan(30, 20), true, 'diagonal');
+    assert.equal(shouldEngageVerticalPan(200, 20), false, 'a sideways swipe with drift keeps the fit');
+    assert.equal(shouldEngageVerticalPan(Number.NaN, 50), false);
   });
 });
 
@@ -152,11 +197,11 @@ describe('isWithinChartBounds', () => {
 
 describe('chart gesture lifecycle session', () => {
   function makeSession() {
-    const crosshairCalls: ({ x: number; y: number } | null)[] = [];
+    const crosshairCalls: CrosshairInput[] = [];
     let gestureStarts = 0;
     let gestureEnds = 0;
     const session = createChartGestureSession({
-      onCrosshair: (point) => crosshairCalls.push(point),
+      onCrosshair: (input) => crosshairCalls.push(input),
       onGestureStart: () => {
         gestureStarts += 1;
       },
@@ -209,20 +254,21 @@ describe('chart gesture lifecycle session', () => {
     assert.equal(session.isCrosshairActive(), true);
     assert.equal(session.moveCrosshair({ x: 30, y: 40 }), true);
     assert.deepEqual(crosshairCalls, [
-      { x: 10, y: 20 },
-      { x: 30, y: 40 },
+      { type: 'scrub', point: { x: 10, y: 20 } },
+      { type: 'scrub', point: { x: 30, y: 40 } },
     ]);
   });
 
   it('ends a long press that never moved, exactly once', () => {
     // Long press → lift with no movement: `crosshairPan` never activated, so
-    // the long press finalize is the only thing that can clear it.
+    // the long press finalize is the only thing that can release it (the
+    // crosshair then stays, pinned — 2026-11-13).
     const { session, crosshairCalls, gestureEnds } = makeSession();
     session.startCrosshair({ x: 10, y: 20 });
 
     assert.equal(session.end('crosshair'), true);
     assert.equal(session.isCrosshairActive(), false);
-    assert.equal(crosshairCalls.at(-1), null);
+    assert.deepEqual(crosshairCalls.at(-1), RELEASE);
     assert.equal(gestureEnds(), 1);
   });
 
@@ -235,9 +281,9 @@ describe('chart gesture lifecycle session', () => {
     assert.equal(session.end('crosshair'), false);
     assert.equal(gestureEnds(), 1, 'gesture end reported exactly once');
     assert.equal(
-      crosshairCalls.filter((call) => call === null).length,
+      crosshairCalls.filter((call) => call.type === 'release').length,
       1,
-      'crosshair cleared exactly once',
+      'released (pinned) exactly once',
     );
   });
 
@@ -251,15 +297,15 @@ describe('chart gesture lifecycle session', () => {
     session.end('crosshair');
 
     assert.equal(session.isCrosshairActive(), false);
-    assert.equal(crosshairCalls.at(-1), null);
+    assert.deepEqual(crosshairCalls.at(-1), RELEASE);
     // Coming back inside must NOT revive the finished crosshair session.
     assert.equal(session.moveCrosshair({ x: 120, y: 100 }), false);
-    assert.equal(crosshairCalls.at(-1), null);
+    assert.deepEqual(crosshairCalls.at(-1), RELEASE);
     assert.equal(gestureEnds(), 1);
 
     // A brand new long press still works.
     assert.equal(session.startCrosshair({ x: 130, y: 90 }), true);
-    assert.deepEqual(crosshairCalls.at(-1), { x: 130, y: 90 });
+    assert.deepEqual(crosshairCalls.at(-1), { type: 'scrub', point: { x: 130, y: 90 } });
   });
 
   it('hands the crosshair over to a pinch in order, without a double end', () => {
@@ -269,7 +315,7 @@ describe('chart gesture lifecycle session', () => {
     // crosshair end → pinch start
     assert.equal(session.takeOver('pinch'), true);
     assert.equal(session.owner(), 'pinch');
-    assert.equal(crosshairCalls.at(-1), null, 'crosshair cleared by the pinch');
+    assert.deepEqual(crosshairCalls.at(-1), RELEASE, 'the scrub ends (its crosshair stays) as the pinch takes over');
     assert.equal(gestureStarts(), 2);
     assert.equal(gestureEnds(), 1);
 
@@ -307,7 +353,7 @@ describe('chart gesture lifecycle session', () => {
     assert.equal(session.end('pinch'), false);
     assert.equal(session.end('crosshair'), false);
     assert.equal(gestureEnds(), 1);
-    assert.equal(crosshairCalls.filter((call) => call === null).length, 1);
+    assert.equal(crosshairCalls.filter((call) => call.type === 'release').length, 1);
   });
 
   it('does nothing on a finalize that follows no gesture at all', () => {

@@ -37,9 +37,15 @@ export const QUERY_KEYS = {
     operatorUser: (userId: string, targetUserId: string) => ['community', 'operator-user', userId, targetUserId] as const,
   },
   /** Operator-published important notices (공지사항, alongside the app's own). */
-  notices: { important: ['notices', 'important'] as const },
-  /** 앱 업데이트 안내: the store-published latest version per platform (public). */
-  appRelease: ['appRelease'] as const,
+  notices: {
+    important: ['notices', 'important'] as const,
+    /** The signed-in member's unconfirmed popup notices (read once per app entry). */
+    popup: (userId: string) => ['notices', 'popup', userId] as const,
+    /** 관리자 전용 콘솔 › 공지사항 관리: every notice with its status (admin's own cache). */
+    admin: (userId: string) => ['notices', 'admin', userId] as const,
+  },
+  /** 앱 업데이트 안내: the store's answer for this install (Google Play on Android, the App Store manifest on iOS). */
+  appRelease: (platform: string) => ['appRelease', platform] as const,
   friends: {
     all: ['friends'] as const,
     list: ['friends', 'list', 'infinite'] as const,

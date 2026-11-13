@@ -46,7 +46,10 @@ import {
 } from '../src/auth/account-deletion.purge';
 import { AccountDeletionService } from '../src/auth/account-deletion.service';
 import { AuthService } from '../src/auth/auth.service';
-import { CURRENT_TERMS_VERSION } from '../src/auth/terms.constants';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from '../src/auth/terms.constants';
 import { ProfileImageCleanupService } from '../src/auth/profile-image-cleanup.service';
 import { EmailAuthCleanupService } from '../src/auth/email-auth-cleanup.service';
 import { DataRetentionCleanupService } from '../src/auth/data-retention-cleanup.service';
@@ -395,6 +398,7 @@ const created = {
   badges: new Set<string>(),
   emails: new Set<string>(),
   learning: [] as Array<{ assetIds: string[]; rateIds: string[] }>,
+  notices: new Set<string>(),
 };
 
 async function member(
@@ -644,6 +648,7 @@ async function ownedRowCounts(ids: {
     'push_devices',
     'push_notifications',
     'notification_preferences',
+    'important_notice_acknowledgements',
     'refresh_token_sessions',
     // Community: nothing keeps the member's id (comments elsewhere are
     // unlinked and shown as 탈퇴계정, leases moved to the receipt).
@@ -1183,6 +1188,25 @@ async function fullMember() {
   await db.notificationPreference.create({
     data: { userId: u.userId, tradeFill: false },
   });
+  // The member's confirmation of a popup notice (2026-11-13) goes with them;
+  // the operator's notice itself stays.
+  const popupNotice = await db.importantNotice.create({
+    data: {
+      title: '팝업 공지',
+      summary: '요약',
+      sections: [{ heading: '안내', paragraphs: ['본문'] }],
+      status: 'published',
+      publishedAt: new Date(),
+      publishedByUserId: operator.userId,
+      idempotencyKey: randomUUID(),
+      createdByUserId: operator.userId,
+      showPopup: true,
+    },
+  });
+  created.notices.add(popupNotice.id);
+  await db.importantNoticeAcknowledgement.create({
+    data: { userId: u.userId, noticeId: popupNotice.id },
+  });
   // Community (docs/community-api-contract.md §12): u's anonymous post with
   // a photo and other members' comment/like/report/number on it; u's
   // anonymous comment on w's post with w's reply under it; u's like, report,
@@ -1530,7 +1554,10 @@ async function fullMember() {
       nickname: u.nickname,
       verificationToken: proof,
       ageConfirmed: true,
+      termsAgreed: true,
       termsVersion: CURRENT_TERMS_VERSION,
+      privacyAgreed: true,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
     },
     meta(),
   );
@@ -2282,6 +2309,9 @@ async function cleanup() {
   });
   await db.accountDeletion.deleteMany({
     where: { requestKeyHash: { in: requestKeys.map(hashOf) } },
+  });
+  await db.importantNotice.deleteMany({
+    where: { id: { in: [...created.notices] } },
   });
   await db.batchJobRun.deleteMany({
     where: { idempotencyKey: { in: [...created.batchKeys] } },

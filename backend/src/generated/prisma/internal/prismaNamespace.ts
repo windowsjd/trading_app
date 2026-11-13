@@ -459,6 +459,7 @@ export const ModelName = {
   PushDelivery: 'PushDelivery',
   PushScanCursor: 'PushScanCursor',
   ImportantNotice: 'ImportantNotice',
+  ImportantNoticeAcknowledgement: 'ImportantNoticeAcknowledgement',
   EmailAuthChallenge: 'EmailAuthChallenge',
   EmailAuthRateBucket: 'EmailAuthRateBucket',
   AccountDeletion: 'AccountDeletion',
@@ -489,7 +490,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLeverageChange" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "adRewardSession" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup" | "communityPost" | "communityPostPhoto" | "communityComment" | "communityPostLike" | "communityCommentLike" | "communityPostAlias" | "communityReport" | "communitySanction" | "communitySanctionCarryover" | "communityRuleConsent" | "communityPhotoCleanup"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLeverageChange" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "pendingOrderModification" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "adRewardSession" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "importantNoticeAcknowledgement" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup" | "communityPost" | "communityPostPhoto" | "communityComment" | "communityPostLike" | "communityCommentLike" | "communityPostAlias" | "communityReport" | "communitySanction" | "communitySanctionCarryover" | "communityRuleConsent" | "communityPhotoCleanup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -6043,6 +6044,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ImportantNoticeAcknowledgement: {
+      payload: Prisma.$ImportantNoticeAcknowledgementPayload<ExtArgs>
+      fields: Prisma.ImportantNoticeAcknowledgementFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ImportantNoticeAcknowledgementFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ImportantNoticeAcknowledgementFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>
+        }
+        findFirst: {
+          args: Prisma.ImportantNoticeAcknowledgementFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ImportantNoticeAcknowledgementFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>
+        }
+        findMany: {
+          args: Prisma.ImportantNoticeAcknowledgementFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>[]
+        }
+        create: {
+          args: Prisma.ImportantNoticeAcknowledgementCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>
+        }
+        createMany: {
+          args: Prisma.ImportantNoticeAcknowledgementCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ImportantNoticeAcknowledgementCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>[]
+        }
+        delete: {
+          args: Prisma.ImportantNoticeAcknowledgementDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>
+        }
+        update: {
+          args: Prisma.ImportantNoticeAcknowledgementUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>
+        }
+        deleteMany: {
+          args: Prisma.ImportantNoticeAcknowledgementDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ImportantNoticeAcknowledgementUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ImportantNoticeAcknowledgementUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>[]
+        }
+        upsert: {
+          args: Prisma.ImportantNoticeAcknowledgementUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportantNoticeAcknowledgementPayload>
+        }
+        aggregate: {
+          args: Prisma.ImportantNoticeAcknowledgementAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateImportantNoticeAcknowledgement>
+        }
+        groupBy: {
+          args: Prisma.ImportantNoticeAcknowledgementGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ImportantNoticeAcknowledgementGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ImportantNoticeAcknowledgementCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ImportantNoticeAcknowledgementCountAggregateOutputType> | number
+        }
+      }
+    }
     EmailAuthChallenge: {
       payload: Prisma.$EmailAuthChallengePayload<ExtArgs>
       fields: Prisma.EmailAuthChallengeFieldRefs
@@ -7207,7 +7282,10 @@ export const UserScalarFieldEnum = {
   updatedAt: 'updatedAt',
   termsVersion: 'termsVersion',
   termsAcceptedAt: 'termsAcceptedAt',
-  ageConfirmedAt: 'ageConfirmedAt'
+  ageConfirmedAt: 'ageConfirmedAt',
+  termsAgreedAt: 'termsAgreedAt',
+  privacyVersion: 'privacyVersion',
+  privacyAgreedAt: 'privacyAgreedAt'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
@@ -8750,10 +8828,20 @@ export const ImportantNoticeScalarFieldEnum = {
   fanoutCursor: 'fanoutCursor',
   fanoutCompletedAt: 'fanoutCompletedAt',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  showPopup: 'showPopup'
 } as const
 
 export type ImportantNoticeScalarFieldEnum = (typeof ImportantNoticeScalarFieldEnum)[keyof typeof ImportantNoticeScalarFieldEnum]
+
+
+export const ImportantNoticeAcknowledgementScalarFieldEnum = {
+  userId: 'userId',
+  noticeId: 'noticeId',
+  acknowledgedAt: 'acknowledgedAt'
+} as const
+
+export type ImportantNoticeAcknowledgementScalarFieldEnum = (typeof ImportantNoticeAcknowledgementScalarFieldEnum)[keyof typeof ImportantNoticeAcknowledgementScalarFieldEnum]
 
 
 export const EmailAuthChallengeScalarFieldEnum = {
@@ -10271,6 +10359,7 @@ export type GlobalOmitConfig = {
   pushDelivery?: Prisma.PushDeliveryOmit
   pushScanCursor?: Prisma.PushScanCursorOmit
   importantNotice?: Prisma.ImportantNoticeOmit
+  importantNoticeAcknowledgement?: Prisma.ImportantNoticeAcknowledgementOmit
   emailAuthChallenge?: Prisma.EmailAuthChallengeOmit
   emailAuthRateBucket?: Prisma.EmailAuthRateBucketOmit
   accountDeletion?: Prisma.AccountDeletionOmit

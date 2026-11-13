@@ -78,6 +78,8 @@ function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearanc
     '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
     '../../components/common/ScreenSheetHost': { ScreenSheetHost: 'ScreenSheetHost' },
     '../../features/appRelease/AppUpdateNotice': { default: 'AppUpdateNotice', __esModule: true },
+    '../../features/notice/NoticePopupHost': { default: 'NoticePopupHost', __esModule: true },
+    '../../features/entryOverlay/EntryOverlaySlot': { EntryOverlayProvider: 'EntryOverlayProvider' },
     '../../features/auth/guestBrowsing': { isGuestBrowsing: () => guest },
     ...Object.fromEntries(
       ['Home', 'Market', 'Guide', 'Ranking', 'Community', 'Wallet', 'My', 'Modes'].map((name) => [
@@ -379,11 +381,25 @@ it('beginner tabs run inside one quest guide keyed by the account, unlike other 
   // Sheets cover the tabs (headers, tab bar) but the quest overlay stays above them.
   assert.equal((renderHostedTabs('beginner') as any).props.children.type, 'ScreenSheetHost');
   for (const mode of ['general', 'season'] as const) assert.equal((renderHostedTabs(mode) as any).type, 'ScreenSheetHost');
-  // 앱 업데이트 안내: once, in that sheet layer (so below the quest overlay), for every mode and guests.
-  const notices = (host: any) => [host.props.children].flat().filter((child: any) => child?.type === 'AppUpdateNotice').length;
-  assert.equal(notices((renderHostedTabs('beginner') as any).props.children), 1);
-  for (const mode of ['general', 'season'] as const) assert.equal(notices(renderHostedTabs(mode)), 1);
-  assert.equal(notices((renderHostedTabs(null, false, 'light', false, 'guest', true) as any).props.children), 1);
+  // 앱 업데이트 안내 and the 공지 팝업: once each, in that sheet layer (so below the quest
+  // overlay) inside one entry-overlay slot (never both on screen), for every mode; the
+  // popup is for signed-in members only.
+  const overlays = (host: any) => {
+    const slots = [host.props.children].flat().filter((child: any) => child?.type === 'EntryOverlayProvider');
+    assert.equal(slots.length, 1);
+    return [slots[0].props.children].flat();
+  };
+  const updates = (host: any) => overlays(host).filter((child: any) => child?.type === 'AppUpdateNotice').length;
+  const popup = (host: any) => overlays(host).filter((child: any) => child?.type === 'NoticePopupHost').map((child: any) => child.props.enabled);
+  assert.equal(updates((renderHostedTabs('beginner') as any).props.children), 1);
+  assert.deepEqual(popup((renderHostedTabs('beginner') as any).props.children), [true]);
+  for (const mode of ['general', 'season'] as const) {
+    assert.equal(updates(renderHostedTabs(mode)), 1);
+    assert.deepEqual(popup(renderHostedTabs(mode)), [true]);
+  }
+  const guestHost = (renderHostedTabs(null, false, 'light', false, 'guest', true) as any).props.children;
+  assert.equal(updates(guestHost), 1);
+  assert.deepEqual(popup(guestHost), [false]);
 });
 it('even switching two season accounts resets nested navigation by account id', () => {
   assert.notEqual(renderTabs('season', false, 'light', false, 'season-one').key, renderTabs('season', false, 'light', false, 'season-two').key);

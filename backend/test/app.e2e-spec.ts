@@ -1,5 +1,8 @@
 import { EmailVerificationService } from '../src/auth/email-verification.service';
-import { CURRENT_TERMS_VERSION } from '../src/auth/terms.constants';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from '../src/auth/terms.constants';
 import { communitySanctionEmailHash } from '../src/community/community-sanction-carryover';
 import { createApiError } from '../src/common/api-error';
 import { SPOT_ASSET_WHERE } from '../src/providers/binance/binance-product-catalog';
@@ -1390,7 +1393,10 @@ describe('AppController (e2e)', () => {
         password: 'Password123!',
         nickname: 'traderKim',
         ageConfirmed: true,
+        termsAgreed: true,
         termsVersion: CURRENT_TERMS_VERSION,
+        privacyAgreed: true,
+        privacyVersion: CURRENT_PRIVACY_VERSION,
       })
       .expect(400)
       .expect((response) =>
@@ -1408,16 +1414,31 @@ describe('AppController (e2e)', () => {
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
   });
 
-  it('apps without the 16+ check or the current terms version cannot sign up and keep the proof', async () => {
+  it('apps without each required consent or the current document versions cannot sign up and keep the proof', async () => {
     const { consume } = app.get<
       EmailVerificationService,
       { consume: jest.Mock }
     >(EmailVerificationService);
+    const full = {
+      ageConfirmed: true,
+      termsAgreed: true,
+      termsVersion: CURRENT_TERMS_VERSION,
+      privacyAgreed: true,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
+    };
     for (const consent of [
       {},
       { ageConfirmed: true },
       { ageConfirmed: 'true', termsVersion: CURRENT_TERMS_VERSION },
       { ageConfirmed: true, termsVersion: '2020-01-01' },
+      // An app from before the terms/privacy checkboxes (2026-11-13).
+      { ageConfirmed: true, termsVersion: CURRENT_TERMS_VERSION },
+      { ...full, termsAgreed: false },
+      { ...full, termsAgreed: 'true' },
+      { ...full, privacyAgreed: undefined },
+      { ...full, privacyAgreed: 'true' },
+      { ...full, privacyVersion: '2020-01-01' },
+      { ...full, ageConfirmed: false },
     ])
       await request(app.getHttpServer())
         .post('/api/v1/auth/signup')
@@ -1459,7 +1480,10 @@ describe('AppController (e2e)', () => {
         nickname: 'traderKim',
         verificationToken: 'verified-signup-proof',
         ageConfirmed: true,
+        termsAgreed: true,
         termsVersion: CURRENT_TERMS_VERSION,
+        privacyAgreed: true,
+        privacyVersion: CURRENT_PRIVACY_VERSION,
       })
       .expect(201)
       .expect((response) => {
@@ -1489,11 +1513,20 @@ describe('AppController (e2e)', () => {
               passwordHash: 'hashed-password',
               role: 'user',
               termsVersion: CURRENT_TERMS_VERSION,
-              termsAcceptedAt: expect.any(Date) as Date,
               ageConfirmedAt: expect.any(Date) as Date,
+              termsAgreedAt: expect.any(Date) as Date,
+              privacyVersion: CURRENT_PRIVACY_VERSION,
+              privacyAgreedAt: expect.any(Date) as Date,
             }),
           }),
         );
+        expect(
+          (
+            prisma.user.create.mock.calls.at(-1) as unknown as [
+              { data: Record<string, unknown> },
+            ]
+          )[0].data,
+        ).not.toHaveProperty('termsAcceptedAt');
         expect(prisma.refreshTokenSession.create).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({

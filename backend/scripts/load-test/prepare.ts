@@ -29,7 +29,10 @@ import { AppClient } from './client';
 import { Actor, type Fixture, type FixtureActor } from './actor';
 import { preflight, verifyApi } from './preflight';
 import { parseFuturesContracts } from '../../src/futures/futures-instrument-coverage';
-import { CURRENT_TERMS_VERSION } from '../../src/auth/terms.constants';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from '../../src/auth/terms.constants';
 import { authEmailMailboxKey } from './auth-email';
 
 /** Complete the existing learning prerequisites through normal HTTP commands.
@@ -374,7 +377,10 @@ export async function prepare(
                 password: c.userPassword,
                 nickname: `load-${index}-${m.runId.slice(-6)}`,
                 ageConfirmed: true,
+                termsAgreed: true,
                 termsVersion: CURRENT_TERMS_VERSION,
+                privacyAgreed: true,
+                privacyVersion: CURRENT_PRIVACY_VERSION,
                 verificationToken: await verifySignupEmail(
                   http,
                   mailbox,

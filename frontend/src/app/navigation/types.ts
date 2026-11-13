@@ -15,6 +15,8 @@ import type {
 export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
+  /** 이용약관 / 개인정보처리방침 from the signup screen's 자세히 보기 (read only). */
+  LegalDocument: { document: 'terms' | 'privacy' };
   PasswordReset: { email?: string } | undefined;
   /** After a confirmed 회원탈퇴: the server receipt (no key, no user data). */
   MembershipDeletionResult: {
@@ -125,6 +127,12 @@ export type MyStackParamList = {
   Settings: undefined;
   /** 회원탈퇴 (안내 → 본인 확인 → 최종 확인). */
   MembershipDeletion: undefined;
+  /** 관리자 전용 콘솔 (admin only; the server checks the role on every request). */
+  AdminConsole: undefined;
+  /** 관리자 전용 콘솔 › 공지사항 관리: notices with status, 게시하기 / 철회하기. */
+  AdminNotices: undefined;
+  /** 관리자 전용 콘솔 › 공지 작성 (미리보기, 초안 저장, 게시하기). */
+  AdminNoticeEditor: undefined;
 };
 
 /** 투자모드: guest browsing's introduction of the three investment modes. */
@@ -229,6 +237,8 @@ export type SignupScreenProps = NativeStackScreenProps<
   AuthStackParamList,
   'Signup'
 >;
+
+export type LegalDocumentScreenProps = NativeStackScreenProps<AuthStackParamList, 'LegalDocument'>;
 
 export type SeasonJoinScreenProps = RootScreenProps<'SeasonJoin'>;
 

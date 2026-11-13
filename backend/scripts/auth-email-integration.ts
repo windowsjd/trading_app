@@ -6,7 +6,10 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { AuthService } from '../src/auth/auth.service';
-import { CURRENT_TERMS_VERSION } from '../src/auth/terms.constants';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from '../src/auth/terms.constants';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
 import {
   EmailAuthCleanupService,
@@ -28,8 +31,14 @@ const v = fixture.verification;
 const suffix = `auth-email-${randomUUID()}`;
 const email = (name: string) => `${name}-${suffix}@example.com`;
 const password = 'Original-password-123!';
-// The signup screen's required 16+ check and its terms version.
-const consent = { ageConfirmed: true, termsVersion: CURRENT_TERMS_VERSION };
+// The signup screen's three required boxes and both document versions.
+const consent = {
+  ageConfirmed: true,
+  termsAgreed: true,
+  termsVersion: CURRENT_TERMS_VERSION,
+  privacyAgreed: true,
+  privacyVersion: CURRENT_PRIVACY_VERSION,
+};
 const nextPassword = 'Changed-password-456!';
 const jwt = new JwtService();
 const config = new ConfigService({

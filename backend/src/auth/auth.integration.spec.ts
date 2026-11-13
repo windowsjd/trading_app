@@ -54,7 +54,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RefreshTokenSessionStatus, UserRole, UserStatus } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
 import { AuthService } from './src/auth/auth.service';
-import { CURRENT_TERMS_VERSION } from './src/auth/terms.constants';
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from './src/auth/terms.constants';
 import { authEmailFixture } from './scripts/lib/auth-email-fixture';
 import { AccessTokenGuard } from './src/auth/access-token.guard';
 import * as argon2 from 'argon2';
@@ -101,14 +101,31 @@ async function main() {
     await cleanup();
 
     const verificationToken = await emailFixture.proof(activeEmail, 'signup');
-    // Without the 16+ check or with other terms: nothing is created and the
-    // proof stays usable (the signup below spends the same proof).
+    // Without any one of the three required boxes, or with other document
+    // versions: nothing is created and the proof stays usable (the signup
+    // below spends the same proof). An app from before the terms/privacy
+    // boxes (16+ and the terms version only) is refused too.
+    const consent = {
+      ageConfirmed: true,
+      termsAgreed: true,
+      termsVersion: CURRENT_TERMS_VERSION,
+      privacyAgreed: true,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
+    };
     for (const refused of [
       { termsVersion: CURRENT_TERMS_VERSION },
       { ageConfirmed: false, termsVersion: CURRENT_TERMS_VERSION },
       { ageConfirmed: 'true', termsVersion: CURRENT_TERMS_VERSION },
       { ageConfirmed: true },
       { ageConfirmed: true, termsVersion: '2020-01-01' },
+      { ageConfirmed: true, termsVersion: CURRENT_TERMS_VERSION },
+      { ...consent, ageConfirmed: false },
+      { ...consent, termsAgreed: false },
+      { ...consent, termsAgreed: 'true' },
+      { ...consent, privacyAgreed: false },
+      { ...consent, privacyAgreed: 'true' },
+      { ...consent, privacyVersion: undefined },
+      { ...consent, privacyVersion: '2020-01-01' },
     ]) {
       try {
         await authService.signup({
@@ -131,8 +148,7 @@ async function main() {
       email: activeEmail,
       password,
       nickname: activeNickname,
-      ageConfirmed: true,
-      termsVersion: CURRENT_TERMS_VERSION,
+      ...consent,
     });
     assert.equal(signupResponse.success, true);
     assert.equal(signupResponse.data.user.email, activeEmail);
@@ -148,9 +164,14 @@ async function main() {
     assert.notEqual(activeUser.passwordHash, password);
     assert.equal(activeUser.role, UserRole.user);
     assert.equal(activeUser.termsVersion, CURRENT_TERMS_VERSION);
-    assert.ok(activeUser.termsAcceptedAt instanceof Date);
-    assert.equal(activeUser.ageConfirmedAt?.getTime(), activeUser.termsAcceptedAt.getTime());
-    assert.equal(/terms|ageConfirmed/.test(JSON.stringify(signupResponse)), false);
+    assert.equal(activeUser.privacyVersion, CURRENT_PRIVACY_VERSION);
+    // Explicit consent: one server instant for the three boxes; the
+    // notice-era column stays empty for a checkbox signup.
+    assert.ok(activeUser.ageConfirmedAt instanceof Date);
+    assert.equal(activeUser.termsAgreedAt?.getTime(), activeUser.ageConfirmedAt.getTime());
+    assert.equal(activeUser.privacyAgreedAt?.getTime(), activeUser.ageConfirmedAt.getTime());
+    assert.equal(activeUser.termsAcceptedAt, null);
+    assert.equal(/terms|privacy|ageConfirmed/.test(JSON.stringify(signupResponse)), false);
     assert.equal(await argon2.verify(activeUser.passwordHash, password), true);
     const signupRefreshSession = await prisma.refreshTokenSession.findUniqueOrThrow({
       where: {

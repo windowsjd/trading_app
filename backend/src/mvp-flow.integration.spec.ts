@@ -79,7 +79,7 @@ import { TradingAccountAccessService } from './src/trading-accounts/trading-acco
 import { GeneralAccountPerformanceService } from './src/portfolio/general-account-performance.service';
 import { GeneralExternalFundingService } from './src/portfolio/general-external-funding.service';
 import { AuthService } from './src/auth/auth.service';
-import { CURRENT_TERMS_VERSION } from './src/auth/terms.constants';
+import { CURRENT_PRIVACY_VERSION, CURRENT_TERMS_VERSION } from './src/auth/terms.constants';
 import { authEmailFixture } from './scripts/lib/auth-email-fixture';
 import { SeasonsService } from './src/seasons/seasons.service';
 import { WalletsService } from './src/wallets/wallets.service';
@@ -238,7 +238,10 @@ async function signupUser() {
       password,
       nickname: scenario.nickname,
       ageConfirmed: true,
+      termsAgreed: true,
       termsVersion: CURRENT_TERMS_VERSION,
+      privacyAgreed: true,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
     },
     metadata(),
   );

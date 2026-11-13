@@ -71,7 +71,10 @@ export class OrderFailuresController {
   }
 }
 
-/** Published important notices for the app's 공지사항 list (authenticated). */
+/** Published important notices for the app's 공지사항 list (authenticated),
+ * and the entry popup of the signed-in member (2026-11-13): the notices to
+ * pop up that the member has not confirmed, and the confirmation itself.
+ * Both use the caller's own id only. */
 @Controller('api/v1/notices')
 export class NoticesController {
   constructor(private readonly notices: ImportantNoticesService) {}
@@ -79,6 +82,20 @@ export class NoticesController {
   @Get()
   list() {
     return this.notices.listPublished();
+  }
+
+  @Get('popup')
+  popup(@Req() request: AuthenticatedRequest) {
+    return this.notices.listPopupFor(request.user);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':noticeId/acknowledgement')
+  acknowledge(
+    @Req() request: AuthenticatedRequest,
+    @Param('noticeId') noticeId: string,
+  ) {
+    return this.notices.acknowledge(request.user, noticeId);
   }
 }
 

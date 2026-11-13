@@ -1,14 +1,21 @@
 import React, { useEffect, useRef } from 'react';
 import { View } from '../../theme/native';
 import {
+  CHART_PAN_ACTIVATION_PX,
   createWheelGestureSession,
   resolveWheelHandling,
   wheelZoomScale,
 } from './candlestickGesturePolicy';
 import type { CandlestickGesturesProps } from './CandlestickGestures';
 
-/** DOM adapter: one pointer owns either plot X-pan or price-axis Y-scale.
- * Capture tracks outside release; every cancellation also closes wheel state. */
+/** DOM adapter: one pointer either moves the chart (pressed on the plot, both
+ * ways) or scales prices (pressed on the price axis), once it has travelled
+ * CHART_PAN_ACTIVATION_PX; released before that it is a click, which pins the
+ * crosshair there or clears the pinned one (2026-11-13). A mouse hovering
+ * shows a following crosshair unless one is pinned; leaving clears only that.
+ * Capture tracks outside release; every cancellation also closes wheel state.
+ * The chart takes touch drags too (`touch-action: none`), the page scrolls
+ * from outside it. */
 export default function CandlestickGestures(props: CandlestickGesturesProps) {
   const containerRef = useRef<View>(null);
   const handlersRef = useRef(props);
@@ -22,12 +29,14 @@ export default function CandlestickGestures(props: CandlestickGesturesProps) {
       touchAction: node.style.touchAction,
     };
     node.style.userSelect = 'none';
-    node.style.touchAction = 'pan-y';
+    node.style.touchAction = 'none';
     let drag: {
       id: number;
       x: number;
       y: number;
+      local: { x: number; y: number };
       mode: 'pan' | 'priceScale';
+      started: boolean;
     } | null = null;
     const local = (event: { clientX: number; clientY: number }) => {
       const rect = node.getBoundingClientRect();
@@ -36,7 +45,7 @@ export default function CandlestickGestures(props: CandlestickGesturesProps) {
     const wheel = createWheelGestureSession({
       onGestureStart: () => handlersRef.current.onGestureStart(),
       onZoom: (scale, x) => handlersRef.current.onZoom(scale, x),
-      onPan: (x) => handlersRef.current.onPan(x),
+      onPan: (x, y) => handlersRef.current.onPan(x, y),
       onGestureEnd: () => handlersRef.current.onGestureEnd(),
     });
     const endDrag = () => {
@@ -45,12 +54,14 @@ export default function CandlestickGestures(props: CandlestickGesturesProps) {
       if (!previous) return;
       if (node.hasPointerCapture?.(previous.id))
         node.releasePointerCapture(previous.id);
-      handlersRef.current.onGestureEnd();
+      if (previous.started) handlersRef.current.onGestureEnd();
     };
+    // Blur, a hidden page, a cancelled pointer: end what is moving; a pinned
+    // crosshair stays.
     const cancel = () => {
       endDrag();
       wheel.end();
-      handlersRef.current.onCrosshair(null);
+      handlersRef.current.onCrosshair({ type: 'leave' });
     };
     const onDown = (event: PointerEvent) => {
       if (event.button !== 0 || event.isPrimary === false || drag) return;
@@ -61,7 +72,9 @@ export default function CandlestickGestures(props: CandlestickGesturesProps) {
         id: event.pointerId,
         x: event.clientX,
         y: event.clientY,
+        local: point,
         mode: point.x >= h.paddingLeft + h.innerWidth ? 'priceScale' : 'pan',
+        started: false,
       };
       event.preventDefault();
       try {
@@ -69,8 +82,6 @@ export default function CandlestickGestures(props: CandlestickGesturesProps) {
       } catch {
         /* Window release still applies. */
       }
-      h.onGestureStart();
-      h.onCrosshair(null);
     };
     const onMove = (event: PointerEvent) => {
       if (!drag || event.pointerId !== drag.id) return;
@@ -81,15 +92,30 @@ export default function CandlestickGestures(props: CandlestickGesturesProps) {
       }
       event.preventDefault();
       const h = handlersRef.current;
-      if (drag.mode === 'priceScale') h.onPriceScale(event.clientY - drag.y);
-      else h.onPan(event.clientX - drag.x);
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      if (!drag.started) {
+        if (Math.hypot(dx, dy) < CHART_PAN_ACTIVATION_PX) return;
+        drag.started = true;
+        h.onCrosshair({ type: 'leave' });
+        h.onGestureStart();
+      }
+      if (drag.mode === 'priceScale') h.onPriceScale(dy);
+      else h.onPan(dx, dy);
     };
     const onHover = (event: PointerEvent) => {
-      if (drag || event.buttons !== 0) return;
-      handlersRef.current.onCrosshair(local(event));
+      if (drag || event.buttons !== 0 || event.pointerType === 'touch') return;
+      handlersRef.current.onCrosshair({ type: 'hover', point: local(event) });
     };
     const onUp = (event: PointerEvent) => {
-      if (drag?.id === event.pointerId) cancel();
+      if (drag?.id !== event.pointerId) return;
+      const click = !drag.started && event.type === 'pointerup' ? drag.local : null;
+      endDrag();
+      // Pressed and released in place: a click (or tap) toggles the pin.
+      if (click) handlersRef.current.onCrosshair({ type: 'tap', point: click });
+    };
+    const onLeave = () => {
+      if (!drag) handlersRef.current.onCrosshair({ type: 'leave' });
     };
     const onOut = (event: PointerEvent) => {
       if (!event.relatedTarget) cancel();
@@ -112,7 +138,7 @@ export default function CandlestickGestures(props: CandlestickGesturesProps) {
 
     node.addEventListener('pointerdown', onDown);
     node.addEventListener('pointermove', onHover);
-    node.addEventListener('pointerleave', cancel);
+    node.addEventListener('pointerleave', onLeave);
     node.addEventListener('lostpointercapture', onUp);
     node.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('pointermove', onMove, { passive: false });
@@ -127,7 +153,7 @@ export default function CandlestickGestures(props: CandlestickGesturesProps) {
       wheel.dispose();
       node.removeEventListener('pointerdown', onDown);
       node.removeEventListener('pointermove', onHover);
-      node.removeEventListener('pointerleave', cancel);
+      node.removeEventListener('pointerleave', onLeave);
       node.removeEventListener('lostpointercapture', onUp);
       node.removeEventListener('wheel', onWheel);
       window.removeEventListener('pointermove', onMove);

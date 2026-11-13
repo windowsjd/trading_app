@@ -1,25 +1,78 @@
 // Pure gesture policy shared by the native and web chart adapters: when a drag
-// counts as a horizontal chart pan (rather than a page scroll), and how wheel
-// input maps to zoom. Keeping these decisions here means both platforms follow
+// belongs to the chart, how a tap and a long press drive the crosshair, and how
+// wheel input maps to zoom. Keeping these decisions here means both platforms follow
 // the same rules and the rules are unit-testable without rendering.
 
-/** Horizontal distance before the chart claims a one-finger drag. */
+/** Two fingers moving together this far (mostly vertically) scale prices. */
 export const HORIZONTAL_PAN_SLOP_PX = 10;
 /** Hold this long without moving to enter crosshair mode on touch screens. */
 export const LONG_PRESS_MS = 300;
+/**
+ * A one-finger drag that starts on the chart is the chart's after this many
+ * pixels in ANY direction (2026-11-13): less than the platforms' own scroll
+ * slop (Android ~8 dp, iOS ~10 pt), so the screen does not scroll under a drag
+ * that began on the chart, while a drag that starts elsewhere scrolls as
+ * before. Web pointers use the same distance.
+ */
+export const CHART_PAN_ACTIVATION_PX = 4;
+/** A tap: lifted sooner than the long press, having moved no more than this. */
+export const TAP_SLOP_PX = 8;
+/**
+ * While prices fit the visible candles automatically, a drag starts moving
+ * prices too only once it has travelled this far vertically and is not
+ * nearly horizontal — browsing history sideways keeps the automatic fit.
+ * After a price-axis change (or once engaged) every drag moves both ways.
+ */
+export const VERTICAL_PAN_ENGAGE_PX = 12;
+
+export function shouldEngageVerticalPan(dx: number, dy: number): boolean {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return false;
+  return Math.abs(dy) >= VERTICAL_PAN_ENGAGE_PX && Math.abs(dy) >= Math.abs(dx) * 0.5;
+}
 
 /**
- * A one-finger drag belongs to the chart only when it is clearly horizontal:
- * small tremors and vertical drags stay with the parent ScrollView so the
- * detail screen keeps scrolling.
+ * What the pointer or finger says about the crosshair (2026-11-13):
+ * - `hover`  a mouse over the chart (web) — follows it, never over a pinned one;
+ * - `leave`  the mouse left / a drag began — clears only a hovering one;
+ * - `scrub`  a long press moving — moves even a pinned one;
+ * - `release` the long press lifted — it stays (pinned);
+ * - `tap`    a simple tap or click — pins one there, or clears the pinned one shown.
  */
-export function isHorizontalPanIntent(
-  dx: number,
-  dy: number,
-  slopPx: number = HORIZONTAL_PAN_SLOP_PX,
-): boolean {
-  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return false;
-  return Math.abs(dx) > slopPx && Math.abs(dx) > Math.abs(dy) * 1.2;
+export type CrosshairInput =
+  | { type: 'hover' | 'scrub' | 'tap'; point: CrosshairPoint }
+  | { type: 'leave' | 'release' };
+
+export type CrosshairMode = 'hover' | 'scrub' | 'pinned';
+export type CrosshairState<A> = { anchor: A; mode: CrosshairMode } | null;
+
+/**
+ * The crosshair after an input. `anchorOf` turns a point into what the chart
+ * stores (a candle and a price, so a pan or zoom never makes it point at
+ * another date or price) and may refuse it (null). `shown`: the current one is
+ * drawn now (a pinned one panned out of view is not, so a tap pins a new one).
+ */
+export function reduceCrosshair<A>(
+  current: CrosshairState<A>,
+  input: CrosshairInput,
+  anchorOf: (point: CrosshairPoint) => A | null,
+  shown: boolean,
+): CrosshairState<A> {
+  const at = (point: CrosshairPoint, mode: CrosshairMode): CrosshairState<A> => {
+    const anchor = anchorOf(point);
+    return anchor === null ? current : { anchor, mode };
+  };
+  switch (input.type) {
+    case 'hover':
+      return current?.mode === 'pinned' || current?.mode === 'scrub' ? current : at(input.point, 'hover');
+    case 'leave':
+      return current?.mode === 'hover' ? null : current;
+    case 'scrub':
+      return at(input.point, 'scrub');
+    case 'release':
+      return current?.mode === 'scrub' ? { ...current, mode: 'pinned' } : current;
+    case 'tap':
+      return current?.mode === 'pinned' && shown ? null : at(input.point, 'pinned');
+  }
 }
 
 export type WheelIntent = 'zoom' | 'pan';
@@ -193,7 +246,7 @@ export type ChartGestureSession = {
 export function createChartGestureSession(callbacks: {
   onGestureStart: () => void;
   onGestureEnd: () => void;
-  onCrosshair: (point: CrosshairPoint | null) => void;
+  onCrosshair: (input: CrosshairInput) => void;
 }): ChartGestureSession {
   let owner: ChartGestureOwner = 'none';
 
@@ -207,8 +260,9 @@ export function createChartGestureSession(callbacks: {
   const end = (type: ChartGestureType): boolean => {
     if (owner !== type) return false;
     owner = 'none';
-    // Leaving crosshair mode always clears the drawn crosshair, exactly once.
-    if (type === 'crosshair') callbacks.onCrosshair(null);
+    // Leaving crosshair mode (lift, cancel, a pinch taking over) keeps the
+    // crosshair where it was, pinned, exactly once (2026-11-13).
+    if (type === 'crosshair') callbacks.onCrosshair({ type: 'release' });
     callbacks.onGestureEnd();
     return true;
   };
@@ -226,12 +280,12 @@ export function createChartGestureSession(callbacks: {
     end,
     startCrosshair(point) {
       if (!begin('crosshair')) return false;
-      callbacks.onCrosshair(point);
+      callbacks.onCrosshair({ type: 'scrub', point });
       return true;
     },
     moveCrosshair(point) {
       if (owner !== 'crosshair') return false;
-      callbacks.onCrosshair(point);
+      callbacks.onCrosshair({ type: 'scrub', point });
       return true;
     },
   };
@@ -269,7 +323,7 @@ export type WheelGestureSession = {
 export function createWheelGestureSession(options: {
   onGestureStart: () => void;
   onZoom: (scale: number, focalX: number) => void;
-  onPan: (translationX: number) => void;
+  onPan: (translationX: number, translationY: number) => void;
   onGestureEnd: () => void;
   idleMs?: number;
   setTimer?: (callback: () => void, ms: number) => unknown;
@@ -335,7 +389,8 @@ export function createWheelGestureSession(options: {
       if (!Number.isFinite(deltaPx)) return;
       enter('pan');
       panPx += deltaPx;
-      options.onPan(panPx);
+      // A wheel pan is horizontal only; prices keep their fit.
+      options.onPan(panPx, 0);
       armIdleTimer();
     },
     end,

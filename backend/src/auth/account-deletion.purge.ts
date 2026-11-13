@@ -540,6 +540,10 @@ export async function purgeDeletionScope(
       Prisma.sql`DELETE FROM notification_preferences WHERE user_id = ${user}`,
     ],
     [
+      'important_notice_acknowledgements',
+      Prisma.sql`DELETE FROM important_notice_acknowledgements WHERE user_id = ${user}`,
+    ],
+    [
       'refresh_token_sessions',
       Prisma.sql`DELETE FROM refresh_token_sessions WHERE user_id = ${user}`,
     ],

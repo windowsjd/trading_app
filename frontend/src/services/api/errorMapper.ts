@@ -333,7 +333,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.AUTH_SIGNUP_CONFLICT:
       return '회원가입을 완료하지 못했습니다. 입력 정보를 확인하고 다시 시도해주세요.';
     case ERROR_CODE.AUTH_SIGNUP_CONSENT_REQUIRED:
-      return '가입을 진행하지 못했습니다. 만 16세 이상 확인에 체크하고, 계속되면 앱을 최신 버전으로 업데이트해주세요.';
+      return '가입을 진행하지 못했습니다. 만 16세 이상 확인, 이용약관 동의, 개인정보처리방침 동의에 모두 체크하고, 계속되면 앱을 최신 버전으로 업데이트해주세요.';
     case ERROR_CODE.AUTH_CONFIGURATION_ERROR:
       return '로그인 또는 회원가입을 완료하지 못했습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.USER_NOT_ACTIVE:

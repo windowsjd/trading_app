@@ -18,6 +18,8 @@ import { useTradingAccount } from '../../features/tradingAccount/TradingAccountC
 import { ScreenSheetHost } from '../../components/common/ScreenSheetHost';
 import { QuestGuideProvider } from '../../features/quest/QuestGuideProvider';
 import AppUpdateNotice from '../../features/appRelease/AppUpdateNotice';
+import NoticePopupHost from '../../features/notice/NoticePopupHost';
+import { EntryOverlayProvider } from '../../features/entryOverlay/EntryOverlaySlot';
 import { isGuestBrowsing } from '../../features/auth/guestBrowsing';
 import { GuestExitContext } from '../../components/guest/guestExit';
 import { leaveGuestBrowsing } from './seasonRouting';
@@ -234,8 +236,18 @@ export default function MainTabs(props: MainTabsScreenProps) {
   // keyed like the navigator, a switch or logout discards it with the tabs.
   // Bottom sheets of tab screens cover headers and the tab bar but stay below
   // the quest overlay, which the provider draws after its children.
-  // 앱 업데이트 안내 opens in the same sheet layer once the app is entered normally.
-  const hosted = <ScreenSheetHost>{tabs}<AppUpdateNotice /></ScreenSheetHost>;
+  // 앱 업데이트 안내 and the members' 공지 팝업 open in the same layer once the
+  // app is entered normally — one at a time (EntryOverlayProvider), the
+  // popup only for a signed-in member.
+  const hosted = (
+    <ScreenSheetHost>
+      {tabs}
+      <EntryOverlayProvider>
+        <AppUpdateNotice />
+        <NoticePopupHost enabled={mode !== 'guest'} />
+      </EntryOverlayProvider>
+    </ScreenSheetHost>
+  );
   if (mode === 'guest') {
     // A guest's 로그인 / 회원가입, from any tab or sheet: this root route's
     // own navigation resets to the auth stack.

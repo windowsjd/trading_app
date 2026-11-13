@@ -27,3 +27,12 @@ export async function endSession() {}
 export function useEnterApp() { return async () => { window.enteredApp = true; }; }
 export function isCurrentSession() { return true; }
 export class SessionSupersededError extends Error {}
+// The rest of services/api/sessionOwnership (session.ts imports it when it is
+// bundled through a relative path the alias does not catch).
+export const getSessionGeneration = () => 1;
+export const canUseSessionCredentials = () => true;
+export function assertCurrentSession() {}
+export function startSessionInstall() { return 1; }
+export function activateSession() {}
+export function invalidateSession() { return 1; }
+export function reportSessionStorageFailure() {}

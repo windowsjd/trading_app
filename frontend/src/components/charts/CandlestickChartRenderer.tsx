@@ -69,6 +69,13 @@ export type CandlestickChartGeometry = {
    * the viewport.
    */
   leadingEmptySlots: number;
+  /**
+   * Sub-candle position of the window, 0…−1 slots (2026-11-13): a drag moves
+   * the candles pixel by pixel, so the first visible candle may be cut by the
+   * left edge. 0 on whole candles. Candles sit at
+   * `leadingEmptySlots + slotShift + index − startIndex`.
+   */
+  slotShift: number;
   minY: number;
   maxY: number;
   range: number;
@@ -130,6 +137,7 @@ export default function CandlestickChartRenderer({
     bodyWidth,
     startIndex,
     leadingEmptySlots,
+    slotShift,
   } = geometry;
   const rightEdgeX = padding.left + innerWidth;
   const bottomY = padding.top + innerHeight;
@@ -158,7 +166,7 @@ export default function CandlestickChartRenderer({
         const x = candleXCenter(
           padding.left,
           slotWidth,
-          leadingEmptySlots + candle.index - startIndex,
+          leadingEmptySlots + slotShift + candle.index - startIndex,
         );
         const color = candle.bullish ? financialColors.candleUp : financialColors.candleDown;
         const openY = yForPrice(candle.open);
@@ -193,6 +201,7 @@ export default function CandlestickChartRenderer({
       slotWidth,
       startIndex,
       leadingEmptySlots,
+      slotShift,
       bodyWidth,
       yForPrice,
     ],
@@ -409,7 +418,7 @@ export default function CandlestickChartRenderer({
       ? candleXCenter(
           padding.left,
           slotWidth,
-          leadingEmptySlots + crosshair.index - startIndex,
+          leadingEmptySlots + slotShift + crosshair.index - startIndex,
         )
       : 0;
   const crosshairPrice =

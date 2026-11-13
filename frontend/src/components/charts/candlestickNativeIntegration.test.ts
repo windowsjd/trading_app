@@ -4,6 +4,7 @@ import { createChartHarness, elements } from './chartIntegrationHarness.cjs';
 import { chartLabelWidth } from './candlestickLayout.ts';
 import { formatChartPrice } from './candlestickPriceFormat.ts';
 import { formatKstDateTime } from '../../utils/format.ts';
+import { priceRange } from './candlestickPriceScale.ts';
 
 // RNGH State values. Inputs below are Android native state transitions, sent
 // through the installed eventReceiver, NOT direct calls to policy functions.
@@ -33,12 +34,21 @@ function setup(extra = {}) {
   const events = harness.attach(detector.props.gesture);
   const pricePan = events.handlers.find((handler) => handler.config.minPointers === 2)!;
   const pinch = events.handlers.find((handler) => handler.handlerName === 'PinchGestureHandler')!;
-  const pan = events.handlers.find((handler) => handler.config.activeOffsetXEnd)!;
+  // The one-finger chart drag: activated by distance in any direction (2026-11-13).
+  const pan = events.handlers.find((handler) => handler.handlerName === 'PanGestureHandler' && handler.config.maxPointers === 1 && !handler.config.activateAfterLongPress)!;
   const crosshair = events.handlers.find((handler) => handler.config.activateAfterLongPress || handler.handlerName === 'LongPressGestureHandler')!;
+  const tap = events.handlers.find((handler) => handler.handlerName === 'TapGestureHandler')!;
   const geometry = () => elements(chart.render()).find((element) => element.props.geometry)!.props;
   const renderer = () => harness.component('CandlestickChartRenderer.tsx', geometry()).render();
   const down = () => events.handlers.forEach((handler) => events.state(handler, UNDETERMINED, BEGAN));
-  return { harness, chart, adapter, detector, events, pinch, pricePan, pan, crosshair, intents, geometry, renderer, down };
+  /** A simple tap at (x, y): the tap recognizer wins its race and the others fail. */
+  const tapAt = (x: number, y: number) => {
+    events.handlers.forEach((handler) => events.state(handler, UNDETERMINED, BEGAN, { x, y }));
+    events.state(tap, BEGAN, ACTIVE, { x, y });
+    events.state(tap, ACTIVE, END, { x, y });
+    for (const other of [pan, crosshair, pinch, pricePan]) events.state(other, BEGAN, FAILED);
+  };
+  return { harness, chart, adapter, detector, events, pinch, pricePan, pan, crosshair, tap, intents, geometry, renderer, down, tapAt };
 }
 
 describe('native adapter → RNGH JS event receiver → chart state → shared renderer', () => {
@@ -89,50 +99,61 @@ describe('native adapter → RNGH JS event receiver → chart state → shared r
     assert.equal(labels.at(-2), formatChartPrice(expectedPrice, 'USD', 5));
     h.events.update(h.crosshair, { x: 180, y: 220 });
     assert.ok(h.geometry().crosshair.index > initial.index);
-    assert.equal(h.geometry().crosshair.y, 220);
+    assert.ok(Math.abs(h.geometry().crosshair.y - 220) < 1e-9);
     const lines = elements(h.renderer(), 'line').filter((element) => element.props.strokeDasharray === '2 2');
     assert.equal(lines.length, 2);
-    assert.equal(lines[1].props.y1, 220);
+    assert.ok(Math.abs(lines[1].props.y1 - 220) < 1e-9);
+    const scrubbed = h.geometry().crosshair;
     h.events.state(h.crosshair, ACTIVE, END);
     h.events.state(h.pinch, BEGAN, FAILED);
-    assert.equal(h.geometry().crosshair, null);
+    // Lifted: the crosshair and both labels stay where the finger left them.
+    assert.deepEqual(h.geometry().crosshair, scrubbed);
     assert.deepEqual(h.intents, ['start', 'end']);
+    // The next simple tap clears it.
+    h.tapAt(150, 150);
+    assert.equal(h.geometry().crosshair, null);
+    assert.deepEqual(h.intents, ['start', 'end'], 'a tap is no chart gesture');
   });
 
   for (const terminal of [END, CANCELLED, FAILED]) {
-    it(`clears a held crosshair on terminal state ${terminal}, including a hold without movement`, () => {
+    it(`keeps a held crosshair pinned on terminal state ${terminal}, including a hold without movement`, () => {
       const h = setup();
       h.down();
       h.events.state(h.crosshair, BEGAN, ACTIVE);
+      const held = h.geometry().crosshair;
+      assert.ok(held);
       h.events.state(h.crosshair, ACTIVE, terminal);
       h.events.state(h.pinch, BEGAN, FAILED);
-      assert.equal(h.geometry().crosshair, null);
+      assert.deepEqual(h.geometry().crosshair, held);
       assert.deepEqual(h.intents, ['start', 'end']);
     });
   }
 
-  it('leaving any chart edge clears crosshair and reentry cannot revive it', () => {
+  it('leaving any chart edge ends the scrub where it was; reentry cannot move it', () => {
     for (const point of [{ x: -1, y: 100 }, { x: 321, y: 100 }, { x: 100, y: -1 }, { x: 100, y: 900 }]) {
       const h = setup();
       h.down();
       h.events.state(h.crosshair, BEGAN, ACTIVE);
+      const last = h.geometry().crosshair;
       h.events.update(h.crosshair, point);
-      assert.equal(h.geometry().crosshair, null);
-      h.events.update(h.crosshair, { x: 100, y: 100 });
+      assert.deepEqual(h.geometry().crosshair, last, 'pinned at the last point on the chart');
+      h.events.update(h.crosshair, { x: 200, y: 200 });
       h.events.state(h.crosshair, ACTIVE, CANCELLED);
-      assert.equal(h.geometry().crosshair, null);
+      assert.deepEqual(h.geometry().crosshair, last);
       assert.deepEqual(h.intents, ['start', 'end']);
     }
   });
 
-  it('pinch activates after a hold, clears crosshair, zooms both ways and ignores late finalizers', () => {
+  it('pinch activates after a hold, keeps the crosshair on its candle, zooms both ways and ignores late finalizers', () => {
     const h = setup();
     h.down();
     h.events.state(h.crosshair, BEGAN, ACTIVE);
+    const held = h.geometry().crosshair;
+    const heldTime = candles[held.index].time;
     const initialWidth = h.geometry().geometry.slotWidth;
     h.events.state(h.pinch, BEGAN, ACTIVE, { numberOfPointers: 2 });
     h.events.state(h.crosshair, ACTIVE, CANCELLED);
-    assert.equal(h.geometry().crosshair, null);
+    assert.equal(candles[h.geometry().crosshair.index].time, heldTime);
     h.events.update(h.pinch, { scale: 2, focalX: 200, numberOfPointers: 2 });
     assert.ok(h.geometry().geometry.slotWidth > initialWidth);
     h.events.update(h.pinch, { scale: 0.5, focalX: 200, numberOfPointers: 2 });
@@ -142,18 +163,21 @@ describe('native adapter → RNGH JS event receiver → chart state → shared r
     assert.deepEqual(h.intents, ['start', 'end', 'start', 'end']);
   });
 
-  it('native configuration races horizontal pan vs hold, while pinch can take over either', () => {
+  it('native configuration races a drag (any direction), a hold and a tap, while pinch can take over', () => {
     const h = setup();
     assert.equal(h.crosshair.config.activateAfterLongPress, 300);
     assert.equal(h.crosshair.config.shouldCancelWhenOutside, true);
     assert.equal(h.crosshair.config.manualActivation, undefined);
-    assert.equal(h.pan.config.activeOffsetXStart, -10);
-    assert.equal(h.pan.config.activeOffsetXEnd, 10);
-    assert.equal(h.pan.config.failOffsetYStart, -10);
-    assert.equal(h.pan.config.failOffsetYEnd, 10);
+    // Below the platforms' ~8–10 pt scroll slop: a drag begun on the chart is the chart's.
+    assert.equal(h.pan.config.minDist, 4);
+    assert.equal(h.pan.config.activeOffsetXEnd, undefined);
+    assert.equal(h.pan.config.failOffsetYEnd, undefined);
     assert.equal(h.pan.config.maxPointers, 1);
     assert.equal(h.crosshair.config.maxPointers, 1);
-    assert.ok(!h.pan.config.simultaneousWith.includes(h.crosshair));
+    assert.equal(h.tap.config.maxDurationMs, 300, 'a hold becomes the crosshair scrub, never a tap');
+    assert.equal(h.tap.config.maxDist, 8);
+    for (const [a, b] of [[h.pan, h.crosshair], [h.pan, h.tap], [h.crosshair, h.tap]])
+      assert.ok(!a.config.simultaneousWith.includes(b), 'one of drag / hold / tap per touch');
     assert.ok(h.pan.config.simultaneousWith.includes(h.pinch));
     assert.ok(h.crosshair.config.simultaneousWith.includes(h.pinch));
     assert.ok(h.events.handlers.every((handler) => !handler.shouldUseReanimated));
@@ -230,12 +254,15 @@ describe('native adapter → RNGH JS event receiver → chart state → shared r
     const h = setup();
     h.down();
     h.events.state(h.crosshair, BEGAN, ACTIVE);
+    const held = h.geometry().crosshair;
     h.adapter.props = { ...h.adapter.props, chartWidth: 700, chartHeight: 320 };
     const rotated = h.adapter.render();
     h.adapter.flushEffects();
-    assert.equal(h.geometry().crosshair, null);
+    // The scrub ends with the old recognizers (no gesture left running); its crosshair stays put.
+    assert.deepEqual(h.geometry().crosshair, held);
+    assert.deepEqual(h.intents, ['start', 'end']);
     const next = h.harness.attach(rotated.props.gesture);
-    const pan = next.handlers.find((handler) => handler.config.activeOffsetXEnd)!;
+    const pan = next.handlers.find((handler) => handler.handlerName === 'PanGestureHandler' && handler.config.maxPointers === 1 && !handler.config.activateAfterLongPress)!;
     next.state(pan, UNDETERMINED, BEGAN);
     next.state(pan, BEGAN, ACTIVE);
     next.update(pan, { translationX: 50 });
@@ -462,4 +489,198 @@ describe('display currency (the won view of a dollar asset)', () => {
     const geometry = h.geometry().geometry;
     for (const label of written) assert.ok(chartLabelWidth(label) <= geometry.padding.right, label);
   });
+});
+
+describe('2026-11-13: the chart moves both ways; the price axis scales; a tap pins the crosshair', () => {
+  const close = (a: number, b: number, why = '') => assert.ok(Math.abs(a - b) < 1e-6, `${why} ${a} ≉ ${b}`);
+  /** One finger pressed at `start`, activated after its first move, then moved along `path` (translations). */
+  const drag = (h: ReturnType<typeof setup>, path: Array<[number, number]>, start = { x: 150, y: 150 }, lift = true) => {
+    h.events.handlers.forEach((handler) => h.events.state(handler, UNDETERMINED, BEGAN, { ...start }));
+    const [[ax, ay], ...rest] = path;
+    h.events.state(h.pan, BEGAN, ACTIVE, { x: start.x + ax, y: start.y + ay, translationX: ax, translationY: ay });
+    for (const other of [h.crosshair, h.tap]) h.events.state(other, BEGAN, CANCELLED);
+    for (const [dx, dy] of rest) h.events.update(h.pan, { x: start.x + dx, y: start.y + dy, translationX: dx, translationY: dy });
+    if (lift) {
+      h.events.state(h.pan, ACTIVE, END);
+      for (const other of [h.pinch, h.pricePan]) h.events.state(other, BEGAN, FAILED);
+    }
+  };
+
+  it('a vertical drag moves candles and prices with the finger; reversing follows; time stays', () => {
+    const h = setup();
+    const before = h.geometry().geometry;
+    // 4 px to activate, then a clear vertical move takes the price window over (no jump) and follows.
+    drag(h, [[0, 4], [0, 10], [0, 16], [0, 56]], undefined, false);
+    const moved = h.geometry().geometry;
+    assert.equal(moved.startIndex, before.startIndex, 'time does not move');
+    assert.equal(moved.slotWidth, before.slotWidth);
+    close(moved.range, before.range, 'the window keeps its size');
+    // Taken over at 12 px (16 − 4): the last 40 px are a move of 40 px worth of prices, upwards on screen = higher prices.
+    close(moved.minY - before.minY, (40 / before.innerHeight) * before.range, 'follows the finger');
+    h.events.update(h.pan, { x: 150, y: 166, translationX: 0, translationY: 16 });
+    close(h.geometry().geometry.minY, before.minY, 'back where the take-over began');
+    h.events.update(h.pan, { x: 150, y: 126, translationX: 0, translationY: -24 });
+    close(h.geometry().geometry.minY - before.minY, (-40 / before.innerHeight) * before.range, 'and the other way');
+    h.events.state(h.pan, ACTIVE, END);
+    assert.deepEqual(h.intents, ['start', 'end']);
+    // A later drag moves prices from its first pixel (the window is no longer automatic).
+    const held = h.geometry().geometry;
+    drag(h, [[0, 4], [0, 9]]);
+    close(h.geometry().geometry.minY - held.minY, (5 / held.innerHeight) * held.range);
+    // 최신 brings back the automatic fit and the latest window.
+    elements(h.chart.render(), 'Pressable')[0].props.onPress();
+    assert.deepEqual(h.geometry().geometry, before);
+  });
+
+  it('a diagonal drag moves both; a sideways swipe with a little drift keeps the automatic price fit', () => {
+    const h = setup();
+    const before = h.geometry().geometry;
+    drag(h, [[4, 1], [100, 8], [200, 12]]);
+    const sideways = h.geometry().geometry;
+    assert.ok(sideways.startIndex < before.startIndex, 'moved into history');
+    // Fitted to the candles on screen (60, or 61 with both edge candles cut).
+    const fits = [60, 61].map((count) => priceRange(99 + sideways.startIndex, 102 + Math.min(239, sideways.startIndex + count - 1)));
+    assert.ok(fits.some((fit) => Math.abs(fit.minY - sideways.minY) < 1e-6 && Math.abs(fit.maxY - sideways.maxY) < 1e-6),
+      'prices still fit the visible candles');
+    assert.ok(elements(h.chart.render(), 'Pressable').length === 1, '최신 offered');
+    elements(h.chart.render(), 'Pressable')[0].props.onPress();
+    assert.deepEqual(h.geometry().geometry, before, 'back to the latest window (drawn before the next drag)');
+    drag(h, [[3, 3], [30, 30], [60, 60]]);
+    const diagonal = h.geometry().geometry;
+    assert.ok(diagonal.startIndex < before.startIndex, 'time moved');
+    close(diagonal.minY - before.minY, (30 / before.innerHeight) * before.range, 'prices moved by the part after the take-over');
+    assert.ok(Math.abs(diagonal.slotShift) < 1 && diagonal.slotShift <= 0, 'between whole candles: shifted by part of a slot');
+  });
+
+  it('small moves are not lost: a few pixels move the candles a few pixels', () => {
+    const h = setup();
+    const before = h.geometry().geometry;
+    drag(h, [[4, 0], [6, 0]], undefined, false);
+    const after = h.geometry().geometry;
+    // 2 px after activation = 2 px on screen, not a whole candle (and not nothing).
+    const shift = (after.leadingEmptySlots + after.slotShift - after.startIndex) - (before.leadingEmptySlots + before.slotShift - before.startIndex);
+    close(shift * after.slotWidth, 2, 'candles follow the finger pixel for pixel');
+  });
+
+  it('a drag on the price axis scales prices only; a drag after it moves prices at once', () => {
+    const h = setup();
+    const before = h.geometry().geometry;
+    const axis = { x: before.padding.left + before.innerWidth + 10, y: 150 };
+    drag(h, [[0, 4], [0, 54]], axis);
+    const scaled = h.geometry().geometry;
+    assert.ok(scaled.range > before.range, 'dragging the axis down widens the range');
+    assert.equal(scaled.startIndex, before.startIndex);
+    assert.deepEqual(h.intents, ['start', 'end']);
+    drag(h, [[0, 4], [0, 9]]);
+    close(h.geometry().geometry.minY - scaled.minY, (5 / scaled.innerHeight) * scaled.range, 'moves without waiting for a take-over');
+    close(h.geometry().geometry.range, scaled.range);
+  });
+
+  it('a price drag stays recoverable: never below zero, never fully away from the loaded prices', () => {
+    const h = setup();
+    drag(h, [[0, 4], [0, 16], [0, -100_000]]);
+    assert.ok(h.geometry().geometry.minY > 0);
+    drag(h, [[0, 4], [0, 100_000]]);
+    const g = h.geometry().geometry;
+    assert.ok(Number.isFinite(g.minY) && Number.isFinite(g.maxY) && g.range > 0);
+    assert.ok(g.minY < 102 + 239, 'some loaded prices stay in view');
+  });
+
+  it('a tap pins the crosshair with its labels; it rides along with pan and zoom; the next tap clears it', () => {
+    const h = setup();
+    h.tapAt(150, 120);
+    const pinned = h.geometry().crosshair;
+    assert.ok(pinned, 'pinned where tapped');
+    const g = h.geometry().geometry;
+    const price = g.minY + (1 - (120 - g.padding.top) / g.innerHeight) * g.range;
+    const labels = () => elements(h.renderer(), 'text').map((node: any) => node.props.children);
+    assert.equal(labels().at(-1), formatKstDateTime(new Date(candles[pinned.index].time)));
+    assert.equal(labels().at(-2), formatChartPrice(price, 'USD', 5));
+    // A sideways drag of three candles carries it along with its candle and price
+    // (the automatic fit may move that price's height; the label never changes).
+    drag(h, [[4, 0], [4 + 3 * g.slotWidth, 0]]);
+    const carried = h.geometry().crosshair;
+    const moved = h.geometry().geometry;
+    assert.equal(carried.index, pinned.index, 'same candle');
+    close(carried.y, moved.padding.top + (1 - (price - moved.minY) / moved.range) * moved.innerHeight, 'drawn at the same price');
+    assert.equal(labels().at(-1), formatKstDateTime(new Date(candles[pinned.index].time)));
+    assert.equal(labels().at(-2), formatChartPrice(price, 'USD', 5));
+    const lineX = () => elements(h.renderer(), 'line').filter((node: any) => node.props.strokeDasharray === '2 2')[0].props.x1;
+    close(lineX(), moved.padding.left + (moved.leadingEmptySlots + moved.slotShift + pinned.index - moved.startIndex + 0.5) * moved.slotWidth, 'on its candle');
+    // Panned far away it is not drawn (and a tap there would pin anew); back again, it returns.
+    drag(h, [[4, 0], [400, 0]]);
+    assert.equal(h.geometry().crosshair, null);
+    drag(h, [[-4, 0], [-400, 0]]);
+    assert.equal(h.geometry().crosshair?.index, pinned.index);
+    // A pinch keeps it on the same candle.
+    h.events.state(h.pinch, BEGAN, ACTIVE, { numberOfPointers: 2 });
+    h.events.update(h.pinch, { scale: 1.5, focalX: 120, numberOfPointers: 2 });
+    h.events.state(h.pinch, ACTIVE, END);
+    assert.equal(h.geometry().crosshair?.index, pinned.index);
+    h.tapAt(60, 200);
+    assert.equal(h.geometry().crosshair, null, 'the next simple tap clears it');
+    h.tapAt(60, 200);
+    assert.ok(h.geometry().crosshair, 'and the one after pins again');
+  });
+
+  it('neither a drag nor a two-finger touch is ever taken for a tap', () => {
+    const h = setup();
+    drag(h, [[4, 0], [40, 0]]);
+    h.events.state(h.tap, BEGAN, CANCELLED);
+    assert.equal(h.geometry().crosshair, null);
+    // Two fingers touched during the touch: the tap's lift is ignored.
+    h.events.handlers.forEach((handler) => h.events.state(handler, UNDETERMINED, BEGAN));
+    h.events.update(h.pricePan, { eventType: 1, numberOfTouches: 2, changedTouches: [],
+      allTouches: [{ id: 1, x: 100, y: 100 }, { id: 2, x: 140, y: 100 }] });
+    h.events.state(h.tap, BEGAN, ACTIVE);
+    h.events.state(h.tap, ACTIVE, END);
+    assert.equal(h.geometry().crosshair, null);
+  });
+
+  it('최신, another timeframe and another asset clear a pinned crosshair and a moved price window', () => {
+    for (const reset of ['latest', 'timeframe', 'asset'] as const) {
+      const h = setup();
+      const before = h.geometry().geometry;
+      h.tapAt(150, 120);
+      drag(h, [[0, 4], [0, 16], [0, 60]]);
+      assert.ok(h.geometry().crosshair);
+      if (reset === 'latest') elements(h.chart.render(), 'Pressable')[0].props.onPress();
+      else {
+        h.chart.props.viewportResetKey = reset === 'timeframe' ? '1h' : 'other-asset:5m';
+        h.chart.render();
+        h.chart.flushEffects();
+      }
+      assert.equal(h.geometry().crosshair, null, reset);
+      assert.deepEqual(h.geometry().geometry, before, reset);
+    }
+  });
+});
+
+it('a one-finger drag that never activated cannot end a two-finger price scaling (after an axis drag)', () => {
+  const h = setup();
+  const before = h.geometry().geometry;
+  // An earlier one-finger drag on the price axis.
+  const axis = { x: before.padding.left + before.innerWidth + 10, y: 150 };
+  h.events.handlers.forEach((handler) => h.events.state(handler, UNDETERMINED, BEGAN, axis));
+  h.events.state(h.pan, BEGAN, ACTIVE, { ...axis, translationX: 0, translationY: 4 });
+  h.events.update(h.pan, { ...axis, translationX: 0, translationY: 30 });
+  h.events.state(h.pan, ACTIVE, END);
+  for (const other of [h.crosshair, h.tap, h.pinch, h.pricePan]) h.events.state(other, BEGAN, FAILED);
+  assert.deepEqual(h.intents, ['start', 'end']);
+  // Now two fingers scale prices; the one-finger recognizers fail mid-way.
+  h.events.handlers.forEach((handler) => h.events.state(handler, UNDETERMINED, BEGAN));
+  const touch = (eventType: number, dy: number) => h.events.update(h.pricePan, {
+    eventType, numberOfTouches: 2, changedTouches: [], allTouches: [{ id: 1, x: 80, y: 100 + dy }, { id: 2, x: 180, y: 100 + dy }],
+  });
+  touch(1, 0);
+  h.events.state(h.pricePan, BEGAN, ACTIVE, { numberOfPointers: 2 });
+  touch(2, 40);
+  const scaling = h.geometry().geometry.range;
+  h.events.state(h.pan, BEGAN, FAILED);
+  h.events.state(h.tap, BEGAN, FAILED);
+  touch(2, 80);
+  assert.ok(h.geometry().geometry.range > scaling, 'the two-finger scaling continues');
+  h.events.state(h.pricePan, ACTIVE, END);
+  h.events.state(h.pinch, BEGAN, FAILED);
+  assert.deepEqual(h.intents, ['start', 'end', 'start', 'end']);
 });

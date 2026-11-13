@@ -29,7 +29,10 @@ import {
   UserStatus,
 } from '../generated/prisma/client';
 import { AuthService } from './auth.service';
-import { CURRENT_TERMS_VERSION } from './terms.constants';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from './terms.constants';
 import * as argon2 from 'argon2';
 
 const mockedArgon2 = jest.mocked(argon2);
@@ -130,10 +133,13 @@ describe('AuthService', () => {
     return { configService, jwtService, prisma, service, verification };
   };
 
-  /** The signup screen's required 16+ check and its terms version. */
+  /** The signup screen's three required boxes and both document versions. */
   const consent = {
     ageConfirmed: true,
+    termsAgreed: true,
     termsVersion: CURRENT_TERMS_VERSION,
+    privacyAgreed: true,
+    privacyVersion: CURRENT_PRIVACY_VERSION,
   };
 
   const hashToken = (token: string) =>
@@ -217,21 +223,37 @@ describe('AuthService', () => {
           role: UserRole.user,
           status: UserStatus.active,
           termsVersion: CURRENT_TERMS_VERSION,
-          termsAcceptedAt: expect.any(Date) as Date,
           ageConfirmedAt: expect.any(Date) as Date,
+          termsAgreedAt: expect.any(Date) as Date,
+          privacyVersion: CURRENT_PRIVACY_VERSION,
+          privacyAgreedAt: expect.any(Date) as Date,
         },
       }),
     );
-    // One server instant for both, never a client-supplied time.
+    // One server instant for the three boxes, never a client-supplied time;
+    // the notice-era `termsAcceptedAt` is not written for a checkbox signup.
     const createCalls = prisma.user.create.mock.calls as unknown as Array<
-      [{ data: { termsAcceptedAt: Date; ageConfirmedAt: Date } }]
+      [
+        {
+          data: {
+            ageConfirmedAt: Date;
+            termsAgreedAt: Date;
+            privacyAgreedAt: Date;
+            termsAcceptedAt?: Date;
+          };
+        },
+      ]
     >;
     const stored = createCalls[0][0].data;
-    expect(stored.ageConfirmedAt.getTime()).toBe(
-      stored.termsAcceptedAt.getTime(),
+    expect(stored.termsAcceptedAt).toBeUndefined();
+    expect(stored.termsAgreedAt.getTime()).toBe(
+      stored.ageConfirmedAt.getTime(),
     );
-    expect(stored.termsAcceptedAt.getTime()).toBeGreaterThanOrEqual(before);
-    expect(stored.termsAcceptedAt.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(stored.privacyAgreedAt.getTime()).toBe(
+      stored.ageConfirmedAt.getTime(),
+    );
+    expect(stored.ageConfirmedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(stored.ageConfirmedAt.getTime()).toBeLessThanOrEqual(Date.now());
     expect(jwtService.signAsync).toHaveBeenCalledWith(
       { sub: activeUser.id, tv: 0 },
       { secret: 'test-secret', expiresIn: '15m' },
@@ -352,16 +374,43 @@ describe('AuthService', () => {
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
   });
 
+  const without = (key: keyof typeof consent) => {
+    const fields: Record<string, unknown> = { ...consent };
+    delete fields[key];
+    return fields;
+  };
   it.each([
-    ['without the age confirmation', { termsVersion: CURRENT_TERMS_VERSION }],
+    ['without the age confirmation', without('ageConfirmed')],
     ['with an unchecked age box', { ...consent, ageConfirmed: false }],
     ['with a non-boolean "true"', { ...consent, ageConfirmed: 'true' }],
     ['with a non-boolean 1', { ...consent, ageConfirmed: 1 }],
-    ['without the terms version', { ageConfirmed: true }],
+    ['without the terms version', without('termsVersion')],
     ['with another terms version', { ...consent, termsVersion: '2020-01-01' }],
     [
       'with a padded terms version',
       { ...consent, termsVersion: ` ${CURRENT_TERMS_VERSION}` },
+    ],
+    // 2026-11-13: the terms and the privacy policy are separate boxes.
+    ['without the terms box', without('termsAgreed')],
+    ['with an unchecked terms box', { ...consent, termsAgreed: false }],
+    ['with a string terms box', { ...consent, termsAgreed: 'true' }],
+    ['without the privacy box', without('privacyAgreed')],
+    ['with an unchecked privacy box', { ...consent, privacyAgreed: false }],
+    ['with a string privacy box', { ...consent, privacyAgreed: 'true' }],
+    ['without the privacy version', without('privacyVersion')],
+    [
+      'with another privacy version',
+      { ...consent, privacyVersion: '2020-01-01' },
+    ],
+    [
+      'with the versions swapped into the wrong field',
+      { ...consent, privacyVersion: 'privacy', termsVersion: 'terms' },
+    ],
+    // An app from before the checkboxes sends only the 16+ box and the
+    // terms version: never treated as consent to the documents.
+    [
+      'from an app without the document boxes',
+      { ageConfirmed: true, termsVersion: CURRENT_TERMS_VERSION },
     ],
   ])(
     'refuses signup %s before the email proof or anything else is used',

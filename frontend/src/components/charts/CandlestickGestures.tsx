@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from '../../theme/native';
 import type { ReactNode } from 'react';
+import type { CrosshairInput } from './candlestickGesturePolicy';
 
 /**
  * Contract between the chart and its platform gesture adapters, plus the
@@ -27,16 +28,19 @@ export type CandlestickGesturesProps = {
 
   /** A pan/pinch is starting: snapshot the current viewport. */
   onGestureStart: () => void;
-  /** Horizontal pan, measured from the gesture start. */
-  onPan: (translationX: number) => void;
+  /**
+   * Chart move, measured from the gesture start: x pans time, y moves prices
+   * (the chart decides when y starts to count — see shouldEngageVerticalPan).
+   */
+  onPan: (translationX: number, translationY: number) => void;
   /** Pinch/wheel zoom about `focalX` (plot coordinates, px). */
   onZoom: (scale: number, focalX: number) => void;
-  /** Vertical price scaling, pixels from the gesture start. */
+  /** Vertical price scaling (a drag on the price axis), pixels from the gesture start. */
   onPriceScale: (translationY: number) => void;
   /** Vertical pinch: price zoom about `focalY` (chart coordinates, px). */
   onPriceZoom: (scale: number, focalY: number) => void;
-  /** Crosshair position in chart coordinates, or null to clear it. */
-  onCrosshair: (position: { x: number; y: number } | null) => void;
+  /** Crosshair input (hover, long-press scrub, release, tap…) in chart coordinates. */
+  onCrosshair: (input: CrosshairInput) => void;
   /** Gesture finished (adapters use it to end crosshair/pan sessions). */
   onGestureEnd: () => void;
 };

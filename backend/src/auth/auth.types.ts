@@ -28,6 +28,11 @@ export type SignupRequestBody = {
   nickname?: unknown;
   ageConfirmed?: unknown;
   termsVersion?: unknown;
+  /** 2026-11-13: the 이용약관 checkbox (exactly `true`). */
+  termsAgreed?: unknown;
+  /** 2026-11-13: the 개인정보처리방침 checkbox (exactly `true`) and its version. */
+  privacyAgreed?: unknown;
+  privacyVersion?: unknown;
 };
 
 export type LoginRequestBody = {

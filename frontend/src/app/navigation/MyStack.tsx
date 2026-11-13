@@ -19,6 +19,9 @@ import RewardScreen from '../../screens/reward/RewardScreen';
 import MyBadgesScreen from '../../screens/my/MyBadgesScreen';
 import SettingsScreen from '../../screens/my/SettingsScreen';
 import MembershipDeletionScreen from '../../screens/my/MembershipDeletionScreen';
+import AdminConsoleScreen from '../../screens/admin/AdminConsoleScreen';
+import AdminNoticesScreen from '../../screens/admin/AdminNoticesScreen';
+import AdminNoticeEditorScreen from '../../screens/admin/AdminNoticeEditorScreen';
 
 const Stack = createNativeStackNavigator<MyStackParamList>();
 
@@ -79,6 +82,9 @@ export default function MyStack() {
         component={MembershipDeletionScreen}
         options={{ title: '회원탈퇴' }}
       />
+      <Stack.Screen name="AdminConsole" component={AdminConsoleScreen} options={{ title: '관리자 전용 콘솔' }} />
+      <Stack.Screen name="AdminNotices" component={AdminNoticesScreen} options={{ title: '공지사항 관리' }} />
+      <Stack.Screen name="AdminNoticeEditor" component={AdminNoticeEditorScreen} options={{ title: '공지 작성' }} />
     </Stack.Navigator>
   );
 }

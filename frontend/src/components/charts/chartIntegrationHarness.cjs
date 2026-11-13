@@ -118,7 +118,7 @@ function createChartHarness(platform = 'android') {
     return {
       handlers,
       state(handler, oldState, state, fields = {}) {
-        receiver({ handlerTag: handler.handlerTag, oldState, state, numberOfPointers: 1, x: 100, y: 100, translationX: 0, ...fields });
+        receiver({ handlerTag: handler.handlerTag, oldState, state, numberOfPointers: 1, x: 100, y: 100, translationX: 0, translationY: 0, ...fields });
       },
       update(handler, fields) { receiver({ handlerTag: handler.handlerTag, ...fields }); },
     };

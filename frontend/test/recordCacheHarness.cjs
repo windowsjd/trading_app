@@ -49,7 +49,11 @@ function createRecordCacheHarness(total = 23) {
       useInfiniteQuery: options => observe(InfiniteQueryObserver, options),
     },
     '../../features/record/api': api,
-    '../../features/me/api': { getMe: async () => ({ id: 'user-a', nickname: '사용자 A', email: 'a@example.test' }) },
+    // `h.role` (default none): MY shows 관리자 전용 콘솔 for an admin only; `h.meFailure` fails the read.
+    '../../features/me/api': { getMe: async () => {
+      if (h.meFailure) throw h.meFailure;
+      return { id: 'user-a', nickname: '사용자 A', email: 'a@example.test', ...(h.role ? { role: h.role } : {}) };
+    } },
     '../../features/season/api': { getCurrentSeason: async () => null },
     '../../features/ranking/api': { getRankings: async () => ({}), getRankingTier: () => '-' },
     '../../features/auth/useLogout': { useLogout: () => () => {} },

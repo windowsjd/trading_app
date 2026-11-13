@@ -1,5 +1,23 @@
 # Trading UI browser regression
 
+2026-11-13 추가(공통: `NODE_PATH=<playwright@1.56·esbuild@0.25 설치 위치>/node_modules BROWSER_EXECUTABLE_PATH=<chrome-headless-shell>`;
+한글 글꼴은 `fonts-nanum`의 `NanumBarunGothic.ttf` — 이 Chromium 1243의 글꼴 검사기는 `NanumGothic.ttf`를 거부한다):
+- `signupConsentBrowser.cjs` (`SIGNUP_CONSENT_FONT`, 출력 `SIGNUP_CONSENT_OUTPUT`): 실제 SignupScreen·LegalDocumentScreen을
+  `signupConsentFixture.jsx`(전송은 `authEmailMocks.js`)로 320/375/430px × 글꼴 1/2배 × Light/Dark 36화면 — 글자 잘림·가로 스크롤
+  없음(강제 넘침 음성 대조), 세 체크박스 미체크·자세히 보기 터치 가능, 약관/방침의 요약→전문 순서·조항 제목·표 28행·돌아가기, 그리고 각
+  체크박스는 자기만 바뀜, 자세히 보기는 이동만 하고 체크하지 않음, 빠진 동의 이름 안내·요청 없음, 세 개 체크 후 인증번호 요청.
+- `chartMovesBrowser.cjs` (출력 `CHART_MOVES_OUTPUT`): `chartPriceLinesFixture.jsx`의 실제 CandlestickChart를 실제 마우스로 —
+  hover/leave, 클릭 고정·hover와 leave에 유지·다음 클릭 해제·클릭은 차트를 움직이지 않음, 세로 드래그 60px → 넘겨받기 12px 뒤 48px
+  이동·가격선 3개가 캔들과 같은 거리, 가로 80px = 고정 십자선이 정확히 80px 이동·가격 유지, 가격축 드래그는 가격만, `최신` 복원,
+  휠 줌, 가로 스크롤 없음.
+- `adminNoticeBrowser.cjs` (`ADMIN_NOTICE_FONT`, 출력 `ADMIN_NOTICE_OUTPUT`): `adminNoticeFixture.jsx`(전송 `adminNoticeMocks.js`)로
+  공지 팝업·공지사항 관리 목록·공지 작성(긴 제목·요약·6문단+소제목, 팝업 선택, 미리보기, 게시 확인)·관리자 콘솔을 320/375/430px ×
+  글꼴 1/2배 × Light/Dark 48화면 — 글자 잘림 없음(음성 대조), 팝업 카드가 화면 안(2배 글꼴은 568px 높이)·두 버튼 터치 가능·뒤 화면
+  터치 차단, 확인 → 확인 기록 요청 후 닫힘.
+- 참고: `authEmailBrowser.cjs`는 HEAD에서도 시작하지 못한다(LoginScreen의 `useBrowseAsGuest`가 navigation context를 요구, 2026-11-13
+  확인). `authEmailMocks.js`에는 이번에 sessionOwnership의 나머지 내보내기만 더했다.
+
+
 퀘스트 강조 영역(2026-11-10)은 `NODE_PATH=/path/to/browser-tools/node_modules BROWSER_EXECUTABLE_PATH=…
 node test/browser/questSpotlightBrowser.cjs` (`QUEST_SPOTLIGHT_CONFIGS=base,nav3,compact,mid,small,wide,large`, 기본 전부; 출력
 `QUEST_SPOTLIGHT_OUTPUT`; 저장된 결과만 다시 판정은 `QUEST_SPOTLIGHT_REPORT=<quest-spotlight.json>`). 전체 앱 fixture(`mainTabHeadersFixture.jsx` + `beginnerMocks.js`)로 10개 퀘스트를 모든 단계까지 실제

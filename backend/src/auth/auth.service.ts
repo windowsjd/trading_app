@@ -35,7 +35,10 @@ import type {
   SignupRequestBody,
   UpdateProfileRequestBody,
 } from './auth.types';
-import { CURRENT_TERMS_VERSION } from './terms.constants';
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from './terms.constants';
 
 type JwtTtlUnit = 's' | 'm' | 'h' | 'd' | 'w';
 type JwtExpiresIn = `${number}${JwtTtlUnit}`;
@@ -45,6 +48,7 @@ type ParsedSignupRequest = {
   password: string;
   nickname: string;
   termsVersion: string;
+  privacyVersion: string;
 };
 
 type ParsedLoginRequest = {
@@ -120,8 +124,12 @@ export class AuthService implements OnModuleInit {
             'NICKNAME_ALREADY_EXISTS',
             'Nickname already exists.',
           );
-        // One server instant: signup completed on the screen that showed this
-        // terms version's notice, with the required 16+ box checked.
+        // One server instant, written with the member in this transaction:
+        // the three required boxes the member checked on the signup screen —
+        // 16+, the terms and the privacy policy of these versions (2026-11-13,
+        // explicit consent). `termsAcceptedAt` stays for members who signed up
+        // under the earlier notice ("가입하면 … 동의한 것으로 봅니다") and is
+        // not written any more.
         const consentAt = new Date();
         const createdUser = await tx.user.create({
           data: {
@@ -132,8 +140,10 @@ export class AuthService implements OnModuleInit {
             role: UserRole.user,
             status: UserStatus.active,
             termsVersion: request.termsVersion,
-            termsAcceptedAt: consentAt,
             ageConfirmedAt: consentAt,
+            termsAgreedAt: consentAt,
+            privacyVersion: request.privacyVersion,
+            privacyAgreedAt: consentAt,
           },
           select: {
             id: true,
@@ -595,34 +605,42 @@ export class AuthService implements OnModuleInit {
     const email = this.parseEmail(body.email);
     const password = this.parsePassword(body.password);
     const nickname = this.parseNickname(body.nickname);
-    const termsVersion = this.parseSignupConsent(body);
+    const consent = this.parseSignupConsent(body);
 
     return {
       email,
       password,
       nickname,
-      termsVersion,
+      ...consent,
     };
   }
 
   /**
-   * The required 만 16세 이상 check and the terms version of the signup screen
-   * (exactly `true` and the current version). Checked with the other fields,
-   * before the email proof is consumed: a refused request (an old app, an
-   * outdated screen) creates nothing and keeps its proof.
+   * The three required boxes of the signup screen, each on its own: 만 16세
+   * 이상, 이용약관 and 개인정보처리방침 — each exactly `true` (not "true", 1 or
+   * missing), with exactly the current version of each document. Checked with
+   * the other fields, before the email proof is consumed: a refused request
+   * (an app from before the checkboxes, an outdated screen) creates nothing
+   * and keeps its proof.
    */
   private parseSignupConsent(body: SignupRequestBody) {
     if (
       body.ageConfirmed !== true ||
-      body.termsVersion !== CURRENT_TERMS_VERSION
+      body.termsAgreed !== true ||
+      body.privacyAgreed !== true ||
+      body.termsVersion !== CURRENT_TERMS_VERSION ||
+      body.privacyVersion !== CURRENT_PRIVACY_VERSION
     ) {
       this.throwBadRequest(
         'AUTH_SIGNUP_CONSENT_REQUIRED',
-        'Age confirmation and the current terms version are required.',
+        'Age confirmation and agreement to the current terms and privacy policy are required.',
       );
     }
 
-    return CURRENT_TERMS_VERSION;
+    return {
+      termsVersion: CURRENT_TERMS_VERSION,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
+    };
   }
 
   private parseLoginRequest(body: LoginRequestBody): ParsedLoginRequest {

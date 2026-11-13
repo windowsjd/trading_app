@@ -42,7 +42,9 @@ for (const kind of ['Login', 'Signup'] as const) it(`${kind}: one request per ta
     }
   });
   // Signup also needs its required 16+ box.
-  if (kind === 'Signup') act(() => renderer.root.findAll((n: any) => n.type === 'Pressable' && n.props.testID === 'auth-signup-age-checkbox')[0].props.onPress());
+  // The three required boxes (2026-11-13: 16+, terms, privacy policy).
+  if (kind === 'Signup') for (const box of ['auth-signup-age-checkbox', 'auth-signup-terms-checkbox', 'auth-signup-privacy-checkbox'])
+    act(() => renderer.root.findAll((n: any) => n.type === 'Pressable' && n.props.testID === box)[0].props.onPress());
   const submit = () => renderer.root.findAll((n: any) => n.type === 'Pressable' && n.props.testID?.endsWith('submit'))[0];
   act(() => { submit().props.onPress(); submit().props.onPress(); submit().props.onPress(); });
   assert.equal(h.mutates.length, 1, 'taps before the pending render are fenced');

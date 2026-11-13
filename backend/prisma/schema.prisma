@@ -381,12 +381,18 @@ model User {
   role            UserRole   @default(user)
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
-  /// Terms version of the signup screen this member completed (null: joined before 2026-10-21).
+  /// Terms (이용약관) version of the signup screen this member completed (null: joined before 2026-10-21). Agreed by checkbox when termsAgreedAt is set; only shown in a notice when termsAcceptedAt is set.
   termsVersion    String?    @map("terms_version") @db.VarChar(32)
-  /// When signup completed on the screen showing termsVersion and its notice ("가입하면 … 동의한 것으로 봅니다"). Not a checkbox consent: there is no terms checkbox.
+  /// Signups 2026-10-21 … before the 2026-11-13 checkboxes only: when signup completed on the screen showing termsVersion and its notice ("가입하면 … 동의한 것으로 봅니다"). Not a checkbox consent, never backfilled or reinterpreted, no longer written.
   termsAcceptedAt DateTime?  @map("terms_accepted_at")
-  /// When signup completed with the required "만 16세 이상" box checked (the same server instant as termsAcceptedAt).
+  /// When signup completed with the required "만 16세 이상" box checked (server time).
   ageConfirmedAt  DateTime?  @map("age_confirmed_at")
+  /// Explicit consent (2026-11-13): when the member checked "[필수] 이용약관에 동의합니다" for termsVersion (server time). Null for earlier members.
+  termsAgreedAt   DateTime?  @map("terms_agreed_at")
+  /// Explicit consent (2026-11-13): the 개인정보처리방침 version the member checked "[필수] 개인정보처리방침에 동의합니다" for.
+  privacyVersion  String?    @map("privacy_version") @db.VarChar(32)
+  /// Explicit consent (2026-11-13): when that box was checked (server time). Null for earlier members.
+  privacyAgreedAt DateTime?  @map("privacy_agreed_at")
 
   friendshipsLow              Friendship[]               @relation("FriendshipLow")
   friendshipsHigh             Friendship[]               @relation("FriendshipHigh")
@@ -423,6 +429,7 @@ model User {
   communityRuleConsent        CommunityRuleConsent?
   communityPhotoCleanups      CommunityPhotoCleanup[]
   adRewardSessions            AdRewardSession[]
+  importantNoticeAcknowledgements ImportantNoticeAcknowledgement[]
 
   @@map("users")
 }
@@ -3108,10 +3115,30 @@ model ImportantNotice {
   fanoutCompletedAt DateTime?             @map("fanout_completed_at")
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
+  /// 2026-11-13: also shown once as a centered popup on app entry to each
+  /// member who has not confirmed it (independent of push preferences). Fixed
+  /// at creation; notices from before the column are false (never popped up).
+  showPopup         Boolean               @default(false) @map("show_popup")
+  acknowledgements  ImportantNoticeAcknowledgement[]
 
   @@unique([createdByUserId, idempotencyKey])
   @@index([status, publishedAt])
   @@map("important_notices")
+}
+
+/// A member's confirmation of a popup notice (2026-11-13): the popup shows
+/// once per member and notice, on any device or trading account. Written only
+/// for the signed-in member; ON CONFLICT DO NOTHING keeps exactly one row
+/// under retries and concurrent devices (the first confirmation's time wins).
+model ImportantNoticeAcknowledgement {
+  userId         String          @map("user_id")
+  noticeId       String          @map("notice_id")
+  acknowledgedAt DateTime        @default(now()) @map("acknowledged_at")
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notice         ImportantNotice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, noticeId])
+  @@map("important_notice_acknowledgements")
 }
 
 

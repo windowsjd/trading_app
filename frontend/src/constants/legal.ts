@@ -1,34 +1,19 @@
 /**
- * Terms of service and privacy policy live on the website; the app only links
- * to them (opened in the external browser).
- */
-export const TERMS_URL = 'https://nanghwa.com';
-export const PRIVACY_URL = 'https://nanghwa.com';
-
-/**
- * Terms version shown on the signup screen and sent with signup. The server
- * accepts only its own CURRENT_TERMS_VERSION (backend/src/auth/terms.constants.ts):
- * raise both together when the terms change.
+ * Document versions of the signup screen (2026-11-13: three separate required
+ * boxes). Signup sends each document's version with its box; the server
+ * accepts only its own CURRENT_TERMS_VERSION / CURRENT_PRIVACY_VERSION
+ * (backend/src/auth/terms.constants.ts). The two documents are versioned
+ * independently: when one's text changes (constants/legalDocuments.ts), raise
+ * its version here and on the server together. A version is the revision
+ * label of the published page, never shown as an effective date.
  */
 export const TERMS_VERSION = '2026-10-20';
+export const PRIVACY_VERSION = '2026-10-20';
 
-/** The only signup checkbox: required, never pre-checked. */
+/** The three required signup boxes, each separate and never pre-checked. */
 export const AGE_CONFIRMATION_LABEL = '[필수] 만 16세 이상입니다';
-
-/**
- * Notice under the checkbox (there is no terms checkbox). Joined, it reads
- * "가입하면 이용약관과 개인정보처리방침에 동의한 것으로 봅니다."; the `link`
- * parts open LEGAL_LINKS.
- */
-export const SIGNUP_LEGAL_NOTICE = [
-  '가입하면 ',
-  { link: 'terms', label: '이용약관' },
-  '과 ',
-  { link: 'privacy', label: '개인정보처리방침' },
-  '에 동의한 것으로 봅니다.',
-] as const;
-
-export const LEGAL_LINKS = { terms: TERMS_URL, privacy: PRIVACY_URL } as const;
+export const TERMS_AGREEMENT_LABEL = '[필수] 이용약관에 동의합니다';
+export const PRIVACY_AGREEMENT_LABEL = '[필수] 개인정보처리방침에 동의합니다';
 
 /**
  * Support contact and account notices. A suspended or deleted member cannot

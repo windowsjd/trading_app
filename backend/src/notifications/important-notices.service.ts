@@ -15,6 +15,10 @@ export type OperatorRequestContext = {
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,100}$/;
 const SECTIONS_MAX_CHARS = 30_000;
+/** Path parameter shape of a notice id (uuid); anything else is not found. */
+const NOTICE_ID = /^[A-Za-z0-9-]{1,64}$/;
+/** Unconfirmed popup notices one read returns, newest first. */
+export const POPUP_NOTICE_LIMIT = 5;
 
 function text(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;
@@ -89,6 +93,68 @@ export class ImportantNoticesService {
     return { success: true, data: { notices: rows.map(present) } };
   }
 
+  /**
+   * App read for the entry popup (2026-11-13): published notices marked
+   * `showPopup` that THIS member has not confirmed, newest first. Withdrawn
+   * notices and drafts never appear; push preferences play no part.
+   */
+  async listPopupFor(user: AuthenticatedUser | undefined) {
+    const actor = this.actor(user);
+    const rows = await this.prisma.importantNotice.findMany({
+      where: {
+        status: 'published',
+        showPopup: true,
+        acknowledgements: { none: { userId: actor.userId } },
+      },
+      orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+      take: POPUP_NOTICE_LIMIT,
+      select: { id: true, title: true, summary: true, publishedAt: true },
+    });
+    return {
+      success: true,
+      data: {
+        notices: rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          summary: row.summary,
+          publishedAt: row.publishedAt?.toISOString() ?? null,
+        })),
+      },
+    };
+  }
+
+  /**
+   * The member confirmed (or closed) a notice's popup. Idempotent: the first
+   * confirmation is the one kept (ON CONFLICT DO NOTHING), so a retry after a
+   * lost response or two devices at once never add a second row. Only for the
+   * signed-in member and a notice that was published (a withdrawn one is still
+   * accepted — it may have been on screen when it was withdrawn).
+   */
+  async acknowledge(user: AuthenticatedUser | undefined, noticeId: string) {
+    const actor = this.actor(user);
+    const notice = NOTICE_ID.test(noticeId)
+      ? await this.prisma.importantNotice.findUnique({
+          where: { id: noticeId },
+          select: { status: true },
+        })
+      : null;
+    if (!notice || notice.status === 'draft')
+      this.fail(HttpStatus.NOT_FOUND, 'NOTICE_NOT_FOUND', 'Notice not found.');
+    await this.prisma.importantNoticeAcknowledgement.createMany({
+      data: [{ userId: actor.userId, noticeId }],
+      skipDuplicates: true,
+    });
+    const row =
+      await this.prisma.importantNoticeAcknowledgement.findUniqueOrThrow({
+        where: { userId_noticeId: { userId: actor.userId, noticeId } },
+        select: { acknowledgedAt: true },
+      });
+    return {
+      success: true,
+      data: { noticeId, acknowledgedAt: row.acknowledgedAt.toISOString() },
+    };
+  }
+
   async create(
     user: AuthenticatedUser | undefined,
     body: unknown,
@@ -123,7 +189,20 @@ export class ImportantNoticesService {
       IDEMPOTENCY_KEY.test(input.idempotencyKey)
         ? input.idempotencyKey
         : null;
-    if (!title || !summary || !sections || !idempotencyKey)
+    // Optional, strictly boolean (2026-11-13); absent = no popup, as before.
+    const showPopup =
+      input?.showPopup === undefined
+        ? false
+        : typeof input.showPopup === 'boolean'
+          ? input.showPopup
+          : null;
+    if (
+      !title ||
+      !summary ||
+      !sections ||
+      !idempotencyKey ||
+      showPopup === null
+    )
       this.fail(
         HttpStatus.BAD_REQUEST,
         'INVALID_NOTICE',
@@ -139,6 +218,7 @@ export class ImportantNoticesService {
       if (
         row.title !== title ||
         row.summary !== summary ||
+        row.showPopup !== showPopup ||
         JSON.stringify(row.sections) !== JSON.stringify(sections)
       )
         this.fail(
@@ -159,6 +239,7 @@ export class ImportantNoticesService {
             sections: sections as Prisma.InputJsonValue,
             idempotencyKey,
             createdByUserId: actor.userId,
+            showPopup,
           },
         });
         await this.audit.recordSuccess(
@@ -169,7 +250,7 @@ export class ImportantNoticesService {
             targetType: 'important_notice',
             targetId: row.id,
             ...context,
-            metadataJson: { sectionCount: sections.length },
+            metadataJson: { sectionCount: sections.length, showPopup },
           },
           tx,
         );
@@ -376,6 +457,7 @@ export class ImportantNoticesService {
   private operatorView(row: ImportantNotice) {
     return {
       ...present(row),
+      showPopup: row.showPopup,
       status: row.status,
       createdAt: row.createdAt.toISOString(),
       createdByUserId: row.createdByUserId,

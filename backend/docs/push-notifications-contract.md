@@ -228,12 +228,50 @@ Every step and every failed attempt (`.failed`, error code only) is in
 
 | Method | Path | Body | Notes |
 |---|---|---|---|
-| POST | `/api/v1/operator/notices` | `{ title ≤100, summary ≤200, sections (1–20 × 1–30 paragraphs ≤2000), idempotencyKey }` | Creates a **draft**; same key + same content replays, different content → 409 `NOTICE_IDEMPOTENCY_CONFLICT`. |
+| POST | `/api/v1/operator/notices` | `{ title ≤100, summary ≤200, sections (1–20 × 1–30 paragraphs ≤2000), idempotencyKey, showPopup? }` | Creates a **draft**; same key + same content (popup choice included) replays, different content → 409 `NOTICE_IDEMPOTENCY_CONFLICT`. `showPopup` (2026-11-13) is optional and strictly boolean (anything else → 400 `INVALID_NOTICE`); absent = `false`. Audited with `metadataJson.showPopup`. |
 | GET | `/api/v1/operator/notices` | — | Newest 100 with status and delivery counts by status. |
 | POST | `/api/v1/operator/notices/:id/publish` | `{ "confirm": true }` | Draft → published once (`NOTICE_PUBLISH_CONFIRMATION_REQUIRED`, `NOTICE_ALREADY_PUBLISHED`, `NOTICE_WITHDRAWN`, `NOTICE_NOT_FOUND`). Starts the fan-out (§2.5). |
 | POST | `/api/v1/operator/notices/:id/withdraw` | — | Published → withdrawn: hidden in the app, unsent pushes skipped (`source_withdrawn`). Sent pushes cannot be recalled; their tap shows "해당 공지를 찾을 수 없습니다". |
 
-There is no edit endpoint: correct a draft by creating a new one.
+There is no edit endpoint: correct a draft by creating a new one. Operator
+views include `showPopup`.
+
+### 4.1 Entry popup (2026-11-13)
+
+A notice created with `showPopup: true` is, once **published**, also shown once
+as a centered popup when a member enters the app — independent of push and of
+the member's push preferences (push keeps §2.5 unchanged: publishing still
+fans out once per member, key `notice:<id>`; the popup adds no push).
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/v1/notices/popup` | Authenticated (active member). The newest ≤5 notices with `status = 'published'`, `show_popup = true` and no confirmation by **this** member: `{ notices: [{ id, title, summary, publishedAt }] }`, newest first. Drafts and withdrawn notices never appear. |
+| POST | `/api/v1/notices/:noticeId/acknowledgement` | Authenticated. Records that this member confirmed or closed the popup (`200 { noticeId, acknowledgedAt }`). Idempotent: `INSERT … ON CONFLICT DO NOTHING` on the `(user_id, notice_id)` primary key, so a retry after a lost response or several devices at once keep exactly one row (the first time wins). A draft or unknown id → 404 `NOTICE_NOT_FOUND`; a withdrawn notice is accepted (it may have been on screen). |
+
+Table `important_notice_acknowledgements (user_id, notice_id, acknowledged_at)`
+(migration `20261113120100_add_important_notice_popup`, with
+`important_notices.show_popup BOOLEAN NOT NULL DEFAULT false`): one row per
+member and notice, FKs to `users` and `important_notices` (ON DELETE CASCADE),
+deleted with the member by account deletion. Every notice that existed before
+the migration has `show_popup = false`, so no earlier notice pops up. The
+member's id always comes from the access token — no request can read or write
+another member's confirmations.
+
+App: read once per app entry (MainTabs mount / sign-in; the read is cached for
+the session and dropped at logout), shown one at a time newest first, never
+over a beginner guide, never together with the 업데이트 안내 (one entry overlay
+at a time), and only on a tab's first screen (it waits while an order, detail
+or root screen is open). 확인, Android Back and 자세히 보기 (which then opens the
+notice in 공지사항) all confirm it; a confirmation the server did not take is
+retried once and the popup does not return in that run (the next entry may
+show it again — the server row is the source of truth). A failed read shows
+nothing and blocks nothing.
+
+The app's 관리자 전용 콘솔 (MY › 관리자 전용 콘솔, shown for `role = 'admin'`
+only) creates drafts with the choice, previews them, publishes after an
+explicit confirmation stating the push and popup consequences, and withdraws;
+it uses only the operator routes above, whose OperatorGuard (operator or admin,
+role re-read from the database per request) is unchanged.
 
 ## 5. Worker, delivery and retention
 

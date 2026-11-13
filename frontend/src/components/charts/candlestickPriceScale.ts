@@ -88,3 +88,34 @@ export function scaledPriceRange(scale: ManualPriceScale): PriceRange {
   );
   return { minY: center - half, maxY: center + half, range: half * 2 };
 }
+
+/**
+ * Vertical chart move (2026-11-13): the candles and every price on the plot
+ * follow the finger — dragging down by `deltaY` px shows higher prices at the
+ * same height, at the window's current size. The window never goes below
+ * zero, and it always keeps some of `bounds` (the loaded candles' prices) in
+ * view, so the chart cannot be dragged into an empty space it cannot leave.
+ */
+export function panPriceScale(
+  start: ManualPriceScale,
+  deltaY: number,
+  plotHeight: number,
+  bounds?: { min: number; max: number } | null,
+): ManualPriceScale {
+  if (!Number.isFinite(deltaY) || !Number.isFinite(plotHeight) || plotHeight <= 0) return start;
+  const { minY, range } = scaledPriceRange(start);
+  const half = range / 2;
+  let center = minY + half + (deltaY / plotHeight) * range;
+  if (bounds && Number.isFinite(bounds.min) && Number.isFinite(bounds.max) && bounds.max >= bounds.min) {
+    // At least a fifth of the window stays over the loaded prices.
+    center = Math.min(Math.max(center, bounds.min - half * 0.8), bounds.max + half * 0.8);
+  }
+  // Above zero with the same size: the window's bottom stays positive.
+  center = Math.min(Math.max(center, half * (1 + 1e-9) + MIN_PRICE), MAX_PRICE);
+  // Keep the size exactly: express the moved window in the start's own terms.
+  return { ...start, center, halfRange: half / clampedFactor(start.factor) };
+}
+
+function clampedFactor(factor: number) {
+  return Number.isFinite(factor) ? Math.max(MIN_PRICE_SCALE, Math.min(MAX_PRICE_SCALE, factor)) : 1;
+}

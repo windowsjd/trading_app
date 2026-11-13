@@ -31,3 +31,37 @@ describe('app version source', () => {
     assert.equal(/versionNameSuffix/.test(gradle), false);
   });
 });
+
+/**
+ * 2026-11-13: the stores are asked directly — Android through the local
+ * native module (modules/play-app-update, compiled only in a native build),
+ * iOS through the server's App Store lookup for one bundle id. These pin the
+ * names that must agree but that no unit test can execute.
+ */
+describe('store sources', () => {
+  const read = (path: string) => readFileSync(resolve(path), 'utf8');
+  const appJson = JSON.parse(read('app.json')) as { ios?: { bundleIdentifier?: string } };
+
+  it('the server looks up exactly the iOS bundle id this app ships with', () => {
+    const lookup = read('../backend/src/app-release/app-store-lookup.service.ts');
+    assert.equal(/export const APP_STORE_BUNDLE_ID = '([^']+)';/.exec(lookup)?.[1], appJson.ios?.bundleIdentifier);
+    assert.equal(/export const APP_STORE_COUNTRY = 'kr';/.test(lookup), true);
+  });
+
+  it('the Play module is autolinked for Android only, under the class and name the app asks for', () => {
+    const config = JSON.parse(read('modules/play-app-update/expo-module.config.json')) as { platforms: string[]; android: { modules: string[] } };
+    assert.deepEqual(config.platforms, ['android']);
+    const kotlin = read('modules/play-app-update/android/src/main/java/expo/modules/playappupdate/PlayAppUpdateModule.kt');
+    const pkg = /^package ([\w.]+)$/m.exec(kotlin)?.[1];
+    const cls = /^class (\w+) : Module\(\)/m.exec(kotlin)?.[1];
+    assert.deepEqual(config.android.modules, [`${pkg}.${cls}`]);
+    const name = /Name\("(\w+)"\)/.exec(kotlin)?.[1];
+    const js = read('src/features/appRelease/playUpdate.ts');
+    assert.equal(/requireOptionalNativeModule<\w+>\('(\w+)'\)/.exec(js)?.[1], name);
+    assert.equal(/AsyncFunction\("(\w+)"\)/.exec(kotlin)?.[1], 'getUpdateInfoAsync');
+    assert.equal(js.includes('getUpdateInfoAsync()'), true);
+    assert.match(read('modules/play-app-update/android/build.gradle'), /implementation 'com\.google\.android\.play:app-update:\d+\.\d+\.\d+'/);
+    // The module only reads; it never starts Play's update flow.
+    assert.equal(/startUpdateFlow|completeUpdate/.test(kotlin), false);
+  });
+});

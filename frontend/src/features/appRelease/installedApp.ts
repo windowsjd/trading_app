@@ -21,10 +21,12 @@ export async function readInstalledApp(): Promise<InstalledApp> {
       appStoreSigned = false;
     }
   }
+  const buildNumber = Number(Application.nativeBuildVersion);
   return {
     platform: Platform.OS,
     applicationId: Application.applicationId,
     version: Application.nativeApplicationVersion,
+    buildNumber: Application.nativeBuildVersion && Number.isSafeInteger(buildNumber) && buildNumber > 0 ? buildNumber : null,
     production,
     appStoreSigned,
   };

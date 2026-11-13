@@ -123,15 +123,24 @@ export function originalCandleIndexForX(input: {
   startIndex: number;
   endIndex: number;
   leadingEmptySlots: number;
+  /** The window's sub-candle position (0…−1, see getViewportFirstSlot); 0 when on whole candles. */
+  slotShift?: number;
 }): number {
   const { startIndex, endIndex } = input;
   if (endIndex <= startIndex) return startIndex;
-  const slot = visibleOffsetForX(
-    input.x,
-    input.paddingLeft,
-    input.slotWidth,
-    input.viewportVisibleCount,
-  );
   const leading = Math.max(0, Math.floor(input.leadingEmptySlots));
+  const shift = typeof input.slotShift === 'number' && Number.isFinite(input.slotShift) ? input.slotShift : 0;
+  if (!shift) {
+    const slot = visibleOffsetForX(
+      input.x,
+      input.paddingLeft,
+      input.slotWidth,
+      input.viewportVisibleCount,
+    );
+    return clamp(startIndex + (slot - leading), startIndex, endIndex - 1);
+  }
+  if (!Number.isFinite(input.x) || input.slotWidth <= 0) return startIndex;
+  // The candle whose (shifted) slot holds x.
+  const slot = Math.round((input.x - input.paddingLeft) / input.slotWidth - 0.5 - shift);
   return clamp(startIndex + (slot - leading), startIndex, endIndex - 1);
 }

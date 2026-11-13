@@ -3,8 +3,9 @@ import { View } from '../../theme/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import {
-  HORIZONTAL_PAN_SLOP_PX,
+  CHART_PAN_ACTIVATION_PX,
   LONG_PRESS_MS,
+  TAP_SLOP_PX,
   createChartGestureSession,
   isWithinChartBounds,
   pinchScale,
@@ -14,14 +15,22 @@ import {
 } from './candlestickGesturePolicy';
 import type { CandlestickGesturesProps } from './CandlestickGestures';
 
-/** One-finger horizontal pan/long-press race alongside simultaneous native
- * pinch and two-finger pan recognizers. Shared touch intention locks X zoom
- * (a pinch), Y zoom (a vertical pinch) or parallel vertical Y scaling until
- * lift. No manual activation or Reanimated dependency: pending recognition
- * never owns the chart session. */
+/** One finger: a tap (pins / clears the crosshair), a long press (scrubs the
+ * crosshair, which stays where it is lifted) or a drag — on the plot it moves
+ * the chart both ways, on the price axis it scales prices — race each other;
+ * pinch and two-finger pan recognizers run alongside. Shared touch intention
+ * locks X zoom (a pinch), Y zoom (a vertical pinch) or parallel vertical Y
+ * scaling until lift. No manual activation or Reanimated dependency: pending
+ * recognition never owns the chart session.
+ *
+ * The drag activates after CHART_PAN_ACTIVATION_PX in any direction — before
+ * the platform's scroll slop — so a drag that starts on the chart moves the
+ * chart and the screen around it scrolls only from outside the chart
+ * (2026-11-13; before, any vertical drag went to the screen). */
 export default function CandlestickGestures({
   children,
   paddingLeft,
+  innerWidth,
   chartWidth,
   chartHeight,
   onGestureStart,
@@ -43,7 +52,15 @@ export default function CandlestickGestures({
     const chartBox = { width: chartWidth, height: chartHeight };
     // Chart pan reports translation from the touch start; the session begins
     // at ACTIVATION, so the slop travelled before that is subtracted.
-    let panOriginX = 0;
+    let panOrigin = { x: 0, y: 0 };
+    // Where the finger went down decides the drag: the price axis (right of
+    // the plot) scales prices, anywhere else moves the chart.
+    let panMode: 'pan' | 'priceScale' = 'pan';
+    // Only a drag that activated in THIS touch may end its session: a stale
+    // 'priceScale' must never end a two-finger price scaling.
+    let panActive = false;
+    // A second finger in this touch sequence: its lift is never a tap.
+    let multiTouch = false;
 
     const crosshairPan = Gesture.Pan()
       .activateAfterLongPress(LONG_PRESS_MS)
@@ -69,20 +86,38 @@ export default function CandlestickGestures({
       .runOnJS(true);
 
     const chartPan = Gesture.Pan()
-      .activeOffsetX([-HORIZONTAL_PAN_SLOP_PX, HORIZONTAL_PAN_SLOP_PX])
-      .failOffsetY([-HORIZONTAL_PAN_SLOP_PX, HORIZONTAL_PAN_SLOP_PX])
+      .minDistance(CHART_PAN_ACTIVATION_PX)
       .minPointers(1)
       .maxPointers(1)
       .onStart((event) => {
-        panOriginX = event.translationX;
-        session.begin('pan');
+        panOrigin = { x: event.translationX, y: event.translationY };
+        panMode = event.x - event.translationX >= paddingLeft + innerWidth ? 'priceScale' : 'pan';
+        panActive = session.begin(panMode);
       })
       .onUpdate((event) => {
-        if (!session.isOwner('pan')) return;
-        onPan(event.translationX - panOriginX);
+        if (!panActive || !session.isOwner(panMode)) return;
+        const dy = event.translationY - panOrigin.y;
+        if (panMode === 'priceScale') onPriceScale(dy);
+        else onPan(event.translationX - panOrigin.x, dy);
       })
       .onFinalize(() => {
-        session.end('pan');
+        if (!panActive) return;
+        panActive = false;
+        session.end(panMode);
+      })
+      .runOnJS(true);
+
+    // A simple tap: lifted before the long press, without travelling. Never
+    // while another gesture owns the chart or after a second finger touched.
+    const tap = Gesture.Tap()
+      .maxDuration(LONG_PRESS_MS)
+      .maxDistance(TAP_SLOP_PX)
+      .onBegin(() => {
+        multiTouch = false;
+      })
+      .onEnd((event, success) => {
+        if (!success || multiTouch || session.owner() !== 'none') return;
+        onCrosshair({ type: 'tap', point: { x: event.x, y: event.y } });
       })
       .runOnJS(true);
 
@@ -129,6 +164,7 @@ export default function CandlestickGestures({
       numberOfTouches: number;
     }) => {
       rawTouchesAvailable = true;
+      if (event.numberOfTouches >= 2) multiTouch = true;
       if (event.numberOfTouches !== 2 || event.allTouches.length !== 2) {
         finishTwo();
         return;
@@ -151,6 +187,7 @@ export default function CandlestickGestures({
       .onTouchesCancelled(finishTwo)
       .onStart(() => {
         pinchActive = true;
+        multiTouch = true;
         applyTouches();
       })
       .onUpdate((event) => {
@@ -197,12 +234,13 @@ export default function CandlestickGestures({
       gesture: Gesture.Simultaneous(
         pinch,
         pricePan,
-        Gesture.Race(crosshairPan, chartPan),
+        Gesture.Race(crosshairPan, chartPan, tap),
       ),
       session,
     };
   }, [
     paddingLeft,
+    innerWidth,
     chartWidth,
     chartHeight,
     onGestureStart,

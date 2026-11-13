@@ -21,6 +21,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
 import { getMe } from '../../features/me/api';
+import { isAdminRole } from '../../features/admin/adminRole';
 import { useLogout } from '../../features/auth/useLogout';
 import { getRankings, getRankingTier } from '../../features/ranking/api';
 import { getHomeTierName } from '../home/tierPresentation';
@@ -228,6 +229,19 @@ export default function MyScreen({ navigation }: Props) {
           >
             <Text style={styles.menuText}>내 뱃지</Text>
           </ActionPressable>
+
+          {/* Admins only, from this successful /me read; a failed or unknown role
+              shows nothing. The server re-checks the role on every request. */}
+          {isAdminRole(me.role) ? (
+            <ActionPressable
+              testID={TEST_IDS.my.adminConsoleMenu}
+              accessibilityRole="button"
+              style={styles.menuRow}
+              onPress={() => navigation.navigate('AdminConsole')}
+            >
+              <Text style={styles.menuText}>관리자 전용 콘솔</Text>
+            </ActionPressable>
+          ) : null}
 
           <LogoutButton testID={TEST_IDS.my.logoutMenu} onPress={onLogout} />
         </View>

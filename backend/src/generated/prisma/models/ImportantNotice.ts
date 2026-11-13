@@ -41,6 +41,7 @@ export type ImportantNoticeMinAggregateOutputType = {
   fanoutCompletedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
+  showPopup: boolean | null
 }
 
 export type ImportantNoticeMaxAggregateOutputType = {
@@ -58,6 +59,7 @@ export type ImportantNoticeMaxAggregateOutputType = {
   fanoutCompletedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
+  showPopup: boolean | null
 }
 
 export type ImportantNoticeCountAggregateOutputType = {
@@ -76,6 +78,7 @@ export type ImportantNoticeCountAggregateOutputType = {
   fanoutCompletedAt: number
   createdAt: number
   updatedAt: number
+  showPopup: number
   _all: number
 }
 
@@ -95,6 +98,7 @@ export type ImportantNoticeMinAggregateInputType = {
   fanoutCompletedAt?: true
   createdAt?: true
   updatedAt?: true
+  showPopup?: true
 }
 
 export type ImportantNoticeMaxAggregateInputType = {
@@ -112,6 +116,7 @@ export type ImportantNoticeMaxAggregateInputType = {
   fanoutCompletedAt?: true
   createdAt?: true
   updatedAt?: true
+  showPopup?: true
 }
 
 export type ImportantNoticeCountAggregateInputType = {
@@ -130,6 +135,7 @@ export type ImportantNoticeCountAggregateInputType = {
   fanoutCompletedAt?: true
   createdAt?: true
   updatedAt?: true
+  showPopup?: true
   _all?: true
 }
 
@@ -221,6 +227,7 @@ export type ImportantNoticeGroupByOutputType = {
   fanoutCompletedAt: Date | null
   createdAt: Date
   updatedAt: Date
+  showPopup: boolean
   _count: ImportantNoticeCountAggregateOutputType | null
   _min: ImportantNoticeMinAggregateOutputType | null
   _max: ImportantNoticeMaxAggregateOutputType | null
@@ -260,6 +267,8 @@ export type ImportantNoticeWhereInput = {
   fanoutCompletedAt?: Prisma.DateTimeNullableFilter<"ImportantNotice"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"ImportantNotice"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ImportantNotice"> | Date | string
+  showPopup?: Prisma.BoolFilter<"ImportantNotice"> | boolean
+  acknowledgements?: Prisma.ImportantNoticeAcknowledgementListRelationFilter
 }
 
 export type ImportantNoticeOrderByWithRelationInput = {
@@ -278,6 +287,8 @@ export type ImportantNoticeOrderByWithRelationInput = {
   fanoutCompletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  showPopup?: Prisma.SortOrder
+  acknowledgements?: Prisma.ImportantNoticeAcknowledgementOrderByRelationAggregateInput
 }
 
 export type ImportantNoticeWhereUniqueInput = Prisma.AtLeast<{
@@ -300,6 +311,8 @@ export type ImportantNoticeWhereUniqueInput = Prisma.AtLeast<{
   fanoutCompletedAt?: Prisma.DateTimeNullableFilter<"ImportantNotice"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"ImportantNotice"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ImportantNotice"> | Date | string
+  showPopup?: Prisma.BoolFilter<"ImportantNotice"> | boolean
+  acknowledgements?: Prisma.ImportantNoticeAcknowledgementListRelationFilter
 }, "id" | "createdByUserId_idempotencyKey">
 
 export type ImportantNoticeOrderByWithAggregationInput = {
@@ -318,6 +331,7 @@ export type ImportantNoticeOrderByWithAggregationInput = {
   fanoutCompletedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  showPopup?: Prisma.SortOrder
   _count?: Prisma.ImportantNoticeCountOrderByAggregateInput
   _max?: Prisma.ImportantNoticeMaxOrderByAggregateInput
   _min?: Prisma.ImportantNoticeMinOrderByAggregateInput
@@ -342,6 +356,7 @@ export type ImportantNoticeScalarWhereWithAggregatesInput = {
   fanoutCompletedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ImportantNotice"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ImportantNotice"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"ImportantNotice"> | Date | string
+  showPopup?: Prisma.BoolWithAggregatesFilter<"ImportantNotice"> | boolean
 }
 
 export type ImportantNoticeCreateInput = {
@@ -360,6 +375,8 @@ export type ImportantNoticeCreateInput = {
   fanoutCompletedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  showPopup?: boolean
+  acknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutNoticeInput
 }
 
 export type ImportantNoticeUncheckedCreateInput = {
@@ -378,6 +395,8 @@ export type ImportantNoticeUncheckedCreateInput = {
   fanoutCompletedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  showPopup?: boolean
+  acknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutNoticeInput
 }
 
 export type ImportantNoticeUpdateInput = {
@@ -396,6 +415,8 @@ export type ImportantNoticeUpdateInput = {
   fanoutCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  showPopup?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  acknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutNoticeNestedInput
 }
 
 export type ImportantNoticeUncheckedUpdateInput = {
@@ -414,6 +435,8 @@ export type ImportantNoticeUncheckedUpdateInput = {
   fanoutCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  showPopup?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  acknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutNoticeNestedInput
 }
 
 export type ImportantNoticeCreateManyInput = {
@@ -432,6 +455,7 @@ export type ImportantNoticeCreateManyInput = {
   fanoutCompletedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  showPopup?: boolean
 }
 
 export type ImportantNoticeUpdateManyMutationInput = {
@@ -450,6 +474,7 @@ export type ImportantNoticeUpdateManyMutationInput = {
   fanoutCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  showPopup?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type ImportantNoticeUncheckedUpdateManyInput = {
@@ -468,6 +493,7 @@ export type ImportantNoticeUncheckedUpdateManyInput = {
   fanoutCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  showPopup?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
 export type ImportantNoticeCreatedByUserIdIdempotencyKeyCompoundUniqueInput = {
@@ -491,6 +517,7 @@ export type ImportantNoticeCountOrderByAggregateInput = {
   fanoutCompletedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  showPopup?: Prisma.SortOrder
 }
 
 export type ImportantNoticeMaxOrderByAggregateInput = {
@@ -508,6 +535,7 @@ export type ImportantNoticeMaxOrderByAggregateInput = {
   fanoutCompletedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  showPopup?: Prisma.SortOrder
 }
 
 export type ImportantNoticeMinOrderByAggregateInput = {
@@ -525,12 +553,153 @@ export type ImportantNoticeMinOrderByAggregateInput = {
   fanoutCompletedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  showPopup?: Prisma.SortOrder
+}
+
+export type ImportantNoticeScalarRelationFilter = {
+  is?: Prisma.ImportantNoticeWhereInput
+  isNot?: Prisma.ImportantNoticeWhereInput
 }
 
 export type EnumImportantNoticeStatusFieldUpdateOperationsInput = {
   set?: $Enums.ImportantNoticeStatus
 }
 
+export type ImportantNoticeCreateNestedOneWithoutAcknowledgementsInput = {
+  create?: Prisma.XOR<Prisma.ImportantNoticeCreateWithoutAcknowledgementsInput, Prisma.ImportantNoticeUncheckedCreateWithoutAcknowledgementsInput>
+  connectOrCreate?: Prisma.ImportantNoticeCreateOrConnectWithoutAcknowledgementsInput
+  connect?: Prisma.ImportantNoticeWhereUniqueInput
+}
+
+export type ImportantNoticeUpdateOneRequiredWithoutAcknowledgementsNestedInput = {
+  create?: Prisma.XOR<Prisma.ImportantNoticeCreateWithoutAcknowledgementsInput, Prisma.ImportantNoticeUncheckedCreateWithoutAcknowledgementsInput>
+  connectOrCreate?: Prisma.ImportantNoticeCreateOrConnectWithoutAcknowledgementsInput
+  upsert?: Prisma.ImportantNoticeUpsertWithoutAcknowledgementsInput
+  connect?: Prisma.ImportantNoticeWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ImportantNoticeUpdateToOneWithWhereWithoutAcknowledgementsInput, Prisma.ImportantNoticeUpdateWithoutAcknowledgementsInput>, Prisma.ImportantNoticeUncheckedUpdateWithoutAcknowledgementsInput>
+}
+
+export type ImportantNoticeCreateWithoutAcknowledgementsInput = {
+  id?: string
+  title: string
+  summary: string
+  sections: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: $Enums.ImportantNoticeStatus
+  idempotencyKey: string
+  createdByUserId: string
+  publishedByUserId?: string | null
+  publishedAt?: Date | string | null
+  withdrawnByUserId?: string | null
+  withdrawnAt?: Date | string | null
+  fanoutCursor?: string | null
+  fanoutCompletedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  showPopup?: boolean
+}
+
+export type ImportantNoticeUncheckedCreateWithoutAcknowledgementsInput = {
+  id?: string
+  title: string
+  summary: string
+  sections: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: $Enums.ImportantNoticeStatus
+  idempotencyKey: string
+  createdByUserId: string
+  publishedByUserId?: string | null
+  publishedAt?: Date | string | null
+  withdrawnByUserId?: string | null
+  withdrawnAt?: Date | string | null
+  fanoutCursor?: string | null
+  fanoutCompletedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  showPopup?: boolean
+}
+
+export type ImportantNoticeCreateOrConnectWithoutAcknowledgementsInput = {
+  where: Prisma.ImportantNoticeWhereUniqueInput
+  create: Prisma.XOR<Prisma.ImportantNoticeCreateWithoutAcknowledgementsInput, Prisma.ImportantNoticeUncheckedCreateWithoutAcknowledgementsInput>
+}
+
+export type ImportantNoticeUpsertWithoutAcknowledgementsInput = {
+  update: Prisma.XOR<Prisma.ImportantNoticeUpdateWithoutAcknowledgementsInput, Prisma.ImportantNoticeUncheckedUpdateWithoutAcknowledgementsInput>
+  create: Prisma.XOR<Prisma.ImportantNoticeCreateWithoutAcknowledgementsInput, Prisma.ImportantNoticeUncheckedCreateWithoutAcknowledgementsInput>
+  where?: Prisma.ImportantNoticeWhereInput
+}
+
+export type ImportantNoticeUpdateToOneWithWhereWithoutAcknowledgementsInput = {
+  where?: Prisma.ImportantNoticeWhereInput
+  data: Prisma.XOR<Prisma.ImportantNoticeUpdateWithoutAcknowledgementsInput, Prisma.ImportantNoticeUncheckedUpdateWithoutAcknowledgementsInput>
+}
+
+export type ImportantNoticeUpdateWithoutAcknowledgementsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  summary?: Prisma.StringFieldUpdateOperationsInput | string
+  sections?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumImportantNoticeStatusFieldUpdateOperationsInput | $Enums.ImportantNoticeStatus
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  createdByUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  withdrawnByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  withdrawnAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fanoutCursor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fanoutCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  showPopup?: Prisma.BoolFieldUpdateOperationsInput | boolean
+}
+
+export type ImportantNoticeUncheckedUpdateWithoutAcknowledgementsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  summary?: Prisma.StringFieldUpdateOperationsInput | string
+  sections?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumImportantNoticeStatusFieldUpdateOperationsInput | $Enums.ImportantNoticeStatus
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  createdByUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  withdrawnByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  withdrawnAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fanoutCursor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fanoutCompletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  showPopup?: Prisma.BoolFieldUpdateOperationsInput | boolean
+}
+
+
+/**
+ * Count Type ImportantNoticeCountOutputType
+ */
+
+export type ImportantNoticeCountOutputType = {
+  acknowledgements: number
+}
+
+export type ImportantNoticeCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  acknowledgements?: boolean | ImportantNoticeCountOutputTypeCountAcknowledgementsArgs
+}
+
+/**
+ * ImportantNoticeCountOutputType without action
+ */
+export type ImportantNoticeCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ImportantNoticeCountOutputType
+   */
+  select?: Prisma.ImportantNoticeCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * ImportantNoticeCountOutputType without action
+ */
+export type ImportantNoticeCountOutputTypeCountAcknowledgementsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ImportantNoticeAcknowledgementWhereInput
+}
 
 
 export type ImportantNoticeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -549,6 +718,9 @@ export type ImportantNoticeSelect<ExtArgs extends runtime.Types.Extensions.Inter
   fanoutCompletedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  showPopup?: boolean
+  acknowledgements?: boolean | Prisma.ImportantNotice$acknowledgementsArgs<ExtArgs>
+  _count?: boolean | Prisma.ImportantNoticeCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["importantNotice"]>
 
 export type ImportantNoticeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -567,6 +739,7 @@ export type ImportantNoticeSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   fanoutCompletedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  showPopup?: boolean
 }, ExtArgs["result"]["importantNotice"]>
 
 export type ImportantNoticeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -585,6 +758,7 @@ export type ImportantNoticeSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   fanoutCompletedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  showPopup?: boolean
 }, ExtArgs["result"]["importantNotice"]>
 
 export type ImportantNoticeSelectScalar = {
@@ -603,13 +777,22 @@ export type ImportantNoticeSelectScalar = {
   fanoutCompletedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  showPopup?: boolean
 }
 
-export type ImportantNoticeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "summary" | "sections" | "status" | "idempotencyKey" | "createdByUserId" | "publishedByUserId" | "publishedAt" | "withdrawnByUserId" | "withdrawnAt" | "fanoutCursor" | "fanoutCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["importantNotice"]>
+export type ImportantNoticeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "summary" | "sections" | "status" | "idempotencyKey" | "createdByUserId" | "publishedByUserId" | "publishedAt" | "withdrawnByUserId" | "withdrawnAt" | "fanoutCursor" | "fanoutCompletedAt" | "createdAt" | "updatedAt" | "showPopup", ExtArgs["result"]["importantNotice"]>
+export type ImportantNoticeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  acknowledgements?: boolean | Prisma.ImportantNotice$acknowledgementsArgs<ExtArgs>
+  _count?: boolean | Prisma.ImportantNoticeCountOutputTypeDefaultArgs<ExtArgs>
+}
+export type ImportantNoticeIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
+export type ImportantNoticeIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $ImportantNoticePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ImportantNotice"
-  objects: {}
+  objects: {
+    acknowledgements: Prisma.$ImportantNoticeAcknowledgementPayload<ExtArgs>[]
+  }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     title: string
@@ -635,6 +818,12 @@ export type $ImportantNoticePayload<ExtArgs extends runtime.Types.Extensions.Int
     fanoutCompletedAt: Date | null
     createdAt: Date
     updatedAt: Date
+    /**
+     * 2026-11-13: also shown once as a centered popup on app entry to each
+     * member who has not confirmed it (independent of push preferences). Fixed
+     * at creation; notices from before the column are false (never popped up).
+     */
+    showPopup: boolean
   }, ExtArgs["result"]["importantNotice"]>
   composites: {}
 }
@@ -1029,6 +1218,7 @@ readonly fields: ImportantNoticeFieldRefs;
  */
 export interface Prisma__ImportantNoticeClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  acknowledgements<T extends Prisma.ImportantNotice$acknowledgementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ImportantNotice$acknowledgementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ImportantNoticeAcknowledgementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1073,6 +1263,7 @@ export interface ImportantNoticeFieldRefs {
   readonly fanoutCompletedAt: Prisma.FieldRef<"ImportantNotice", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"ImportantNotice", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"ImportantNotice", 'DateTime'>
+  readonly showPopup: Prisma.FieldRef<"ImportantNotice", 'Boolean'>
 }
     
 
@@ -1089,6 +1280,10 @@ export type ImportantNoticeFindUniqueArgs<ExtArgs extends runtime.Types.Extensio
    * Omit specific fields from the ImportantNotice
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
   /**
    * Filter, which ImportantNotice to fetch.
    */
@@ -1108,6 +1303,10 @@ export type ImportantNoticeFindUniqueOrThrowArgs<ExtArgs extends runtime.Types.E
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
+  /**
    * Filter, which ImportantNotice to fetch.
    */
   where: Prisma.ImportantNoticeWhereUniqueInput
@@ -1125,6 +1324,10 @@ export type ImportantNoticeFindFirstArgs<ExtArgs extends runtime.Types.Extension
    * Omit specific fields from the ImportantNotice
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
   /**
    * Filter, which ImportantNotice to fetch.
    */
@@ -1174,6 +1377,10 @@ export type ImportantNoticeFindFirstOrThrowArgs<ExtArgs extends runtime.Types.Ex
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
+  /**
    * Filter, which ImportantNotice to fetch.
    */
   where?: Prisma.ImportantNoticeWhereInput
@@ -1221,6 +1428,10 @@ export type ImportantNoticeFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Omit specific fields from the ImportantNotice
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
   /**
    * Filter, which ImportantNotices to fetch.
    */
@@ -1270,6 +1481,10 @@ export type ImportantNoticeCreateArgs<ExtArgs extends runtime.Types.Extensions.I
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
+  /**
    * The data needed to create a ImportantNotice.
    */
   data: Prisma.XOR<Prisma.ImportantNoticeCreateInput, Prisma.ImportantNoticeUncheckedCreateInput>
@@ -1317,6 +1532,10 @@ export type ImportantNoticeUpdateArgs<ExtArgs extends runtime.Types.Extensions.I
    * Omit specific fields from the ImportantNotice
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
   /**
    * The data needed to update a ImportantNotice.
    */
@@ -1384,6 +1603,10 @@ export type ImportantNoticeUpsertArgs<ExtArgs extends runtime.Types.Extensions.I
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
+  /**
    * The filter to search for the ImportantNotice to update in case it exists.
    */
   where: Prisma.ImportantNoticeWhereUniqueInput
@@ -1410,6 +1633,10 @@ export type ImportantNoticeDeleteArgs<ExtArgs extends runtime.Types.Extensions.I
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
+  /**
    * Filter which ImportantNotice to delete.
    */
   where: Prisma.ImportantNoticeWhereUniqueInput
@@ -1430,6 +1657,30 @@ export type ImportantNoticeDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
 }
 
 /**
+ * ImportantNotice.acknowledgements
+ */
+export type ImportantNotice$acknowledgementsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ImportantNoticeAcknowledgement
+   */
+  select?: Prisma.ImportantNoticeAcknowledgementSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ImportantNoticeAcknowledgement
+   */
+  omit?: Prisma.ImportantNoticeAcknowledgementOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeAcknowledgementInclude<ExtArgs> | null
+  where?: Prisma.ImportantNoticeAcknowledgementWhereInput
+  orderBy?: Prisma.ImportantNoticeAcknowledgementOrderByWithRelationInput | Prisma.ImportantNoticeAcknowledgementOrderByWithRelationInput[]
+  cursor?: Prisma.ImportantNoticeAcknowledgementWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ImportantNoticeAcknowledgementScalarFieldEnum | Prisma.ImportantNoticeAcknowledgementScalarFieldEnum[]
+}
+
+/**
  * ImportantNotice without action
  */
 export type ImportantNoticeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1441,4 +1692,8 @@ export type ImportantNoticeDefaultArgs<ExtArgs extends runtime.Types.Extensions.
    * Omit specific fields from the ImportantNotice
    */
   omit?: Prisma.ImportantNoticeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeInclude<ExtArgs> | null
 }

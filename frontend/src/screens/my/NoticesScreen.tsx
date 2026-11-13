@@ -6,6 +6,7 @@ import { semantic } from '../../theme/tokens';
 import { getHeaderScreenContentStyle } from '../../theme/screenLayout';
 import ActionPressable from '../../components/common/ActionPressable';
 import EmptyState from '../../components/states/EmptyState';
+import NoticeSections from '../../components/notice/NoticeSections';
 import { mergeNotices, notices, type Notice } from '../../features/notice/notices';
 import { useImportantNotices } from '../../features/notice/useImportantNotices';
 
@@ -106,14 +107,7 @@ function NoticeItem({ notice, expanded, onToggle, onLayout }: {
       </ActionPressable>
       {expanded ? (
         <View testID={`notice-${notice.id}-body`} style={styles.body}>
-          {notice.sections.map((section) => (
-            <View key={section.heading} style={styles.section}>
-              <Text accessibilityRole="header" style={styles.heading}>{section.heading}</Text>
-              {section.paragraphs.map((paragraph) => (
-                <Text key={paragraph} style={styles.paragraph}>{paragraph}</Text>
-              ))}
-            </View>
-          ))}
+          <NoticeSections sections={notice.sections} />
         </View>
       ) : null}
     </View>
@@ -130,9 +124,6 @@ const styles = StyleSheet.create({
   date: { fontSize: 13, lineHeight: 19, color: semantic.secondary, fontVariant: ['tabular-nums'] },
   chevron: { fontSize: 13, lineHeight: 19, color: semantic.secondary },
   body: { paddingHorizontal: 16, paddingBottom: 18, borderTopWidth: 1, borderTopColor: semantic.border },
-  section: { gap: 6, paddingTop: 14 },
-  heading: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: semantic.text },
-  paragraph: { fontSize: 15, lineHeight: 24, color: semantic.secondary },
   important: { fontWeight: '700', color: semantic.text },
   notice: { fontSize: 14, lineHeight: 21, color: semantic.secondary },
   retry: { minHeight: 44, justifyContent: 'center' },

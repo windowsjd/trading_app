@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppState, Linking, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
@@ -7,20 +7,35 @@ import InlineBottomSheet from '../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../components/common/ScreenSheetHost';
 import CTAButton from '../../components/common/CTAButton';
 import { useQuestGuide } from '../quest/QuestGuideProvider';
+import { useEntryOverlaySlot } from '../entryOverlay/EntryOverlaySlot';
 import { getAppRelease } from './api';
-import { RELEASE_RECHECK_MS, decideAppUpdate, shouldRecheckRelease, type AppUpdateNotice as Notice, type InstalledApp } from './appUpdate';
+import {
+  RELEASE_RECHECK_MS, decideAppUpdate, decidePlayUpdate, shouldRecheckRelease, type AppUpdateNotice as Notice, type InstalledApp,
+} from './appUpdate';
 import { readInstalledApp } from './installedApp';
+import { readPlayUpdate } from './playUpdate';
 
 /** Shown once per platform and version for the whole app run (a remount does not repeat it). */
 const shownThisRun = new Set<string>();
 
 /**
+ * The store's answer for this build (2026-11-13): Google Play itself on
+ * Android, the App Store version the server reads from Apple on iOS. Throws
+ * when the store cannot be asked; a throw only means "no notice".
+ */
+async function checkStore(installed: InstalledApp, signal?: AbortSignal): Promise<Notice | null> {
+  if (installed.platform === 'android') return decidePlayUpdate(await readPlayUpdate(), installed);
+  return decideAppUpdate(await getAppRelease(signal), installed);
+}
+
+/**
  * 앱 업데이트 안내 after the app's normal entry (inside MainTabs, signed in or
- * browsing as a guest): a newer version the store actually publishes
- * (appUpdate.ts), never forced. Read when the app starts and again when it
- * comes back to the front after a while (shouldRecheckRelease), so a release
- * published while the app sat in the background is still heard of in this
- * run. It waits while a beginner guide is on screen, and any failure (no
+ * browsing as a guest): a newer version the store actually offers this
+ * install (appUpdate.ts), never forced. Asked when the app starts and again
+ * when it comes back to the front after a while (shouldRecheckRelease), so a
+ * release published while the app sat in the background is still heard of in
+ * this run. It waits while a beginner guide is on screen or another entry
+ * overlay (the 공지 팝업) is open, and any failure (Play unavailable, no
  * manifest, no store app, a read error) simply shows nothing or says so,
  * never blocking the app.
  */
@@ -35,8 +50,9 @@ export default function AppUpdateNotice() {
   // Only a store build asks; everything else never reads the manifest.
   const eligible = !!installed?.production && (installed.platform === 'android' || installed.platform === 'ios');
   const release = useQuery({
-    queryKey: QUERY_KEYS.appRelease,
-    queryFn: ({ signal }) => getAppRelease(signal),
+    queryKey: QUERY_KEYS.appRelease(installed?.platform ?? 'unknown'),
+    // Enabled only once the installed build is known.
+    queryFn: ({ signal }) => (installed ? checkStore(installed, signal) : null),
     enabled: eligible,
     staleTime: RELEASE_RECHECK_MS,
     retry: false,
@@ -49,19 +65,21 @@ export default function AppUpdateNotice() {
     if (!eligible) return undefined;
     const subscription = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
-      const read = queryClient.getQueryState(QUERY_KEYS.appRelease);
+      const read = queryClient.getQueryState(QUERY_KEYS.appRelease(installed?.platform ?? 'unknown'));
       if (shouldRecheckRelease({ now: Date.now(), dataUpdatedAt: read?.dataUpdatedAt ?? 0, errorUpdatedAt: read?.errorUpdatedAt ?? 0,
         failed: read?.status === 'error', fetching: read?.fetchStatus === 'fetching' })) void refetch();
     });
     return () => subscription.remove();
-  }, [eligible, queryClient, refetch]);
-  const notice = useMemo(() => (installed && release.data ? decideAppUpdate(release.data, installed) : null), [installed, release.data]);
+  }, [eligible, installed?.platform, queryClient, refetch]);
+  const notice = release.data ?? null;
   const [open, setOpen] = useState<Notice | null>(null);
+  // One entry overlay at a time: a 공지 팝업 on screen first keeps this waiting.
+  const granted = useEntryOverlaySlot('appUpdate', (!!notice && !guiding && !shownThisRun.has(notice.key)) || !!open);
   useEffect(() => {
-    if (!notice || guiding || shownThisRun.has(notice.key)) return;
+    if (!notice || guiding || !granted || shownThisRun.has(notice.key)) return;
     shownThisRun.add(notice.key);
     setOpen(notice);
-  }, [guiding, notice]);
+  }, [granted, guiding, notice]);
   const last = useRef<Notice | null>(null);
   if (open) last.current = open;
   const shown = open ?? last.current;
@@ -92,10 +110,13 @@ export default function AppUpdateNotice() {
                 <Text style={styles.label}>현재 버전</Text>
                 <Text style={styles.value}>{shown.currentVersion}</Text>
               </View>
-              <View style={styles.row} testID="app-update-latest">
-                <Text style={styles.label}>새 버전</Text>
-                <Text style={[styles.value, styles.latest]}>{shown.latestVersion}</Text>
-              </View>
+              {/* Google Play does not tell the new version's name; none is guessed. */}
+              {shown.latestVersion ? (
+                <View style={styles.row} testID="app-update-latest">
+                  <Text style={styles.label}>새 버전</Text>
+                  <Text style={[styles.value, styles.latest]}>{shown.latestVersion}</Text>
+                </View>
+              ) : null}
             </View>
             {shown.notes ? <Text testID="app-update-notes" style={styles.notes}>{shown.notes}</Text> : null}
             {failed ? (

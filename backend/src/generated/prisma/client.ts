@@ -482,6 +482,14 @@ export type PushScanCursor = Prisma.PushScanCursorModel
  */
 export type ImportantNotice = Prisma.ImportantNoticeModel
 /**
+ * Model ImportantNoticeAcknowledgement
+ * A member's confirmation of a popup notice (2026-11-13): the popup shows
+ * once per member and notice, on any device or trading account. Written only
+ * for the signed-in member; ON CONFLICT DO NOTHING keeps exactly one row
+ * under retries and concurrent devices (the first confirmation's time wins).
+ */
+export type ImportantNoticeAcknowledgement = Prisma.ImportantNoticeAcknowledgementModel
+/**
  * Model EmailAuthChallenge
  * 
  */

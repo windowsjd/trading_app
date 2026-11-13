@@ -6,6 +6,7 @@ jest.mock('../operator/operator-audit.service', () => ({
 import { HttpException } from '@nestjs/common';
 import {
   ImportantNoticesService,
+  POPUP_NOTICE_LIMIT,
   noticeSourceKey,
   parseNoticeSections,
 } from './important-notices.service';
@@ -44,6 +45,7 @@ function notice(overrides: Record<string, unknown> = {}) {
     fanoutCompletedAt: null,
     createdAt: new Date('2026-10-17T00:00:00.000Z'),
     updatedAt: new Date('2026-10-17T00:00:00.000Z'),
+    showPopup: false,
     ...overrides,
   };
 }
@@ -81,11 +83,55 @@ function harness(
       }),
     },
   };
+  // Member popup reads and confirmations (2026-11-13): one row per
+  // (user, notice), duplicates skipped like ON CONFLICT DO NOTHING.
+  const acknowledgements = new Map<string, Date>();
+  const popupQueries: unknown[] = [];
   const prisma = {
     $transaction: jest.fn(async (run: (client: typeof tx) => unknown) =>
       run(tx),
     ),
-    importantNotice: tx.importantNotice,
+    importantNotice: {
+      ...tx.importantNotice,
+      findMany: jest.fn((args: unknown) => {
+        popupQueries.push(args);
+        return Promise.resolve(
+          row && row.status === 'published' && row.showPopup ? [row] : [],
+        );
+      }),
+    },
+    importantNoticeAcknowledgement: {
+      createMany: jest.fn(
+        (args: {
+          data: Array<{ userId: string; noticeId: string }>;
+          skipDuplicates: boolean;
+        }) => {
+          expect(args.skipDuplicates).toBe(true);
+          let count = 0;
+          for (const { userId, noticeId } of args.data) {
+            const key = `${userId}|${noticeId}`;
+            if (acknowledgements.has(key)) continue;
+            acknowledgements.set(
+              key,
+              new Date(Date.UTC(2026, 10, 13, 0, 0, acknowledgements.size)),
+            );
+            count += 1;
+          }
+          return Promise.resolve({ count });
+        },
+      ),
+      findUniqueOrThrow: jest.fn(
+        (args: {
+          where: { userId_noticeId: { userId: string; noticeId: string } };
+        }) => {
+          const { userId, noticeId } = args.where.userId_noticeId;
+          const at = acknowledgements.get(`${userId}|${noticeId}`);
+          return at
+            ? Promise.resolve({ acknowledgedAt: at })
+            : Promise.reject(new Error('not found'));
+        },
+      ),
+    },
   };
   const audit = {
     recordSuccess: jest.fn(
@@ -104,6 +150,9 @@ function harness(
     audits,
     failures,
     skips,
+    acknowledgements,
+    popupQueries,
+    prisma,
     current: () => row,
   };
 }
@@ -221,6 +270,122 @@ describe('ImportantNoticesService', () => {
         h.service.publish(operator, 'missing', { confirm: true }, context),
       ),
     ).toBe('NOTICE_NOT_FOUND');
+  });
+
+  it('creates a popup notice only from a strict boolean, as part of its replay', async () => {
+    const h = harness();
+    const body = {
+      title: '서버 점검',
+      summary: '요약',
+      sections,
+      idempotencyKey: 'k2',
+      showPopup: true,
+    };
+    const created = await h.service.create(operator, body, context);
+    expect(created.data.notice.showPopup).toBe(true);
+    expect(h.current()?.showPopup).toBe(true);
+    expect(h.audits[0]).toMatchObject({
+      metadataJson: { sectionCount: 1, showPopup: true },
+    });
+    // The same key must carry the same choice.
+    expect(
+      await errorCode(
+        h.service.create(operator, { ...body, showPopup: false }, context),
+      ),
+    ).toBe('NOTICE_IDEMPOTENCY_CONFLICT');
+    for (const showPopup of ['true', 1, null])
+      expect(
+        await errorCode(
+          harness().service.create(
+            operator,
+            { ...body, idempotencyKey: 'k3', showPopup },
+            context,
+          ),
+        ),
+      ).toBe('INVALID_NOTICE');
+    // Without the field: no popup, exactly as before the column existed.
+    const plain = harness();
+    const { showPopup: _omitted, ...withoutPopup } = body;
+    void _omitted;
+    const old = await plain.service.create(operator, withoutPopup, context);
+    expect(old.data.notice.showPopup).toBe(false);
+  });
+
+  it('lists only published popup notices the caller has not confirmed', async () => {
+    const member = { userId: 'member-1', role: 'user' as const };
+    const h = harness({
+      row: notice({
+        status: 'published',
+        showPopup: true,
+        publishedAt: new Date('2026-11-13T00:00:00.000Z'),
+      }),
+    });
+    const listed = await h.service.listPopupFor(member);
+    expect(listed.data.notices).toEqual([
+      {
+        id: 'notice-1',
+        title: '서버 점검',
+        summary: '10월 20일 새벽 점검이 있어요.',
+        publishedAt: '2026-11-13T00:00:00.000Z',
+      },
+    ]);
+    expect(h.popupQueries[0]).toEqual({
+      where: {
+        status: 'published',
+        showPopup: true,
+        acknowledgements: { none: { userId: 'member-1' } },
+      },
+      orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+      take: POPUP_NOTICE_LIMIT,
+      select: { id: true, title: true, summary: true, publishedAt: true },
+    });
+    expect(await errorCode(h.service.listPopupFor(undefined))).toBe(
+      'UNAUTHORIZED',
+    );
+  });
+
+  it('records one confirmation per member and notice, whatever the retries', async () => {
+    const member = { userId: 'member-1', role: 'user' as const };
+    const other = { userId: 'member-2', role: 'user' as const };
+    const h = harness({
+      row: notice({ status: 'published', showPopup: true }),
+    });
+    const first = await h.service.acknowledge(member, 'notice-1');
+    const retry = await h.service.acknowledge(member, 'notice-1');
+    expect(retry.data).toEqual(first.data);
+    expect(h.acknowledgements.size).toBe(1);
+    // Another member keeps their own state.
+    const theirs = await h.service.acknowledge(other, 'notice-1');
+    expect(theirs.data.acknowledgedAt).not.toBe(first.data.acknowledgedAt);
+    expect([...h.acknowledgements.keys()]).toEqual([
+      'member-1|notice-1',
+      'member-2|notice-1',
+    ]);
+    expect(await errorCode(h.service.acknowledge(undefined, 'notice-1'))).toBe(
+      'UNAUTHORIZED',
+    );
+  });
+
+  it('confirms only a published (or since withdrawn) notice', async () => {
+    const member = { userId: 'member-1', role: 'user' as const };
+    expect(
+      await errorCode(
+        harness({ row: notice() }).service.acknowledge(member, 'notice-1'),
+      ),
+    ).toBe('NOTICE_NOT_FOUND');
+    expect(
+      await errorCode(
+        harness({ row: null }).service.acknowledge(member, 'missing'),
+      ),
+    ).toBe('NOTICE_NOT_FOUND');
+    const odd = harness({ row: notice({ status: 'published' }) });
+    expect(
+      await errorCode(odd.service.acknowledge(member, `x/${'y'.repeat(80)}`)),
+    ).toBe('NOTICE_NOT_FOUND');
+    expect(odd.prisma.importantNotice.findUnique).not.toHaveBeenCalled();
+    const withdrawn = harness({ row: notice({ status: 'withdrawn' }) });
+    await withdrawn.service.acknowledge(member, 'notice-1');
+    expect(withdrawn.acknowledgements.size).toBe(1);
   });
 
   it('requires an authenticated operator context', async () => {

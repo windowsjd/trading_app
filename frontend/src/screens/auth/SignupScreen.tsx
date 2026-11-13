@@ -3,7 +3,7 @@ import EmailVerificationPanel from './EmailVerificationPanel';
 import AuthCheckbox from './AuthCheckbox';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Linking } from '../../theme/native';
+import { View, Text, StyleSheet } from '../../theme/native';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import AuthFormLayout, { AuthField, AuthSubmitBox } from './AuthFormLayout';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -29,8 +29,9 @@ import { ERROR_CODE } from '../../models/enums/errorCode';
 import {
   AGE_CONFIRMATION_LABEL,
   BLOCKED_ACCOUNT_MESSAGES,
-  LEGAL_LINKS,
-  SIGNUP_LEGAL_NOTICE,
+  PRIVACY_AGREEMENT_LABEL,
+  PRIVACY_VERSION,
+  TERMS_AGREEMENT_LABEL,
   TERMS_VERSION,
 } from '../../constants/legal';
 import type { AuthViewState } from '../../models/enums/viewState';
@@ -38,6 +39,19 @@ import type { UserStatus } from '../../models/dto/user';
 
 function isValidEmail(value: string) {
   return /\S+@\S+\.\S+/.test(value);
+}
+
+/**
+ * The required boxes still unchecked, by name, for "…에 체크해주세요." Each box
+ * is its own consent: none implies another, and opening a document's 자세히
+ * 보기 checks nothing.
+ */
+export function missingSignupConsents(consent: { age: boolean; terms: boolean; privacy: boolean }): string[] {
+  return [
+    ...(consent.age ? [] : ['만 16세 이상 확인']),
+    ...(consent.terms ? [] : ['이용약관 동의']),
+    ...(consent.privacy ? [] : ['개인정보처리방침 동의']),
+  ];
 }
 
 function getBlockedAuthState(status: UserStatus): AuthViewState | null {
@@ -65,9 +79,10 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  // Required and never pre-checked: the only checkbox on this screen.
+  // Three required boxes, each separate and never pre-checked (2026-11-13).
   const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
+  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -167,8 +182,9 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       return;
     }
 
-    if (!ageConfirmed) {
-      setFieldError('만 16세 이상 확인에 체크해주세요.');
+    const missing = missingSignupConsents({ age: ageConfirmed, terms: termsAgreed, privacy: privacyAgreed });
+    if (missing.length) {
+      setFieldError(`${missing.join(', ')}에 체크해주세요.`);
       return;
     }
 
@@ -184,19 +200,15 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       nickname: nickname.trim(),
       password,
       ageConfirmed: true,
+      termsAgreed: true,
       termsVersion: TERMS_VERSION,
+      privacyAgreed: true,
+      privacyVersion: PRIVACY_VERSION,
     });
   };
 
-  // The terms and the privacy policy open in the external browser.
-  const openLegalLink = async (url: string) => {
-    setLinkError(null);
-    try {
-      await Linking.openURL(url);
-    } catch {
-      setLinkError('링크를 열지 못했습니다. 잠시 후 다시 시도해주세요.');
-    }
-  };
+  // The document opens over this screen, which keeps every input and box.
+  const openDocument = (document: 'terms' | 'privacy') => navigation.navigate('LegalDocument', { document });
 
   return (
     <AuthFormLayout testID={TEST_IDS.auth.signupScreen} scroll={scroll}>
@@ -247,25 +259,45 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         style={styles.input}
       />
 
-      <AuthCheckbox
-        testID={TEST_IDS.auth.signupAgeCheckbox}
-        label={AGE_CONFIRMATION_LABEL}
-        checked={ageConfirmed}
-        disabled={signupMutation.isPending}
-        onChange={setAgeConfirmed}
-      />
-
-      <Text testID={TEST_IDS.auth.signupLegalNotice} style={styles.notice}>
-        {SIGNUP_LEGAL_NOTICE.map((part, index) => typeof part === 'string' ? part : (
-          <Text key={index} accessibilityRole="link" style={styles.noticeLink}
-            testID={part.link === 'terms' ? TEST_IDS.auth.signupTermsLink : TEST_IDS.auth.signupPrivacyLink}
-            onPress={() => void openLegalLink(LEGAL_LINKS[part.link])}>
-            {part.label}
-          </Text>
-        ))}
-      </Text>
-
-      {linkError ? <Text style={styles.errorText}>{linkError}</Text> : null}
+      <View testID={TEST_IDS.auth.signupConsents} style={styles.consents}>
+        <AuthCheckbox
+          testID={TEST_IDS.auth.signupAgeCheckbox}
+          label={AGE_CONFIRMATION_LABEL}
+          checked={ageConfirmed}
+          disabled={signupMutation.isPending}
+          onChange={setAgeConfirmed}
+        />
+        <View style={styles.consentRow}>
+          <View style={styles.consentBox}>
+            <AuthCheckbox
+              testID={TEST_IDS.auth.signupTermsCheckbox}
+              label={TERMS_AGREEMENT_LABEL}
+              checked={termsAgreed}
+              disabled={signupMutation.isPending}
+              onChange={setTermsAgreed}
+            />
+          </View>
+          <ActionPressable testID={TEST_IDS.auth.signupTermsDetail} accessibilityRole="button"
+            accessibilityLabel="이용약관 자세히 보기" onPress={() => openDocument('terms')} style={styles.detail}>
+            <Text style={styles.detailText}>자세히 보기</Text>
+          </ActionPressable>
+        </View>
+        <View style={styles.consentRow}>
+          <View style={styles.consentBox}>
+            <AuthCheckbox
+              testID={TEST_IDS.auth.signupPrivacyCheckbox}
+              label={PRIVACY_AGREEMENT_LABEL}
+              checked={privacyAgreed}
+              disabled={signupMutation.isPending}
+              onChange={setPrivacyAgreed}
+            />
+          </View>
+          <ActionPressable testID={TEST_IDS.auth.signupPrivacyDetail} accessibilityRole="button"
+            accessibilityLabel="개인정보처리방침 자세히 보기" onPress={() => openDocument('privacy')} style={styles.detail}>
+            <Text style={styles.detailText}>자세히 보기</Text>
+          </ActionPressable>
+        </View>
+      </View>
 
       {authState === 'auth_invalid_input' && fieldError ? (
         <Text style={styles.errorText}>{fieldError}</Text>
@@ -362,13 +394,14 @@ const styles = StyleSheet.create({
     color: semantic.error,
     fontSize: 14,
   },
-  notice: {
-    color: semantic.secondary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  noticeLink: {
+  consents: { gap: 2 },
+  // The box's label wraps beside 자세히 보기 (320 pt screens, large text).
+  consentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  consentBox: { flex: 1, minWidth: 0 },
+  detail: { minHeight: 44, minWidth: 44, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  detailText: {
     color: semantic.secondaryActionForeground,
+    fontSize: 14,
     fontWeight: '700',
     textDecorationLine: 'underline',
   },

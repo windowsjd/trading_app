@@ -392,3 +392,52 @@ describe('data changes', () => {
     assert.equal(getVisibleIndexRange(100, shrunk).startIndex, 0);
   });
 });
+
+describe('continuous horizontal position (2026-11-13: a drag follows the finger pixel for pixel)', () => {
+  const v = viewportModule;
+  it('moves by part of a candle instead of rounding to whole candles', () => {
+    const start = v.createDefaultViewport(600);
+    const half = v.panViewportByPixels(start, 5, 10, 600);
+    assert.equal(half.rightOffset, 0.5);
+    assert.equal(v.panViewportByPixels(start, 1, 10, 600).rightOffset, 0.1, 'a 1 px move is not lost');
+    // Both edge candles are partly on screen: one more index than slots.
+    assert.deepEqual(v.getVisibleIndexRange(600, half), { startIndex: 539, endIndex: 600 });
+    assert.equal(v.getViewportFirstSlot(600, half), -0.5);
+    assert.equal(v.isViewingLatest(half), true, 'the newest candle is still (half) on screen');
+    assert.equal(v.isDefaultViewport(half, 600), false);
+    // Whole candles behave exactly as before.
+    const whole = v.panViewportByPixels(start, 30, 10, 600);
+    assert.deepEqual(v.getVisibleIndexRange(600, whole), { startIndex: 537, endIndex: 597 });
+    assert.equal(v.getViewportFirstSlot(600, whole), 0);
+    assert.equal(v.isViewingLatest(whole), false);
+  });
+
+  it('reverses smoothly and clamps at both loaded edges', () => {
+    const start = v.createDefaultViewport(600);
+    const away = v.panViewportByPixels(start, 37, 10, 600);
+    assert.equal(away.rightOffset, 3.7);
+    assert.equal(v.panViewportByPixels(away, -37, 10, 600).rightOffset, 0);
+    assert.equal(v.panViewportByPixels(away, -1_000, 10, 600).rightOffset, 0);
+    assert.equal(v.panViewportByPixels(away, 1_000_000, 10, 600).rightOffset, 540);
+  });
+
+  it('a short data set keeps its empty leading slots and cannot be moved', () => {
+    const short = v.createDefaultViewport(12);
+    assert.equal(v.panViewportByPixels(short, 25, 10, 12).rightOffset, 0);
+    assert.equal(v.getViewportFirstSlot(12, short), 48);
+  });
+
+  it('zoom keeps the point under the fingers where it is, even between whole candles', () => {
+    const between = { visibleCount: 60, rightOffset: 10.25 };
+    const zoomed = v.zoomViewportAtFocalPoint(between, 2, 150, 300, 600);
+    assert.equal(zoomed.visibleCount, 30);
+    // The focal ratio 0.5 sat at index (600 − 10.25 − 60) + 30 = 559.75 and still does.
+    const end = 600 - zoomed.rightOffset;
+    assert.ok(Math.abs(end - zoomed.visibleCount + 0.5 * zoomed.visibleCount - 559.75) < 1e-9);
+  });
+
+  it('a live candle keeps a history view on the same candles, and a near-latest view at the right edge', () => {
+    assert.equal(v.adjustViewportForDataChange({ visibleCount: 60, rightOffset: 3.5 }, 600, 601).rightOffset, 4.5);
+    assert.equal(v.adjustViewportForDataChange({ visibleCount: 60, rightOffset: 0.5 }, 600, 601).rightOffset, 0.5);
+  });
+});

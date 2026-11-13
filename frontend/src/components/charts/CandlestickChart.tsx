@@ -1,5 +1,6 @@
 import { semantic } from '../../theme/tokens';
-import { priceRange, capturePriceScale, scalePriceByPixels, scaledPriceRange, zoomPriceScale, type ManualPriceScale } from './candlestickPriceScale';
+import { priceRange, capturePriceScale, panPriceScale, scalePriceByPixels, scaledPriceRange, zoomPriceScale, type ManualPriceScale } from './candlestickPriceScale';
+import { reduceCrosshair, shouldEngageVerticalPan, type CrosshairInput, type CrosshairState } from './candlestickGesturePolicy';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutChangeEvent,
@@ -34,6 +35,7 @@ import {
   adjustViewportForDataChange,
   createDefaultViewport,
   getRenderIndexRange,
+  getViewportFirstSlot,
   getVisibleIndexRange,
   isDefaultViewport,
   isViewingLatest,
@@ -103,6 +105,23 @@ type ParsedCandle = {
   bullish: boolean;
 };
 
+/** What a crosshair points at: a candle (by its time) and a price — never pixels. */
+type CrosshairAnchor = { time: number; price: number };
+
+/** The candle of this time in the time-sorted list, or -1. */
+function indexOfTime(candles: ParsedCandle[], time: number): number {
+  let low = 0;
+  let high = candles.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const value = candles[middle].time;
+    if (value === time) return middle;
+    if (value < time) low = middle + 1;
+    else high = middle - 1;
+  }
+  return -1;
+}
+
 const DEFAULT_WIDTH = 320;
 // Parse cap aligned with the largest single API page (Binance klines: 1000).
 // Only the visible window + buffer is ever rendered out of these.
@@ -154,19 +173,25 @@ function parseCandles(candles: CandlestickChartCandle[]): ParsedCandle[] {
     : parsed;
 }
 
-function getPriceRange(candles: ParsedCandle[], currentPriceValue: number | null) {
-  if (candles.length === 0) return { minY: 0, maxY: 1, range: 1 };
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
+/** Lowest low and highest high (and the live price), unpadded; null without candles. */
+function priceExtent(candles: ParsedCandle[], currentPriceValue: number | null) {
+  if (candles.length === 0) return null;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
   for (const candle of candles) {
-    if (candle.low < minY) minY = candle.low;
-    if (candle.high > maxY) maxY = candle.high;
+    if (candle.low < min) min = candle.low;
+    if (candle.high > max) max = candle.high;
   }
   if (currentPriceValue !== null && Number.isFinite(currentPriceValue)) {
-    minY = Math.min(minY, currentPriceValue);
-    maxY = Math.max(maxY, currentPriceValue);
+    min = Math.min(min, currentPriceValue);
+    max = Math.max(max, currentPriceValue);
   }
-  return priceRange(minY, maxY);
+  return { min, max };
+}
+
+function getPriceRange(candles: ParsedCandle[], currentPriceValue: number | null) {
+  const extent = priceExtent(candles, currentPriceValue);
+  return extent ? priceRange(extent.min, extent.max) : { minY: 0, maxY: 1, range: 1 };
 }
 
 /**
@@ -182,6 +207,14 @@ function getPriceRange(candles: ParsedCandle[], currentPriceValue: number | null
  * only translate raw gestures into pan/zoom/crosshair intent. Moving beyond the
  * loaded range is intentionally impossible — fetching more history is a future
  * addition that would only extend the candle array handed in here.
+ *
+ * 2026-11-13: a drag on the plot moves the chart both ways, pixel for pixel —
+ * sideways through the loaded candles, up and down through prices (the
+ * automatic price fit gives way to a fixed window once a drag clearly moves
+ * vertically, or after a price-axis change). A tap pins the crosshair (date
+ * and price labels) until the next tap; it stays on its candle and price
+ * while the chart moves or zooms. Display only: no price used for orders or
+ * profit is ever derived from this view.
  *
  * Zoom has NO on-screen controls: mobile pinches, web wheels. `visibleCount`
  * is an internal viewport value, never a candle count the user picks. The only
@@ -211,9 +244,9 @@ export default function CandlestickChart({
       windowHeight,
       platform: toChartLayoutPlatform(Platform.OS),
     });
-  const [crosshair, setCrosshair] = useState<{ x: number; y: number } | null>(
-    null,
-  );
+  const [crosshair, setCrosshair] = useState<CrosshairState<CrosshairAnchor>>(null);
+  // Whether the stored crosshair is drawn now (read by a tap's toggle).
+  const crosshairShownRef = useRef(false);
   // Where the 최신 button ends, so price labels start below it.
   const [resetBottom, setResetBottom] = useState(0);
 
@@ -221,9 +254,15 @@ export default function CandlestickChart({
   const manualPriceScaleRef = useRef(manualPriceScale);
   manualPriceScaleRef.current = manualPriceScale;
   const gestureStartPriceRef = useRef<ManualPriceScale | null>(null);
+  // The price window when the gesture began: null while prices fit automatically.
+  const gestureStartManualRef = useRef<ManualPriceScale | null>(null);
+  // From automatic fit, the window a drag took over and the drag's y at that moment.
+  const verticalTakeoverRef = useRef<{ base: ManualPriceScale; fromY: number } | null>(null);
   const geometryRef = useRef<CandlestickChartGeometry | null>(null);
 
   const parsed = useMemo(() => parseCandles(candles), [candles]);
+  const parsedRef = useRef(parsed);
+  parsedRef.current = parsed;
   const total = parsed.length;
   const [viewport, setViewport] = useState<CandleViewport>(() =>
     createDefaultViewport(total),
@@ -235,6 +274,10 @@ export default function CandlestickChart({
     () => getPriceRange(parsed, toNumber(currentPrice ?? null)),
     [parsed, currentPrice],
   );
+  // A price drag always keeps some of the loaded prices (not just padding) in view.
+  const loadedExtent = useMemo(() => priceExtent(parsed, toNumber(currentPrice ?? null)), [parsed, currentPrice]);
+  const priceBoundsRef = useRef(loadedExtent);
+  priceBoundsRef.current = loadedExtent;
 
   const chartWidth = Math.max(width, 160);
   // Reserve the longest integer part in this range plus the declared decimal
@@ -299,11 +342,13 @@ export default function CandlestickChart({
 
   const handleGestureStart = useCallback(() => {
     gestureStartViewportRef.current = viewportRef.current;
+    gestureStartManualRef.current = manualPriceScaleRef.current;
+    verticalTakeoverRef.current = null;
     gestureStartPriceRef.current = manualPriceScaleRef.current ??
       (geometryRef.current ? capturePriceScale(geometryRef.current) : null);
   }, []);
 
-  const handlePan = useCallback((translationX: number) => {
+  const handlePan = useCallback((translationX: number, translationY: number) => {
     setViewport((current) => {
       const next = panViewportByPixels(
         gestureStartViewportRef.current,
@@ -311,12 +356,26 @@ export default function CandlestickChart({
         slotWidthRef.current,
         totalRef.current,
       );
-      // Only a real index change re-renders (gestures fire per pixel).
       return next.rightOffset === current.rightOffset &&
         next.visibleCount === current.visibleCount
         ? current
         : next;
     });
+    // Prices: a fixed window moves with the finger at once; the automatic fit
+    // gives way only to a clearly vertical drag, taking over the window as it
+    // is drawn at that moment (no jump), with the drag counted from there.
+    let base = gestureStartManualRef.current;
+    let fromY = 0;
+    if (!base) {
+      const takeover = verticalTakeoverRef.current ?? (
+        shouldEngageVerticalPan(translationX, translationY) && geometryRef.current
+          ? { base: capturePriceScale(geometryRef.current), fromY: translationY }
+          : null);
+      if (!takeover) return;
+      verticalTakeoverRef.current = takeover;
+      ({ base, fromY } = takeover);
+    }
+    setManualPriceScale(panPriceScale(base, translationY - fromY, innerHeightRef.current, priceBoundsRef.current));
   }, []);
 
   const handleZoom = useCallback((scale: number, focalX: number) => {
@@ -348,24 +407,32 @@ export default function CandlestickChart({
       );
   }, []);
 
-  const handleCrosshair = useCallback(
-    (position: { x: number; y: number } | null) => {
-      if (!position) {
-        setCrosshair(null);
-        return;
-      }
-      const clampedX = Math.max(
-        PADDING.left,
-        Math.min(position.x, PADDING.left + innerWidthRef.current),
-      );
-      const clampedY = Math.max(
-        PADDING.top,
-        Math.min(position.y, PADDING.top + innerHeight),
-      );
-      setCrosshair({ x: clampedX, y: clampedY });
-    },
-    [innerHeight],
-  );
+  // A point on the chart → the candle and the price under it, as drawn now.
+  const anchorOf = useCallback((point: { x: number; y: number }): CrosshairAnchor | null => {
+    const g = geometryRef.current;
+    const list = parsedRef.current;
+    if (!g || !list.length) return null;
+    const x = Math.max(PADDING.left, Math.min(point.x, PADDING.left + g.innerWidth));
+    const y = Math.max(PADDING.top, Math.min(point.y, PADDING.top + g.innerHeight));
+    const { startIndex, endIndex } = getVisibleIndexRange(list.length, viewportRef.current);
+    const index = originalCandleIndexForX({
+      x,
+      paddingLeft: PADDING.left,
+      slotWidth: g.slotWidth,
+      viewportVisibleCount: viewportRef.current.visibleCount,
+      startIndex,
+      endIndex,
+      leadingEmptySlots: g.leadingEmptySlots,
+      slotShift: g.slotShift,
+    });
+    const candle = list[index];
+    if (!candle) return null;
+    return { time: candle.time, price: g.minY + (1 - (y - PADDING.top) / g.innerHeight) * g.range };
+  }, []);
+
+  const handleCrosshair = useCallback((input: CrosshairInput) => {
+    setCrosshair((current) => reduceCrosshair(current, input, anchorOf, crosshairShownRef.current));
+  }, [anchorOf]);
 
   const handleGestureEnd = useCallback(() => {
     gestureStartViewportRef.current = viewportRef.current;
@@ -383,6 +450,13 @@ export default function CandlestickChart({
     const { startIndex, endIndex } = getVisibleIndexRange(total, viewport);
     if (endIndex <= startIndex) return null;
 
+    // Short data sets keep the default candle width and sit against the right
+    // edge; the shortfall becomes empty slots on the left. Between whole
+    // candles the window is shifted by part of a slot (slotShift).
+    const firstSlot = getViewportFirstSlot(total, viewport);
+    const leadingEmptySlots = firstSlot > 0
+      ? computeLeadingEmptySlots(viewport.visibleCount, endIndex - startIndex)
+      : 0;
     return {
       width: chartWidth,
       height: chartHeight,
@@ -392,12 +466,8 @@ export default function CandlestickChart({
       slotWidth,
       bodyWidth,
       startIndex,
-      // Short data sets keep the default candle width and sit against the right
-      // edge; the shortfall becomes empty slots on the left.
-      leadingEmptySlots: computeLeadingEmptySlots(
-        viewport.visibleCount,
-        endIndex - startIndex,
-      ),
+      leadingEmptySlots,
+      slotShift: firstSlot - leadingEmptySlots,
       ...(manualPriceScale ? scaledPriceRange(manualPriceScale) : getPriceRange(
         parsed.slice(startIndex, endIndex),
         isViewingLatest(viewport)
@@ -445,23 +515,22 @@ export default function CandlestickChart({
     ? (livePrice ?? parsed[total - 1].close)
     : null;
 
-  // Crosshair x → slot → ORIGINAL candle index, so its labels always describe
-  // a candle that exists: a pointer over the empty leading slots of a short
-  // data set snaps to the first real candle instead of a negative index.
-  const crosshairState = crosshair
-    ? {
-        index: originalCandleIndexForX({
-          x: crosshair.x,
-          paddingLeft: PADDING.left,
-          slotWidth,
-          viewportVisibleCount: viewport.visibleCount,
-          startIndex,
-          endIndex,
-          leadingEmptySlots: geometry.leadingEmptySlots,
-        }),
-        y: crosshair.y,
-      }
+  // The crosshair is stored as a candle (time) and a price, so after a pan or
+  // zoom it still names the same date and price; drawn only while that candle
+  // and price are on the plot (a pinned one panned away comes back with them).
+  const crosshairIndex = crosshair ? indexOfTime(parsed, crosshair.anchor.time) : -1;
+  const crosshairX = crosshairIndex >= 0
+    ? PADDING.left + (geometry.leadingEmptySlots + geometry.slotShift + crosshairIndex - startIndex + 0.5) * slotWidth
+    : NaN;
+  const crosshairY = crosshair
+    ? PADDING.top + (1 - (crosshair.anchor.price - geometry.minY) / geometry.range) * innerHeight
+    : NaN;
+  const crosshairState = crosshair && crosshairIndex >= startIndex && crosshairIndex < endIndex &&
+    crosshairX >= PADDING.left - 0.5 && crosshairX <= PADDING.left + innerWidth + 0.5 &&
+    crosshairY >= PADDING.top - 0.5 && crosshairY <= PADDING.top + innerHeight + 0.5
+    ? { index: crosshairIndex, y: crosshairY }
     : null;
+  crosshairShownRef.current = !!crosshairState;
 
   // The viewport is off its default window, so the reset affordance would do
   // something. (It is the only chart button: zoom has no controls.)

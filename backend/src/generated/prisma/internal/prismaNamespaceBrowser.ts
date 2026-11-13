@@ -126,6 +126,7 @@ export const ModelName = {
   PushDelivery: 'PushDelivery',
   PushScanCursor: 'PushScanCursor',
   ImportantNotice: 'ImportantNotice',
+  ImportantNoticeAcknowledgement: 'ImportantNoticeAcknowledgement',
   EmailAuthChallenge: 'EmailAuthChallenge',
   EmailAuthRateBucket: 'EmailAuthRateBucket',
   AccountDeletion: 'AccountDeletion',
@@ -174,7 +175,10 @@ export const UserScalarFieldEnum = {
   updatedAt: 'updatedAt',
   termsVersion: 'termsVersion',
   termsAcceptedAt: 'termsAcceptedAt',
-  ageConfirmedAt: 'ageConfirmedAt'
+  ageConfirmedAt: 'ageConfirmedAt',
+  termsAgreedAt: 'termsAgreedAt',
+  privacyVersion: 'privacyVersion',
+  privacyAgreedAt: 'privacyAgreedAt'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
@@ -1717,10 +1721,20 @@ export const ImportantNoticeScalarFieldEnum = {
   fanoutCursor: 'fanoutCursor',
   fanoutCompletedAt: 'fanoutCompletedAt',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  showPopup: 'showPopup'
 } as const
 
 export type ImportantNoticeScalarFieldEnum = (typeof ImportantNoticeScalarFieldEnum)[keyof typeof ImportantNoticeScalarFieldEnum]
+
+
+export const ImportantNoticeAcknowledgementScalarFieldEnum = {
+  userId: 'userId',
+  noticeId: 'noticeId',
+  acknowledgedAt: 'acknowledgedAt'
+} as const
+
+export type ImportantNoticeAcknowledgementScalarFieldEnum = (typeof ImportantNoticeAcknowledgementScalarFieldEnum)[keyof typeof ImportantNoticeAcknowledgementScalarFieldEnum]
 
 
 export const EmailAuthChallengeScalarFieldEnum = {

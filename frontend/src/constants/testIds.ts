@@ -11,9 +11,11 @@ export const TEST_IDS = {
     signupPasswordInput: 'auth-signup-password-input',
     signupConfirmPasswordInput: 'auth-signup-confirm-password-input',
     signupAgeCheckbox: 'auth-signup-age-checkbox',
-    signupLegalNotice: 'auth-signup-legal-notice',
-    signupTermsLink: 'auth-signup-terms-link',
-    signupPrivacyLink: 'auth-signup-privacy-link',
+    signupConsents: 'auth-signup-consents',
+    signupTermsCheckbox: 'auth-signup-terms-checkbox',
+    signupPrivacyCheckbox: 'auth-signup-privacy-checkbox',
+    signupTermsDetail: 'auth-signup-terms-detail',
+    signupPrivacyDetail: 'auth-signup-privacy-detail',
     signupSubmit: 'auth-signup-submit',
   },
 
@@ -176,6 +178,7 @@ export const TEST_IDS = {
 
   my: {
     screen: 'my-screen',
+    adminConsoleMenu: 'my-admin-console-menu',
     badgeMenu: 'my-badge-menu',
     logoutMenu: 'my-logout-menu',
     // Profile editing (moved from Settings, 2026-10-20).

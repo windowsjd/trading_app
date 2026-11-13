@@ -50,6 +50,9 @@ export type UserMinAggregateOutputType = {
   termsVersion: string | null
   termsAcceptedAt: Date | null
   ageConfirmedAt: Date | null
+  termsAgreedAt: Date | null
+  privacyVersion: string | null
+  privacyAgreedAt: Date | null
 }
 
 export type UserMaxAggregateOutputType = {
@@ -68,6 +71,9 @@ export type UserMaxAggregateOutputType = {
   termsVersion: string | null
   termsAcceptedAt: Date | null
   ageConfirmedAt: Date | null
+  termsAgreedAt: Date | null
+  privacyVersion: string | null
+  privacyAgreedAt: Date | null
 }
 
 export type UserCountAggregateOutputType = {
@@ -86,6 +92,9 @@ export type UserCountAggregateOutputType = {
   termsVersion: number
   termsAcceptedAt: number
   ageConfirmedAt: number
+  termsAgreedAt: number
+  privacyVersion: number
+  privacyAgreedAt: number
   _all: number
 }
 
@@ -114,6 +123,9 @@ export type UserMinAggregateInputType = {
   termsVersion?: true
   termsAcceptedAt?: true
   ageConfirmedAt?: true
+  termsAgreedAt?: true
+  privacyVersion?: true
+  privacyAgreedAt?: true
 }
 
 export type UserMaxAggregateInputType = {
@@ -132,6 +144,9 @@ export type UserMaxAggregateInputType = {
   termsVersion?: true
   termsAcceptedAt?: true
   ageConfirmedAt?: true
+  termsAgreedAt?: true
+  privacyVersion?: true
+  privacyAgreedAt?: true
 }
 
 export type UserCountAggregateInputType = {
@@ -150,6 +165,9 @@ export type UserCountAggregateInputType = {
   termsVersion?: true
   termsAcceptedAt?: true
   ageConfirmedAt?: true
+  termsAgreedAt?: true
+  privacyVersion?: true
+  privacyAgreedAt?: true
   _all?: true
 }
 
@@ -255,6 +273,9 @@ export type UserGroupByOutputType = {
   termsVersion: string | null
   termsAcceptedAt: Date | null
   ageConfirmedAt: Date | null
+  termsAgreedAt: Date | null
+  privacyVersion: string | null
+  privacyAgreedAt: Date | null
   _count: UserCountAggregateOutputType | null
   _avg: UserAvgAggregateOutputType | null
   _sum: UserSumAggregateOutputType | null
@@ -296,6 +317,9 @@ export type UserWhereInput = {
   termsVersion?: Prisma.StringNullableFilter<"User"> | string | null
   termsAcceptedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   ageConfirmedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  termsAgreedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  privacyVersion?: Prisma.StringNullableFilter<"User"> | string | null
+  privacyAgreedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   friendshipsLow?: Prisma.FriendshipListRelationFilter
   friendshipsHigh?: Prisma.FriendshipListRelationFilter
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
@@ -331,6 +355,7 @@ export type UserWhereInput = {
   communityRuleConsent?: Prisma.XOR<Prisma.CommunityRuleConsentNullableScalarRelationFilter, Prisma.CommunityRuleConsentWhereInput> | null
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupListRelationFilter
   adRewardSessions?: Prisma.AdRewardSessionListRelationFilter
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -349,6 +374,9 @@ export type UserOrderByWithRelationInput = {
   termsVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   termsAcceptedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   ageConfirmedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  termsAgreedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  privacyVersion?: Prisma.SortOrderInput | Prisma.SortOrder
+  privacyAgreedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   friendshipsLow?: Prisma.FriendshipOrderByRelationAggregateInput
   friendshipsHigh?: Prisma.FriendshipOrderByRelationAggregateInput
   seasonParticipants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
@@ -384,6 +412,7 @@ export type UserOrderByWithRelationInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentOrderByWithRelationInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupOrderByRelationAggregateInput
   adRewardSessions?: Prisma.AdRewardSessionOrderByRelationAggregateInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -405,6 +434,9 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   termsVersion?: Prisma.StringNullableFilter<"User"> | string | null
   termsAcceptedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   ageConfirmedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  termsAgreedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  privacyVersion?: Prisma.StringNullableFilter<"User"> | string | null
+  privacyAgreedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   friendshipsLow?: Prisma.FriendshipListRelationFilter
   friendshipsHigh?: Prisma.FriendshipListRelationFilter
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
@@ -440,6 +472,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   communityRuleConsent?: Prisma.XOR<Prisma.CommunityRuleConsentNullableScalarRelationFilter, Prisma.CommunityRuleConsentWhereInput> | null
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupListRelationFilter
   adRewardSessions?: Prisma.AdRewardSessionListRelationFilter
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementListRelationFilter
 }, "id" | "email" | "nickname">
 
 export type UserOrderByWithAggregationInput = {
@@ -458,6 +491,9 @@ export type UserOrderByWithAggregationInput = {
   termsVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   termsAcceptedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   ageConfirmedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  termsAgreedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  privacyVersion?: Prisma.SortOrderInput | Prisma.SortOrder
+  privacyAgreedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _avg?: Prisma.UserAvgOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
@@ -484,6 +520,9 @@ export type UserScalarWhereWithAggregatesInput = {
   termsVersion?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   termsAcceptedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
   ageConfirmedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  termsAgreedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  privacyVersion?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
+  privacyAgreedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
 }
 
 export type UserCreateInput = {
@@ -502,6 +541,9 @@ export type UserCreateInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -537,6 +579,7 @@ export type UserCreateInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -555,6 +598,9 @@ export type UserUncheckedCreateInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -590,6 +636,7 @@ export type UserUncheckedCreateInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -608,6 +655,9 @@ export type UserUpdateInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -643,6 +693,7 @@ export type UserUpdateInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -661,6 +712,9 @@ export type UserUncheckedUpdateInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -696,6 +750,7 @@ export type UserUncheckedUpdateInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -714,6 +769,9 @@ export type UserCreateManyInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
 }
 
 export type UserUpdateManyMutationInput = {
@@ -732,6 +790,9 @@ export type UserUpdateManyMutationInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type UserUncheckedUpdateManyInput = {
@@ -750,6 +811,9 @@ export type UserUncheckedUpdateManyInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type UserCountOrderByAggregateInput = {
@@ -768,6 +832,9 @@ export type UserCountOrderByAggregateInput = {
   termsVersion?: Prisma.SortOrder
   termsAcceptedAt?: Prisma.SortOrder
   ageConfirmedAt?: Prisma.SortOrder
+  termsAgreedAt?: Prisma.SortOrder
+  privacyVersion?: Prisma.SortOrder
+  privacyAgreedAt?: Prisma.SortOrder
 }
 
 export type UserAvgOrderByAggregateInput = {
@@ -790,6 +857,9 @@ export type UserMaxOrderByAggregateInput = {
   termsVersion?: Prisma.SortOrder
   termsAcceptedAt?: Prisma.SortOrder
   ageConfirmedAt?: Prisma.SortOrder
+  termsAgreedAt?: Prisma.SortOrder
+  privacyVersion?: Prisma.SortOrder
+  privacyAgreedAt?: Prisma.SortOrder
 }
 
 export type UserMinOrderByAggregateInput = {
@@ -808,6 +878,9 @@ export type UserMinOrderByAggregateInput = {
   termsVersion?: Prisma.SortOrder
   termsAcceptedAt?: Prisma.SortOrder
   ageConfirmedAt?: Prisma.SortOrder
+  termsAgreedAt?: Prisma.SortOrder
+  privacyVersion?: Prisma.SortOrder
+  privacyAgreedAt?: Prisma.SortOrder
 }
 
 export type UserSumOrderByAggregateInput = {
@@ -1172,6 +1245,20 @@ export type UserUpdateOneRequiredWithoutPushNotificationsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutPushNotificationsInput, Prisma.UserUpdateWithoutPushNotificationsInput>, Prisma.UserUncheckedUpdateWithoutPushNotificationsInput>
 }
 
+export type UserCreateNestedOneWithoutImportantNoticeAcknowledgementsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutImportantNoticeAcknowledgementsInput, Prisma.UserUncheckedCreateWithoutImportantNoticeAcknowledgementsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutImportantNoticeAcknowledgementsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutImportantNoticeAcknowledgementsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutImportantNoticeAcknowledgementsInput, Prisma.UserUncheckedCreateWithoutImportantNoticeAcknowledgementsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutImportantNoticeAcknowledgementsInput
+  upsert?: Prisma.UserUpsertWithoutImportantNoticeAcknowledgementsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutImportantNoticeAcknowledgementsInput, Prisma.UserUpdateWithoutImportantNoticeAcknowledgementsInput>, Prisma.UserUncheckedUpdateWithoutImportantNoticeAcknowledgementsInput>
+}
+
 export type UserCreateNestedOneWithoutCommunityPostsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutCommunityPostsInput, Prisma.UserUncheckedCreateWithoutCommunityPostsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutCommunityPostsInput
@@ -1382,6 +1469,9 @@ export type UserCreateWithoutInquiriesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -1416,6 +1506,7 @@ export type UserCreateWithoutInquiriesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutInquiriesInput = {
@@ -1434,6 +1525,9 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -1468,6 +1562,7 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutInquiriesInput = {
@@ -1502,6 +1597,9 @@ export type UserUpdateWithoutInquiriesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -1536,6 +1634,7 @@ export type UserUpdateWithoutInquiriesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutInquiriesInput = {
@@ -1554,6 +1653,9 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -1588,6 +1690,7 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutInquiryAnswersInput = {
@@ -1606,6 +1709,9 @@ export type UserCreateWithoutInquiryAnswersInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -1640,6 +1746,7 @@ export type UserCreateWithoutInquiryAnswersInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutInquiryAnswersInput = {
@@ -1658,6 +1765,9 @@ export type UserUncheckedCreateWithoutInquiryAnswersInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -1692,6 +1802,7 @@ export type UserUncheckedCreateWithoutInquiryAnswersInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutInquiryAnswersInput = {
@@ -1726,6 +1837,9 @@ export type UserUpdateWithoutInquiryAnswersInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -1760,6 +1874,7 @@ export type UserUpdateWithoutInquiryAnswersInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
@@ -1778,6 +1893,9 @@ export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -1812,6 +1930,7 @@ export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFriendshipsLowInput = {
@@ -1830,6 +1949,9 @@ export type UserCreateWithoutFriendshipsLowInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
@@ -1864,6 +1986,7 @@ export type UserCreateWithoutFriendshipsLowInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFriendshipsLowInput = {
@@ -1882,6 +2005,9 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
@@ -1916,6 +2042,7 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFriendshipsLowInput = {
@@ -1939,6 +2066,9 @@ export type UserCreateWithoutFriendshipsHighInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
@@ -1973,6 +2103,7 @@ export type UserCreateWithoutFriendshipsHighInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFriendshipsHighInput = {
@@ -1991,6 +2122,9 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
@@ -2025,6 +2159,7 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFriendshipsHighInput = {
@@ -2059,6 +2194,9 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
@@ -2093,6 +2231,7 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
@@ -2111,6 +2250,9 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
@@ -2145,6 +2287,7 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutFriendshipsHighInput = {
@@ -2174,6 +2317,9 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
@@ -2208,6 +2354,7 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
@@ -2226,6 +2373,9 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
@@ -2260,6 +2410,7 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutOperatorAuditLogsInput = {
@@ -2278,6 +2429,9 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2312,6 +2466,7 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
@@ -2330,6 +2485,9 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2364,6 +2522,7 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutOperatorAuditLogsInput = {
@@ -2398,6 +2557,9 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -2432,6 +2594,7 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
@@ -2450,6 +2613,9 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -2484,6 +2650,7 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRefreshTokenSessionsInput = {
@@ -2502,6 +2669,9 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2536,6 +2706,7 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
@@ -2554,6 +2725,9 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2588,6 +2762,7 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRefreshTokenSessionsInput = {
@@ -2622,6 +2797,9 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -2656,6 +2834,7 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
@@ -2674,6 +2853,9 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -2708,6 +2890,7 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTradingAccountsInput = {
@@ -2726,6 +2909,9 @@ export type UserCreateWithoutTradingAccountsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2760,6 +2946,7 @@ export type UserCreateWithoutTradingAccountsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTradingAccountsInput = {
@@ -2778,6 +2965,9 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2812,6 +3002,7 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTradingAccountsInput = {
@@ -2846,6 +3037,9 @@ export type UserUpdateWithoutTradingAccountsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -2880,6 +3074,7 @@ export type UserUpdateWithoutTradingAccountsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTradingAccountsInput = {
@@ -2898,6 +3093,9 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -2932,6 +3130,7 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSeasonParticipantsInput = {
@@ -2950,6 +3149,9 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
@@ -2984,6 +3186,7 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
@@ -3002,6 +3205,9 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
@@ -3036,6 +3242,7 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonParticipantsInput = {
@@ -3070,6 +3277,9 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
@@ -3104,6 +3314,7 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
@@ -3122,6 +3333,9 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
@@ -3156,6 +3370,7 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutUserBadgesInput = {
@@ -3174,6 +3389,9 @@ export type UserCreateWithoutUserBadgesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3208,6 +3426,7 @@ export type UserCreateWithoutUserBadgesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutUserBadgesInput = {
@@ -3226,6 +3445,9 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3260,6 +3482,7 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutUserBadgesInput = {
@@ -3294,6 +3517,9 @@ export type UserUpdateWithoutUserBadgesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3328,6 +3554,7 @@ export type UserUpdateWithoutUserBadgesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutUserBadgesInput = {
@@ -3346,6 +3573,9 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3380,6 +3610,7 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSeasonRewardsInput = {
@@ -3398,6 +3629,9 @@ export type UserCreateWithoutSeasonRewardsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3432,6 +3666,7 @@ export type UserCreateWithoutSeasonRewardsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonRewardsInput = {
@@ -3450,6 +3685,9 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3484,6 +3722,7 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonRewardsInput = {
@@ -3518,6 +3757,9 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3552,6 +3794,7 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
@@ -3570,6 +3813,9 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3604,6 +3850,7 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRewardFulfillmentTargetsInput = {
@@ -3622,6 +3869,9 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3656,6 +3906,7 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
@@ -3674,6 +3925,9 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3708,6 +3962,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentTargetsInput = {
@@ -3731,6 +3986,9 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3765,6 +4023,7 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
@@ -3783,6 +4042,9 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3817,6 +4079,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsRequestedInput = {
@@ -3840,6 +4103,9 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3874,6 +4140,7 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
@@ -3892,6 +4159,9 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3926,6 +4196,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsProcessedInput = {
@@ -3949,6 +4220,9 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3983,6 +4257,7 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
@@ -4001,6 +4276,9 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -4035,6 +4313,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsCanceledInput = {
@@ -4069,6 +4348,9 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -4103,6 +4385,7 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
@@ -4121,6 +4404,9 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -4155,6 +4441,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsRequestedInput = {
@@ -4184,6 +4471,9 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -4218,6 +4508,7 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
@@ -4236,6 +4527,9 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -4270,6 +4564,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsProcessedInput = {
@@ -4299,6 +4594,9 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -4333,6 +4631,7 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
@@ -4351,6 +4650,9 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -4385,6 +4687,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsCanceledInput = {
@@ -4414,6 +4717,9 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -4448,6 +4754,7 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
@@ -4466,6 +4773,9 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -4500,6 +4810,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAdRewardClaimsInput = {
@@ -4518,6 +4829,9 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -4552,6 +4866,7 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
@@ -4570,6 +4885,9 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -4604,6 +4922,7 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAdRewardClaimsInput = {
@@ -4638,6 +4957,9 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -4672,6 +4994,7 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
@@ -4690,6 +5013,9 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -4724,6 +5050,7 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAdRewardSessionsInput = {
@@ -4742,6 +5069,9 @@ export type UserCreateWithoutAdRewardSessionsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -4776,6 +5106,7 @@ export type UserCreateWithoutAdRewardSessionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAdRewardSessionsInput = {
@@ -4794,6 +5125,9 @@ export type UserUncheckedCreateWithoutAdRewardSessionsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -4828,6 +5162,7 @@ export type UserUncheckedCreateWithoutAdRewardSessionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAdRewardSessionsInput = {
@@ -4862,6 +5197,9 @@ export type UserUpdateWithoutAdRewardSessionsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -4896,6 +5234,7 @@ export type UserUpdateWithoutAdRewardSessionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAdRewardSessionsInput = {
@@ -4914,6 +5253,9 @@ export type UserUncheckedUpdateWithoutAdRewardSessionsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -4948,6 +5290,7 @@ export type UserUncheckedUpdateWithoutAdRewardSessionsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutGeneralAccountResetsInput = {
@@ -4966,6 +5309,9 @@ export type UserCreateWithoutGeneralAccountResetsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -5000,6 +5346,7 @@ export type UserCreateWithoutGeneralAccountResetsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
@@ -5018,6 +5365,9 @@ export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -5052,6 +5402,7 @@ export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutGeneralAccountResetsInput = {
@@ -5086,6 +5437,9 @@ export type UserUpdateWithoutGeneralAccountResetsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -5120,6 +5474,7 @@ export type UserUpdateWithoutGeneralAccountResetsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
@@ -5138,6 +5493,9 @@ export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -5172,6 +5530,7 @@ export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutQuotesInput = {
@@ -5190,6 +5549,9 @@ export type UserCreateWithoutQuotesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -5224,6 +5586,7 @@ export type UserCreateWithoutQuotesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutQuotesInput = {
@@ -5242,6 +5605,9 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -5276,6 +5642,7 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutQuotesInput = {
@@ -5310,6 +5677,9 @@ export type UserUpdateWithoutQuotesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -5344,6 +5714,7 @@ export type UserUpdateWithoutQuotesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutQuotesInput = {
@@ -5362,6 +5733,9 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -5396,6 +5770,7 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFxExecuteRequestsInput = {
@@ -5414,6 +5789,9 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -5448,6 +5826,7 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -5466,6 +5845,9 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -5500,6 +5882,7 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -5534,6 +5917,9 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -5568,6 +5954,7 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -5586,6 +5973,9 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -5620,6 +6010,7 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPushDevicesInput = {
@@ -5638,6 +6029,9 @@ export type UserCreateWithoutPushDevicesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -5672,6 +6066,7 @@ export type UserCreateWithoutPushDevicesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPushDevicesInput = {
@@ -5690,6 +6085,9 @@ export type UserUncheckedCreateWithoutPushDevicesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -5724,6 +6122,7 @@ export type UserUncheckedCreateWithoutPushDevicesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPushDevicesInput = {
@@ -5758,6 +6157,9 @@ export type UserUpdateWithoutPushDevicesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -5792,6 +6194,7 @@ export type UserUpdateWithoutPushDevicesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPushDevicesInput = {
@@ -5810,6 +6213,9 @@ export type UserUncheckedUpdateWithoutPushDevicesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -5844,6 +6250,7 @@ export type UserUncheckedUpdateWithoutPushDevicesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutNotificationPreferenceInput = {
@@ -5862,6 +6269,9 @@ export type UserCreateWithoutNotificationPreferenceInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -5896,6 +6306,7 @@ export type UserCreateWithoutNotificationPreferenceInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
@@ -5914,6 +6325,9 @@ export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -5948,6 +6362,7 @@ export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutNotificationPreferenceInput = {
@@ -5982,6 +6397,9 @@ export type UserUpdateWithoutNotificationPreferenceInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -6016,6 +6434,7 @@ export type UserUpdateWithoutNotificationPreferenceInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
@@ -6034,6 +6453,9 @@ export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -6068,6 +6490,7 @@ export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPushNotificationsInput = {
@@ -6086,6 +6509,9 @@ export type UserCreateWithoutPushNotificationsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -6120,6 +6546,7 @@ export type UserCreateWithoutPushNotificationsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPushNotificationsInput = {
@@ -6138,6 +6565,9 @@ export type UserUncheckedCreateWithoutPushNotificationsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -6172,6 +6602,7 @@ export type UserUncheckedCreateWithoutPushNotificationsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPushNotificationsInput = {
@@ -6206,6 +6637,9 @@ export type UserUpdateWithoutPushNotificationsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -6240,6 +6674,7 @@ export type UserUpdateWithoutPushNotificationsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPushNotificationsInput = {
@@ -6258,6 +6693,9 @@ export type UserUncheckedUpdateWithoutPushNotificationsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -6292,6 +6730,247 @@ export type UserUncheckedUpdateWithoutPushNotificationsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutImportantNoticeAcknowledgementsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutImportantNoticeAcknowledgementsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+  communityPosts?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutUserInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedCreateNestedManyWithoutRemovedByInput
+  communityComments?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutUserInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedCreateNestedManyWithoutRemovedByInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedCreateNestedManyWithoutUserInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedCreateNestedManyWithoutUserInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedCreateNestedManyWithoutUserInput
+  communityReports?: Prisma.CommunityReportUncheckedCreateNestedManyWithoutUserInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutUserInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutCreatedByInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutImportantNoticeAcknowledgementsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutImportantNoticeAcknowledgementsInput, Prisma.UserUncheckedCreateWithoutImportantNoticeAcknowledgementsInput>
+}
+
+export type UserUpsertWithoutImportantNoticeAcknowledgementsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutImportantNoticeAcknowledgementsInput, Prisma.UserUncheckedUpdateWithoutImportantNoticeAcknowledgementsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutImportantNoticeAcknowledgementsInput, Prisma.UserUncheckedCreateWithoutImportantNoticeAcknowledgementsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutImportantNoticeAcknowledgementsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutImportantNoticeAcknowledgementsInput, Prisma.UserUncheckedUpdateWithoutImportantNoticeAcknowledgementsInput>
+}
+
+export type UserUpdateWithoutImportantNoticeAcknowledgementsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutImportantNoticeAcknowledgementsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+  communityPosts?: Prisma.CommunityPostUncheckedUpdateManyWithoutUserNestedInput
+  communityPostsRemoved?: Prisma.CommunityPostUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityComments?: Prisma.CommunityCommentUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentsRemoved?: Prisma.CommunityCommentUncheckedUpdateManyWithoutRemovedByNestedInput
+  communityPostLikes?: Prisma.CommunityPostLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityCommentLikes?: Prisma.CommunityCommentLikeUncheckedUpdateManyWithoutUserNestedInput
+  communityPostAliases?: Prisma.CommunityPostAliasUncheckedUpdateManyWithoutUserNestedInput
+  communityReports?: Prisma.CommunityReportUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctions?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutUserNestedInput
+  communitySanctionsCreated?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutCreatedByNestedInput
+  communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
+  communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
+  communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
+  adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityPostsInput = {
@@ -6310,6 +6989,9 @@ export type UserCreateWithoutCommunityPostsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -6344,6 +7026,7 @@ export type UserCreateWithoutCommunityPostsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPostsInput = {
@@ -6362,6 +7045,9 @@ export type UserUncheckedCreateWithoutCommunityPostsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -6396,6 +7082,7 @@ export type UserUncheckedCreateWithoutCommunityPostsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPostsInput = {
@@ -6419,6 +7106,9 @@ export type UserCreateWithoutCommunityPostsRemovedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -6453,6 +7143,7 @@ export type UserCreateWithoutCommunityPostsRemovedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPostsRemovedInput = {
@@ -6471,6 +7162,9 @@ export type UserUncheckedCreateWithoutCommunityPostsRemovedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -6505,6 +7199,7 @@ export type UserUncheckedCreateWithoutCommunityPostsRemovedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPostsRemovedInput = {
@@ -6539,6 +7234,9 @@ export type UserUpdateWithoutCommunityPostsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -6573,6 +7271,7 @@ export type UserUpdateWithoutCommunityPostsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPostsInput = {
@@ -6591,6 +7290,9 @@ export type UserUncheckedUpdateWithoutCommunityPostsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -6625,6 +7327,7 @@ export type UserUncheckedUpdateWithoutCommunityPostsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutCommunityPostsRemovedInput = {
@@ -6654,6 +7357,9 @@ export type UserUpdateWithoutCommunityPostsRemovedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -6688,6 +7394,7 @@ export type UserUpdateWithoutCommunityPostsRemovedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPostsRemovedInput = {
@@ -6706,6 +7413,9 @@ export type UserUncheckedUpdateWithoutCommunityPostsRemovedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -6740,6 +7450,7 @@ export type UserUncheckedUpdateWithoutCommunityPostsRemovedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityCommentsInput = {
@@ -6758,6 +7469,9 @@ export type UserCreateWithoutCommunityCommentsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -6792,6 +7506,7 @@ export type UserCreateWithoutCommunityCommentsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityCommentsInput = {
@@ -6810,6 +7525,9 @@ export type UserUncheckedCreateWithoutCommunityCommentsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -6844,6 +7562,7 @@ export type UserUncheckedCreateWithoutCommunityCommentsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityCommentsInput = {
@@ -6867,6 +7586,9 @@ export type UserCreateWithoutCommunityCommentsRemovedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -6901,6 +7623,7 @@ export type UserCreateWithoutCommunityCommentsRemovedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityCommentsRemovedInput = {
@@ -6919,6 +7642,9 @@ export type UserUncheckedCreateWithoutCommunityCommentsRemovedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -6953,6 +7679,7 @@ export type UserUncheckedCreateWithoutCommunityCommentsRemovedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityCommentsRemovedInput = {
@@ -6987,6 +7714,9 @@ export type UserUpdateWithoutCommunityCommentsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -7021,6 +7751,7 @@ export type UserUpdateWithoutCommunityCommentsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityCommentsInput = {
@@ -7039,6 +7770,9 @@ export type UserUncheckedUpdateWithoutCommunityCommentsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -7073,6 +7807,7 @@ export type UserUncheckedUpdateWithoutCommunityCommentsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutCommunityCommentsRemovedInput = {
@@ -7102,6 +7837,9 @@ export type UserUpdateWithoutCommunityCommentsRemovedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -7136,6 +7874,7 @@ export type UserUpdateWithoutCommunityCommentsRemovedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityCommentsRemovedInput = {
@@ -7154,6 +7893,9 @@ export type UserUncheckedUpdateWithoutCommunityCommentsRemovedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -7188,6 +7930,7 @@ export type UserUncheckedUpdateWithoutCommunityCommentsRemovedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityPostLikesInput = {
@@ -7206,6 +7949,9 @@ export type UserCreateWithoutCommunityPostLikesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -7240,6 +7986,7 @@ export type UserCreateWithoutCommunityPostLikesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPostLikesInput = {
@@ -7258,6 +8005,9 @@ export type UserUncheckedCreateWithoutCommunityPostLikesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -7292,6 +8042,7 @@ export type UserUncheckedCreateWithoutCommunityPostLikesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPostLikesInput = {
@@ -7326,6 +8077,9 @@ export type UserUpdateWithoutCommunityPostLikesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -7360,6 +8114,7 @@ export type UserUpdateWithoutCommunityPostLikesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPostLikesInput = {
@@ -7378,6 +8133,9 @@ export type UserUncheckedUpdateWithoutCommunityPostLikesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -7412,6 +8170,7 @@ export type UserUncheckedUpdateWithoutCommunityPostLikesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityCommentLikesInput = {
@@ -7430,6 +8189,9 @@ export type UserCreateWithoutCommunityCommentLikesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -7464,6 +8226,7 @@ export type UserCreateWithoutCommunityCommentLikesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityCommentLikesInput = {
@@ -7482,6 +8245,9 @@ export type UserUncheckedCreateWithoutCommunityCommentLikesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -7516,6 +8282,7 @@ export type UserUncheckedCreateWithoutCommunityCommentLikesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityCommentLikesInput = {
@@ -7550,6 +8317,9 @@ export type UserUpdateWithoutCommunityCommentLikesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -7584,6 +8354,7 @@ export type UserUpdateWithoutCommunityCommentLikesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityCommentLikesInput = {
@@ -7602,6 +8373,9 @@ export type UserUncheckedUpdateWithoutCommunityCommentLikesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -7636,6 +8410,7 @@ export type UserUncheckedUpdateWithoutCommunityCommentLikesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityPostAliasesInput = {
@@ -7654,6 +8429,9 @@ export type UserCreateWithoutCommunityPostAliasesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -7688,6 +8466,7 @@ export type UserCreateWithoutCommunityPostAliasesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPostAliasesInput = {
@@ -7706,6 +8485,9 @@ export type UserUncheckedCreateWithoutCommunityPostAliasesInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -7740,6 +8522,7 @@ export type UserUncheckedCreateWithoutCommunityPostAliasesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPostAliasesInput = {
@@ -7774,6 +8557,9 @@ export type UserUpdateWithoutCommunityPostAliasesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -7808,6 +8594,7 @@ export type UserUpdateWithoutCommunityPostAliasesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPostAliasesInput = {
@@ -7826,6 +8613,9 @@ export type UserUncheckedUpdateWithoutCommunityPostAliasesInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -7860,6 +8650,7 @@ export type UserUncheckedUpdateWithoutCommunityPostAliasesInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityReportsInput = {
@@ -7878,6 +8669,9 @@ export type UserCreateWithoutCommunityReportsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -7912,6 +8706,7 @@ export type UserCreateWithoutCommunityReportsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityReportsInput = {
@@ -7930,6 +8725,9 @@ export type UserUncheckedCreateWithoutCommunityReportsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -7964,6 +8762,7 @@ export type UserUncheckedCreateWithoutCommunityReportsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityReportsInput = {
@@ -7998,6 +8797,9 @@ export type UserUpdateWithoutCommunityReportsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -8032,6 +8834,7 @@ export type UserUpdateWithoutCommunityReportsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityReportsInput = {
@@ -8050,6 +8853,9 @@ export type UserUncheckedUpdateWithoutCommunityReportsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -8084,6 +8890,7 @@ export type UserUncheckedUpdateWithoutCommunityReportsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunitySanctionsInput = {
@@ -8102,6 +8909,9 @@ export type UserCreateWithoutCommunitySanctionsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -8136,6 +8946,7 @@ export type UserCreateWithoutCommunitySanctionsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunitySanctionsInput = {
@@ -8154,6 +8965,9 @@ export type UserUncheckedCreateWithoutCommunitySanctionsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -8188,6 +9002,7 @@ export type UserUncheckedCreateWithoutCommunitySanctionsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunitySanctionsInput = {
@@ -8211,6 +9026,9 @@ export type UserCreateWithoutCommunitySanctionsCreatedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -8245,6 +9063,7 @@ export type UserCreateWithoutCommunitySanctionsCreatedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunitySanctionsCreatedInput = {
@@ -8263,6 +9082,9 @@ export type UserUncheckedCreateWithoutCommunitySanctionsCreatedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -8297,6 +9119,7 @@ export type UserUncheckedCreateWithoutCommunitySanctionsCreatedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunitySanctionsCreatedInput = {
@@ -8320,6 +9143,9 @@ export type UserCreateWithoutCommunitySanctionsRevokedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -8354,6 +9180,7 @@ export type UserCreateWithoutCommunitySanctionsRevokedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunitySanctionsRevokedInput = {
@@ -8372,6 +9199,9 @@ export type UserUncheckedCreateWithoutCommunitySanctionsRevokedInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -8406,6 +9236,7 @@ export type UserUncheckedCreateWithoutCommunitySanctionsRevokedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunitySanctionsRevokedInput = {
@@ -8440,6 +9271,9 @@ export type UserUpdateWithoutCommunitySanctionsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -8474,6 +9308,7 @@ export type UserUpdateWithoutCommunitySanctionsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunitySanctionsInput = {
@@ -8492,6 +9327,9 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -8526,6 +9364,7 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutCommunitySanctionsCreatedInput = {
@@ -8555,6 +9394,9 @@ export type UserUpdateWithoutCommunitySanctionsCreatedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -8589,6 +9431,7 @@ export type UserUpdateWithoutCommunitySanctionsCreatedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput = {
@@ -8607,6 +9450,9 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -8641,6 +9487,7 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsCreatedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutCommunitySanctionsRevokedInput = {
@@ -8670,6 +9517,9 @@ export type UserUpdateWithoutCommunitySanctionsRevokedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -8704,6 +9554,7 @@ export type UserUpdateWithoutCommunitySanctionsRevokedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput = {
@@ -8722,6 +9573,9 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -8756,6 +9610,7 @@ export type UserUncheckedUpdateWithoutCommunitySanctionsRevokedInput = {
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityRuleConsentInput = {
@@ -8774,6 +9629,9 @@ export type UserCreateWithoutCommunityRuleConsentInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -8808,6 +9666,7 @@ export type UserCreateWithoutCommunityRuleConsentInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityRuleConsentInput = {
@@ -8826,6 +9685,9 @@ export type UserUncheckedCreateWithoutCommunityRuleConsentInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -8860,6 +9722,7 @@ export type UserUncheckedCreateWithoutCommunityRuleConsentInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedCreateNestedManyWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityRuleConsentInput = {
@@ -8894,6 +9757,9 @@ export type UserUpdateWithoutCommunityRuleConsentInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -8928,6 +9794,7 @@ export type UserUpdateWithoutCommunityRuleConsentInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityRuleConsentInput = {
@@ -8946,6 +9813,9 @@ export type UserUncheckedUpdateWithoutCommunityRuleConsentInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -8980,6 +9850,7 @@ export type UserUncheckedUpdateWithoutCommunityRuleConsentInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityPhotoCleanups?: Prisma.CommunityPhotoCleanupUncheckedUpdateManyWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCommunityPhotoCleanupsInput = {
@@ -8998,6 +9869,9 @@ export type UserCreateWithoutCommunityPhotoCleanupsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -9032,6 +9906,7 @@ export type UserCreateWithoutCommunityPhotoCleanupsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentCreateNestedOneWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCommunityPhotoCleanupsInput = {
@@ -9050,6 +9925,9 @@ export type UserUncheckedCreateWithoutCommunityPhotoCleanupsInput = {
   termsVersion?: string | null
   termsAcceptedAt?: Date | string | null
   ageConfirmedAt?: Date | string | null
+  termsAgreedAt?: Date | string | null
+  privacyVersion?: string | null
+  privacyAgreedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -9084,6 +9962,7 @@ export type UserUncheckedCreateWithoutCommunityPhotoCleanupsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedCreateNestedManyWithoutRevokedByInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedCreateNestedOneWithoutUserInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedCreateNestedManyWithoutUserInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCommunityPhotoCleanupsInput = {
@@ -9118,6 +9997,9 @@ export type UserUpdateWithoutCommunityPhotoCleanupsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -9152,6 +10034,7 @@ export type UserUpdateWithoutCommunityPhotoCleanupsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUpdateOneWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput = {
@@ -9170,6 +10053,9 @@ export type UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput = {
   termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  termsAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  privacyVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  privacyAgreedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -9204,6 +10090,7 @@ export type UserUncheckedUpdateWithoutCommunityPhotoCleanupsInput = {
   communitySanctionsRevoked?: Prisma.CommunitySanctionUncheckedUpdateManyWithoutRevokedByNestedInput
   communityRuleConsent?: Prisma.CommunityRuleConsentUncheckedUpdateOneWithoutUserNestedInput
   adRewardSessions?: Prisma.AdRewardSessionUncheckedUpdateManyWithoutUserNestedInput
+  importantNoticeAcknowledgements?: Prisma.ImportantNoticeAcknowledgementUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -9245,6 +10132,7 @@ export type UserCountOutputType = {
   communitySanctionsRevoked: number
   communityPhotoCleanups: number
   adRewardSessions: number
+  importantNoticeAcknowledgements: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -9281,6 +10169,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   communitySanctionsRevoked?: boolean | UserCountOutputTypeCountCommunitySanctionsRevokedArgs
   communityPhotoCleanups?: boolean | UserCountOutputTypeCountCommunityPhotoCleanupsArgs
   adRewardSessions?: boolean | UserCountOutputTypeCountAdRewardSessionsArgs
+  importantNoticeAcknowledgements?: boolean | UserCountOutputTypeCountImportantNoticeAcknowledgementsArgs
 }
 
 /**
@@ -9524,6 +10413,13 @@ export type UserCountOutputTypeCountAdRewardSessionsArgs<ExtArgs extends runtime
   where?: Prisma.AdRewardSessionWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountImportantNoticeAcknowledgementsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ImportantNoticeAcknowledgementWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -9541,6 +10437,9 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   termsVersion?: boolean
   termsAcceptedAt?: boolean
   ageConfirmedAt?: boolean
+  termsAgreedAt?: boolean
+  privacyVersion?: boolean
+  privacyAgreedAt?: boolean
   friendshipsLow?: boolean | Prisma.User$friendshipsLowArgs<ExtArgs>
   friendshipsHigh?: boolean | Prisma.User$friendshipsHighArgs<ExtArgs>
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
@@ -9576,6 +10475,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   communityRuleConsent?: boolean | Prisma.User$communityRuleConsentArgs<ExtArgs>
   communityPhotoCleanups?: boolean | Prisma.User$communityPhotoCleanupsArgs<ExtArgs>
   adRewardSessions?: boolean | Prisma.User$adRewardSessionsArgs<ExtArgs>
+  importantNoticeAcknowledgements?: boolean | Prisma.User$importantNoticeAcknowledgementsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -9595,6 +10495,9 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   termsVersion?: boolean
   termsAcceptedAt?: boolean
   ageConfirmedAt?: boolean
+  termsAgreedAt?: boolean
+  privacyVersion?: boolean
+  privacyAgreedAt?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -9613,6 +10516,9 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   termsVersion?: boolean
   termsAcceptedAt?: boolean
   ageConfirmedAt?: boolean
+  termsAgreedAt?: boolean
+  privacyVersion?: boolean
+  privacyAgreedAt?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectScalar = {
@@ -9631,9 +10537,12 @@ export type UserSelectScalar = {
   termsVersion?: boolean
   termsAcceptedAt?: boolean
   ageConfirmedAt?: boolean
+  termsAgreedAt?: boolean
+  privacyVersion?: boolean
+  privacyAgreedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "emailVerifiedAt" | "tokenVersion" | "nickname" | "profileImageUrl" | "portfolioPublic" | "status" | "role" | "createdAt" | "updatedAt" | "termsVersion" | "termsAcceptedAt" | "ageConfirmedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "emailVerifiedAt" | "tokenVersion" | "nickname" | "profileImageUrl" | "portfolioPublic" | "status" | "role" | "createdAt" | "updatedAt" | "termsVersion" | "termsAcceptedAt" | "ageConfirmedAt" | "termsAgreedAt" | "privacyVersion" | "privacyAgreedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   friendshipsLow?: boolean | Prisma.User$friendshipsLowArgs<ExtArgs>
   friendshipsHigh?: boolean | Prisma.User$friendshipsHighArgs<ExtArgs>
@@ -9670,6 +10579,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   communityRuleConsent?: boolean | Prisma.User$communityRuleConsentArgs<ExtArgs>
   communityPhotoCleanups?: boolean | Prisma.User$communityPhotoCleanupsArgs<ExtArgs>
   adRewardSessions?: boolean | Prisma.User$adRewardSessionsArgs<ExtArgs>
+  importantNoticeAcknowledgements?: boolean | Prisma.User$importantNoticeAcknowledgementsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -9713,6 +10623,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     communityRuleConsent: Prisma.$CommunityRuleConsentPayload<ExtArgs> | null
     communityPhotoCleanups: Prisma.$CommunityPhotoCleanupPayload<ExtArgs>[]
     adRewardSessions: Prisma.$AdRewardSessionPayload<ExtArgs>[]
+    importantNoticeAcknowledgements: Prisma.$ImportantNoticeAcknowledgementPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -9728,17 +10639,29 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     createdAt: Date
     updatedAt: Date
     /**
-     * Terms version of the signup screen this member completed (null: joined before 2026-10-21).
+     * Terms (이용약관) version of the signup screen this member completed (null: joined before 2026-10-21). Agreed by checkbox when termsAgreedAt is set; only shown in a notice when termsAcceptedAt is set.
      */
     termsVersion: string | null
     /**
-     * When signup completed on the screen showing termsVersion and its notice ("가입하면 … 동의한 것으로 봅니다"). Not a checkbox consent: there is no terms checkbox.
+     * Signups 2026-10-21 … before the 2026-11-13 checkboxes only: when signup completed on the screen showing termsVersion and its notice ("가입하면 … 동의한 것으로 봅니다"). Not a checkbox consent, never backfilled or reinterpreted, no longer written.
      */
     termsAcceptedAt: Date | null
     /**
-     * When signup completed with the required "만 16세 이상" box checked (the same server instant as termsAcceptedAt).
+     * When signup completed with the required "만 16세 이상" box checked (server time).
      */
     ageConfirmedAt: Date | null
+    /**
+     * Explicit consent (2026-11-13): when the member checked "[필수] 이용약관에 동의합니다" for termsVersion (server time). Null for earlier members.
+     */
+    termsAgreedAt: Date | null
+    /**
+     * Explicit consent (2026-11-13): the 개인정보처리방침 version the member checked "[필수] 개인정보처리방침에 동의합니다" for.
+     */
+    privacyVersion: string | null
+    /**
+     * Explicit consent (2026-11-13): when that box was checked (server time). Null for earlier members.
+     */
+    privacyAgreedAt: Date | null
   }, ExtArgs["result"]["user"]>
   composites: {}
 }
@@ -10168,6 +11091,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   communityRuleConsent<T extends Prisma.User$communityRuleConsentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityRuleConsentArgs<ExtArgs>>): Prisma.Prisma__CommunityRuleConsentClient<runtime.Types.Result.GetResult<Prisma.$CommunityRuleConsentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   communityPhotoCleanups<T extends Prisma.User$communityPhotoCleanupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$communityPhotoCleanupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CommunityPhotoCleanupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   adRewardSessions<T extends Prisma.User$adRewardSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$adRewardSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdRewardSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  importantNoticeAcknowledgements<T extends Prisma.User$importantNoticeAcknowledgementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$importantNoticeAcknowledgementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ImportantNoticeAcknowledgementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -10212,6 +11136,9 @@ export interface UserFieldRefs {
   readonly termsVersion: Prisma.FieldRef<"User", 'String'>
   readonly termsAcceptedAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly ageConfirmedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly termsAgreedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly privacyVersion: Prisma.FieldRef<"User", 'String'>
+  readonly privacyAgreedAt: Prisma.FieldRef<"User", 'DateTime'>
 }
     
 
@@ -11432,6 +12359,30 @@ export type User$adRewardSessionsArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   distinct?: Prisma.AdRewardSessionScalarFieldEnum | Prisma.AdRewardSessionScalarFieldEnum[]
+}
+
+/**
+ * User.importantNoticeAcknowledgements
+ */
+export type User$importantNoticeAcknowledgementsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ImportantNoticeAcknowledgement
+   */
+  select?: Prisma.ImportantNoticeAcknowledgementSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ImportantNoticeAcknowledgement
+   */
+  omit?: Prisma.ImportantNoticeAcknowledgementOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportantNoticeAcknowledgementInclude<ExtArgs> | null
+  where?: Prisma.ImportantNoticeAcknowledgementWhereInput
+  orderBy?: Prisma.ImportantNoticeAcknowledgementOrderByWithRelationInput | Prisma.ImportantNoticeAcknowledgementOrderByWithRelationInput[]
+  cursor?: Prisma.ImportantNoticeAcknowledgementWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ImportantNoticeAcknowledgementScalarFieldEnum | Prisma.ImportantNoticeAcknowledgementScalarFieldEnum[]
 }
 
 /**

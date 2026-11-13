@@ -168,7 +168,8 @@ describe('gesture adapters', () => {
   it('native: every start/end goes through the lifecycle session', () => {
     assert.ok(nativeGestureSource.includes('createChartGestureSession'));
     assert.ok(nativeGestureSource.includes("session.takeOver('pinch')"));
-    assert.ok(nativeGestureSource.includes("session.end('pan')"));
+    assert.ok(nativeGestureSource.includes('session.begin(panMode)'));
+    assert.ok(nativeGestureSource.includes('session.end(panMode)'));
     assert.ok(nativeGestureSource.includes("session.end(twoMode)"));
     assert.ok(nativeGestureSource.includes("session.end('crosshair')"));
     // The adapter must not call the chart's lifecycle callbacks directly any
@@ -177,11 +178,17 @@ describe('gesture adapters', () => {
     assert.ok(!/[^.]\bonGestureStart\(\)/.test(nativeGestureSource));
   });
 
-  it('native: one-finger vertical swipes still belong to the parent ScrollView', () => {
-    assert.ok(nativeGestureSource.includes('.activeOffsetX('));
-    assert.ok(nativeGestureSource.includes('.failOffsetY('));
+  it('native: a one-finger drag that starts on the chart is the chart’s, in any direction (2026-11-13)', () => {
+    // Activated by distance in any direction (below the scroll slop), not by a
+    // horizontal offset that would hand vertical drags to the screen.
+    assert.ok(nativeGestureSource.includes('.minDistance(CHART_PAN_ACTIVATION_PX)'));
+    assert.ok(!nativeGestureSource.includes('.activeOffsetX('));
+    assert.ok(!nativeGestureSource.includes('.failOffsetY('));
     assert.ok(nativeGestureSource.includes('.maxPointers(1)'));
+    assert.ok(nativeGestureSource.includes('Gesture.Tap()'), 'a tap pins / clears the crosshair');
     assert.ok(nativeGestureSource.includes('Gesture.Pinch()'), 'pinch zoom kept');
+    // Nothing turns the screen's scrolling off: only a drag that began on the chart is taken.
+    assert.ok(!/scrollEnabled|simultaneousWithExternalGesture|blocksExternalGesture/.test(nativeGestureSource));
   });
 
   it('web: wheel over the chart is consumed as zoom/pan, drag still pans', () => {
@@ -192,6 +199,7 @@ describe('gesture adapters', () => {
     assert.ok(webGestureSource.includes("handling === 'zoom'"));
     assert.ok(webGestureSource.includes("addEventListener('pointerdown'"), 'mouse drag pan kept');
     assert.ok(webGestureSource.includes("addEventListener('pointermove'"), 'hover crosshair kept');
+    assert.ok(webGestureSource.includes("node.style.touchAction = 'none'"), 'touch drags on the chart move the chart, not the page');
     assert.ok(webGestureSource.includes('wheel.end();'), 'mouse down closes any open wheel session');
   });
 

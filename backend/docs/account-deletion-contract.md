@@ -85,7 +85,7 @@
 | 커뮤니티 댓글 | 다른 회원 글에 남긴 `community_comments` | **삭제하지 않음**: 회원 연결(`user_id`)만 지우고 본문을 남겨 '탈퇴계정'으로 표시(그 아래 다른 회원의 답글·좋아요·신고 유지, §5.2) |
 | 커뮤니티 반응·동의 | 회원의 `community_post_likes`·`community_comment_likes`·`community_reports`·`community_post_aliases`·`community_rule_consents` | 삭제 |
 | 커뮤니티 제재 | 회원이 대상인 `community_sanctions` | 삭제. 진행 중이던 제재는 이메일 해시로 `community_sanction_carryovers`에 남김(§5.2) |
-| 알림 | `push_devices`, `notification_preferences`, 회원의 `push_notifications`(+`push_deliveries` cascade) | 삭제 |
+| 알림 | `push_devices`, `notification_preferences`, 회원의 `push_notifications`(+`push_deliveries` cascade), 공지 팝업 확인 기록 `important_notice_acknowledgements`(2026-11-13) | 삭제 |
 | 보상 | `season_rewards`, `reward_fulfillment_requests`(대상), `user_badges` | 삭제 |
 | 가상 투자 | 모든 투자계정(초보·일반·시즌)과 지갑·원장·견적·주문·포지션·환전·이체·FX 요청·광고 보상·선물 포지션/체결/요청/지정가/청산/시즌 정산·조건주문·LOC·보호 주문·진입 TP/SL·학습 확인·스냅샷 | 삭제(체결·청산 없이) |
 | 시즌 | 진행·대기·정산 전(`upcoming/active/ended`) 참가와 그 일별 순위 | 삭제 |

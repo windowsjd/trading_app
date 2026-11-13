@@ -3,9 +3,12 @@
 // covers every rule the gestures depend on.
 //
 // The viewport is a window over the ALREADY LOADED candle array:
-//   visibleCount — how many SLOTS fill the chart width,
+//   visibleCount — how many SLOTS fill the chart width (a whole number),
 //   rightOffset  — how many candles the window sits back from the newest one
-//                  (0 = latest candle is the rightmost one on screen).
+//                  (0 = latest candle is the rightmost one on screen). Since
+//                  2026-11-13 it is continuous: a drag moves the candles with
+//                  the finger pixel by pixel instead of a whole candle at a
+//                  time, so the candles at both edges can be partly visible.
 //
 // `visibleCount` counts SCREEN SLOTS, not candles, and is deliberately
 // independent of how much data exists: a 5m chart with 40 candles and a 1w
@@ -60,7 +63,7 @@ export function clampVisibleCount(
   return clamp(Math.round(visibleCount), MIN_VISIBLE_CANDLES, MAX_VISIBLE_CANDLES);
 }
 
-/** Keeps the window inside the data: 0 = latest, max = oldest. */
+/** Keeps the window inside the data: 0 = latest, max = oldest (continuous). */
 export function clampRightOffset(
   rightOffset: number,
   visibleCount: number,
@@ -70,8 +73,11 @@ export function clampRightOffset(
   const count = clampVisibleCount(visibleCount, total);
   const max = Math.max(0, total - count);
   if (!Number.isFinite(rightOffset)) return 0;
-  return clamp(Math.round(rightOffset), 0, max);
+  return clamp(rightOffset, 0, max);
 }
+
+/** Floating-point slack: a candle less than this far on screen counts as off it. */
+const EDGE_EPSILON = 1e-9;
 
 /**
  * Latest data at the default density. The slot count is the SAME for every
@@ -88,8 +94,9 @@ export function resetViewport(totalCount: number): CandleViewport {
   return createDefaultViewport(totalCount);
 }
 
+/** The newest candle is (at least partly) on screen. */
 export function isViewingLatest(viewport: CandleViewport): boolean {
-  return viewport.rightOffset <= 0;
+  return viewport.rightOffset < 1;
 }
 
 /** Normalizes any viewport against the current data length. */
@@ -105,9 +112,9 @@ export function clampViewport(
 }
 
 /**
- * REAL data indices on screen. With fewer candles than slots this returns the
- * whole data set (0 → totalCount); the leftover slots are empty space, never
- * fake indices.
+ * REAL data indices on screen, including a candle only partly visible at
+ * either edge. With fewer candles than slots this returns the whole data set
+ * (0 → totalCount); the leftover slots are empty space, never fake indices.
  */
 export function getVisibleIndexRange(
   totalCount: number,
@@ -116,9 +123,27 @@ export function getVisibleIndexRange(
   const total = safeTotal(totalCount);
   if (total === 0) return { startIndex: 0, endIndex: 0 };
   const { visibleCount, rightOffset } = clampViewport(viewport, total);
-  const endIndex = total - rightOffset;
-  const startIndex = Math.max(0, endIndex - visibleCount);
+  const end = total - rightOffset;
+  const endIndex = Math.min(total, Math.ceil(end - EDGE_EPSILON));
+  const startIndex = Math.max(0, Math.floor(end - visibleCount + EDGE_EPSILON));
   return { startIndex, endIndex };
+}
+
+/**
+ * Where `startIndex`'s candle sits, in slots from the plot's left edge:
+ * 0…−1 while the window is between whole candles (the candle is cut by the
+ * left edge), or the empty slots on the left of a short data set. Every
+ * candle is drawn at `slot(index) = firstSlot + index − startIndex`.
+ */
+export function getViewportFirstSlot(
+  totalCount: number,
+  viewport: CandleViewport,
+): number {
+  const total = safeTotal(totalCount);
+  if (total === 0) return 0;
+  const base = clampViewport(viewport, total);
+  const { startIndex } = getVisibleIndexRange(total, base);
+  return startIndex + base.visibleCount - total + base.rightOffset;
 }
 
 /** Visible range plus the render buffer, clamped to the data. */
@@ -148,13 +173,13 @@ export function panViewportByPixels(
   const base = clampViewport(viewport, totalCount);
   if (!Number.isFinite(translationX) || !Number.isFinite(slotWidth)) return base;
   if (slotWidth <= 0) return base;
-  // Rounded to whole candles: gestures pass the translation from their own
-  // start against a snapshot viewport, so there is no accumulated drift.
-  const movedCandles = Math.round(translationX / slotWidth);
+  // Pixel for pixel (2026-11-13): the candle under the finger stays under it.
+  // Gestures pass the translation from their own start against a snapshot
+  // viewport, so there is no accumulated drift.
   return {
     visibleCount: base.visibleCount,
     rightOffset: clampRightOffset(
-      base.rightOffset + movedCandles,
+      base.rightOffset + translationX / slotWidth,
       base.visibleCount,
       totalCount,
     ),
@@ -186,9 +211,10 @@ export function zoomViewportAtFocalPoint(
       ? clamp(focalX / innerWidth, 0, 1)
       : 0.5;
 
-  const { startIndex, endIndex } = getVisibleIndexRange(total, base);
-  // Fractional index under the focal point (measured from the window start).
-  const focalIndex = startIndex + ratio * (endIndex - startIndex);
+  // Continuous index under the focal point, counted in slots from the
+  // window's left edge (a short data set's empty slots included).
+  const end = total - base.rightOffset;
+  const focalIndex = end - base.visibleCount + ratio * base.visibleCount;
   const nextEndIndex = focalIndex + (1 - ratio) * nextVisibleCount;
 
   return {
@@ -221,7 +247,8 @@ export function isDefaultViewport(
 /**
  * Applies a data-length change (live candle appended, refetch, first load):
  *  - empty → default window,
- *  - viewing the latest → stay pinned to the newest candle,
+ *  - viewing the latest (the newest candle at least partly on screen) → stay
+ *    pinned to the newest candle,
  *  - viewing history → keep the SAME candles on screen by ageing rightOffset
  *    with the number of appended candles.
  */
@@ -237,7 +264,9 @@ export function adjustViewportForDataChange(
 
   const base = clampViewport(viewport, previous);
   if (isViewingLatest(base)) {
-    return clampViewport({ ...base, rightOffset: 0 }, next);
+    // Follows the newest candle, keeping a part-of-a-candle position as it is
+    // (no jump under a finger that just let go there).
+    return clampViewport(base, next);
   }
   const appended = next - previous;
   return clampViewport(

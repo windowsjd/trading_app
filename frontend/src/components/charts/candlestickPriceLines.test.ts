@@ -28,11 +28,12 @@ function setup(extra: Record<string, unknown> = {}) {
   const detector = adapter.render();
   adapter.flushEffects();
   const events = harness.attach(detector.props.gesture);
-  const pan = events.handlers.find((handler: any) => handler.config.activeOffsetXEnd)!;
+  // The one-finger chart drag (any direction since 2026-11-13); this test moves it sideways only.
+  const pan = events.handlers.find((handler: any) => handler.handlerName === 'PanGestureHandler' && handler.config.maxPointers === 1 && !handler.config.activateAfterLongPress)!;
   const panBy = (translationX: number) => {
     events.handlers.forEach((handler: any) => events.state(handler, UNDETERMINED, BEGAN));
     events.state(pan, BEGAN, ACTIVE);
-    events.update(pan, { translationX });
+    events.update(pan, { translationX, translationY: 0 });
     events.state(pan, ACTIVE, END);
     chart.render(); chart.flushEffects();
   };
