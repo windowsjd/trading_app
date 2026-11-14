@@ -91,7 +91,7 @@ if (
 
 const ANDROID_UNIT = 'ca-app-pub-7899930948413451/3165650506';
 const IOS_UNIT = 'ca-app-pub-7899930948413451/8170740188';
-const BANNER_UNIT = 'ca-app-pub-7899930948413451/9868671521';
+const BANNER_UNIT = 'ca-app-pub-7899930948413451/9687728183';
 Object.assign(process.env, {
   AD_REWARD_ENABLED: 'true',
   AD_REWARD_PROVIDER: 'admob',

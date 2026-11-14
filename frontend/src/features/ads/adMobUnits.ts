@@ -20,7 +20,7 @@ export const GOOGLE_TEST_UNITS = {
 
 export const TRADING_CLASS_UNITS = {
   rewarded: { android: 'ca-app-pub-7899930948413451/3165650506', ios: 'ca-app-pub-7899930948413451/8170740188' },
-  banner: { android: 'ca-app-pub-7899930948413451/9868671521', ios: 'ca-app-pub-7899930948413451/1842841847' },
+  banner: { android: 'ca-app-pub-7899930948413451/9687728183', ios: 'ca-app-pub-7899930948413451/1842841847' },
 } as const;
 
 export function adMobUnit(kind: AdUnitKind, platform: string, config: unknown, expoGo: boolean): string | null {

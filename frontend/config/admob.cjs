@@ -23,7 +23,7 @@ const PRODUCTION_UNITS = Object.freeze({
     ios: 'ca-app-pub-7899930948413451/8170740188',
   }),
   banner: Object.freeze({
-    android: 'ca-app-pub-7899930948413451/9868671521',
+    android: 'ca-app-pub-7899930948413451/9687728183',
     ios: 'ca-app-pub-7899930948413451/1842841847',
   }),
 });

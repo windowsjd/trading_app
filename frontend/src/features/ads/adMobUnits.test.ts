@@ -14,7 +14,7 @@ const sdkPackage = require('react-native-google-mobile-ads/package.json');
 /** The confirmed units (2026-11-07): rewarded and banner, per platform, never mixed. */
 const CONFIRMED = {
   rewarded: { android: 'ca-app-pub-7899930948413451/3165650506', ios: 'ca-app-pub-7899930948413451/8170740188' },
-  banner: { android: 'ca-app-pub-7899930948413451/9868671521', ios: 'ca-app-pub-7899930948413451/1842841847' },
+  banner: { android: 'ca-app-pub-7899930948413451/9687728183', ios: 'ca-app-pub-7899930948413451/1842841847' },
 };
 
 test('the confirmed production units, Google sample units, and their build-config copies agree', () => {
