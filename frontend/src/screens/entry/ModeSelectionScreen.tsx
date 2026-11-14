@@ -14,7 +14,7 @@ import { SafeAreaView } from '../../theme/safeArea';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
-import type { ModeSelectionScreenProps } from '../../app/navigation/types';
+import type { RootNavigationProp } from '../../app/navigation/types';
 import { resetToHome } from '../../app/navigation/seasonRouting';
 import CTAButton from '../../components/common/CTAButton';
 import ErrorState from '../../components/states/ErrorState';
@@ -78,7 +78,7 @@ const NEXT_SEASON_POLL_MS = 60_000;
  */
 export default function ModeSelectionScreen({
   navigation,
-}: ModeSelectionScreenProps) {
+}: { navigation: RootNavigationProp }) {
   const {
     accounts,
     isLoading: accountsLoading,
@@ -274,9 +274,9 @@ export default function ModeSelectionScreen({
                 <ActionPressable
                   key={account.id}
                   style={styles.pastRow}
-                  onPress={() => startWithAccount(account)}
+                  onPress={() => navigation.navigate('SeasonAccountHistory', { accountId: account.id })}
                   accessibilityRole="button"
-                  accessibilityLabel={`${display.title}, ${display.statusLabel}. 이 계정으로 시작`}
+                  accessibilityLabel={`${display.title}, ${display.statusLabel}. 기록 보기`}
                   testID={TEST_IDS.modeSelection.pastSeason(account.id)}
                 >
                   <View style={styles.pastRowText}>

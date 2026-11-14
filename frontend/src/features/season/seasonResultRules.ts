@@ -7,7 +7,7 @@ import { isShownFinalResult } from '../record/seasonFinalResult.ts';
  * 시즌최종결과 자동 표시 (2026-11-14): the rules SeasonResultAutoOpen follows,
  * pure so `node --test` covers them.
  *
- * Only the SELECTED season account is watched: its season ends (`ended`),
+ * Owned pending results remain watched after the operating selection moves away:
  * the server settles it (`settled`), and its final result has not been seen
  * (`finalResultViewedAt === null`, explicitly — an older server's absent field
  * is unknown, never "unseen"). The result read (`/records/me/seasons/:id/
@@ -77,4 +77,10 @@ export function isAtHomeRoot(root: NavState): boolean {
 /** A 시즌최종결과 screen is already on the root stack (opened by the member or by this). */
 export function hasFinalResultOnStack(root: NavState): boolean {
   return !!root?.routes.some((route) => route.name === 'SeasonFinalResult');
+}
+
+/** Preserve final-result guidance independently of the operating selection. */
+export function pendingResultAccount(accounts: readonly NonNullable<Account>[], selected: Account): Account {
+  return [...accounts].filter(account => unseenSettledSeason(account) || awaitsSettlement(account))
+    .sort((left, right) => Number(!!unseenSettledSeason(right)) - Number(!!unseenSettledSeason(left)) || (right.season?.endAt ?? '').localeCompare(left.season?.endAt ?? '') || left.id.localeCompare(right.id))[0] ?? selected;
 }

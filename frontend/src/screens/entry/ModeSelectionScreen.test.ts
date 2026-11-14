@@ -73,7 +73,8 @@ it('keeps loading, account/season retries, general-open failure and past-season 
   h.accounts = [general, { ...season, status: 'closed', season: { ...season.season, seasonStatus: 'settled' } }];
   h.season = { isSuccess: true, data: null }; tree = h.render(); assert.ok(find(tree, 'mode-selection-season-none'));
   assert.ok(find(tree, 'mode-selection-past-season-season')); find(tree, 'mode-selection-past-season-season').props.onPress();
-  assert.deepEqual(h.selections, ['season']); assert.equal(h.opens, 0);
+  assert.deepEqual(h.selections, []); assert.equal(h.opens, 0);
+  assert.deepEqual(h.navigation, [['SeasonAccountHistory', { accountId: 'season' }]]);
 });
 
 

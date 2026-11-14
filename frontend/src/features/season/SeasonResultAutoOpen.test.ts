@@ -63,6 +63,7 @@ function harness(t: any, options: { account?: unknown; enabled?: boolean; rival?
     '../tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({
         selectedAccount: h.account,
+        accounts: h.accounts ?? [],
         refetchAccounts: h.refetchAccounts,
       }),
     },
@@ -249,4 +250,15 @@ describe('시즌최종결과 자동 표시', () => {
     await signOut.wait(500);
     assert.deepEqual(signOut.opened(), []);
   });
+});
+
+it('still announces an owned unseen result after operating selection falls back to general', async t => {
+  const h = harness(t, { account: { id: 'general', mode: 'general', status: 'active', season: null } });
+  h.accounts = [seasonAccount('past', 'past-season', 'ended')];
+  h.afterAccountRead = () => { h.accounts = [seasonAccount('past', 'past-season', 'settled', null)]; };
+  await h.mount();
+  await h.tick(SETTLEMENT_POLL_MS);
+  await h.update();
+  assert.deepEqual(h.opened(), ['SeasonFinalResult:past-season']);
+  assert.equal(h.account.id, 'general');
 });

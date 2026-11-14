@@ -1,3 +1,4 @@
+import { isSwitchableAccount, type SelectableAccount } from '../tradingAccount/accountSelection.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 
 /**
@@ -41,8 +42,8 @@ export type AuthedEntryRoute = 'home' | 'mode_selection';
 /** How this session came to be authenticated. */
 export type AuthedEntryIntent = 'new_login' | 'session_restore';
 
-/** The only field the decision needs. Keeps this testable without the DTO. */
-export type EntryAccount = { id: string };
+/** Lifecycle fields reject historical stored choices; legacy ID-only callers remain supported. */
+export type EntryAccount = { id: string } & Partial<Omit<SelectableAccount, 'id'>>;
 
 export function resolveAuthedEntryRoute(
   intent: AuthedEntryIntent,
@@ -52,7 +53,7 @@ export function resolveAuthedEntryRoute(
   if (
     intent === 'session_restore' &&
     !!storedAccountId &&
-    (accounts ?? []).some((account) => account.id === storedAccountId)
+    (accounts ?? []).some((account) => account.id === storedAccountId && (account.mode !== 'season' || isSwitchableAccount(account as SelectableAccount)))
   ) {
     return 'home';
   }

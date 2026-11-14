@@ -207,6 +207,7 @@ export type RootStackParamList = {
    * current-price read). Showing a result records my first view of it.
    */
   SeasonFinalResult: { seasonId: string };
+  SeasonAccountHistory: { accountId: string };
 };
 
 type RootScreenProps<RouteName extends keyof RootStackParamList> =

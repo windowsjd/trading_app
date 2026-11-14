@@ -1,3 +1,5 @@
+import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { isSwitchableAccount } from '../../features/tradingAccount/accountSelection';
 import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform } from '../../theme/native';
@@ -18,6 +20,8 @@ import RecordMetric from './RecordMetric';
 
 export default function RecordSeasonDetailScreen({ route, navigation }: RecordSeasonDetailScreenProps) {
   const { seasonId } = route.params;
+  const { accounts } = useTradingAccount();
+  const historical = accounts.find(account => account.season?.seasonId === seasonId && !isSwitchableAccount(account));
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.record.seasonDetail(seasonId),
     queryFn: () => getMySeasonRecordDetail(seasonId),
@@ -71,6 +75,8 @@ export default function RecordSeasonDetailScreen({ route, navigation }: RecordSe
           {profitAnalysis.state !== 'available' ? <Text style={styles.helper}>총 손익을 확인할 수 없습니다. 수익 분석에서 확인 가능한 내역을 볼 수 있습니다.</Text> : null}
         </View>
         <View style={styles.actions}>
+          {settled ? <CTAButton variant="secondary" testID="record-season-final-result" label="시즌최종결과" onPress={() => navigation.navigate('SeasonFinalResult', { seasonId })} /> : null}
+          {historical ? <CTAButton variant="secondary" testID="record-season-account-history" label="보유자산·지갑 기록" onPress={() => navigation.navigate('SeasonAccountHistory', { accountId: historical.id })} /> : null}
           <CTAButton testID={TEST_IDS.record.seasonDetailProfitAnalysisCta} label="수익 분석" onPress={() => navigation.navigate('RecordProfitAnalysis', { seasonId })} style={styles.action} />
           <CTAButton variant="secondary" testID={TEST_IDS.record.seasonDetailOrdersCta} label="거래 내역 보기" onPress={() => navigation.navigate('TradeHistory', { seasonId })} style={styles.action} />
         </View>

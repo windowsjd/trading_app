@@ -38,6 +38,7 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
 
 function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`, guest = false, navigation: unknown = undefined, read: { isEmpty?: boolean; accountReadError?: unknown; retryAccountRead?: () => void } = {}) {
   const MainTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
+    '../../screens/entry/ModeSelectionScreen': { default: 'ModeSelectionScreen', __esModule: true },
     'react-native': { Text: 'Text', useWindowDimensions: () => ({ fontScale: 1 }) },
     'react-native-safe-area-context': {
       useSafeAreaInsets: () => ({ bottom: 0 }),
@@ -223,8 +224,8 @@ describe('mode-aware bottom tabs', () => {
     assert.deepEqual(calls, ['retry', JSON.stringify({ index: 0, routes: [{ name: 'Splash' }] })]);
 
     const empty: any = renderHostedTabs(null, false, 'light', false, 'x', false, navigation, { isEmpty: true });
-    assert.deepEqual([empty.type, empty.props.title, empty.props.message],
-      ['ErrorState', '사용할 계정이 없습니다.', '처음 화면에서 투자 모드를 다시 선택해주세요.']);
+    assert.equal(empty.type, 'ModeSelectionScreen');
+    assert.equal(empty.props.navigation === navigation, true);
     const unresolved: any = renderHostedTabs(null, false);
     assert.deepEqual([unresolved.type, unresolved.props.title], ['ErrorState', '계정 정보를 불러오지 못했습니다.']);
   });
@@ -392,15 +393,15 @@ it('beginner tabs run inside one quest guide keyed by the account, unlike other 
   };
   const updates = (host: any) => overlays(host).filter((child: any) => child?.type === 'AppUpdateNotice').length;
   const popup = (host: any) => overlays(host).filter((child: any) => child?.type === 'NoticePopupHost').map((child: any) => child.props.enabled);
-  // 시즌최종결과 opened on its own (2026-11-14): in the same slot, for a season account only.
+  // 시즌최종결과 opened on its own (2026-11-14): in the same slot, independently of the operating account mode.
   const seasonResult = (host: any) => overlays(host).filter((child: any) => child?.type === 'SeasonResultAutoOpen').map((child: any) => child.props.enabled);
   assert.equal(updates((renderHostedTabs('beginner') as any).props.children), 1);
   assert.deepEqual(popup((renderHostedTabs('beginner') as any).props.children), [true]);
-  assert.deepEqual(seasonResult((renderHostedTabs('beginner') as any).props.children), [false]);
+  assert.deepEqual(seasonResult((renderHostedTabs('beginner') as any).props.children), [true]);
   for (const mode of ['general', 'season'] as const) {
     assert.equal(updates(renderHostedTabs(mode)), 1);
     assert.deepEqual(popup(renderHostedTabs(mode)), [true]);
-    assert.deepEqual(seasonResult(renderHostedTabs(mode)), [mode === 'season']);
+    assert.deepEqual(seasonResult(renderHostedTabs(mode)), [true]);
   }
   const guestHost = (renderHostedTabs(null, false, 'light', false, 'guest', true) as any).props.children;
   assert.equal(updates(guestHost), 1);

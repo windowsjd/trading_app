@@ -107,3 +107,13 @@ for (const role of ['admin', 'user', 'operator']) {
     }
   });
 }
+
+it('MY season detail opens owned historical wallet records without changing the operating account', async t => {
+  const h = createRecordScreenHarness('detail'); t.after(h.close); await h.settle();
+  h.selectedAccount = h.accounts[1];
+  await h.press('record-season-account-history');
+  assert.deepEqual(h.navigation.at(-1), ['SeasonAccountHistory', { accountId: 'historical' }]);
+  assert.equal(h.selectedAccount.id, 'current');
+  await h.press('record-season-final-result');
+  assert.deepEqual(h.navigation.at(-1), ['SeasonFinalResult', { seasonId: 'record-0' }]);
+});

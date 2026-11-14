@@ -185,3 +185,10 @@ describe('loadEntryRoute', () => {
     );
   });
 });
+
+it('reopens mode selection when a restored choice is an ended or settled season', () => {
+  for (const seasonStatus of ['ended', 'settled'] as const) {
+    assert.equal(resolveAuthedEntryRoute('session_restore', [{ id: 'past', mode: 'season', status: 'active',
+      season: { seasonStatus } as never }], 'past'), 'mode_selection');
+  }
+});

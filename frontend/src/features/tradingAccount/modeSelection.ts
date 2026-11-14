@@ -22,7 +22,7 @@ import {
  *   - 시즌 투자 offers the season accounts the user is actually COMPETING in
  *     (`seasonContinue`), joining the current season when that is genuinely
  *     open to them (`seasonJoin`), and — separately, never as a default —
- *     their finished/settled season accounts (`seasonPast`), so a user whose
+ *     their finished/settled season records (`seasonPast`, dedicated read-only route), so a user whose
  *     seasons have all ended can still reach their own history without being
  *     forced to open an account they did not ask for.
  *

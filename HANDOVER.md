@@ -1,5 +1,24 @@
 # 프로젝트 인수인계서
 
+## 2026-11-14 — 계정 변경과 과거 시즌 기록 분리
+
+**기능 구현 의도: 운영 중인 투자계정 선택과 종료된 시즌 기록 열람을 분리하기 위함.**
+
+- 실제 원인: AccountSwitcher는 modeSelection의 seasonPast가 아니라 보유 accounts 전체를 map했다. 저장된 계정·fallback 역시 과거 시즌을 허용했다.
+- 계정 변경/기본 선택에는 기존 isParticipatingSeasonAccount 판정(계정 active + 시즌 active + 기존 참가 허용 상태)을 공유한다. ended/settled/제외·닫힌 시즌은 제외하고 일반·초보 계정 정책은 보존한다. 이름이 같은 season0도 ID와 서버 상태로 구분한다. 서버 보유 목록은 전혀 필터링하지 않는다.
+- 종료 계정이 저장돼 있으면 세션 복원 시 기존 모드 선택 화면을 연다. 사용 중 종료되면 기존 유효 계정으로 fallback하고, 유효 계정이 없으면 같은 모드 선택 화면을 제공한다. 계정 개설·시즌 참가는 사용자 버튼으로만 실행한다. 새 계정 생성 직후의 선택도 기존 refetch/선택 순서를 유지한다.
+- 신규 로그인은 기존 모드 선택과 미확인 최종 결과 버튼을 유지한다. 최종 결과 자동 안내는 선택 계정 대신 보유 계정의 미확인 결과/정산 대기를 감시한다. 일반·초보모드로 옮겨져도 안내를 유지하며 guest는 제외한다. 서버에서 settled + 명시적 viewedAt null + 표시 가능한 결과가 확인돼야 열고, 기존 overlay·가이드·중복 방지 규칙은 유지한다. ended 계정 목록도 polling하여 정산 완료를 읽는다.
+- MY → 시즌 전적 → 상세의 수익 분석·거래 내역은 유지한다. 같은 화면에 기존 시즌최종결과 및 보유자산·지갑 기록 진입을 연결했다. 로그인 선택 화면의 지난 시즌 기록도 같은 전용 경로를 사용한다.
+- SeasonAccountHistory는 route의 소유 accountId로만 기존 WalletStack(지갑·현물·선물 보유 내역·원장)을 재사용한다. HistoricalAccountProvider는 그 화면 하위에서만 읽기 주체를 덮어쓰고 현재 투자계정/저장값은 바꾸지 않는다. 거래 권한과 거래 화면 진입은 비활성화한다. 주문 내역은 기존 accountId/seasonId 고정 경로로 열며, 뒤로 가면 기존 투자계정 그대로다. 다른 회원 ID·운영 중 계정은 이 기록 경로에서 해석하지 않는다.
+- API/DB/서버/정산·랭킹·금융 데이터·보상은 변경하지 않았다. /api/v1 기존 계약의 소유자 조회(active/suspended/closed 읽기 허용)를 사용한다. 최종 자산·수익률은 기존 시즌 전적의 확정값이며, 지갑 화면은 기존 계정 조회값이다.
+
+변경 파일: `frontend/src/features/tradingAccount/{accountSelection.ts,accountSelection.test.ts,TradingAccountContext.tsx,TradingAccountContext.test.ts,HistoricalAccountProvider.test.ts,modeSelection.ts}`, `frontend/src/components/tradingAccount/{AccountSwitcher.tsx,AccountSwitcherSheet.test.ts,FuturesPositionsSection.tsx}`, `frontend/src/features/auth/{entry.ts,entry.test.ts}`, `frontend/src/features/season/{SeasonResultAutoOpen.tsx,SeasonResultAutoOpen.test.ts,seasonResultRules.ts}`, `frontend/src/screens/entry/{ModeSelectionScreen.tsx,ModeSelectionScreen.test.ts}`, `frontend/src/screens/record/{SeasonAccountHistoryScreen.tsx,RecordSeasonDetailScreen.tsx,recordPresentation.test.ts}`, `frontend/src/screens/wallet/WalletScreen.tsx`, `frontend/src/app/navigation/{MainTabs.tsx,MainTabs.test.ts,RootNavigator.tsx,types.ts}`, 이 인수인계서.
+
+검증: 관련 40개 파일 402개 테스트 PASS(계정 선택/목록 상태 전환/동일 이름/저장 선택/회원별 저장·세션 캐시/일반·초보·시즌 참가/조회 실패·재시도/최종 결과 안내/MY 전적·뱃지/주문·보유자산·지갑). `npm run typecheck`, `npm run lint:accounts:check`, `git diff --check` PASS. 테스트는 Node 24의 `--test-isolation=none`을 파일별 별도 실행하고, 자식까지 적용되는 NODE_OPTIONS 힙 한도와 전체 timeout을 적용했다. 여러 파일을 한 프로세스에서 실행한 초기 시도는 기존 전역 timer hook 충돌로 실패하여 파일별 격리로 검증했다. 실패를 성공으로 치환하거나 테스트를 skip/삭제하지 않았다. 신규·수정 단언은 작은 원시값/DTO만 사용하며 ReactTestInstance를 null/undefined와 직접 비교하지 않는다.
+
+남은 확인: 이 환경에 adb/iOS 실행 도구가 없어 실기기·에뮬레이터 화면/뒤로가기·전환 애니메이션은 미검증이다. 배포·EAS 빌드·운영 데이터 변경은 실행하지 않았다.
+
+
 ## 2026-11-14 — 랭킹 최종 랭킹 자격 안내 · 정산 완료 시 시즌최종결과 자동 표시 · 새 season0(일반 시즌) 생성 절차 · 시즌모드 홈 운영 기간 (main, 미커밋)
 
 - **기준/범위:** 시작 HEAD = `6d0a67ff`(작업 트리 깨끗, origin/main과 같음). frontend 3건 + backend 운영 CLI(동작 2개·모듈 1개·PG 러너·CI 단계) + 문서. **API·DB 스키마·마이그레이션 변경 없음.** **무변경:** 주문·체결·선물·청산·지갑·원장·환전·잔고·손익·시즌 최종 평가·최종 랭킹 산식·티어·보상·시세, 기존 launch(첫 출시) 경로와 그 CHECK/트리거, lifecycle/정산/랭킹 작업, 계정 목록 30초 폴링. **운영 DB에 시즌을 만들지 않았다**(읽기 전용 dry run만). 커밋·푸시·배포·환경 변수 변경 없음.

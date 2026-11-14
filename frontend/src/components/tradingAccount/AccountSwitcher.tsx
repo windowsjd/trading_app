@@ -1,3 +1,4 @@
+import { isSwitchableAccount } from '../../features/tradingAccount/accountSelection';
 import SeasonTitle from './SeasonTitle';
 import BeginnerAccountEntry from './BeginnerAccountEntry';
 import ModeEntryCard from './ModeEntryCard';
@@ -121,6 +122,7 @@ export default function AccountSwitcher({
   seasonPeriodCaps,
 }: Props) {
   const {
+    historyOnly,
     accounts,
     selectedAccount,
     selectedAccountId,
@@ -142,7 +144,7 @@ export default function AccountSwitcher({
     staleTime: 30_000,
   });
   // Use the same eligibility as ModeSelection. Loading/errors hide only this
-  // offer; the owned accounts remain selectable, including past seasons.
+  // offer; historical season accounts are opened through records.
   const { seasonJoin } = buildModeSelectionModel(
     accounts,
     seasonQuery.isSuccess ? seasonQuery.data : null,
@@ -160,6 +162,8 @@ export default function AccountSwitcher({
   // pretending to be a selectable account, and nothing financial is read
   // until the server has actually answered with the created account.
   const startGeneral = useOpenGeneralAccount({ onOpened: switched });
+
+  if (historyOnly) return <Text>지난 시즌 기록 · {selectedAccount?.season?.seasonName}</Text>;
 
   if (isLoading) {
     return (
@@ -286,7 +290,7 @@ export default function AccountSwitcher({
           <Text style={styles.sheetHelp}>
             계정마다 지갑, 보유 종목, 주문, 수익률이 완전히 분리되어 있습니다.
           </Text>
-          {accounts.map((account) => (
+          {accounts.filter(isSwitchableAccount).map((account) => (
             <AccountRow
               key={account.id}
               account={account}

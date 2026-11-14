@@ -116,7 +116,7 @@ describe('selectTradingAccountId', () => {
     assert.equal(selectTradingAccountId(accounts, null).accountId, 'g1');
   });
 
-  it('falls back to the most recently opened readable account', () => {
+  it('does not fall back to historical season accounts', () => {
     const accounts = [
       seasonAccount('s-2025', {
         status: 'closed',
@@ -129,8 +129,8 @@ describe('selectTradingAccountId', () => {
     ];
 
     assert.deepEqual(selectTradingAccountId(accounts, null), {
-      accountId: 's-2026',
-      reason: 'most_recent',
+      accountId: null,
+      reason: 'none',
     });
   });
 
@@ -143,8 +143,8 @@ describe('selectTradingAccountId', () => {
 
   it('is deterministic when two accounts share an openedAt', () => {
     const accounts = [
-      seasonAccount('b', { status: 'closed' }),
-      seasonAccount('a', { status: 'closed' }),
+      generalAccount('b'),
+      generalAccount('a'),
     ];
 
     const first = selectTradingAccountId(accounts, null).accountId;
@@ -152,6 +152,7 @@ describe('selectTradingAccountId', () => {
       .accountId;
 
     assert.equal(first, second, 'selection must not depend on input order');
+    assert.equal(first, 'a');
   });
 });
 
@@ -223,28 +224,27 @@ describe('selection never prefers a season that is no longer running (작업 10 
     });
   });
 
-  it('a stale season account is still REACHABLE as the most recent fallback', () => {
-    // It is readable history, just not the landing place. With no general
-    // account it must still be selected rather than leaving an empty state.
+  it('a stale season account requires an explicit record route', () => {
+    // Owned history remains readable, but is never an operating selection.
     const accounts = [
       seasonAccount('s-ended', { status: 'active', seasonStatus: 'ended' }),
     ];
 
     assert.deepEqual(selectTradingAccountId(accounts, null), {
-      accountId: 's-ended',
-      reason: 'most_recent',
+      accountId: null,
+      reason: 'none',
     });
   });
 
-  it('keeps a stored CLOSED account: an explicit choice outranks the policy', () => {
+  it('drops a stored historical account in favor of an existing general account', () => {
     const accounts = [
       seasonAccount('s-closed', { status: 'closed', seasonStatus: 'settled' }),
       generalAccount('g1'),
     ];
 
     assert.deepEqual(selectTradingAccountId(accounts, 's-closed'), {
-      accountId: 's-closed',
-      reason: 'stored',
+      accountId: 'g1',
+      reason: 'active_general',
     });
   });
 
@@ -289,4 +289,19 @@ describe('display ordering follows the same season-liveness rule', () => {
       ['g1', 's-ended'],
     );
   });
+});
+
+it('operational selection uses status and IDs even when every season has the same season0 name', () => {
+  const live = seasonAccount('live');
+  const beginner = { ...generalAccount('beginner'), mode: 'beginner' as const };
+  const past = ['ended', 'settled'].map(status => seasonAccount(status, { seasonStatus: status }));
+  const excluded = seasonAccount('excluded', { participantStatus: 'excluded' });
+  const accounts = [live, ...past, excluded, generalAccount('general'), beginner]
+    .map(account => account.season ? { ...account, season: { ...account.season, seasonName: 'season0' } } : account);
+  assert.equal(selectTradingAccountId(accounts, 'ended').accountId, 'live');
+  assert.equal(selectTradingAccountId(accounts, 'settled').accountId, 'live');
+  assert.equal(selectTradingAccountId(accounts, 'beginner').accountId, 'beginner');
+  assert.equal(selectTradingAccountId([...past, beginner], 'ended').accountId, 'beginner');
+  assert.equal(selectTradingAccountId(past, 'ended').accountId, null);
+  assert.equal(accounts.length, 6, 'owned records remain intact');
 });

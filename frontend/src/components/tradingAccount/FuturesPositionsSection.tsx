@@ -9,7 +9,7 @@ import ErrorState from '../states/ErrorState';
 import SectionSkeleton from '../states/SectionSkeleton';
 import InlineEmptyState from '../states/InlineEmptyState';
 
-type Props = { holdings: ReturnType<typeof useFuturesHoldings>; onOpen: (position: FuturesPosition) => void;
+type Props = { holdings: ReturnType<typeof useFuturesHoldings>; onOpen?: (position: FuturesPosition) => void;
   limit?: number; testID?: string };
 export default function FuturesPositionsSection({ holdings, onOpen, limit, testID = 'futures-positions' }: Props) {
   return <View testID={testID} style={styles.section}>
@@ -19,7 +19,7 @@ export default function FuturesPositionsSection({ holdings, onOpen, limit, testI
         : holdings.data.positions.length === 0 ? <InlineEmptyState title="포지션이 없습니다." testID={`${testID}-empty`} />
           : holdings.data.positions.slice(0, limit).map(position => <FuturesPositionRow key={position.id}
             testID={`${testID}-${position.id}`} position={futuresHolding(position)} evaluatedAt={holdings.data.evaluatedAt}
-            now={holdings.clock} onPress={() => onOpen(position)} />)}
+            now={holdings.clock} onPress={onOpen ? () => onOpen(position) : undefined} />)}
   </View>;
 }
 const styles = StyleSheet.create({

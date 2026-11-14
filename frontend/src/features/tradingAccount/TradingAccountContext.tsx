@@ -19,6 +19,7 @@ import {
   type TradingAccountsDto,
 } from './api';
 import {
+  isSwitchableAccount,
   selectTradingAccountId,
   sortAccountsForDisplay,
   type AccountSelectionReason,
@@ -59,6 +60,7 @@ import {
  */
 
 export type TradingAccountContextValue = {
+  historyOnly?: boolean;
   accounts: TradingAccountDto[];
   selectedAccountId: string | null;
   selectedAccount: TradingAccountDto | null;
@@ -135,7 +137,7 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
     queryFn: getTradingAccounts,
     enabled: !!userId,
     staleTime: 30_000,
-    refetchInterval: (query) => query.state.data?.accounts.some((account) => account.mode === 'season' && account.season?.seasonStatus === 'active') ? 30_000 : false,
+    refetchInterval: (query) => query.state.data?.accounts.some((account) => account.mode === 'season' && (account.season?.seasonStatus === 'active' || account.season?.seasonStatus === 'ended')) ? 30_000 : false,
   });
 
   const accounts = useMemo(
@@ -286,7 +288,7 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
       isEmpty:
         !accountsQuery.isLoading &&
         !selectionIsLoading &&
-        accounts.length === 0,
+        selection.accountId === null,
       accountReadError: accountsQuery.isError ? accountsQuery.error
         : meQuery.isError && !meQuery.data ? meQuery.error : null,
       retryAccountRead,
@@ -354,4 +356,15 @@ export async function clearTradingAccountSession(
   if (userId) {
     await clearSelectedAccountId(userId);
   }
+}
+
+/** Route-local historical subject: never changes or persists the operating account. */
+export function HistoricalAccountProvider({ accountId, children }: PropsWithChildren<{ accountId: string }>) {
+  const current = useTradingAccount();
+  const account = current.accounts.find(item => item.id === accountId && item.mode === 'season' && !isSwitchableAccount(item)) ?? null;
+  const capabilities = getTradingAccountCapabilities(account);
+  return <TradingAccountContext.Provider value={{ ...current, historyOnly: true, selectedAccountId: account?.id ?? null,
+    selectedAccount: account, capabilities: capabilities ? { ...capabilities, canTrade: false, canQuote: false, canCancelOrder: false, canExchange: false, canClaimAdReward: false } : null, isEmpty: !account }}>
+    {children}
+  </TradingAccountContext.Provider>;
 }

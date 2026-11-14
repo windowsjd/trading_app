@@ -132,3 +132,24 @@ it('switching accounts restarts the other tabs with the selection; the current a
   assert.deepEqual(tabs[1], { name: 'MarketTab' }, 'the season order form does not survive the switch');
   assert.deepEqual(tabs[0], { name: 'HomeTab', state: { routes: [{ name: 'Home' }] } }, 'the focused Home stays');
 });
+
+it('hides ended, settled and excluded accounts, including same-named seasons, without creating accounts', t => {
+  const accounts = [season,
+    { ...season, id: 'ended', season: { ...season.season, seasonId: 'old-1', seasonStatus: 'ended' } },
+    { ...season, id: 'settled', status: 'closed', season: { ...season.season, seasonId: 'old-2', seasonStatus: 'settled' } },
+    { ...season, id: 'excluded', season: { ...season.season, participantStatus: 'excluded' } },
+    { ...season, id: 'general', mode: 'general', season: null },
+    { ...season, id: 'beginner', mode: 'beginner', season: null }];
+  const h = setup(t, accounts);
+  const ids = () => h.renderer.root.findAll((node: any) => node.type === 'Pressable'
+    && String(node.props.testID).startsWith('trading-account-switcher-option-')).map((node: any) => node.props.testID);
+  assert.deepEqual(ids(), ['season-1', 'general', 'beginner'].map(TEST_IDS.tradingAccount.switcherOption));
+  accounts[0] = { ...season, season: { ...season.season, seasonStatus: 'ended' } };
+  h.rerender();
+  assert.deepEqual(ids(), ['general', 'beginner'].map(TEST_IDS.tradingAccount.switcherOption));
+  accounts[0] = { ...season, season: { ...season.season, seasonStatus: 'settled' } };
+  h.rerender();
+  assert.deepEqual(ids(), ['general', 'beginner'].map(TEST_IDS.tradingAccount.switcherOption));
+  assert.equal(h.starts + h.beginnerStarts, 0);
+  assert.deepEqual(h.selected, []);
+});

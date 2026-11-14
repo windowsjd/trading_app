@@ -151,20 +151,23 @@ it('updates selected-account CTA capability at start and end without a network r
   assert.equal(caps.canCancelOrder, true);
 });
 
-it('applies refreshed participant exclusion while keeping the same account and history', (t) => {
+it('drops excluded operating selection while retaining the owned record', async (t) => {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: start });
   const h = harness(account);
   t.after(h.dispose);
   assert.equal(h.render().capabilities?.canExchange, true);
+  await Promise.resolve();
+  await Promise.resolve();
+  h.render();
   h.setAccount({
     ...account,
     season: { ...account.season!, participantStatus: 'excluded' },
   });
   const value = h.render();
-  assert.equal(value.selectedAccountId, account.id);
-  assert.equal(value.capabilities?.tradeBlockReason, 'participant_excluded');
-  assert.equal(value.capabilities?.canExchange, false);
-  assert.equal(value.capabilities?.canCancelOrder, true);
+  assert.equal(value.selectedAccountId, null);
+  assert.equal(value.capabilities, null);
+  assert.equal(value.accounts[0].id, account.id);
+  assert.equal(value.isEmpty, true);
 });
 
 

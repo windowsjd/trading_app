@@ -1,4 +1,5 @@
 import React from 'react';
+import ModeSelectionScreen from '../../screens/entry/ModeSelectionScreen';
 import { useWindowDimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
@@ -66,6 +67,9 @@ export default function MainTabs(props: MainTabsScreenProps) {
   }
   // Loaded and still no account: the read failed, or came back without one. Never an
   // endless loader with no tab bar and no way out — say why, retry, or start over.
+  if (!guest && !account && isEmpty && !accountReadError) {
+    return <ModeSelectionScreen navigation={props.navigation} />;
+  }
   if (!guest && !account) {
     return (
       <ErrorState
@@ -247,7 +251,7 @@ export default function MainTabs(props: MainTabsScreenProps) {
       <EntryOverlayProvider>
         <AppUpdateNotice />
         <NoticePopupHost enabled={mode !== 'guest'} />
-        <SeasonResultAutoOpen enabled={mode === 'season'} />
+        <SeasonResultAutoOpen enabled={mode !== 'guest'} />
       </EntryOverlayProvider>
     </ScreenSheetHost>
   );

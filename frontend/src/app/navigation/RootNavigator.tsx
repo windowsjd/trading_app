@@ -1,4 +1,5 @@
 import React from 'react';
+import SeasonAccountHistoryScreen from '../../screens/record/SeasonAccountHistoryScreen';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { useAppearance } from '../../theme/appearance';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -80,6 +81,7 @@ export default function RootNavigator() {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.text,
         }} />
+        <Stack.Screen name="SeasonAccountHistory" component={SeasonAccountHistoryScreen} options={{ headerShown: true, title: '지난 시즌 보유자산·지갑 기록' }} />
         <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} layout={pushedRootLayout} options={stackTransition(reducedMotion, Platform.OS)} />
         <Stack.Screen name="SeasonFinalResult" component={SeasonFinalResultScreen} layout={pushedRootLayout} options={{
           ...stackTransition(reducedMotion, Platform.OS),

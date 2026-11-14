@@ -11,20 +11,9 @@ import type { TradingAccountDto } from './api';
  *
  * The ordering below is not arbitrary:
  *
- *   1. a stored choice that is STILL OWNED wins — switching accounts is an
- *      explicit user act, and an app restart is not one;
- *   2. otherwise the season the user is actually competing in, because that is
- *      the only account with a live leaderboard position;
- *   3. otherwise their general account;
- *   4. otherwise the most recently opened readable account, so a user whose
- *      seasons have all settled still lands on their own history instead of an
- *      empty screen;
- *   5. otherwise nothing — an explicit empty state, never a fabricated account.
- *
- * A stored id that is no longer owned is DROPPED rather than kept and retried:
- * it means the account was closed out of the list, the token now belongs to a
- * different user, or the id was never valid. Any of those must fall back, and
- * none of them should produce repeated 404s against another user's account.
+ * Stored and fallback choices use only operational season accounts. Historical
+ * season accounts stay owned and readable through the dedicated record route.
+ * Standalone account selection and creation policy are unchanged.
  */
 
 export type SelectableAccount = Pick<
@@ -86,8 +75,7 @@ function isActive(account: SelectableAccount) {
  * account behind by definition of the failure. Preferring either over a live
  * general account lands the user on a frozen leaderboard position, with no
  * trading possible, while the account they can actually use sits one tap away.
- * "Most recently opened" (rule 4) still reaches those accounts — they are
- * readable history, just not the natural landing place.
+ * Those accounts remain readable through the dedicated historical route.
  */
 export function isParticipatingSeasonAccount(account: SelectableAccount) {
   return (
@@ -99,10 +87,16 @@ export function isParticipatingSeasonAccount(account: SelectableAccount) {
   );
 }
 
+/** Operational choices only; historical accounts remain in the owned list for records. */
+export function isSwitchableAccount(account: SelectableAccount) {
+  return account.mode !== 'season' || isParticipatingSeasonAccount(account);
+}
+
 export function selectTradingAccountId(
   accounts: readonly SelectableAccount[],
   storedAccountId: string | null | undefined,
 ): AccountSelectionResult {
+  accounts = accounts.filter(isSwitchableAccount);
   if (accounts.length === 0) {
     return { accountId: null, reason: 'none' };
   }

@@ -72,6 +72,7 @@ type AccountWalletProps = {
 
 function AccountWallet({ account, capabilities, navigation }: AccountWalletProps) {
   const accountId = account.id;
+  const { historyOnly } = useTradingAccount();
   const guide = useQuestGuide();
   const transferGate = useLearningAccess(accountId).gate('transfer');
   const rootNavigation = useRootNavigation();
@@ -317,7 +318,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                       key={position.positionId}
                       testID={`wallet-position-${position.assetId}`}
                       position={position}
-                      onPress={() => rootNavigation.navigate('MainTabs', openInMarketTab('AssetDetail', { assetId: position.assetId, returnTab: 'WalletTab' }))}
+                      onPress={historyOnly ? undefined : () => rootNavigation.navigate('MainTabs', openInMarketTab('AssetDetail', { assetId: position.assetId, returnTab: 'WalletTab' }))}
                     />
                   ))}
             {positions ? positionsQuery.data?.valuationErrors?.map((failure, index) => (
@@ -325,7 +326,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             )) : null}
           </View>
           <FuturesPositionsSection holdings={futures} testID="wallet-futures"
-            onOpen={position => rootNavigation.navigate('MainTabs', openInMarketTab('Futures', { accountId, instrumentId: position.instrumentId }))} />
+            onOpen={historyOnly ? undefined : position => rootNavigation.navigate('MainTabs', openInMarketTab('Futures', { accountId, instrumentId: position.instrumentId }))} />
         </View>
       ) : null}
     </ScrollView>

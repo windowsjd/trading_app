@@ -15,6 +15,7 @@ import {
   RESULT_RETRY_MS,
   SETTLEMENT_POLL_MS,
   awaitsSettlement,
+  pendingResultAccount,
   canAutoOpen,
   hasFinalResultOnStack,
   isAtHomeRoot,
@@ -57,11 +58,10 @@ function useAppActive() {
 
 /**
  * 시즌최종결과 자동 표시 (2026-11-14), inside MainTabs beside the 업데이트
- * 안내 and the 공지 팝업, for a signed-in member's SELECTED season account.
+ * 안내 and the 공지 팝업, for a signed-in member's owned pending season result.
  *
  * - While that season awaits settlement (`ended`), the owned list is re-read
- *   every 30 s with the app in front (the provider polls only `active`
- *   seasons, so `ended → settled` was never seen without signing in again).
+ *   every 30 s with the app in front, independently of operating selection.
  *   Coming back to the front re-reads it at once.
  * - Once the server reports it settled with the result unseen (explicit
  *   null), the result is read; only a shown, unseen result of that very
@@ -75,10 +75,10 @@ function useAppActive() {
  *   read shows nothing and blocks nothing; it is retried a few times.
  */
 export default function SeasonResultAutoOpen({ enabled }: { enabled: boolean }) {
-  const { selectedAccount, refetchAccounts } = useTradingAccount();
+  const { selectedAccount, accounts = [], refetchAccounts } = useTradingAccount();
   const me = useQuery<MeDto>({ queryKey: QUERY_KEYS.me, enabled: false }).data;
   const userId = enabled ? (me?.id ?? null) : null;
-  const account = userId ? selectedAccount : null;
+  const account = userId ? pendingResultAccount(accounts, selectedAccount) : null;
   const guiding = !!useQuestGuide()?.active;
   const { atHome, resultOpen } = useRootPlaces();
   const appActive = useAppActive();
