@@ -79,6 +79,7 @@ function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearanc
     '../../components/common/ScreenSheetHost': { ScreenSheetHost: 'ScreenSheetHost' },
     '../../features/appRelease/AppUpdateNotice': { default: 'AppUpdateNotice', __esModule: true },
     '../../features/notice/NoticePopupHost': { default: 'NoticePopupHost', __esModule: true },
+    '../../features/season/SeasonResultAutoOpen': { default: 'SeasonResultAutoOpen', __esModule: true },
     '../../features/entryOverlay/EntryOverlaySlot': { EntryOverlayProvider: 'EntryOverlayProvider' },
     '../../features/auth/guestBrowsing': { isGuestBrowsing: () => guest },
     ...Object.fromEntries(
@@ -391,15 +392,20 @@ it('beginner tabs run inside one quest guide keyed by the account, unlike other 
   };
   const updates = (host: any) => overlays(host).filter((child: any) => child?.type === 'AppUpdateNotice').length;
   const popup = (host: any) => overlays(host).filter((child: any) => child?.type === 'NoticePopupHost').map((child: any) => child.props.enabled);
+  // 시즌최종결과 opened on its own (2026-11-14): in the same slot, for a season account only.
+  const seasonResult = (host: any) => overlays(host).filter((child: any) => child?.type === 'SeasonResultAutoOpen').map((child: any) => child.props.enabled);
   assert.equal(updates((renderHostedTabs('beginner') as any).props.children), 1);
   assert.deepEqual(popup((renderHostedTabs('beginner') as any).props.children), [true]);
+  assert.deepEqual(seasonResult((renderHostedTabs('beginner') as any).props.children), [false]);
   for (const mode of ['general', 'season'] as const) {
     assert.equal(updates(renderHostedTabs(mode)), 1);
     assert.deepEqual(popup(renderHostedTabs(mode)), [true]);
+    assert.deepEqual(seasonResult(renderHostedTabs(mode)), [mode === 'season']);
   }
   const guestHost = (renderHostedTabs(null, false, 'light', false, 'guest', true) as any).props.children;
   assert.equal(updates(guestHost), 1);
   assert.deepEqual(popup(guestHost), [false]);
+  assert.deepEqual(seasonResult(guestHost), [false]);
 });
 it('even switching two season accounts resets nested navigation by account id', () => {
   assert.notEqual(renderTabs('season', false, 'light', false, 'season-one').key, renderTabs('season', false, 'light', false, 'season-two').key);

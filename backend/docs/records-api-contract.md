@@ -279,6 +279,7 @@ Records that the owner saw the final result: `season_participants.final_result_v
 - Idempotent: the update matches only a NULL column (`UPDATE … WHERE final_result_viewed_at IS NULL`, default isolation, so a concurrent first view matches no row instead of failing), then the stored instant is read back and returned. Repeated calls return the first instant.
 - `200 { "success": true, "data": { "seasonId": "season-id", "viewedAt": "2026-10-02T01:02:03.000Z" } }`.
 - The owned trading-account list (`GET /api/v1/trading-accounts`) carries the same instant as `season.finalResultViewedAt` (`null` until viewed) so account selection can choose between `시즌결과 확인하기` and the next-season action without another request.
+- App use (2026-11-14, no contract change): while a member stays signed in on a season account whose season is `ended`, the app re-reads the owned list every 30 s in the foreground (and on returning to the foreground); when it becomes `settled` with `finalResultViewedAt === null` it reads `GET …/final-result` and, only for a shown state (`available`/`not_qualified`/`excluded`) of that same season with `viewedAt === null`, opens 시즌최종결과 once on Home's first screen. The screen then calls this POST after showing the result.
 
 ### Error Codes
 

@@ -554,6 +554,19 @@ jobs:
           PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE season0_launch_test'
           pnpm exec prisma migrate deploy
           pnpm run integration:launch-season
+      # Regular seasons (docs/season-schedule-operations.md): a new season0
+      # beside a settled one with the same name, real CLI plan/apply + audit,
+      # lifecycle activation, one initial grant, independent settlement.
+      - name: Regular season schedule PostgreSQL integration
+        if: ${{ !cancelled() }}
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/season_schedule_test?schema=public
+          NODE_ENV: test
+          SEASON_SCHEDULE_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE season_schedule_test'
+          pnpm exec prisma migrate deploy
+          pnpm run integration:season-schedule
       - name: Active administrator concurrency PostgreSQL integration
         if: ${{ !cancelled() }}
         env:

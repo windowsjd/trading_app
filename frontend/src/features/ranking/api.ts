@@ -210,6 +210,47 @@ async function requestRankings(
   return response.data.data;
 }
 
+/**
+ * My own final-ranking eligibility in one season (backend
+ * docs/season-final-ranking-eligibility.md §7). Read-only; the verdict is the
+ * server's — `features/ranking/qualification.ts` decides what may be shown.
+ */
+export interface RankingQualificationDto {
+  state: 'available' | 'not_applicable' | 'not_joined' | 'unavailable';
+  season: {
+    id: string;
+    name: string;
+    displayBadge?: 'beta';
+    status: SeasonStatus;
+    startAt: IsoDateTimeString;
+    endAt: IsoDateTimeString;
+  } | null;
+  basis: 'provisional' | 'final' | null;
+  asOf: IsoDateTimeString | null;
+  criteria: {
+    minTradedInstrumentCount: number;
+    minTurnoverRatio: string;
+    minRecognizedTurnoverKrw: MoneyString;
+  } | null;
+  tradedInstrumentCount: number | null;
+  recognizedTurnoverKrw: MoneyString | null;
+  remainingTradedInstrumentCount: number | null;
+  remainingRecognizedTurnoverKrw: MoneyString | null;
+  tradedInstrumentRequirementMet: boolean | null;
+  turnoverRequirementMet: boolean | null;
+  qualified: boolean | null;
+  reason?: string;
+  message?: string;
+}
+
+export async function getRankingQualification(seasonId: string, signal?: AbortSignal) {
+  const response = await apiClient.get<ApiSuccessResponse<RankingQualificationDto>>(
+    `/ranking/qualification?seasonId=${encodeURIComponent(seasonId)}`,
+    { signal },
+  );
+  return response.data.data;
+}
+
 export async function getUserSeasonSummary(
   userId: string,
   signal?: AbortSignal,

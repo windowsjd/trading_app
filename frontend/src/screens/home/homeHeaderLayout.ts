@@ -69,6 +69,50 @@ export function homeHeaderLayout(width: number, fontScale: number, mode: HomeHea
   return { iconOnly, titleMaxWidth, titleFontCap, changeFontCap: 1 };
 }
 
+/**
+ * A season account's period under its name (2026-11-14): `2026.11.14 ~
+ * 2026.11.29`, 12/16 in the secondary color, inside the same 44dp control as
+ * the name and 계정변경. Two lines must stay inside the platform's own header
+ * bar — the native bar does not grow on iOS (UINavigationBar, 44pt) and the
+ * Android toolbar is 56dp tall — so the name's line is 24 and both lines
+ * scale only as far as they still fit that height (iOS 1.1x, Android 1.4x;
+ * system bars do not follow very large text either). The period also never
+ * wraps beside 계정변경: its scale gives way first. Nothing is cut or hidden.
+ */
+export const HOME_SEASON_PERIOD_FONT_SIZE = 12;
+export const HOME_SEASON_PERIOD_LINE_HEIGHT = 16;
+export const HOME_SEASON_TITLE_LINE_HEIGHT_WITH_PERIOD = 24;
+/** Header bar heights the two lines fit: iOS UINavigationBar, Android toolbar, web (elements) header. */
+export const HOME_HEADER_BAR_HEIGHT = { ios: 44, android: 56, web: 64 } as const;
+
+/** Estimated width of the period line at a scale: digits and `~` ~0.6em, `.` and spaces ~0.32em, plus per-glyph slack. */
+export function homeSeasonPeriodWidth(text: string, scale: number) {
+  const size = HOME_SEASON_PERIOD_FONT_SIZE * scale;
+  let width = 0;
+  for (const char of text) width += (/[\d~]/u.test(char) ? 0.6 : 0.32) * size + GLYPH_SLACK;
+  return Math.ceil(width);
+}
+
+const floorTenth = (value: number) => Math.floor(value * 10 + 1e-9) / 10;
+
+export function homeSeasonHeaderLayout(width: number, fontScale: number, platform: string, periodText: string) {
+  const base = homeHeaderLayout(width, fontScale, 'season');
+  const bar = HOME_HEADER_BAR_HEIGHT[platform as keyof typeof HOME_HEADER_BAR_HEIGHT] ?? HOME_HEADER_BAR_HEIGHT.android;
+  const heightCap = Math.max(1, floorTenth(bar / (HOME_SEASON_TITLE_LINE_HEIGHT_WITH_PERIOD + HOME_SEASON_PERIOD_LINE_HEIGHT)));
+  // The period shares the title's column, beside the 계정변경 chip.
+  const room = base.titleMaxWidth - homeAccountChangeWidth(Math.min(Math.max(fontScale || 1, 1), base.changeFontCap));
+  let periodFontCap = 1;
+  for (let cap = 1.1; cap <= heightCap + 1e-9; cap += 0.1)
+    if (homeSeasonPeriodWidth(periodText, cap) <= room) periodFontCap = Math.round(cap * 10) / 10;
+  return {
+    ...base,
+    titleFontCap: Math.min(base.titleFontCap, heightCap),
+    periodFontCap,
+    /** The two lines at their caps (for the bar-height check). */
+    periodRoom: room,
+  };
+}
+
 /** The badge counts quests not yet completed; none (or unknown progress) hides it. */
 export function questBadgeCount(total: number, completed: number | null): number | null {
   if (completed === null) return null;

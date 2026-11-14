@@ -15,7 +15,8 @@ export default function SeasonTitle({ name, displayBadge, style, containerStyle,
     <Text testID={testID} numberOfLines={numberOfLines} maxFontSizeMultiplier={maxFontSizeMultiplier} style={[{ flexShrink: 1, minWidth: 0, maxWidth: '100%' }, style]}>{name}</Text>
     {displayBadge === 'beta' ? <View testID={testID ? `${testID}-beta` : undefined} accessible={false}
       style={{ backgroundColor: '#565B63', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2, minHeight: 20, justifyContent: 'center' }}>
-      <Text style={{ color: '#FFFFFF', fontSize: 11, lineHeight: 14 }}>beta</Text>
+      {/* The same cap as the name: in Home's header the pill must not outgrow the bar either. */}
+      <Text maxFontSizeMultiplier={maxFontSizeMultiplier} style={{ color: '#FFFFFF', fontSize: 11, lineHeight: 14 }}>beta</Text>
     </View> : null}
   </View>;
 }

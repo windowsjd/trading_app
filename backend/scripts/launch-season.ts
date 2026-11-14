@@ -22,6 +22,10 @@ import {
   planLaunchTestCleanup,
 } from '../src/seasons/launch-test-cleanup';
 import {
+  prepareScheduledSeason,
+  rescheduleScheduledSeason,
+} from '../src/seasons/scheduled-season.operations';
+import {
   describeDatabaseTarget,
   formatDatabaseTarget,
   loadRuntimeEnv,
@@ -35,6 +39,15 @@ export type LaunchRequest = {
   startAt?: string;
   kind?: 'test' | 'release';
   testUserIds?: string[];
+  // Regular seasons (prepare-season / reschedule-season,
+  // docs/season-schedule-operations.md): KST operating days, end derived.
+  name?: string;
+  firstDayKst?: string;
+  lastDayKst?: string;
+  initialCapitalKrw?: string;
+  minTradedInstruments?: string;
+  minTurnoverRatio?: string;
+  feeSourceSeasonId?: string;
 };
 const ACTIONS = [
   'prepare',
@@ -45,6 +58,8 @@ const ACTIONS = [
   'stop-test',
   'restore-development',
   'cleanup-test',
+  'prepare-season',
+  'reschedule-season',
 ];
 export async function executeLaunchRequest(
   tx: Prisma.TransactionClient,
@@ -87,6 +102,10 @@ export async function executeLaunchRequest(
       const plan = await planLaunchTestCleanup(tx, request.seasonId, now);
       return apply ? applyLaunchTestCleanup(tx, plan, now) : plan;
     }
+    case 'prepare-season':
+      return prepareScheduledSeason(tx, request, now, apply);
+    case 'reschedule-season':
+      return rescheduleScheduledSeason(tx, request, now, apply);
     default:
       throw new Error('Unknown launch action.');
   }
@@ -115,7 +134,16 @@ export async function inspectLaunchRequest(
   const before = await tx.season.findMany({
     where: {
       OR: [
-        { id: { in: [DEVELOPMENT_SEASON_ID, request.seasonId] } },
+        {
+          id: {
+            in: [
+              DEVELOPMENT_SEASON_ID,
+              request.seasonId,
+              // A regular season copies its fees: a fee change voids the plan.
+              ...(request.feeSourceSeasonId ? [request.feeSourceSeasonId] : []),
+            ],
+          },
+        },
         { status: { in: ['active', 'upcoming'] }, suspendedAt: null },
       ],
     },
@@ -159,6 +187,107 @@ export function launchPlanFingerprint(
     .digest('hex');
 }
 
+export type ApprovedLaunchPlan = {
+  version: number;
+  environment: unknown;
+  request: LaunchRequest;
+  fingerprint: string;
+};
+
+/** The READ ONLY dry run: what --out stores for review (no audit row, no write). */
+export async function planLaunchRequest(
+  db: PrismaService,
+  environment: unknown,
+  request: LaunchRequest,
+) {
+  const inspection = await db.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+      return inspectLaunchRequest(tx, request);
+    },
+    { isolationLevel: 'RepeatableRead', timeout: 60_000 },
+  );
+  return {
+    version: 1,
+    environment,
+    request,
+    inspection,
+    fingerprint: launchPlanFingerprint(environment, request, inspection),
+  };
+}
+
+/**
+ * Applies exactly the reviewed plan's request, in one transaction under the
+ * season administration lock, only while the target DB, the scope and every
+ * counted row still match the reviewed fingerprint; the audit row commits
+ * with the change.
+ */
+export async function applyLaunchPlan(
+  db: PrismaService,
+  environment: { host: string; port: string; database: string },
+  approved: ApprovedLaunchPlan,
+  options: { backupRef: string; confirm?: string; workersStopped?: boolean },
+) {
+  if (
+    approved.version !== 1 ||
+    canonical(approved.environment) !== canonical(environment)
+  )
+    throw new Error('Plan DB identity mismatch.');
+  const request = approved.request;
+  const confirmation = `${environment.host}:${environment.port}/${environment.database}/${request.seasonId}`;
+  if (options.confirm !== confirmation)
+    throw new Error(`Explicit --confirm must equal ${confirmation}`);
+  if (request.action === 'cleanup-test' && !options.workersStopped)
+    throw new Error(
+      'Cleanup requires verified worker shutdown/drain and --workers-stopped.',
+    );
+  return db.$transaction(
+    async (tx) => {
+      if (request.action === 'cleanup-test')
+        await lockLaunchTestCleanupQuotes(tx, request.seasonId);
+      await lockSeasonAdministration(tx, request.seasonId);
+      if (request.action === 'cleanup-test')
+        await lockLaunchTestCleanupAccounts(tx, request.seasonId);
+      const inspection = await inspectLaunchRequest(tx, request);
+      if (
+        launchPlanFingerprint(environment, request, inspection) !==
+        approved.fingerprint
+      )
+        throw new Error(
+          'Scope/configuration/counts changed since approval. Generate and review a fresh plan.',
+        );
+      const applied = await executeLaunchRequest(tx, request, true);
+      await new OperatorAuditService(db).recordSuccess(
+        {
+          actorUserId: inspection.actor.id,
+          actorRole: inspection.actor.role,
+          action: `launch_season.${request.action}`,
+          targetType: 'launch_season',
+          targetId: request.seasonId,
+          metadataJson: {
+            planFingerprint: approved.fingerprint,
+            backupRef: options.backupRef,
+            result: JSON.parse(canonical(applied)) as Prisma.InputJsonValue,
+          },
+        },
+        tx,
+      );
+      return applied;
+    },
+    { timeout: 60_000, maxWait: 10_000 },
+  );
+}
+
+const REGULAR_SEASON_OPTIONS = [
+  ['--name', 'name'],
+  ['--first-day-kst', 'firstDayKst'],
+  ['--last-day-kst', 'lastDayKst'],
+  ['--initial-capital-krw', 'initialCapitalKrw'],
+  ['--min-traded-instruments', 'minTradedInstruments'],
+  ['--min-turnover-ratio', 'minTurnoverRatio'],
+  ['--fee-source-season-id', 'feeSourceSeasonId'],
+] as const;
+
 function flags(argv: string[]) {
   const result = new Map<string, string>();
   for (let i = 0; i < argv.length; i++) {
@@ -189,6 +318,13 @@ function flags(argv: string[]) {
         '--confirm',
         '--backup-ref',
         '--workers-stopped',
+        '--name',
+        '--first-day-kst',
+        '--last-day-kst',
+        '--initial-capital-krw',
+        '--min-traded-instruments',
+        '--min-turnover-ratio',
+        '--fee-source-season-id',
       ].includes(key)
     )
       throw new Error(`Unknown option ${key}`);
@@ -226,21 +362,13 @@ async function main(argv: string[]) {
                 .filter(Boolean),
             }
           : {}),
+        ...Object.fromEntries(
+          REGULAR_SEASON_OPTIONS.filter(([flag]) => args.has(flag)).map(
+            ([flag, field]) => [field, args.get(flag)],
+          ),
+        ),
       };
-      const inspection = await db.$transaction(
-        async (tx) => {
-          await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-          return inspectLaunchRequest(tx, request);
-        },
-        { isolationLevel: 'RepeatableRead', timeout: 60_000 },
-      );
-      const plan = {
-        version: 1,
-        environment,
-        request,
-        inspection,
-        fingerprint: launchPlanFingerprint(environment, request, inspection),
-      };
+      const plan = await planLaunchRequest(db, environment, request);
       if (!args.get('--out'))
         throw new Error('An --out plan path is required.');
       writeFileSync(args.get('--out')!, JSON.stringify(plan, null, 2) + '\n', {
@@ -252,60 +380,14 @@ async function main(argv: string[]) {
     }
     if (!args.get('--plan') || !args.get('--backup-ref'))
       throw new Error('Apply requires the reviewed --plan and --backup-ref.');
-    const approved = JSON.parse(readFileSync(args.get('--plan')!, 'utf8')) as {
-      version: number;
-      environment: unknown;
-      request: LaunchRequest;
-      fingerprint: string;
-    };
-    if (
-      approved.version !== 1 ||
-      canonical(approved.environment) !== canonical(environment)
-    )
-      throw new Error('Plan DB identity mismatch.');
-    const request = approved.request;
-    const confirmation = `${environment.host}:${environment.port}/${environment.database}/${request.seasonId}`;
-    if (args.get('--confirm') !== confirmation)
-      throw new Error(`Explicit --confirm must equal ${confirmation}`);
-    if (request.action === 'cleanup-test' && !args.has('--workers-stopped'))
-      throw new Error(
-        'Cleanup requires verified worker shutdown/drain and --workers-stopped.',
-      );
-    const result = await db.$transaction(
-      async (tx) => {
-        if (request.action === 'cleanup-test')
-          await lockLaunchTestCleanupQuotes(tx, request.seasonId);
-        await lockSeasonAdministration(tx, request.seasonId);
-        if (request.action === 'cleanup-test')
-          await lockLaunchTestCleanupAccounts(tx, request.seasonId);
-        const inspection = await inspectLaunchRequest(tx, request);
-        if (
-          launchPlanFingerprint(environment, request, inspection) !==
-          approved.fingerprint
-        )
-          throw new Error(
-            'Scope/configuration/counts changed since approval. Generate and review a fresh plan.',
-          );
-        const applied = await executeLaunchRequest(tx, request, true);
-        await new OperatorAuditService(db).recordSuccess(
-          {
-            actorUserId: inspection.actor.id,
-            actorRole: inspection.actor.role,
-            action: `launch_season.${request.action}`,
-            targetType: 'launch_season',
-            targetId: request.seasonId,
-            metadataJson: {
-              planFingerprint: approved.fingerprint,
-              backupRef: args.get('--backup-ref'),
-              result: JSON.parse(canonical(applied)) as Prisma.InputJsonValue,
-            },
-          },
-          tx,
-        );
-        return applied;
-      },
-      { timeout: 60_000, maxWait: 10_000 },
-    );
+    const approved = JSON.parse(
+      readFileSync(args.get('--plan')!, 'utf8'),
+    ) as ApprovedLaunchPlan;
+    const result = await applyLaunchPlan(db, environment, approved, {
+      backupRef: args.get('--backup-ref')!,
+      confirm: args.get('--confirm'),
+      workersStopped: args.has('--workers-stopped'),
+    });
     console.log(JSON.stringify(result, null, 2));
   } finally {
     await db.$disconnect();

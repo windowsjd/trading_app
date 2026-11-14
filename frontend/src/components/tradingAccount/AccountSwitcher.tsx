@@ -9,6 +9,9 @@ import {
   HOME_ACCOUNT_CHANGE_FONT_SIZE,
   HOME_ACCOUNT_CHANGE_LABEL,
   HOME_ACCOUNT_CHANGE_PADDING,
+  HOME_SEASON_PERIOD_FONT_SIZE,
+  HOME_SEASON_PERIOD_LINE_HEIGHT,
+  HOME_SEASON_TITLE_LINE_HEIGHT_WITH_PERIOD,
   HOME_TITLE_FONT_CAP,
 } from '../../screens/home/homeHeaderLayout';
 import { useSafeAreaInsets } from '../../theme/safeArea';
@@ -31,6 +34,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { getCurrentSeason } from '../../features/season/api';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
+import { getSeasonPeriod } from '../../features/season/seasonPeriod';
 import {
   buildModeSelectionModel,
   GENERAL_MODE_DESCRIPTION,
@@ -80,6 +84,12 @@ type Props = {
   /** Home header only: text scaling caps that keep the whole mode name and 계정변경 visible (homeHeaderLayout). */
   titleFontCap?: number;
   changeFontCap?: number;
+  /**
+   * Home header only, season accounts (2026-11-14): text scaling caps while
+   * the season's period sits under its name — both lines stay inside the
+   * native header bar (homeSeasonHeaderLayout).
+   */
+  seasonPeriodCaps?: { title: number; period: number };
 };
 
 /**
@@ -108,6 +118,7 @@ export default function AccountSwitcher({
   maxWidth,
   titleFontCap = HOME_TITLE_FONT_CAP,
   changeFontCap = HOME_ACCOUNT_CHANGE_FONT_CAP,
+  seasonPeriodCaps,
 }: Props) {
   const {
     accounts,
@@ -196,6 +207,16 @@ export default function AccountSwitcher({
   }
 
   const display = getAccountDisplay(selectedAccount);
+  // Home's season header (2026-11-14): THIS account's season period under its
+  // name, from the server's startAt/endAt; nothing when they are unreadable.
+  const period = homeHeader && selectedAccount.mode === 'season' ? getSeasonPeriod(selectedAccount.season) : null;
+  const periodCaps = period ? (seasonPeriodCaps ?? { title: 1, period: 1 }) : null;
+  const headerTitle = (
+    <SeasonTitle testID="home-account-title" numberOfLines={1} containerStyle={styles.homeHeaderTitleBox}
+      style={periodCaps ? [styles.homeTitle, styles.homeTitleWithPeriod] : styles.homeTitle}
+      maxFontSizeMultiplier={periodCaps ? Math.min(titleFontCap, periodCaps.title) : titleFontCap} name={display.title}
+      displayBadge={selectedAccount.mode === 'season' ? selectedAccount.season?.displayBadge : undefined} />
+  );
 
   return (
     <>
@@ -204,12 +225,18 @@ export default function AccountSwitcher({
           style={[styles.homeHeader, maxWidth ? { maxWidth } : null]}
           onPress={() => setOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
+          accessibilityLabel={`계정 변경. 현재 ${display.title}${period ? `, 운영 기간 ${period.spoken}` : ''}, ${display.statusLabel}`}
           testID={TEST_IDS.tradingAccount.switcherTrigger}
         >
-          <SeasonTitle testID="home-account-title" numberOfLines={1} containerStyle={styles.homeHeaderTitleBox}
-            style={styles.homeTitle} maxFontSizeMultiplier={titleFontCap} name={display.title}
-            displayBadge={selectedAccount.mode === 'season' ? selectedAccount.season?.displayBadge : undefined} />
+          {period && periodCaps ? (
+            // The name, then the period under it; 계정변경 stays beside both.
+            <View testID="home-account-title-column" style={styles.homeHeaderTitleColumn}>
+              {headerTitle}
+              <Text testID="home-season-period" maxFontSizeMultiplier={periodCaps.period} style={styles.homePeriod}>
+                {period.text}
+              </Text>
+            </View>
+          ) : headerTitle}
           {/* 계정변경 (2026-11-07 (3)): a text chip instead of the ⇄ icon. It
               never shrinks, so its label is never wrapped or cut; the title
               beside it gives way (homeHeaderLayout). */}
@@ -389,6 +416,16 @@ const styles = StyleSheet.create({
   homeHeaderTitleBox: { flexWrap: 'nowrap', flexShrink: 1 },
   // One line in the header; the full name is in the label and the sheet.
   homeTitle: { minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
+  // With the period under it, the two lines fit the native bar (homeHeaderLayout).
+  homeTitleWithPeriod: { lineHeight: HOME_SEASON_TITLE_LINE_HEIGHT_WITH_PERIOD },
+  homeHeaderTitleColumn: { flexShrink: 1, minWidth: 0, justifyContent: 'center' },
+  // Smaller than the name and in the secondary ink: the period never outweighs it.
+  homePeriod: {
+    fontSize: HOME_SEASON_PERIOD_FONT_SIZE,
+    lineHeight: HOME_SEASON_PERIOD_LINE_HEIGHT,
+    color: semantic.secondary,
+    fontVariant: ['tabular-nums'],
+  },
   homeChange: {
     flexShrink: 0,
     minHeight: 28,

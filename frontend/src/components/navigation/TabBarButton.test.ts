@@ -48,6 +48,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
     '../../components/states/ErrorState': { default: 'ErrorState', __esModule: true },
     '../../features/appRelease/AppUpdateNotice': { default: 'AppUpdateNotice', __esModule: true },
     '../../features/notice/NoticePopupHost': { default: 'NoticePopupHost', __esModule: true },
+    '../../features/season/SeasonResultAutoOpen': { default: 'SeasonResultAutoOpen', __esModule: true },
     '../../features/entryOverlay/EntryOverlaySlot': { EntryOverlayProvider: 'EntryOverlayProvider' },
     '../../features/tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({ selectedAccount: { id: 'account-1', mode }, isLoading: false }),

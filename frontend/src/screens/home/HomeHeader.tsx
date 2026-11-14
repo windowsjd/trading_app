@@ -1,5 +1,5 @@
 import React from 'react';
-import { useWindowDimensions, View } from '../../theme/native';
+import { Platform, useWindowDimensions, View } from '../../theme/native';
 import { useAppearance } from '../../theme/appearance';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { useBeginnerQuestProgress } from '../../features/quest/useBeginnerQuestProgress';
@@ -8,14 +8,23 @@ import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import TabBarIcon from '../../components/navigation/TabBarIcon';
 import HomeHeaderButton from './HomeHeaderButton';
 import { HomeRewardButton } from './GeneralRewardSheet';
-import { homeHeaderLayout, questBadgeCount, type HomeHeaderMode } from './homeHeaderLayout';
+import { homeHeaderLayout, homeSeasonHeaderLayout, questBadgeCount, type HomeHeaderMode } from './homeHeaderLayout';
 
-/** Home's headerLeft: the mode title control that opens the account sheet (both platforms: left-aligned). */
+/** Every period has this shape (`YYYY.MM.DD ~ YYYY.MM.DD`), so the layout does not wait for the account. */
+const SEASON_PERIOD_SHAPE = '0000.00.00 ~ 0000.00.00';
+
+/**
+ * Home's headerLeft: the mode title control that opens the account sheet
+ * (both platforms: left-aligned). A season account's period sits under its
+ * name (2026-11-14), scaled so both lines stay inside the native bar.
+ */
 export function HomeHeaderTitle({ mode }: { mode: HomeHeaderMode }) {
   const { width, fontScale } = useWindowDimensions();
   const layout = homeHeaderLayout(width, fontScale, mode);
+  const season = mode === 'season' ? homeSeasonHeaderLayout(width, fontScale, Platform.OS, SEASON_PERIOD_SHAPE) : null;
   return <AccountSwitcher homeHeader maxWidth={layout.titleMaxWidth} titleFontCap={layout.titleFontCap}
-    changeFontCap={layout.changeFontCap} />;
+    changeFontCap={layout.changeFontCap}
+    seasonPeriodCaps={season ? { title: season.titleFontCap, period: season.periodFontCap } : undefined} />;
 }
 
 /** Home's headerRight: 퀘스트 (beginner), 가이드 + 보상 (general), nothing for a season account. */

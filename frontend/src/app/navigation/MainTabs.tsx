@@ -19,6 +19,7 @@ import { ScreenSheetHost } from '../../components/common/ScreenSheetHost';
 import { QuestGuideProvider } from '../../features/quest/QuestGuideProvider';
 import AppUpdateNotice from '../../features/appRelease/AppUpdateNotice';
 import NoticePopupHost from '../../features/notice/NoticePopupHost';
+import SeasonResultAutoOpen from '../../features/season/SeasonResultAutoOpen';
 import { EntryOverlayProvider } from '../../features/entryOverlay/EntryOverlaySlot';
 import { isGuestBrowsing } from '../../features/auth/guestBrowsing';
 import { GuestExitContext } from '../../components/guest/guestExit';
@@ -238,13 +239,15 @@ export default function MainTabs(props: MainTabsScreenProps) {
   // the quest overlay, which the provider draws after its children.
   // 앱 업데이트 안내 and the members' 공지 팝업 open in the same layer once the
   // app is entered normally — one at a time (EntryOverlayProvider), the
-  // popup only for a signed-in member.
+  // popup only for a signed-in member. A season account's settled, unseen
+  // 시즌최종결과 (2026-11-14) takes the same slot before it opens on its own.
   const hosted = (
     <ScreenSheetHost>
       {tabs}
       <EntryOverlayProvider>
         <AppUpdateNotice />
         <NoticePopupHost enabled={mode !== 'guest'} />
+        <SeasonResultAutoOpen enabled={mode === 'season'} />
       </EntryOverlayProvider>
     </ScreenSheetHost>
   );

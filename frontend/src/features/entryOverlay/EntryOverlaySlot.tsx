@@ -1,7 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-/** The overlays that may appear on their own after the app is entered. */
-export type EntryOverlay = 'appUpdate' | 'notice';
+/**
+ * The overlays that may appear on their own after the app is entered: the
+ * 업데이트 안내, the 공지 팝업 and (2026-11-14) the 시즌최종결과 opened on
+ * its own after settlement, which holds the slot while it is on screen.
+ */
+export type EntryOverlay = 'appUpdate' | 'notice' | 'seasonResult';
 
 type Slot = {
   owner: EntryOverlay | null;

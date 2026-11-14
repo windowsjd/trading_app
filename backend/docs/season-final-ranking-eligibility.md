@@ -275,7 +275,16 @@ Please try again later.")로 거부되고 아무것도 체결되지 않는다. �
 조건부 진입은 재시도 대상 코드가 아니므로 `failed`(`failureCode` 기록)가 된다. 정상 운영에서는
 환율 수집 이력이 있는 한 발생하지 않는다(신선도 기준 없음).
 
-**현재 앱과의 호환(4번 UI 작업 전)**: 앱은 위 값을 몰라도 깨지지 않는다(런타임 검증 없음,
+**앱 UI(2026-11-14, 4번 작업 완료)**: 랭킹 탭 내 순위 카드와 목록 사이(목록 탭 바로 위)에 작은 빨간 안내
+`최종 랭킹 참가 기준을 아직 충족하지 못했습니다. ⓘ` — 서버 응답이 `state: available` + `qualified: false`이고 응답의
+`season.id`가 화면의 시즌과 같을 때만 표시한다. ⓘ 시트는 `criteria`·현재 값·`remaining*`를 그대로 보여 준다(필요·잔여 금액은
+원 단위 올림, 현재 금액은 내림 — 진척을 과장하지 않음). `not_applicable`/`not_joined`/`unavailable`(제외)/읽기 실패/필드
+모순은 표시하지 않는다. 정산 전(`provisional`)은 진행 중·정산 대기 문구, 정산 후(`final`)는 확정 문구. 정산 시즌 미달자의
+내 순위 카드는 `최종 랭킹 자격 미충족`, 적격자 0명(`NO_QUALIFIED_PARTICIPANTS`)은 `최종 랭킹 참가 기준을 충족한 참가자가
+없습니다.`로 표시한다(이전 `랭킹 생성 대기 중` 대신). 앱은 체결·거래대금을 재집계하지 않는다
+(`frontend/src/features/ranking/qualification.ts`).
+
+**현재 앱과의 호환(4번 UI 작업 전, 이력)**: 앱은 위 값을 몰라도 깨지지 않는다(런타임 검증 없음,
 `state !== 'available'`은 미확정으로 처리). 미달자에게는 "최종 결과 조회 불가"/"랭킹 생성 대기
 중" 문구가 보이므로, 4번 작업에서 `not_qualified`/`FINAL_RANKING_NOT_QUALIFIED`/
 `NO_QUALIFIED_PARTICIPANTS`와 자격 API를 사용해 경고·안내 UI를 붙인다. 프런트엔드는 금융

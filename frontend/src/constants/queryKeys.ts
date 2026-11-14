@@ -290,6 +290,12 @@ export const QUERY_KEYS = {
       ] as const,
     userSeasonSummary: (userId: string) =>
       ['ranking', 'user-season-summary', userId] as const,
+    /**
+     * My final-ranking eligibility in one season (최종 랭킹 참가 기준). Under
+     * `ranking.all`, so the season-UI invalidation after a fill re-reads it.
+     */
+    qualification: (seasonId: string) =>
+      ['ranking', 'qualification', seasonId] as const,
   },
 
   record: {

@@ -50,6 +50,8 @@ import { useAppearance } from '../../theme/appearance';
 import { getHomeTier, type HomeTier } from '../home/tierPresentation';
 import TierEmblem, { tierEmblemWidth } from '../home/TierEmblem';
 import RankingInsightSlot from './RankingInsightSlot';
+import RankingQualificationNotice from './RankingQualificationNotice';
+import { FINAL_RANKING_NOT_QUALIFIED_LABEL } from '../../features/record/seasonFinalResult';
 import RankingPodium from './RankingPodium';
 import StandingCard, { rankingFigureText } from './StandingCard';
 
@@ -438,14 +440,22 @@ export default function RankingScreen({ navigation }: Props) {
   }
 
   if (viewState === 'ranking_unavailable') {
+    // Settlement's answer, not a pending ranking: nobody met the final criteria.
+    const noneQualified = publication?.reason === 'NO_QUALIFIED_PARTICIPANTS';
     return (
       <ScrollView refreshControl={refresh.refreshControl} style={styles.container} contentContainerStyle={styles.content}>
         <EmptyState
-          title={seasonNotConfigured ? '현재 진행 중인 시즌이 없습니다.' : '랭킹 생성 대기 중입니다.'}
-          message={seasonNotConfigured ? '시즌이 열리고 랭킹이 생성되면 이곳에 표시됩니다.' : '랭킹 스냅샷이 생성되면 이곳에 표시됩니다.'}
+          title={seasonNotConfigured ? '현재 진행 중인 시즌이 없습니다.'
+            : noneQualified ? '최종 랭킹 참가 기준을 충족한 참가자가 없습니다.' : '랭킹 생성 대기 중입니다.'}
+          message={seasonNotConfigured ? '시즌이 열리고 랭킹이 생성되면 이곳에 표시됩니다.'
+            : noneQualified ? '이번 시즌은 최종 순위와 티어가 확정된 참가자가 없습니다.' : '랭킹 스냅샷이 생성되면 이곳에 표시됩니다.'}
           actionLabel={hasNotJoined && !seasonNotConfigured ? '시즌 참가하기' : undefined}
           onAction={hasNotJoined && !seasonNotConfigured ? () => rootNavigation.navigate('SeasonJoin') : undefined}
         />
+        {seasonNotConfigured ? null : (
+          <RankingQualificationNotice seasonId={seasonQuery.data?.id} enabled={seasonQuery.data?.joined === true}
+            focused={isFocused} />
+        )}
       </ScrollView>
     );
   }
@@ -491,6 +501,10 @@ export default function RankingScreen({ navigation }: Props) {
             <RankingInsightSlot messages={insights} paused={!isFocused} />
 
             {podium ? <RankingPodium entries={podium} rankType={rankType} style={styles.podium} /> : null}
+
+            {/* 최종 랭킹 참가 기준 (2026-11-14): between 내 순위 and the list, right above its tabs. */}
+            <RankingQualificationNotice seasonId={seasonQuery.data?.id} enabled={seasonQuery.data?.joined === true}
+              focused={isFocused} />
 
             <SegmentedControl testID="ranking-tabs" accessibilityLabel="랭킹 범위" value={selectedTab} onChange={selectTab}
               style={styles.tabs}
@@ -600,10 +614,14 @@ function MyRankingCard({
   }
 
   if (myRanking?.state === 'unavailable') {
+    // Settlement confirmed that I did not meet the final criteria: no final rank exists, nothing is pending.
+    const notQualified = myRanking.reason === 'FINAL_RANKING_NOT_QUALIFIED';
     return (
       <View style={styles.card}>
         <Text style={styles.label}>내 순위</Text>
-        <Text style={styles.helper}>내 랭킹 생성 대기 중입니다.</Text>
+        <Text testID="ranking-my-unavailable" style={styles.helper}>
+          {notQualified ? FINAL_RANKING_NOT_QUALIFIED_LABEL : '내 랭킹 생성 대기 중입니다.'}
+        </Text>
       </View>
     );
   }

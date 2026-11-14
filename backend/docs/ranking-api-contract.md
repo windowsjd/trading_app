@@ -366,6 +366,11 @@ rankings, tie-breaks and tier ratios are unchanged.
 - New `GET /api/v1/ranking/qualification?seasonId=` returns the caller's own
   eligibility (`provisional` while the season runs, `final` once settled). It
   reads only the caller's account and never writes.
+- App use (2026-11-14): the ranking tab reads it with the current season's
+  `seasonId` for a joined member and shows the 최종 랭킹 참가 기준 notice only
+  on `state: available` + `qualified: false`; it re-reads every 60 s while the
+  tab is focused and a running season's verdict is still short, and after a
+  season-account fill (key under `ranking.all`). No contract change.
 
 ### Final result verification (2026-10-15 follow-up)
 

@@ -1,5 +1,40 @@
 # 프로젝트 인수인계서
 
+## 2026-11-14 — 랭킹 최종 랭킹 자격 안내 · 정산 완료 시 시즌최종결과 자동 표시 · 새 season0(일반 시즌) 생성 절차 · 시즌모드 홈 운영 기간 (main, 미커밋)
+
+- **기준/범위:** 시작 HEAD = `6d0a67ff`(작업 트리 깨끗, origin/main과 같음). frontend 3건 + backend 운영 CLI(동작 2개·모듈 1개·PG 러너·CI 단계) + 문서. **API·DB 스키마·마이그레이션 변경 없음.** **무변경:** 주문·체결·선물·청산·지갑·원장·환전·잔고·손익·시즌 최종 평가·최종 랭킹 산식·티어·보상·시세, 기존 launch(첫 출시) 경로와 그 CHECK/트리거, lifecycle/정산/랭킹 작업, 계정 목록 30초 폴링. **운영 DB에 시즌을 만들지 않았다**(읽기 전용 dry run만). 커밋·푸시·배포·환경 변수 변경 없음.
+
+### A. 랭킹 탭 최종 랭킹 참가 기준 안내
+- **구현:** `screens/ranking/RankingQualificationNotice.tsx` + 순수 판정 `features/ranking/qualification.ts` + `getRankingQualification`(`GET /ranking/qualification?seasonId=`), 키 `['ranking','qualification',seasonId]`. 내 순위 카드 → 순위 안내 → TOP3 → **안내** → 목록 탭(목록에 가장 가까운 위치). 13px `semantic.error`, 카드·배경·테두리 없음, 줄바꿈. 문구+ⓘ 한 버튼 → 기존 floating `InlineBottomSheet`(TriggerPriceLabel 패턴): 종목 수·인정 거래대금 각각 필요/현재 인정/추가 필요, 판정 기준(잠정/확정), 인정 거래대금 설명.
+- **의도:** 서버 판정이 유일한 근거. `available` + `qualified:false` + 응답 시즌 ID = 화면 시즌일 때만, 서버 필드가 서로 모순되면 표시 안 함(추측 금지). 미참가(요청 안 함)·참가 제외·기준 없는 시즌·조회 오류는 표시 안 함. 금액은 진척을 과장하지 않게(필요·잔여 올림, 현재 내림). 거래 차단 아님(안내 문구에 명시).
+- **정산 전/후:** 진행 중 `…아직 충족하지 못했습니다.`, 종료~정산 전 `…정산 후 확정됩니다.`, 정산 후 `…최종 순위에 포함되지 않았습니다.` 기존에 정산 시즌 미달자의 내 순위 카드가 `내 랭킹 생성 대기 중입니다.`, 적격자 0명 시즌이 `랭킹 생성 대기 중`으로 잘못 보이던 것을 `최종 랭킹 자격 미충족` / `최종 랭킹 참가 기준을 충족한 참가자가 없습니다.`로 고침(서버 확정 판정을 따름).
+- **기존 기능과의 관계:** 순위·페이지네이션·친구·TOP10·순위 안내·시상대 코드는 그대로(헤더에 한 줄 추가). 60초 재조회는 탭이 보이고 진행 중 미달일 때만, 체결 후에는 기존 `ranking.all` 무효화로 재조회.
+
+### B. 정산 완료 시 시즌최종결과 자동 표시
+- **실제 원인(가설 검증):** 맞음 — `TradingAccountContext` 계정 목록 폴링은 시즌 계정이 `active`일 때만 30초(계정 DTO의 `seasonStatus`는 DB 원본 상태). 종료 tick에 `ended`가 되면 폴링이 멈춰 `ended → settled`를 재로그인 전까지 못 본다. 홈에는 결과 화면 자동 이동이 없고(버튼만), 계정 선택 화면에만 미확인 결과 정책이 있었다. 추가로 확인: 같은 MainTabs에 업데이트 안내·공지 팝업이 쓰는 진입 overlay 슬롯(한 번에 하나)과 '탭 첫 화면에서만' 정책이 이미 있어 재사용했다.
+- **구현:** `features/season/SeasonResultAutoOpen.tsx`(MainTabs의 overlay 슬롯 안, 시즌 계정 모드에서만) + 순수 규칙 `seasonResultRules.ts`. 선택된 시즌 계정이 `ended`면 앱이 앞에 있을 때만 30초마다 목록 재조회, 배경→앞 복귀 시 즉시 재조회. `settled` + `finalResultViewedAt === null`(명시적 null) → 결과 GET → 같은 시즌·settled·viewedAt null·표시 상태(available/not_qualified/excluded)일 때만, **홈 첫 화면**·가이드 없음·슬롯 획득 후 350ms 뒤 기존 `SeasonFinalResult`로 이동(실행 중 회원·계정·시즌당 1회, 이미 열려 있으면 안 함). 결과 화면이 떠 있는 동안 슬롯 유지 → 업데이트 안내·공지 팝업과 겹치지 않음. 확인 기록은 기존대로 결과 화면이 표시 후 POST(실패 시 기존 재시도 버튼, 자동 반복 push 없음).
+- **취소·실패:** 계정 전환·로그아웃·일반/초보 모드 → 대기 중 이동 취소(키 변경·언마운트, 이동 직전 재확인). 결과 GET 실패 → 열지 않음, 앞 복귀·60초 간격 최대 5회 재조회. 새 시즌 계정 사용 중에는 지난 시즌 미확인 결과를 덮어 띄우지 않음(계정 선택 `시즌결과 확인하기`·그 계정 홈 버튼으로 확인 — 기존 정책).
+- **의도:** 주문 입력·체결 확인·차트·다른 탭에서는 덮지 않고 진입 화면(홈)으로 돌아왔을 때 표시. 영구 고빈도 폴링 없음(정산 대기 중인 선택 계정만, 정산되면 중지).
+
+### C. 새 season0(일반 시즌) 생성·시작 절차
+- **조사 결과:** 첫 출시 경로(`prepare/arm`)는 개발 시즌을 같은 트랜잭션에서 중지하며 넘기는 전용이고, DB CHECK `seasons_launch_policy_check`가 launch 행에 **504시간(21일)** 을 강제, 활성화는 개발 시즌 cutoff = 시작 시각을 요구한다(개발 시즌은 10-24에 이미 중지). → 이번 시즌은 `launch_kind = NULL` **일반 시즌**으로 만든다. CHECK 일반 분기에는 기간 제한이 없고 기존 lifecycle이 `upcoming→active→ended`를 지원한다. **21일 계약은 우회·완화하지 않았고 DB 변경도 없다**(launch 행에만 계속 적용). 그래서 16일(11-14~11-29)을 그대로 쓰고 12월로 늘리지 않았다. beta는 launch 행에만 붙는 기존 정책대로 새 시즌에는 없다.
+- **구현:** `src/seasons/scheduled-season.operations.ts` + `season:launch` CLI의 `prepare-season`·`reschedule-season`(기존 READ ONLY dry run·0600 plan·지문·`--confirm`·`--backup-ref`·감사 행 재사용; `planLaunchRequest`/`applyLaunchPlan`을 추출해 테스트 가능하게 함 — 기존 동작 동일, 기존 season0 러너 57/57). 입력은 첫/마지막 **KST 운영일** + 정확한 시작 시각; 종료 경계는 마지막날 다음 00:00 KST로 **계산**(타이핑 불가). 시작은 승인된 첫날·DB 시각 기준 미래(소급 없음 → 11-15 이후 적용 시 자동 거부), 새 ID(기존·감사 기록 ID 불가), 자본·자격 검증, 수수료는 지정 시즌에서 **복사**, armed launch 없음, 중지되지 않은 upcoming/active와 기간 겹침 금지. reschedule은 이 도구로 만든 미사용 upcoming만.
+- **PG 통합(`scripts/season-schedule-integration.ts`, CI 별도 DB 단계 추가):** 운영 형태(개발 중지 + 정산된 release season0 + 참가자 있는 정산된 일반 season0) 위에서 dry run 무기록, 거부 11종, 대상 DB/확인 문자열, 같은 기간 동시 apply 2개 → 1개만, 재적용 거부, 겹침 거부, 정확한 UTC instant·KST 날짜, 감사 행, 공개 목록 3개 season0(ID별, beta는 launch만), 시작 전 참가 거부, reschedule, **기존 lifecycle 활성화**, 동시 참가 1승·재참가 거부·초기 지급 1회 10,000,000·지갑 4개·자금 미승계·생성만으로 지급 없음, 두 season0 계정 구분, 이전 결과 미확인→확인 기록(새 시즌과 분리), 자격 API(잠정/확정), 새 시즌 종료(픽스처에서만 경계 앞당김)→정산→최종 결과 unseen, **이전 시즌 3개 행 전부 불변** — 61 assertions, 2회 연속 PASS.
+- **운영 dry run(읽기 전용, 2026-11-14 16:29 KST):** 운영 시즌 = `sea_2026_s0_release`(settled, 10-24~11-14T00:00Z, 수수료 0.001/0.001, 5/3) + 중지된 개발 시즌. 충돌·armed 없음. 계획: `sea_2026_s0_20261114`, 시작 20:00 KST(11:00Z, 예시), 종료 2026-11-29T15:00Z = 11-30 00:00 KST, 16일, 앱 표시 `2026.11.14 ~ 2026.11.29`, 지문 `756a389a…`. lifecycle·정산·랭킹 작업 분당 성공 중. 이전 season0: 참가 13명(적격 3, 미달 10), 결과 미확인 10명, 계정 13개 모두 closed, 정산 09:01 KST 성공.
+
+### D. 시즌모드 홈 상단 운영 기간
+- **구현:** `AccountSwitcher` homeHeader(시즌 계정): `season0 [beta]` 아래 `2026.11.14 ~ 2026.11.29`(12/16, `semantic.secondary`), 계정변경 칩은 옆 그대로, 한 44dp 버튼, 접근성 이름에 기간 포함. `features/season/seasonPeriod.ts` = 그 계정 시즌의 `startAt` KST 날짜 ~ `endAt − 1ms` KST 날짜(서버 `endAt`은 배타적 경계 → 11.30으로 잘못 표시하지 않음), 기존 고정 KST 포맷터 사용, 값이 불완전하면 표시 안 함. 일반·초보 없음.
+- **헤더 높이:** 네이티브 바는 iOS 44pt로 늘어나지 않고 Android 툴바는 56dp → 두 줄(이름 줄 28→24 + 기간 16)이 들어가도록 `homeSeasonHeaderLayout`이 글꼴 배율 상한(iOS 1.1, Android 1.4; 시스템 내비게이션 바도 큰 글꼴을 따르지 않음)과 폭 상한(기간이 계정변경 옆에서 줄바꿈되지 않게)을 계산. 이름 한 줄 말줄임은 기존 그대로(시트에 전체 이름).
+- **검증:** 새/이전 season0 날짜, 동일 이름·다른 ID 전환, 일반·초보 없음, 경계(UTC/KST, 끝 1ms), 기기 시간대 무관, 320/360/390/430 × 1~2배 × iOS/Android/web 높이·폭 예산, RN-Web(아래).
+
+### 공통 검증·남은 조치
+- **frontend:** `npm run typecheck`·`lint:accounts:check`(새 파일 6개를 게이트 범위에 추가) PASS, 전체 `npm test` **4,068/4,068**(513 suites, skip 0). 새 테스트 파일 6개 + 헤더/MainTabs/TabBarButton 테스트(새 overlay 경계 stub과 마운트 단언 추가 — 기존 단언 약화 없음). 음성 대조 8개(기간 끝 1ms, qualified/시즌 ID 검사, 명시적 null, 홈 첫 화면, 슬롯 유지, ended 폴링, iOS 높이 상한) 모두 해당 테스트 실패 확인 후 원복(바이트 동일).
+- **backend:** typecheck PASS, 단위 **6,130 PASS**(실패 1 suite = `auth-email.service.spec`의 로컬 `express` 해석, CI 통과 이력), e2e **464/464**(`.env*` 없는 사본 + `env -i`), PG(사용자 공간 PG16 127.0.0.1:55714, `*_test` 템플릿): 새 러너 61×2, 기존 season0 러너 57. 음성 대조: 첫날·소급·겹침 검사를 빼면 단위/PG 실패.
+- **RN-Web(Playwright, 스크래치 픽스처 — 실제 AccountSwitcher·RankingQualificationNotice·InlineBottomSheet, 텍스트는 기기처럼 `maxFontSizeMultiplier` 적용, 헤더는 iOS 44/Android 56 높이 막대):** 224화면(헤더 160 = iOS·Android × 새/이전/긴 이름 season0 × 320/360/390/430 × 1/1.3/1.5/2배 × 라이트/다크, 랭킹 64 = 잠정/확정 × 4폭 × 4배율 × 2모드) 문제 0·페이지 오류 0. 검사: 이름·beta·기간·계정변경이 막대 안, 기간은 이름 아래 한 줄·글자 넘침 없음·보조 색, 계정변경과 겹침 없음, 안내는 카드와 탭 사이·배경 없음·빨간 색·줄바꿈 넘침 없음, 시트 6개 값이 시트 안. **첫 실행에서 결함 발견·수정:** iOS 2배에서 이전 season0의 `beta` 알약이 이름 상한을 따르지 않아 기간 줄을 막대 밖으로 밀었다(beta −2.8…29.2, 기간 29.2…46.8 vs 0…44) → `SeasonTitle`이 받은 `maxFontSizeMultiplier`를 배지 글자에도 적용(홈 헤더만 이 값을 넘김) + 회귀 단언.
+- **실기기 미검증:** iOS 내비게이션 바/Android 툴바 안의 실제 두 줄 높이·Dynamic Type, 실제 백그라운드 복귀 타이밍, 정산 직후 자동 이동 — EAS 빌드·기기 없음.
+- **운영 적용(별도 승인 필요, 순서):** ① 오늘(11-14 KST) 중 시작 시각 확정 → 그 시각으로 새 dry run(plan) → 검토 ② 백업 근거(Render PITR 상태) 확인 → `--backup-ref` ③ `pnpm run season:launch --apply --plan … --backup-ref … --confirm <host:port/db>/sea_2026_s0_20261114` ④ 시작 1~2분 후 lifecycle 활성화·첫 참가(지갑 4·지급 1회) 확인. **백엔드 배포 불필요**(배포된 lifecycle이 일반 시즌을 활성화; CLI는 로컬 실행). 앱 3건은 새 EAS 빌드·스토어 배포 후에만 보인다(구 앱도 새 시즌 참가·거래는 정상, 날짜·안내·자동 표시만 없음). 11-15 00:00 KST가 지나면 계획은 자동 거부 → 날짜는 다시 승인받는다.
+- **이번 시즌이 21일이 아닌 이유:** 21일은 첫 출시(launch) 행의 DB 계약이며 이번은 개발 시즌 전환이 없는 일반 시즌이다. 사용자가 지정한 11-14~11-29(16일)를 그대로 쓴다.
+
 ## 2026-11-13 — 스토어 최신 버전 자동 감지 · 차트 상하좌우 이동/가격축/십자선 고정 · 관리자 전용 콘솔/공지 팝업 · 회원가입 약관 개별 동의 (main, 미커밋)
 
 - **기준/범위:** 시작 HEAD = `2ba4431f`(작업 트리 깨끗). frontend + backend + additive DB 마이그레이션 2개. **무변경:** 주문·체결·지정가·조건주문·선물·청산·지갑·원장·환전·보유자산·손익·시즌 정산·랭킹·보상·시세 처리, 기존 API 주소, operator API 권한(OperatorGuard = operator+admin 그대로), Render 환경변수, 운영 DB. 커밋·푸시·배포·공지 발행·스토어 제출 없음.
