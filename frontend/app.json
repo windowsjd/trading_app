@@ -4,6 +4,7 @@
   "slug": "leagueoftrading",
   "icon": "./assets/icon/trading-class-ios-icon-1024.png",
   "ios": {
+    "version": "1.0.4",
     "bundleIdentifier": "com.leagueoftrading",
     "infoPlist": {
       "ITSAppUsesNonExemptEncryption": false,
