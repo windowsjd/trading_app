@@ -94,6 +94,11 @@ function settingsHarness(portfolioPublic = true, constants?: unknown, applicatio
       default: (props: { userId: string }) => React.createElement('NotificationSettingsSection', props),
       __esModule: true,
     },
+    // The device's 광고 성과 측정 card has its own tests (features/adMeasurement).
+    '../../features/adMeasurement/AdMeasurementSettingsSection': {
+      default: () => React.createElement('AdMeasurementSettingsSection'),
+      __esModule: true,
+    },
     '../../components/states/FullPageLoading': {
       default: 'FullPageLoading',
       __esModule: true,
@@ -364,6 +369,8 @@ describe('Settings without profile editing', () => {
       assert.equal(x.node(id) === undefined, false, id);
     }
     assert.equal(x.h.renderer.root.findAll((item: any) => item.type === 'NotificationSettingsSection').length, 1);
+    // 2026-11-21: the device's 광고 성과 측정 choice, withdrawn here.
+    assert.equal(x.h.renderer.root.findAll((item: any) => item.type === 'AdMeasurementSettingsSection').length, 1);
   });
 });
 

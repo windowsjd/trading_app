@@ -57,6 +57,8 @@ function secondaryDiagnosticsHarness(screen, role = 'admin') {
     '../../components/tradingAccount/AccountSetupPanel': { default: 'AccountSetupPanel', __esModule: true },
     // Settings' push switches have their own diagnostics/tests (NotificationSettingsSection.test.ts).
     '../../features/notifications/NotificationSettingsSection': { default: 'NotificationSettingsSection', __esModule: true },
+    // The device's 광고 성과 측정 card has its own tests (features/adMeasurement).
+    '../../features/adMeasurement/AdMeasurementSettingsSection': { default: 'AdMeasurementSettingsSection', __esModule: true },
   };
   const files = { ranking: 'ranking/RankingScreen', summary: 'ranking/UserSeasonSummaryScreen', list: 'record/RecordSeasonListScreen', detail: 'record/RecordSeasonDetailScreen', profit: 'record/RecordProfitAnalysisScreen', friends: 'friends/FriendsScreen', season: 'season/SeasonJoinScreen', reward: 'reward/RewardScreen', settings: 'my/SettingsScreen', my: 'my/MyScreen' };
   const Screen = h.load(`src/screens/${files[screen]}.tsx`, mocks).default;

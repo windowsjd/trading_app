@@ -194,6 +194,11 @@ describe('guest Wallet and 투자모드', () => {
         __esModule: true,
         default: ({ visible, title, testID, children }: any) => visible ? React.createElement('Sheet', { testID, title }, children) : null,
       },
+      // The device's 광고 성과 측정 card (own tests in features/adMeasurement): a visitor has no MY tab.
+      '../../features/adMeasurement/AdMeasurementSettingsSection': {
+        __esModule: true,
+        default: ({ testID }: { testID: string }) => React.createElement('AdMeasurementSettingsSection', { testID }),
+      },
     };
     const Screen = h.load('src/screens/entry/GuestModesScreen.tsx', sheetMocks).default;
     h.mount(Screen);
@@ -208,6 +213,7 @@ describe('guest Wallet and 투자모드', () => {
       assert.equal(text.includes(description), true, description);
     }
     assert.equal(h.byTestId('guest-mode-sign-in').length, 0, 'no sheet before a press');
+    assert.equal(h.byTestId('guest-ad-measurement').length, 1, 'the visitor can see and withdraw the device choice');
 
     h.press('guest-mode-season-start');
     const sheet = h.byTestId('guest-mode-sign-in');

@@ -1460,6 +1460,45 @@ describe('AppController (e2e)', () => {
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
   });
 
+  it('an app installed before the 2026-11-21 privacy text still signs up and records the text it showed', () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    prisma.user.create.mockResolvedValueOnce({
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      role: user.role,
+      status: user.status,
+    });
+
+    return request(app.getHttpServer())
+      .post('/api/v1/auth/signup')
+      .send({
+        email: 'user@example.com',
+        password: 'Password123!',
+        nickname: 'traderKim',
+        verificationToken: 'verified-signup-proof',
+        ageConfirmed: true,
+        termsAgreed: true,
+        termsVersion: CURRENT_TERMS_VERSION,
+        privacyAgreed: true,
+        privacyVersion: '2026-10-20',
+      })
+      .expect(201)
+      .expect(() => {
+        expect(CURRENT_PRIVACY_VERSION).toBe('2026-11-21');
+        expect(prisma.user.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              privacyVersion: '2026-10-20',
+              privacyAgreedAt: expect.any(Date) as Date,
+            }),
+          }),
+        );
+      });
+  });
+
   it('/api/v1/auth/signup (POST) creates a user and returns access and refresh tokens', () => {
     prisma.user.findUnique
       .mockResolvedValueOnce(null)

@@ -5,6 +5,7 @@ import { semantic } from '../../theme/tokens';
 import { getHeaderScreenContentStyle } from '../../theme/screenLayout';
 import CTAButton from '../../components/common/CTAButton';
 import GuestSignInSheet from '../../components/guest/GuestSignInSheet';
+import AdMeasurementSettingsSection from '../../features/adMeasurement/AdMeasurementSettingsSection';
 
 type GuestMode = { key: 'season' | 'general' | 'beginner'; title: string; description: string; points: string[] };
 
@@ -68,6 +69,8 @@ export default function GuestModesScreen() {
             <CTAButton testID={`guest-mode-${mode.key}-start`} label={`${mode.title} 시작하기`} onPress={() => start(mode)} />
           </View>
         ))}
+        {/* A visitor withdraws (or gives) the device's 광고 성과 측정 choice here: no MY tab while browsing. */}
+        <AdMeasurementSettingsSection testID="guest-ad-measurement" />
       </ScrollView>
       <GuestSignInSheet
         testID="guest-mode-sign-in"

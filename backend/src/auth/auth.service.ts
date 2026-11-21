@@ -36,7 +36,7 @@ import type {
   UpdateProfileRequestBody,
 } from './auth.types';
 import {
-  CURRENT_PRIVACY_VERSION,
+  ACCEPTED_PRIVACY_VERSIONS,
   CURRENT_TERMS_VERSION,
 } from './terms.constants';
 
@@ -618,18 +618,22 @@ export class AuthService implements OnModuleInit {
   /**
    * The three required boxes of the signup screen, each on its own: 만 16세
    * 이상, 이용약관 and 개인정보처리방침 — each exactly `true` (not "true", 1 or
-   * missing), with exactly the current version of each document. Checked with
-   * the other fields, before the email proof is consumed: a refused request
-   * (an app from before the checkboxes, an outdated screen) creates nothing
-   * and keeps its proof.
+   * missing), with exactly the current terms version and a privacy version an
+   * app still shows (ACCEPTED_PRIVACY_VERSIONS: an app installed before the
+   * 2026-11-21 text keeps signing up and records the text it showed). Checked
+   * with the other fields, before the email proof is consumed: a refused
+   * request (an app from before the checkboxes, an outdated screen) creates
+   * nothing and keeps its proof.
    */
   private parseSignupConsent(body: SignupRequestBody) {
+    const privacyVersion = body.privacyVersion;
     if (
       body.ageConfirmed !== true ||
       body.termsAgreed !== true ||
       body.privacyAgreed !== true ||
       body.termsVersion !== CURRENT_TERMS_VERSION ||
-      body.privacyVersion !== CURRENT_PRIVACY_VERSION
+      typeof privacyVersion !== 'string' ||
+      !ACCEPTED_PRIVACY_VERSIONS.includes(privacyVersion)
     ) {
       this.throwBadRequest(
         'AUTH_SIGNUP_CONSENT_REQUIRED',
@@ -639,7 +643,7 @@ export class AuthService implements OnModuleInit {
 
     return {
       termsVersion: CURRENT_TERMS_VERSION,
-      privacyVersion: CURRENT_PRIVACY_VERSION,
+      privacyVersion,
     };
   }
 

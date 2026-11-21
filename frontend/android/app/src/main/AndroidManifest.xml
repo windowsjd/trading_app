@@ -1,9 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
   <uses-permission android:name="android.permission.INTERNET"/>
-  <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
+  <!-- 광고 성과 측정 (2026-11-21): the advertising ID permission is kept for Meta install measurement.
+       Whether the Meta SDK reads and sends the ID follows the in-app consent
+       (com.facebook.sdk.AdvertiserIDCollectionEnabled starts false below); the user's own
+       "delete / limit advertising ID" setting still applies. Google Mobile Ads declares the same
+       permission and can read the ID as well (frontend/docs/meta-ad-measurement.md). -->
+  <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+  <!-- Privacy Sandbox (AdServices) permissions that Google Mobile Ads and the Meta SDK declare stay
+       removed: neither the install measurement nor the ads use them here. -->
   <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove"/>
   <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove"/>
   <uses-permission android:name="android.permission.ACCESS_ADSERVICES_TOPICS" tools:node="remove"/>
+  <uses-permission android:name="android.permission.ACCESS_ADSERVICES_CUSTOM_AUDIENCE" tools:node="remove"/>
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.CAMERA" tools:node="remove"/>
@@ -28,6 +36,15 @@
     <meta-data android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT" android:value="true" tools:replace="android:value"/>
     <meta-data android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION" android:value="true" tools:replace="android:value"/>
     <meta-data android:name="com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING" android:value="true" tools:replace="android:value"/>
+    <!-- Meta SDK (광고 성과 측정, 2026-11-21): nothing runs before the in-app consent. With these three
+         off, the SDK's start-up provider only loads its settings (no app event, no advertising ID, no
+         network request). After consent the app turns them on at runtime
+         (features/adMeasurement); the SDK keeps them in its own settings until the consent is withdrawn. -->
+    <meta-data android:name="com.facebook.sdk.ApplicationId" android:value="@string/facebook_app_id"/>
+    <meta-data android:name="com.facebook.sdk.ClientToken" android:value="@string/facebook_client_token"/>
+    <meta-data android:name="com.facebook.sdk.AutoInitEnabled" android:value="false"/>
+    <meta-data android:name="com.facebook.sdk.AutoLogAppEventsEnabled" android:value="false"/>
+    <meta-data android:name="com.facebook.sdk.AdvertiserIDCollectionEnabled" android:value="false"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>

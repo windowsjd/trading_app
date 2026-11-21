@@ -30,6 +30,7 @@ import {
 } from '../generated/prisma/client';
 import { AuthService } from './auth.service';
 import {
+  ACCEPTED_PRIVACY_VERSIONS,
   CURRENT_PRIVACY_VERSION,
   CURRENT_TERMS_VERSION,
 } from './terms.constants';
@@ -285,6 +286,41 @@ describe('AuthService', () => {
     expect(JSON.stringify(response)).not.toContain('passwordHash');
   });
 
+  it('records the earlier privacy version an installed app still shows (2026-11-21)', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    prisma.user.create.mockResolvedValueOnce({
+      id: activeUser.id,
+      email: activeUser.email,
+      nickname: activeUser.nickname,
+      role: activeUser.role,
+      status: activeUser.status,
+    });
+
+    expect(CURRENT_PRIVACY_VERSION).toBe('2026-11-21');
+    expect(ACCEPTED_PRIVACY_VERSIONS).toEqual(['2026-11-21', '2026-10-20']);
+    await service.signup({
+      email: 'user@example.com',
+      password: 'Password123!',
+      nickname: 'traderKim',
+      ...consent,
+      privacyVersion: '2026-10-20',
+    });
+
+    // The member agreed to the text that app showed, not to the newer one.
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          termsVersion: CURRENT_TERMS_VERSION,
+          privacyVersion: '2026-10-20',
+          privacyAgreedAt: expect.any(Date) as Date,
+        }) as unknown,
+      }),
+    );
+  });
+
   it('re-applies a community restriction kept from a deleted account with the same email', async () => {
     const { prisma, service } = createService();
     prisma.user.findUnique
@@ -401,6 +437,14 @@ describe('AuthService', () => {
     [
       'with another privacy version',
       { ...consent, privacyVersion: '2020-01-01' },
+    ],
+    [
+      'with a padded earlier privacy version',
+      { ...consent, privacyVersion: ' 2026-10-20' },
+    ],
+    [
+      'with a non-string privacy version',
+      { ...consent, privacyVersion: ['2026-11-21'] },
     ],
     [
       'with the versions swapped into the wrong field',

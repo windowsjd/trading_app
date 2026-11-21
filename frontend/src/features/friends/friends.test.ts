@@ -282,6 +282,7 @@ describe('overall menu and server privacy setting', () => {
       '../../features/auth/useLogout': { useLogout: () => () => {} },
       '../../components/states/FullPageLoading': { default: 'Loading' }, '../../components/states/ErrorState': { default: 'Error' },
       '../../features/notifications/NotificationSettingsSection': { default: 'NotificationSettingsSection', __esModule: true },
+      '../../features/adMeasurement/AdMeasurementSettingsSection': { default: 'AdMeasurementSettingsSection', __esModule: true },
     }).default;
     const toggle = elements(Screen({}), 'Switch')[0];
     assert.equal(toggle.props.value, false);

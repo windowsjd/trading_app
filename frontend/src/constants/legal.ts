@@ -1,14 +1,20 @@
 /**
  * Document versions of the signup screen (2026-11-13: three separate required
  * boxes). Signup sends each document's version with its box; the server
- * accepts only its own CURRENT_TERMS_VERSION / CURRENT_PRIVACY_VERSION
- * (backend/src/auth/terms.constants.ts). The two documents are versioned
- * independently: when one's text changes (constants/legalDocuments.ts), raise
- * its version here and on the server together. A version is the revision
- * label of the published page, never shown as an effective date.
+ * accepts its own CURRENT_TERMS_VERSION / CURRENT_PRIVACY_VERSION
+ * (backend/src/auth/terms.constants.ts) and, for the privacy policy, the
+ * earlier versions that installed apps still show (ACCEPTED_PRIVACY_VERSIONS),
+ * recording the version each member actually agreed to. The two documents are
+ * versioned independently: when one's text changes (constants/legalDocuments.ts),
+ * raise its version here and on the server together, keeping the previous one
+ * accepted there until no app shows it. A version is the revision label of the
+ * published page, never shown as an effective date.
+ *
+ * 2026-11-21: the privacy policy gained 광고 성과 측정 (Meta, optional) and
+ * 앱 안 광고 (Google AdMob).
  */
 export const TERMS_VERSION = '2026-10-20';
-export const PRIVACY_VERSION = '2026-10-20';
+export const PRIVACY_VERSION = '2026-11-21';
 
 /** The three required signup boxes, each separate and never pre-checked. */
 export const AGE_CONFIRMATION_LABEL = '[필수] 만 16세 이상입니다';

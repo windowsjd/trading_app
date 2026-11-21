@@ -13,7 +13,8 @@ import {
  */
 const PINNED = {
   terms: { version: '2026-10-20', sha256: 'de820205f6640412004e077608ea8540259514f330d1a6a8dfdcb372e7738ab8' },
-  privacy: { version: '2026-10-20', sha256: '27f9aff653cb10e171ff9c00e24d1ac3d2138b4d443de808f47a582e24b4c81d' },
+  // 2026-11-21: 광고 성과 측정 (Meta, optional) and 앱 안 광고 (Google AdMob) added.
+  privacy: { version: '2026-11-21', sha256: 'aee6d5eb9c5dac1f8e5c668443bf86fe55a472fedb32d57b8a735a908c6a0cb7' },
 } as const;
 
 const fingerprint = (kind: 'terms' | 'privacy') =>
@@ -42,12 +43,13 @@ describe('legal documents shown at signup', () => {
 
   it('carries every section, table row and cell of the privacy policy', () => {
     assert.deepEqual(PRIVACY_DOCUMENT.sections.map((section) => section.heading), [
-      '1. 개인정보의 처리 목적', '2. 처리하는 개인정보 항목', '3. 개인정보의 보유 및 이용기간', '4. 개인정보의 처리위탁 및 국외 처리',
+      '1. 개인정보의 처리 목적', '2. 처리하는 개인정보 항목', '3. 개인정보의 보유 및 이용기간', '4. 개인정보의 처리위탁, 제3자 제공 및 국외 처리',
       '5. 개인정보의 파기 및 회원탈퇴 시 처리', '6. 이용자의 권리 및 계정 삭제', '7. 개인정보 보호를 위한 조치', '8. 만 16세 미만 이용자',
       '9. 개인정보 관련 문의', '10. 개인정보처리방침의 변경',
     ]);
     const [items, retention, processors] = [1, 2, 3].map((index) => tables(PRIVACY_DOCUMENT.sections[index].blocks)[0]);
-    for (const [table, columns, rows] of [[items, 4, 8], [retention, 2, 12], [processors, 3, 8]] as const) {
+    const recipients = tables(PRIVACY_DOCUMENT.sections[3].blocks)[1];
+    for (const [table, columns, rows] of [[items, 4, 10], [retention, 2, 14], [processors, 3, 8], [recipients, 5, 2]] as const) {
       assert.equal(table?.kind, 'table');
       if (table?.kind !== 'table') continue;
       assert.equal(table.columns.length, columns);
@@ -58,7 +60,22 @@ describe('legal documents shown at signup', () => {
     if (processors?.kind === 'table')
       assert.deepEqual(processors.rows.map((row) => row[0]), ['Render', 'Cloudflare, Inc. (R2)', 'Resend', 'Expo',
         'Google Firebase Cloud Messaging (FCM)', 'Apple Push Notification service (APNs)', 'Logo.dev', 'Tiingo, Binance 등 시장데이터 제공업체']);
+    // The parties that process for their own purposes are listed apart from the processors.
+    if (recipients?.kind === 'table') assert.deepEqual(recipients.rows.map((row) => row[0]), ['Meta Platforms, Inc.', 'Google LLC (AdMob)']);
+    if (items?.kind === 'table') {
+      const measurement = items.rows.find((row) => row[0] === '광고 성과 측정');
+      assert.equal(measurement?.[2], '선택(별도 동의)');
+    }
     assert.ok(PRIVACY_DOCUMENT.sections[5].blocks.some((block) => block.kind === 'link' && block.url === ACCOUNT_DELETION_PAGE_URL));
+  });
+
+  it('describes the advertising identifier the way the app now handles it (2026-11-21)', () => {
+    const text = [...PRIVACY_DOCUMENT.summary, ...legalDocumentText(PRIVACY_DOCUMENT)].join(' ');
+    // The 2026-10-20 sentence would contradict the optional Meta measurement and AdMob.
+    assert.equal(text.includes('광고 추적 목적으로 수집하지 않습니다'), false);
+    for (const point of ['회사 서버는 광고 ID를 수집하거나 저장하지 않습니다', '광고 성과 측정에 동의한 경우에만 Meta에 제공',
+      '앱 추적 허용', 'Google AdMob', '언제든 철회', '이메일, 닉네임, 회원 ID'])
+      assert.equal(text.includes(point), true, point);
   });
 
   it('summarizes the points a member must understand, without an effective date', () => {
@@ -68,7 +85,8 @@ describe('legal documents shown at signup', () => {
       assert.ok(terms.includes(point), point);
     const privacy = PRIVACY_DOCUMENT.summary.join(' ');
     for (const point of ['이메일, 비밀번호(해시 저장), 닉네임', '프로필 사진은 선택', 'Expo Push Token', '가상 투자계정', '시즌 참가',
-      '친구 관계', '고객문의', '90일', '탈퇴회원용 임의 식별정보', 'Render, Cloudflare R2, Resend, Expo', '국외', '회원탈퇴', 'admin@nanghwa.com'])
+      '친구 관계', '고객문의', '90일', '탈퇴회원용 임의 식별정보', 'Render, Cloudflare R2, Resend, Expo', '국외', '회원탈퇴', 'admin@nanghwa.com',
+      '광고 성과 측정은 선택 항목', 'Meta Platforms, Inc.', 'Google AdMob'])
       assert.ok(privacy.includes(point), point);
     for (const document of [TERMS_DOCUMENT, PRIVACY_DOCUMENT])
       // 제14조 speaks of 시행일 in general; no date is ever written.

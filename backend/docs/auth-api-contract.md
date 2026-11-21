@@ -50,19 +50,20 @@ signup screen has three separate required boxes, never pre-checked: "[필수] �
 이상입니다", "[필수] 이용약관에 동의합니다" and "[필수] 개인정보처리방침에
 동의합니다" (each document opens in the app from its 자세히 보기; opening it checks
 nothing). The request must carry `ageConfirmed`, `termsAgreed` and `privacyAgreed`
-each exactly `true`, `termsVersion` equal to `CURRENT_TERMS_VERSION` and
-`privacyVersion` equal to `CURRENT_PRIVACY_VERSION` (`src/auth/terms.constants.ts`,
-both `2026-10-20` — the revision label of the published documents; the app never
-shows it as an effective date). Anything else — a missing field, `false`, the
-string `"true"`, `1`, another or swapped version — is `400
-AUTH_SIGNUP_CONSENT_REQUIRED` (one code). It is checked with the other body fields,
+each exactly `true`, `termsVersion` equal to `CURRENT_TERMS_VERSION` (`2026-10-20`)
+and `privacyVersion` one of `ACCEPTED_PRIVACY_VERSIONS` (`src/auth/terms.constants.ts`:
+the current `2026-11-21` and the earlier `2026-10-20` — revision labels of the
+published documents; the app never shows them as an effective date). Anything
+else — a missing field, `false`, the string `"true"`, `1`, a non-string, padded,
+unknown or swapped version — is `400 AUTH_SIGNUP_CONSENT_REQUIRED` (one code). It is checked with the other body fields,
 before the IP completion budget and before the email proof is consumed: a refused
 request creates nothing and keeps its proof. There is no birth date and no
 server-side age check.
 
 In the signup transaction (one server clock reading, never a client time) the
-server stores `users.terms_version`, `terms_agreed_at`, `privacy_version`,
-`privacy_agreed_at` and `age_confirmed_at`; SQL CHECKs keep a privacy version and
+server stores `users.terms_version`, `terms_agreed_at`, `privacy_version` (the
+version the request named: the text that app showed), `privacy_agreed_at` and
+`age_confirmed_at`; SQL CHECKs keep a privacy version and
 its time together and a terms consent with its version. `terms_accepted_at` is no
 longer written: it belongs to members who joined 2026-10-21 … before this change,
 on the screen that showed the terms version and the notice "가입하면
@@ -75,7 +76,18 @@ When a document changes, raise its constant and the app's matching value
 (`frontend/src/constants/legal.ts` `TERMS_VERSION` / `PRIVACY_VERSION`; the app pins
 each document's text to its version in `legalDocuments.test.ts`) together: a server
 ahead of an app refuses that app's signups (its error copy asks to update the app),
-an app ahead of the server is refused until the server ships.
+an app ahead of the server is refused until the server ships. To avoid both, the
+server keeps accepting the previous privacy version for as long as installed apps
+show it.
+
+Privacy policy 2026-11-21 (광고 성과 측정 · 앱 안 광고, frontend/docs/meta-ad-measurement.md):
+`CURRENT_PRIVACY_VERSION` became `2026-11-21` and `2026-10-20` stays accepted,
+because apps installed before it show the earlier text, which matches what those
+apps do (no Meta SDK). No schema change (`privacy_version` is VARCHAR(32)) and no
+re-consent gate for existing members: the new optional Meta measurement has its
+own in-app consent on the device. Order: deploy this server first (both versions
+accepted, old apps unaffected), then release the app that sends `2026-11-21`.
+Remove `2026-10-20` from the list only when no supported app shows it.
 
 Rollout (2026-11-13): apps from before the checkboxes send only `ageConfirmed` and
 `termsVersion`, so once this server is deployed they are refused (never treated as

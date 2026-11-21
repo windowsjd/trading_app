@@ -25,6 +25,7 @@ import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
 import OrderFillNotifier from '../../features/order/OrderFillNotifier';
 import FriendRequestNotifier from '../../features/friends/FriendRequestNotifier';
 import PushNotificationsHost from '../../features/notifications/PushNotificationsHost';
+import AdMeasurementHost from '../../features/adMeasurement/AdMeasurementHost';
 import AndroidExitConfirm from './AndroidExitConfirm';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -104,6 +105,10 @@ export default function RootNavigator() {
       <PushNotificationsHost />
       {/* Android: the Back that would leave the app asks first. Draws nothing. */}
       <AndroidExitConfirm />
+      {/* 광고 성과 측정 (Meta): the device's choice applied at start, the one-time
+          question after the splash and 설정's sheet, over every screen. Nothing
+          reaches Meta without that consent (and on iOS 앱 추적 허용). */}
+      <AdMeasurementHost />
     </NavigationContainer>
   );
 }

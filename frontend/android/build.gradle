@@ -12,6 +12,12 @@ buildscript {
   }
 }
 
+// react-native-fbsdk-next asks for `18.+`: pinned, so a build never takes a newer Meta SDK whose
+// start-up and consent behaviour has not been checked (frontend/docs/meta-ad-measurement.md).
+ext {
+  facebookSdkVersion = '18.3.0'
+}
+
 allprojects {
   repositories {
     google()

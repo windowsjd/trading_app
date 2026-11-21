@@ -154,5 +154,8 @@ describe('sign-up: three separate required consents (만 16세, 이용약관, �
     const server = readFileSync(path.join(process.cwd(), '../backend/src/auth/terms.constants.ts'), 'utf8');
     assert.equal(server.includes(`export const CURRENT_TERMS_VERSION = '${TERMS_VERSION}';`), true);
     assert.equal(server.includes(`export const CURRENT_PRIVACY_VERSION = '${PRIVACY_VERSION}';`), true);
+    // Apps installed before 2026-11-21 show and send the earlier text: the server keeps it accepted.
+    const accepted = /ACCEPTED_PRIVACY_VERSIONS[^=]*=\s*\[([^\]]*)\]/u.exec(server)?.[1] ?? '';
+    assert.equal(accepted.includes('CURRENT_PRIVACY_VERSION') && accepted.includes("'2026-10-20'"), true);
   });
 });

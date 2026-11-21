@@ -93,7 +93,9 @@ test('native app IDs, existing plugins, package and build profiles are preserved
   assert.equal(plugin.androidAppId, 'ca-app-pub-7899930948413451~9002185139');
   assert.equal(plugin.iosAppId, 'ca-app-pub-7899930948413451~7288069200');
   assert.equal(plugin.delayAppMeasurementInit, true);
-  assert.equal(plugin.userTrackingUsageDescription === undefined, true, 'no ATT prompt: ads are requested non-personalized');
+  // AdMob adds no ATT text of its own: its ads stay non-personalized. (The ATT
+  // prompt belongs to 광고 성과 측정 — expo-tracking-transparency, features/adMeasurement.)
+  assert.equal(plugin.userTrackingUsageDescription === undefined, true, 'no AdMob ATT text: ads are requested non-personalized');
   assert.equal(app.android.package, 'com.nanghwa.tradingclass');
   assert.equal(app.ios.bundleIdentifier, 'com.leagueoftrading');
   for (const name of ['expo-image-picker', 'expo-notifications']) assert.equal(app.plugins.some((p: unknown[]) => p[0] === name), true);
@@ -105,10 +107,16 @@ test('native app IDs, existing plugins, package and build profiles are preserved
   const manifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
   assert.match(manifest, /APPLICATION_ID" android:value="ca-app-pub-7899930948413451~9002185139"/);
   assert.match(manifest, /DELAY_APP_MEASUREMENT_INIT" android:value="true"/);
-  for (const permission of ['com.google.android.gms.permission.AD_ID', 'android.permission.ACCESS_ADSERVICES_AD_ID',
-    'android.permission.ACCESS_ADSERVICES_ATTRIBUTION', 'android.permission.ACCESS_ADSERVICES_TOPICS']) {
-    assert.equal(app.android.blockedPermissions.includes(permission), true);
-    assert.equal(manifest.includes(`android:name="${permission}" tools:node="remove"`), true);
+  // 2026-11-21 (광고 성과 측정): the advertising ID permission is kept for the
+  // consent-gated Meta measurement — the app's other identifier permissions
+  // (Privacy Sandbox) stay removed, now including the one the Meta SDK adds.
+  assert.equal(app.android.blockedPermissions.includes('com.google.android.gms.permission.AD_ID'), false);
+  assert.equal(manifest.includes('<uses-permission android:name="com.google.android.gms.permission.AD_ID"/>'), true);
+  assert.equal(manifest.includes('android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"'), false);
+  for (const permission of ['android.permission.ACCESS_ADSERVICES_AD_ID', 'android.permission.ACCESS_ADSERVICES_ATTRIBUTION',
+    'android.permission.ACCESS_ADSERVICES_TOPICS', 'android.permission.ACCESS_ADSERVICES_CUSTOM_AUDIENCE']) {
+    assert.equal(app.android.blockedPermissions.includes(permission), true, permission);
+    assert.equal(manifest.includes(`android:name="${permission}" tools:node="remove"`), true, permission);
   }
 });
 

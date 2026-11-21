@@ -29,6 +29,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import NotificationSettingsSection from '../../features/notifications/NotificationSettingsSection';
+import AdMeasurementSettingsSection from '../../features/adMeasurement/AdMeasurementSettingsSection';
 import { LOGO_DEV_KEY } from '../../features/market/assetLogoSource';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
@@ -202,6 +203,9 @@ export default function SettingsScreen({ navigation }: Props) {
         </View>
 
         <NotificationSettingsSection userId={meQuery.data.id} />
+
+        {/* This device's 광고 성과 측정 choice (not the account's): kept through logout. */}
+        <AdMeasurementSettingsSection />
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>앱 정보</Text>
