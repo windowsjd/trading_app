@@ -1,5 +1,31 @@
 # 프로젝트 인수인계서
 
+## 2026-11-21 (3) — 약관·개인정보처리방침 상시 열람 및 iOS 1.0.5 준비
+
+**의도:** 가입 시 동의한 문서를 서비스 이용 중에도 언제든 확인할 수 있게 한다. 기존 문서·표시 화면을 재사용하고 열람과 동의 행위를 분리한다. 다음 App Store 배포용 iOS 표시 버전만 독립적으로 올린다.
+
+- **조사·구현:** 기존 `LegalDocumentScreen`은 `AuthStack`에만 등록되어 있었다. 같은 컴포넌트를 `MyStack`과 `ModesStack`에도 등록하고 공통 화면 props가 세 스택을 수용하도록 확장했다. 각 호출 화면 위에 일반 스택 화면으로 열리므로 기존 화면·탭·상위 세션/투자계정 provider를 유지하고 `goBack()`으로 복귀한다. 루트 이동·탭 전환·reset이 필요 없어 `RootNavigator`, `AuthStack`, `SignupScreen`은 수정하지 않았다. 새 화면·라이브러리·공통 UI 추상화는 추가하지 않았다.
+- **경로:** 로그인 `MY → 설정 → 약관 및 정책 → 이용약관 / 개인정보처리방침`, 비로그인 `투자모드 탭 → 약관 및 정책 → 이용약관 / 개인정보처리방침`. 회원가입의 두 `자세히 보기` 경로는 그대로다. 새 항목은 기존 카드·semantic 테마·ActionPressable을 사용하고 접근성 이름/힌트, 최소 48dp 터치 높이, 높이 제한 없는 줄바꿈 텍스트를 제공한다.
+- **유지:** 모든 경로가 동일한 `LEGAL_DOCUMENTS`와 표시 화면을 사용한다. 문서 내용·요약·버전(약관 `2026-10-20`, 개인정보 `2026-11-21`)은 무변경이며 기존 해시 고정 테스트를 통과했다. 전체 문단·목록·표 행/셀·외부 링크·오류 안내·돌아가기 버튼, 회원가입 입력 4개와 동의 체크 3개, 기존 투자모드 안내/로그인 시트·설정값·광고 측정 카드 유지. 열람은 navigation 호출만 하며 동의 기록·API·계정 선택을 변경하지 않는다. Meta/AdMob·백엔드·금융/시즌 동작은 수정하지 않았다.
+- **버전:** `frontend/app.json`의 `ios.version`만 `1.0.4 → 1.0.5`. 루트 `version = 1.0.3`, Android `versionName = 1.0.3` / 로컬 `versionCode = 1`, Android 패키지 `com.nanghwa.tradingclass`, iOS Bundle ID `com.leagueoftrading` 유지. `app.config.js`는 플랫폼 설정을 그대로 전달한다. 설치된 Expo config/plugin으로 동적 설정을 해석하고 `CFBundleShortVersionString = 1.0.5`를 만드는 것을 단위 테스트로 확인했다(실제 네이티브 빌드는 아님).
+- **원격 조회(2026-11-21):** `eas build:version:get --platform ios --profile production --json --non-interactive` → 원격 buildNumber `17`. 최근 iOS EAS 빌드도 production `1.0.4 (17)`, FINISHED(`7cfeee6e-4288-4763-9d64-defe1b310eca`). `eas.json`의 `appVersionSource: remote`, production `autoIncrement: true` 유지, 로컬 buildNumber를 임의 지정하지 않았다. 다음 production 빌드는 원격 자동 증가 정책을 따르며 실제 할당 번호는 빌드 때 확인해야 한다.
+- **업데이트 안내:** 기존과 같은 [Apple 한국 공개 조회](https://itunes.apple.com/lookup?bundleId=com.leagueoftrading&country=kr)에서 Bundle ID 일치, 현재 공개 버전 `1.0.4`(세 자리)를 확인했다. 설치 예정 버전 `1.0.5`와 형식 일치. `1.0.4 → 공개 1.0.5` 안내, 동일 버전·공개 버전보다 최신인 설치본에는 안내 없음 테스트 PASS. 비교 정책 및 자동 안내 구현은 무변경이다.
+
+변경 파일:
+- 설정/화면: `frontend/app.json`, `frontend/src/screens/my/SettingsScreen.tsx`, `frontend/src/screens/entry/GuestModesScreen.tsx`, `frontend/src/screens/auth/LegalDocumentScreen.tsx`(공유 용도 주석만).
+- 내비게이션: `frontend/src/app/navigation/{MyStack.tsx,ModesStack.tsx,types.ts}`.
+- 테스트: `frontend/src/app/navigation/legalNavigation.test.ts`(신규), `frontend/src/screens/my/SettingsScreen.test.ts`, `frontend/src/screens/home/guestScreens.test.ts`, `frontend/src/screens/auth/signupConsent.test.ts`, `frontend/src/features/appRelease/{appUpdate.test.ts,appVersionSource.test.ts}`.
+- 문서: 이 `HANDOVER.md`.
+
+검증 결과:
+- 관련 **10파일 72개 PASS**, skip/삭제 없음: `legalNavigation` 6, `legalDocuments` 5, `LegalDocumentScreen` 3, `signupConsent` 5, `SettingsScreen` 16, `guestScreens` 7, `appVersionSource` 5, `appUpdate` 8, `AppUpdateNotice` 7, `AdMeasurementSettingsSection` 10. 실제 스택 선언과 Navigation 코어를 사용하는 새 테스트에서 3개 진입 스택 × 2개 문서의 버튼/헤더/시스템 뒤로가기, 호출 화면 route key·마운트·로컬 상태 유지 확인. 화면 테스트에서는 입력·체크·설정 캐시·비로그인 상태, 문서 전문/표/링크, 기존 광고 측정 카드·안내 동작 확인. 네이티브 전환과 호출 화면 일부는 경계 mock이므로 실기기 검증을 대체하지 않는다.
+- 테스트는 파일별 프로세스로 `NODE_OPTIONS=--max-old-space-size=1536 timeout -k 5s 90s node --test --test-isolation=none <파일>` 실행. 수정·신규 단언과 실패 경로는 원시값/작은 DTO를 사용해 ReactTestInstance 직접 출력 위험을 검토했다.
+- `npm run typecheck`, `npm run lint:accounts:check`, `npm run lint:guides:check`, `git diff --check` PASS. 신규 파일을 포함한 전체 diff 자체 검토 완료. 전체 프런트/백엔드 테스트와 클라우드/네이티브 빌드는 실행하지 않았다.
+
+남은 검증:
+- iOS/Android 실기기에서 라이트·다크, 작은 화면·큰 글자·표/긴 URL 줄바꿈, VoiceOver/TalkBack, iOS 스와이프/Android 하드웨어 뒤로가기, 실제 로그인/선택 계정 및 가입 입력 복귀 확인. 이 환경은 네이티브 실행 도구가 없어 시각적 잘림·제스처를 검증하지 못했다.
+- 실제 iOS production 빌드의 표시 버전 `1.0.5`와 원격에서 할당된 buildNumber 확인, App Store Connect의 기존 업로드와 번호 충돌 여부 및 등록 버전 `1.0.5` 일치 확인. EAS 최근 빌드/원격 번호만 조회했으며 App Store Connect의 전체 업로드 내역은 조회하지 않았다. 실제 빌드·업로드·제출은 실행하지 않았다.
+
 ## 2026-11-21 (2) — Meta SDK 광고 측정 동의 제어 안전성 보완 (main, 미커밋, 기준 6f36a999)
 
 **기능 구현 의도: 이번 실행에서 유효한 동의가 확인된 뒤에만 Meta SDK가 동작하게 하고, 시작·중단은 네이티브가 실제로 반영했다고 답한 뒤에만 완료로 처리하기 위함.** 상세: `frontend/docs/meta-ad-measurement.md` 2~4·10절.

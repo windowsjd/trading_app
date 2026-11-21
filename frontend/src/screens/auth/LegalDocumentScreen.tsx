@@ -8,10 +8,9 @@ import { LEGAL_DOCUMENTS, type LegalBlock } from '../../constants/legalDocuments
 import type { LegalDocumentScreenProps } from '../../app/navigation/types';
 
 /**
- * 이용약관 / 개인정보처리방침 opened from the signup screen's 자세히 보기
- * (2026-11-13): the title, the key points first, then the full text with
- * every table row, and a way back. Only reading: nothing here checks a
- * signup box, and the signup screen underneath keeps its inputs.
+ * Shared read-only 이용약관 / 개인정보처리방침 for signup, Settings and
+ * guest 투자모드. Each stack pushes this screen over its caller and keeps
+ * that screen's state; reading never records consent or changes an account.
  */
 export default function LegalDocumentScreen({ route, navigation }: LegalDocumentScreenProps) {
   const document = LEGAL_DOCUMENTS[route.params.document] ?? LEGAL_DOCUMENTS.terms;

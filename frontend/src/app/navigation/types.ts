@@ -125,6 +125,8 @@ export type MyStackParamList = {
   Badges: undefined;
   Reward: undefined;
   Settings: undefined;
+  /** Read-only documents, pushed over Settings without changing the account. */
+  LegalDocument: AuthStackParamList['LegalDocument'];
   /** 회원탈퇴 (안내 → 본인 확인 → 최종 확인). */
   MembershipDeletion: undefined;
   /** 관리자 전용 콘솔 (admin only; the server checks the role on every request). */
@@ -138,6 +140,8 @@ export type MyStackParamList = {
 /** 투자모드: guest browsing's introduction of the three investment modes. */
 export type ModesStackParamList = {
   Modes: undefined;
+  /** Available while browsing without signing in. */
+  LegalDocument: AuthStackParamList['LegalDocument'];
 };
 
 export type MainTabParamList = {
@@ -239,7 +243,10 @@ export type SignupScreenProps = NativeStackScreenProps<
   'Signup'
 >;
 
-export type LegalDocumentScreenProps = NativeStackScreenProps<AuthStackParamList, 'LegalDocument'>;
+export type LegalDocumentScreenProps =
+  | NativeStackScreenProps<AuthStackParamList, 'LegalDocument'>
+  | NativeStackScreenProps<MyStackParamList, 'LegalDocument'>
+  | NativeStackScreenProps<ModesStackParamList, 'LegalDocument'>;
 
 export type SeasonJoinScreenProps = RootScreenProps<'SeasonJoin'>;
 

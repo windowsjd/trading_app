@@ -208,6 +208,17 @@ export default function SettingsScreen({ navigation }: Props) {
         <AdMeasurementSettingsSection />
 
         <View style={styles.card}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>약관 및 정책</Text>
+          {([['terms', '이용약관'], ['privacy', '개인정보처리방침']] as const).map(([document, label]) => (
+            <ActionPressable key={document} testID={`settings-legal-${document}`}
+              accessibilityRole="button" accessibilityLabel={label} accessibilityHint="문서 열람 화면으로 이동합니다"
+              style={styles.legalLink} onPress={() => navigation.navigate('LegalDocument', { document })}>
+              <Text style={styles.legalLinkText}>{label}</Text>
+            </ActionPressable>
+          ))}
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.sectionTitle}>앱 정보</Text>
           {/* The installed build's own version (what the stores and the update notice see). */}
           <Text testID="settings-version" style={styles.helper}>
@@ -260,6 +271,8 @@ const styles = StyleSheet.create({
   switchLabel: { flex: 1, minWidth: 0, lineHeight: 27 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
   attribution: { minHeight: 44, justifyContent: 'center' },
+  legalLink: { minHeight: 48, justifyContent: 'center', paddingVertical: 8 },
+  legalLinkText: { fontSize: 16, lineHeight: 24, color: semantic.text },
   membershipDeletion: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
   membershipDeletionText: { fontSize: 14, color: semantic.secondary, textDecorationLine: 'underline', textAlign: 'center' },
 });

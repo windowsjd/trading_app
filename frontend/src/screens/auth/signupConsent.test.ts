@@ -136,7 +136,16 @@ describe('sign-up: three separate required consents (만 16세, 이용약관, �
       assert.deepEqual(screen.navigations, [['LegalDocument', { document: 'terms' }], ['LegalDocument', { document: 'privacy' }]]);
       assert.deepEqual(screen.checked(), [true, false, false], 'reading a document is not agreeing to it');
       assert.equal(screen.byId('auth-signup-email-input')[0].props.value, 'new@example.com');
+      assert.equal(screen.byId('auth-signup-nickname-input')[0].props.value, 'new-user');
       assert.equal(screen.byId('auth-signup-password-input')[0].props.value, 'new-password');
+      assert.equal(screen.byId('auth-signup-confirm-password-input')[0].props.value, 'new-password');
+      // Reading also preserves existing agreements; it cannot create a signup request.
+      await screen.press('auth-signup-terms-checkbox');
+      await screen.press('auth-signup-privacy-checkbox');
+      await screen.press('auth-signup-terms-detail');
+      await screen.press('auth-signup-privacy-detail');
+      assert.deepEqual(screen.checked(), [true, true, true]);
+      assert.equal(screen.mutates.length, 0);
     } finally { act(() => screen.renderer.unmount()); }
   });
 

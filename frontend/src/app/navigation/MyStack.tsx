@@ -18,6 +18,7 @@ import MyScreen from '../../screens/my/MyScreen';
 import RewardScreen from '../../screens/reward/RewardScreen';
 import MyBadgesScreen from '../../screens/my/MyBadgesScreen';
 import SettingsScreen from '../../screens/my/SettingsScreen';
+import LegalDocumentScreen from '../../screens/auth/LegalDocumentScreen';
 import MembershipDeletionScreen from '../../screens/my/MembershipDeletionScreen';
 import AdminConsoleScreen from '../../screens/admin/AdminConsoleScreen';
 import AdminNoticesScreen from '../../screens/admin/AdminNoticesScreen';
@@ -77,6 +78,8 @@ export default function MyStack() {
         component={SettingsScreen}
         options={{ title: '설정' }}
       />
+      <Stack.Screen name="LegalDocument" component={LegalDocumentScreen}
+        options={({ route }) => ({ title: route.params.document === 'privacy' ? '개인정보처리방침' : '이용약관' })} />
       <Stack.Screen
         name="MembershipDeletion"
         component={MembershipDeletionScreen}

@@ -65,6 +65,18 @@ describe('앱 업데이트 안내 rules', () => {
     assert.equal(notice?.store, 'App Store');
   });
 
+  it('offers iOS 1.0.5 to 1.0.4, and stays quiet when installed is current or ahead of the store', () => {
+    assert.equal(compareVersions('1.0.5', '1.0.4'), 1);
+    assert.equal(compareVersions('1.0.4', '1.0.5'), -1);
+    const release = parseAppReleaseManifest({ ios: { ...manifest.ios, latestVersion: '1.0.5' } });
+    const notice = decideAppUpdate(release, { ...ios, version: '1.0.4' });
+    assert.equal(notice?.latestVersion, '1.0.5');
+    assert.equal(notice?.currentVersion, '1.0.4');
+    assert.equal(decideAppUpdate(release, { ...ios, version: '1.0.5' }) === null, true);
+    const olderStore = parseAppReleaseManifest({ ios: { ...manifest.ios, latestVersion: '1.0.4' } });
+    assert.equal(decideAppUpdate(olderStore, { ...ios, version: '1.0.5' }) === null, true);
+  });
+
   it('no notice for the same or an older store version, another app id, or a build that is not from the store', () => {
     const cases: Array<[string, InstalledApp]> = [
       ['already current', { ...ios, version: '1.0.2' }],

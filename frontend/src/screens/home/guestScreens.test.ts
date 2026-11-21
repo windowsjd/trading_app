@@ -48,7 +48,8 @@ function harness() {
   h.mount = (Screen: unknown) => {
     const exit = { signIn: () => h.exits.push('signIn'), signUp: () => h.exits.push('signUp') };
     h.renderer = h.render(React.createElement(QueryClientProvider, { client: h.client },
-      React.createElement(GuestExitContext.Provider, { value: exit }, React.createElement(Screen as never, {}))));
+      React.createElement(GuestExitContext.Provider, { value: exit }, React.createElement(Screen as never,
+        { navigation: { navigate: (...args: unknown[]) => h.navigation.push(args) } }))));
     return h.renderer;
   };
   h.byTestId = (id: string) => h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === id);
@@ -186,6 +187,8 @@ describe('guest Wallet and 투자모드', () => {
   });
 
   it('투자모드 introduces the three modes; 시작하기 asks for sign-in and creates nothing', (t) => {
+    guestState.setGuestBrowsing(true);
+    t.after(() => guestState.setGuestBrowsing(false));
     const h = harness();
     const sheetMocks = {
       ...h.common,
@@ -214,6 +217,19 @@ describe('guest Wallet and 투자모드', () => {
     }
     assert.equal(h.byTestId('guest-mode-sign-in').length, 0, 'no sheet before a press');
     assert.equal(h.byTestId('guest-ad-measurement').length, 1, 'the visitor can see and withdraw the device choice');
+
+    for (const [document, label] of [['terms', '이용약관'], ['privacy', '개인정보처리방침']]) {
+      const link = h.byTestId(`guest-legal-${document}`)[0];
+      assert.equal(link.props.accessibilityRole, 'button');
+      assert.equal(link.props.accessibilityLabel, label);
+      assert.equal(link.props.style.minHeight >= 44, true);
+      h.press(`guest-legal-${document}`);
+    }
+    assert.deepEqual(h.navigation, [['LegalDocument', { document: 'terms' }], ['LegalDocument', { document: 'privacy' }]]);
+    assert.equal(guestState.isGuestBrowsing(), true);
+    assert.equal(h.byTestId('guest-mode-sign-in').length, 0, 'reading requires no sign-in');
+    assert.equal(h.byTestId('guest-ad-measurement').length, 1);
+    assert.deepEqual(h.exits, []);
 
     h.press('guest-mode-season-start');
     const sheet = h.byTestId('guest-mode-sign-in');

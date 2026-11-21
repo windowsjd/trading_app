@@ -149,6 +149,27 @@ function settingsHarness(portfolioPublic = true, constants?: unknown, applicatio
 }
 
 describe('Settings 앱 정보', () => {
+  it('opens both read-only documents without changing settings or the cached user', async (t) => {
+    const x = settingsHarness(false);
+    t.after(x.close);
+    await x.mount();
+    await act(async () => x.node(TEST_IDS.settings.appearance('dark')).props.onPress());
+    const before = JSON.stringify(x.client.getQueryData(QUERY_KEYS.me));
+    for (const [document, label] of [['terms', '이용약관'], ['privacy', '개인정보처리방침']]) {
+      const link = x.node(`settings-legal-${document}`);
+      assert.equal(link.props.accessibilityRole, 'button');
+      assert.equal(link.props.accessibilityLabel, label);
+      assert.equal(link.props.style.minHeight >= 44, true);
+      await act(async () => link.props.onPress());
+    }
+    assert.deepEqual(x.h.navigations, [['LegalDocument', { document: 'terms' }], ['LegalDocument', { document: 'privacy' }]]);
+    assert.equal(JSON.stringify(x.client.getQueryData(QUERY_KEYS.me)), before);
+    assert.equal(x.node('settings-portfolio-public').props.value, false);
+    assert.deepEqual(x.h.appearanceChoices, ['dark']);
+    assert.equal(x.h.patches.length, 0);
+    assert.equal(x.h.renderer.root.findAll((n: any) => n.type === 'AdMeasurementSettingsSection').length, 1);
+  });
+
   it('names the installed build by its EAS commit stamp, or 개발 빌드 without one', async (t) => {
     const stamped = settingsHarness(true, { __esModule: true, default: { expoConfig: { extra: {
       build: { commit: '367fbe5e7a9fa96aa7a7a46d44dc70cf1a4d8b1a', profile: 'preview', id: 'eas-build' } } } } });

@@ -6,6 +6,11 @@ import { getHeaderScreenContentStyle } from '../../theme/screenLayout';
 import CTAButton from '../../components/common/CTAButton';
 import GuestSignInSheet from '../../components/guest/GuestSignInSheet';
 import AdMeasurementSettingsSection from '../../features/adMeasurement/AdMeasurementSettingsSection';
+import ActionPressable from '../../components/common/ActionPressable';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { ModesStackParamList } from '../../app/navigation/types';
+
+type Props = NativeStackScreenProps<ModesStackParamList, 'Modes'>;
 
 type GuestMode = { key: 'season' | 'general' | 'beginner'; title: string; description: string; points: string[] };
 
@@ -39,7 +44,7 @@ const MODES: GuestMode[] = [
  * nothing; 시작하기 asks the visitor to sign in or sign up, after which the
  * existing account selection screen lets them choose the mode themselves.
  */
-export default function GuestModesScreen() {
+export default function GuestModesScreen({ navigation }: Props) {
   const [starting, setStarting] = useState<GuestMode | null>(null);
   // The sheet keeps its copy while it slides away.
   const [shown, setShown] = useState<GuestMode>(MODES[0]);
@@ -71,6 +76,16 @@ export default function GuestModesScreen() {
         ))}
         {/* A visitor withdraws (or gives) the device's 광고 성과 측정 choice here: no MY tab while browsing. */}
         <AdMeasurementSettingsSection testID="guest-ad-measurement" />
+        <View style={styles.card}>
+          <Text accessibilityRole="header" style={styles.cardTitle}>약관 및 정책</Text>
+          {([['terms', '이용약관'], ['privacy', '개인정보처리방침']] as const).map(([document, label]) => (
+            <ActionPressable key={document} testID={`guest-legal-${document}`}
+              accessibilityRole="button" accessibilityLabel={label} accessibilityHint="문서 열람 화면으로 이동합니다"
+              style={styles.legalLink} onPress={() => navigation.navigate('LegalDocument', { document })}>
+              <Text style={styles.legalLinkText}>{label}</Text>
+            </ActionPressable>
+          ))}
+        </View>
       </ScrollView>
       <GuestSignInSheet
         testID="guest-mode-sign-in"
@@ -101,4 +116,6 @@ const styles = StyleSheet.create({
   point: { flexDirection: 'row', gap: 6, minWidth: 0 },
   bullet: { fontSize: 14, lineHeight: 21, color: semantic.muted },
   pointText: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 21, color: semantic.secondary },
+  legalLink: { minHeight: 48, justifyContent: 'center', paddingVertical: 8 },
+  legalLinkText: { fontSize: 16, lineHeight: 24, color: semantic.text },
 });

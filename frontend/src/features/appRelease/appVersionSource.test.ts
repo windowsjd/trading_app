@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { compareVersions } from './appUpdate.ts';
+
+const require = createRequire(import.meta.url);
 
 /**
  * The installed version the update notice compares (expo-application's native
@@ -29,6 +32,21 @@ describe('app version source', () => {
   it('a single versionName, set in defaultConfig (no flavour or build type overrides it)', () => {
     assert.equal((gradle.match(/^\s*versionName\s/gm) ?? []).length, 1);
     assert.equal(/versionNameSuffix/.test(gradle), false);
+  });
+
+  it('resolves iOS 1.0.5 into Info.plist while keeping the Android version and EAS policy', () => {
+    const { getConfig } = require('@expo/config');
+    const { IOSConfig } = require('@expo/config-plugins');
+    const { exp } = getConfig(process.cwd());
+    const plist = IOSConfig.Version.setVersion(exp, {});
+    assert.equal(plist.CFBundleShortVersionString, '1.0.5');
+    assert.equal(exp.ios.bundleIdentifier, 'com.leagueoftrading');
+    assert.equal(exp.version, '1.0.3');
+    assert.equal(versionName, '1.0.3');
+    assert.equal(exp.android.package, 'com.nanghwa.tradingclass');
+    const eas = JSON.parse(readFileSync(resolve('eas.json'), 'utf8'));
+    assert.equal(eas.cli.appVersionSource, 'remote');
+    assert.equal(eas.build.production.autoIncrement, true);
   });
 });
 
