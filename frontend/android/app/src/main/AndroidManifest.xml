@@ -36,10 +36,13 @@
     <meta-data android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT" android:value="true" tools:replace="android:value"/>
     <meta-data android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION" android:value="true" tools:replace="android:value"/>
     <meta-data android:name="com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING" android:value="true" tools:replace="android:value"/>
-    <!-- Meta SDK (광고 성과 측정, 2026-11-21): nothing runs before the in-app consent. With these three
-         off, the SDK's start-up provider only loads its settings (no app event, no advertising ID, no
-         network request). After consent the app turns them on at runtime
-         (features/adMeasurement); the SDK keeps them in its own settings until the consent is withdrawn. -->
+    <!-- Meta SDK (광고 성과 측정, 2026-11-21): nothing of it runs before the in-app consent is checked.
+         Its start-up provider is removed: it initializes the SDK in every process before JavaScript,
+         and from there sends events queued in an earlier run and follows a server-sent auto-logging
+         value over these flags. The SDK starts only from FBSettings.startMeasurement (frontend/patches),
+         called after the consent has been checked in this process (features/adMeasurement). The three
+         flags stay off as a second guard; the SDK keeps runtime changes in its own settings. -->
+    <provider android:name="com.facebook.internal.FacebookInitProvider" android:authorities="${applicationId}.FacebookInitProvider" tools:node="remove"/>
     <meta-data android:name="com.facebook.sdk.ApplicationId" android:value="@string/facebook_app_id"/>
     <meta-data android:name="com.facebook.sdk.ClientToken" android:value="@string/facebook_client_token"/>
     <meta-data android:name="com.facebook.sdk.AutoInitEnabled" android:value="false"/>

@@ -24,7 +24,11 @@ export function useAdMeasurement(): AdMeasurementState {
   return useSyncExternalStore(adMeasurement.subscribe, adMeasurement.getState, adMeasurement.getState);
 }
 
-/** A choice that could not be saved was not applied (a withdrawal still stopped the SDK for now). */
+/**
+ * A choice that could not be saved was not applied (a withdrawal still stopped
+ * the SDK for now); a saved withdrawal the SDK did not confirm is said too.
+ */
 export function alertIfNotSaved(result: DecisionResult) {
   if (result === 'failed') Alert.alert('저장하지 못했습니다', '광고 성과 측정 설정을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  else if (result === 'stopFailed') Alert.alert('측정을 바로 중단하지 못했습니다', '철회는 저장되었습니다. 앱을 다시 실행하면 측정하지 않습니다.');
 }

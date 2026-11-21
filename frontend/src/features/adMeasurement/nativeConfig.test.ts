@@ -46,6 +46,20 @@ describe('Android native settings', () => {
       assert.equal(metaData(`com.facebook.sdk.${name}`), 'false', name);
   });
 
+  it('removes the SDK start-up provider, so no SDK code runs before the consent is checked', () => {
+    // It would initialize the SDK in every process, send events queued in an
+    // earlier run and follow a server-sent auto-logging value over the flags above.
+    assert.equal(manifest.includes(
+      '<provider android:name="com.facebook.internal.FacebookInitProvider" android:authorities="${applicationId}.FacebookInitProvider" tools:node="remove"/>',
+    ), true);
+    assert.equal((manifest.match(/FacebookInitProvider/g) ?? []).length, 2);
+  });
+
+  it('keeps the SDK field the patch reads by name if release minification is turned on', () => {
+    const rules = read('android/app/proguard-rules.pro');
+    assert.equal(/-keepclassmembers class com\.facebook\.appevents\.internal\.ActivityLifecycleTracker \{\s*private static int activityReferences;\s*\}/.test(rules), true);
+  });
+
   it('uses the same Meta app as iOS, and only its public client identifiers', () => {
     assert.equal(string('facebook_app_id'), facebook?.appID);
     assert.equal(string('facebook_client_token'), facebook?.clientToken);
@@ -97,14 +111,36 @@ describe('react-native-fbsdk-next patch', () => {
     assert.equal((JSON.parse(read(`${installed}/package.json`)) as { version: string }).version, version);
   });
 
-  it('is applied: no iOS launch hook, and the Android consent calls exist', () => {
+  it('is applied: no iOS launch hook, and the Android start and stop answer only once done', () => {
     // Without the hook the iOS SDK starts only from Settings.initializeSDK() after consent.
     const expoModule = JSON.parse(read(`${installed}/expo-module.config.json`)) as { platforms: string[]; ios?: unknown };
     assert.deepEqual(expoModule.platforms, []);
     assert.equal(expoModule.ios === undefined, true);
-    const settings = read(`${installed}/android/src/main/java/com/facebook/reactnative/androidsdk/FBSettingsModule.java`);
-    assert.equal(settings.includes('public void setAutoInitEnabled(Boolean enabled) {\n        FacebookSdk.setAutoInitEnabled(enabled);'), true);
-    assert.equal(settings.includes('AppEventsLogger.activateApp((Application) FacebookSdk.getApplicationContext());'), true);
+    const androidsdk = `${installed}/android/src/main/java/com/facebook/reactnative/androidsdk`;
+    const settings = read(`${androidsdk}/FBSettingsModule.java`);
+    for (const method of ['startMeasurement', 'stopMeasurement'])
+      assert.equal(settings.includes(`@ReactMethod\n    public void ${method}(final String consent, final Promise promise) {\n        UiThreadUtil.runOnUiThread(() -> {`), true, method);
+    // Initialized only here, fully before its first request; the launch the tracking missed is replayed.
+    assert.equal(settings.includes('FacebookSdk.setAutoInitEnabled(true);\n        if (!FacebookSdk.isInitialized()) FacebookSdk.sdkInitialize(application);'), true);
+    assert.equal(settings.includes('if (!wasTracking && activity instanceof LifecycleOwner) replayLifecycle(activity);'), true);
+    // A stop sends nothing more from this process and keeps the consent it ended.
+    assert.equal(settings.includes('AppEventsLogger.setFlushBehavior(AppEventsLogger.FlushBehavior.EXPLICIT_ONLY);'), true);
+    assert.equal(settings.includes('return state.edit().putString(STOPPED_CONSENT, consent).commit();'), true);
+    // The earlier fire-and-forget calls that kept the SDK on across launches are gone.
+    assert.equal(/public void (setAutoInitEnabled|activateApp)\(/.test(settings), false);
+    assert.equal(read(`${androidsdk}/FBSDKPackage.java`).includes('new FBSettingsModule(reactContext),'), true);
+  });
+
+  it('the patch file itself carries the Android calls, so a fresh install gets them', () => {
+    const patch = read(`patches/react-native-fbsdk-next+${version}.patch`);
+    for (const line of ['+    public void startMeasurement(final String consent, final Promise promise) {', '+    public void stopMeasurement(final String consent, final Promise promise) {', '+                new FBSettingsModule(reactContext),', '+  "platforms": []'])
+      assert.equal(patch.includes(line), true, line);
+    // Only the library's sources: never its build output.
+    assert.deepEqual(patch.match(/^diff --git a\/node_modules\/react-native-fbsdk-next\/(\S+)/gm)?.map((line) => line.split('react-native-fbsdk-next/')[1]), [
+      'android/src/main/java/com/facebook/reactnative/androidsdk/FBSDKPackage.java',
+      'android/src/main/java/com/facebook/reactnative/androidsdk/FBSettingsModule.java',
+      'expo-module.config.json',
+    ]);
   });
 });
 
@@ -128,5 +164,12 @@ describe('data boundary in the app code', () => {
   it('reaches the Meta SDK and 앱 추적 허용 from one adapter only', () => {
     assert.deepEqual(using(/\bFBSettings\b/), ['src/features/adMeasurement/metaSdk.native.ts']);
     assert.deepEqual(using(/(?:from |import |import\(|require\()['"]expo-tracking-transparency['"]/), ['src/features/adMeasurement/metaSdk.native.ts']);
+  });
+
+  it('starts and stops Android only through the calls that confirm it', () => {
+    const adapter = read('src/features/adMeasurement/metaSdk.native.ts');
+    assert.equal(adapter.includes('android().startMeasurement(consent)'), true);
+    assert.equal(adapter.includes('android().stopMeasurement(consent)'), true);
+    assert.equal(/setAutoInitEnabled|activateApp/.test(adapter), false);
   });
 });

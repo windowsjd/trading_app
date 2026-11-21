@@ -12,3 +12,9 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+
+# 광고 성과 측정 (frontend/patches, FBSettingsModule.countStartedActivity): this Meta SDK field is
+# looked up by name; keep it if release minification is ever turned on.
+-keepclassmembers class com.facebook.appevents.internal.ActivityLifecycleTracker {
+    private static int activityReferences;
+}

@@ -1,45 +1,181 @@
+diff --git a/node_modules/react-native-fbsdk-next/android/src/main/java/com/facebook/reactnative/androidsdk/FBSDKPackage.java b/node_modules/react-native-fbsdk-next/android/src/main/java/com/facebook/reactnative/androidsdk/FBSDKPackage.java
+index 1f7fa73..40bdbce 100644
+--- a/node_modules/react-native-fbsdk-next/android/src/main/java/com/facebook/reactnative/androidsdk/FBSDKPackage.java
++++ b/node_modules/react-native-fbsdk-next/android/src/main/java/com/facebook/reactnative/androidsdk/FBSDKPackage.java
+@@ -44,7 +44,7 @@ public class FBSDKPackage implements ReactPackage {
+                 new FBLoginManagerModule(reactContext, mActivityEventListener),
+                 new FBMessageDialogModule(reactContext, mActivityEventListener),
+                 new FBProfileModule(reactContext),
+-                new FBSettingsModule(),
++                new FBSettingsModule(reactContext),
+                 new FBShareDialogModule(reactContext, mActivityEventListener)
+         );
+     }
 diff --git a/node_modules/react-native-fbsdk-next/android/src/main/java/com/facebook/reactnative/androidsdk/FBSettingsModule.java b/node_modules/react-native-fbsdk-next/android/src/main/java/com/facebook/reactnative/androidsdk/FBSettingsModule.java
-index dc37b2f..ba58545 100644
+index dc37b2f..38adff6 100644
 --- a/node_modules/react-native-fbsdk-next/android/src/main/java/com/facebook/reactnative/androidsdk/FBSettingsModule.java
 +++ b/node_modules/react-native-fbsdk-next/android/src/main/java/com/facebook/reactnative/androidsdk/FBSettingsModule.java
-@@ -8,9 +8,12 @@
+@@ -8,13 +8,27 @@
  
  package com.facebook.reactnative.androidsdk;
  
++import android.app.Activity;
 +import android.app.Application;
++import android.content.Context;
++import android.content.SharedPreferences;
 +
  import androidx.annotation.Nullable;
++import androidx.lifecycle.Lifecycle;
++import androidx.lifecycle.LifecycleOwner;
  
  import com.facebook.FacebookSdk;
 +import com.facebook.appevents.AppEventsLogger;
++import com.facebook.appevents.internal.ActivityLifecycleTracker;
++import com.facebook.appevents.internal.SessionInfo;
  import com.facebook.react.bridge.BaseJavaModule;
++import com.facebook.react.bridge.Promise;
++import com.facebook.react.bridge.ReactApplicationContext;
  import com.facebook.react.bridge.ReactMethod;
  import com.facebook.react.bridge.ReadableArray;
-@@ -55,6 +58,24 @@ public class FBSettingsModule extends BaseJavaModule {
-         FacebookSdk.fullyInitialize();
-     }
++import com.facebook.react.bridge.UiThreadUtil;
+ import com.facebook.react.module.annotations.ReactModule;
++import java.lang.reflect.Field;
+ import java.util.ArrayList;
+ import java.util.List;
  
-+    /**
-+     * Persisted (com.facebook.sdk.AutoInitEnabled): whether the next app start
-+     * fully initializes the SDK. initializeSDK() lasts for this process only.
+@@ -26,7 +40,131 @@ public class FBSettingsModule extends BaseJavaModule {
+ 
+     public static final String NAME = "FBSettings";
+ 
+-    public FBSettingsModule() {}
++    public FBSettingsModule(ReactApplicationContext reactContext) {
++        super(reactContext);
++    }
++
++    /*
++     * Consent-gated measurement (trading-app patch, frontend/docs/meta-ad-measurement.md).
++     * The app removes the SDK's FacebookInitProvider, so nothing of the SDK runs until
++     * startMeasurement: JavaScript calls it only after checking the person's consent in this
++     * process. Both calls resolve on the main thread once every step has run.
 +     */
++
++    /** This module's own record of the last stop (never read by the SDK). */
++    private static final String MEASUREMENT_STATE = "com.facebook.reactnative.androidsdk.Measurement";
++    /**
++     * The consent in effect at the last stop. Present: what the SDK kept from before that stop is
++     * dropped at the next start. Equal to a consent passed to start: that consent was withdrawn.
++     */
++    private static final String STOPPED_CONSENT = "stoppedConsent";
++    /** The SDK's queue of unsent events, which it sends as soon as it is initialized (AppEventDiskStore). */
++    private static final String PERSISTED_EVENTS = "AppEventsLogger.persistedevents";
++    /**
++     * Stopped after running in this process. The SDK can neither stop its activity tracking nor
++     * drop the events it holds in memory, so it starts again only in a new process.
++     */
++    private static boolean stoppedWhileRunning = false;
++
++    /** Resolves "started", "withdrawn" (this consent was withdrawn on this device) or "nextLaunch". */
 +    @ReactMethod
-+    public void setAutoInitEnabled(Boolean enabled) {
-+        FacebookSdk.setAutoInitEnabled(enabled);
++    public void startMeasurement(final String consent, final Promise promise) {
++        UiThreadUtil.runOnUiThread(() -> {
++            try {
++                promise.resolve(start(consent));
++            } catch (Exception e) {
++                promise.reject("E_META_START", e);
++            }
++        });
++    }
++
++    /** Resolves true once the stop is also saved for the next launches, false when it holds for this process only. */
++    @ReactMethod
++    public void stopMeasurement(final String consent, final Promise promise) {
++        UiThreadUtil.runOnUiThread(() -> {
++            try {
++                promise.resolve(stop(consent));
++            } catch (Exception e) {
++                promise.reject("E_META_STOP", e);
++            }
++        });
++    }
++
++    private String start(String consent) {
++        if (consent.isEmpty()) throw new IllegalArgumentException("A consent is required to start.");
++        ReactApplicationContext context = getReactApplicationContext();
++        Application application = (Application) context.getApplicationContext();
++        SharedPreferences state = application.getSharedPreferences(MEASUREMENT_STATE, Context.MODE_PRIVATE);
++        String stopped = state.getString(STOPPED_CONSENT, null);
++        if (consent.equals(stopped)) return "withdrawn";
++        if (stoppedWhileRunning) return "nextLaunch";
++        boolean discard = stopped != null && !FacebookSdk.isInitialized();
++        boolean wasTracking = ActivityLifecycleTracker.isTracking();
++        if (discard) application.getFileStreamPath(PERSISTED_EVENTS).delete();
++        AppEventsLogger.setFlushBehavior(AppEventsLogger.FlushBehavior.AUTO);
++        FacebookSdk.setLimitEventAndDataUsage(application, false);
++        FacebookSdk.setAdvertiserIDCollectionEnabled(true);
++        // Before the first initialization, so the SDK never sends half-initialized (a POST that
++        // fails that way is queued and sent again).
++        FacebookSdk.setAutoInitEnabled(true);
++        if (!FacebookSdk.isInitialized()) FacebookSdk.sdkInitialize(application);
++        if (discard) SessionInfo.clearSavedSessionFromDisk();
++        // Starts the activity tracking.
++        FacebookSdk.setAutoLogAppEventsEnabled(true);
++        // The install, once per install.
++        AppEventsLogger.activateApp(application);
++        Activity activity = context.getCurrentActivity();
++        if (!wasTracking && activity instanceof LifecycleOwner) replayLifecycle(activity);
++        if (stopped != null) state.edit().remove(STOPPED_CONSENT).commit();
++        return "started";
++    }
++
++    private boolean stop(String consent) {
++        Application application = (Application) getReactApplicationContext().getApplicationContext();
++        if (FacebookSdk.isInitialized()) {
++            // First, so nothing queued from here on (the settings change below included) is sent.
++            AppEventsLogger.setFlushBehavior(AppEventsLogger.FlushBehavior.EXPLICIT_ONLY);
++            // Nor passed to the Facebook app on this device (the SDK's on-device processing).
++            FacebookSdk.setLimitEventAndDataUsage(application, true);
++            stoppedWhileRunning = true;
++        }
++        // Read when the ID would be sent, so no advertising ID leaves from now on.
++        FacebookSdk.setAdvertiserIDCollectionEnabled(false);
++        FacebookSdk.setAutoLogAppEventsEnabled(false);
++        FacebookSdk.setAutoInitEnabled(false);
++        SharedPreferences state = application.getSharedPreferences(MEASUREMENT_STATE, Context.MODE_PRIVATE);
++        // A stop without a consent never replaces the withdrawal of one.
++        if (consent.isEmpty() && state.contains(STOPPED_CONSENT)) return true;
++        return state.edit().putString(STOPPED_CONSENT, consent).commit();
 +    }
 +
 +    /**
-+     * Manual activation: publishes the install once per install and starts the
-+     * activity lifecycle tracking (a no-op when automatic logging already started it).
++     * The tracking starts after the activity did: replays what the SDK missed, through the entry
++     * points it keeps public for this ("Public in order to allow unity sdk to correctly log app
++     * events"), so this launch is logged now and the session continues from the saved one.
 +     */
-+    @ReactMethod
-+    public void activateApp() {
-+        AppEventsLogger.activateApp((Application) FacebookSdk.getApplicationContext());
++    private static void replayLifecycle(Activity activity) {
++        Lifecycle.State state = ((LifecycleOwner) activity).getLifecycle().getCurrentState();
++        if (!state.isAtLeast(Lifecycle.State.CREATED)) return;
++        if (state.isAtLeast(Lifecycle.State.STARTED)) countStartedActivity();
++        ActivityLifecycleTracker.onActivityCreated(activity);
++        if (state.isAtLeast(Lifecycle.State.RESUMED)) ActivityLifecycleTracker.onActivityResumed(activity);
 +    }
 +
-     /**
-      * Set app id
-      * @param appID app id
++    /**
++     * The SDK counts started activities in its onActivityStarted callback, which this activity
++     * passed before the tracking began; one short, every event of this process would carry the
++     * opposite in-background flag. No public setter: SDK 18.3.0's private field.
++     */
++    private static void countStartedActivity() {
++        try {
++            Field references = ActivityLifecycleTracker.class.getDeclaredField("activityReferences");
++            references.setAccessible(true);
++            references.setInt(null, references.getInt(null) + 1);
++        } catch (Exception ignored) {
++            // Measurement goes on; only that flag can be off for this process.
++        }
++    }
+ 
+     @Override
+     public String getName() {
 diff --git a/node_modules/react-native-fbsdk-next/expo-module.config.json b/node_modules/react-native-fbsdk-next/expo-module.config.json
 index ee0e803..7864896 100644
 --- a/node_modules/react-native-fbsdk-next/expo-module.config.json

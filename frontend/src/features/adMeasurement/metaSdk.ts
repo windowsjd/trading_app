@@ -8,6 +8,7 @@ const unsupported = () => Promise.reject(new Error('Meta measurement needs an iO
 
 export const metaSdk: MetaMeasurementSdk = {
   available: () => false,
+  keepsWithdrawals: false,
   getTracking: () => Promise.resolve(null),
   requestTracking: () => Promise.resolve(null),
   start: unsupported,

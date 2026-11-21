@@ -23,9 +23,11 @@ export type ConsentRecord = {
   version: string;
   decidedAt: string;
   /**
-   * Whether the Meta SDK may still be switched on natively. Set before the SDK
-   * is started and cleared only after it has been stopped, so a stop that never
-   * completed (the app closed in between) is repeated on the next launch.
+   * Whether the Meta SDK may have run since its last confirmed stop. Set before
+   * the SDK is started and cleared only once the SDK confirms a stop that holds
+   * for the next launches, so a stop that never completed (the app closed in
+   * between, or the SDK failed) is repeated on the next launch. It never lets
+   * the SDK run: only the choice does.
    */
   sdkOn: boolean;
 };

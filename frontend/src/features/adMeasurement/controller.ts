@@ -18,22 +18,45 @@ import {
  * withdrawn. Pure: the SDK, the storage and the clock are passed in, so
  * node --test drives every path (controller.test.ts).
  *
- * Fails closed: a choice that cannot be read starts nothing (and stops a
- * measurement left on), a choice that cannot be saved is not acted on (a
- * withdrawal still stops the SDK for this session), and an SDK that throws is
- * treated as off. None of it ever blocks the rest of the app.
+ * The stored choice is the only thing that lets the SDK run: it never starts
+ * by itself (no start-up provider on Android, no launch hook on iOS —
+ * docs/meta-ad-measurement.md), so every launch begins with it off until the
+ * choice read here allows it. Only a start the SDK confirmed counts as
+ * running, and only a confirmed stop as stopped.
+ *
+ * Fails closed: a choice that cannot be read starts nothing, a choice that
+ * cannot be saved is not acted on (a withdrawal still stops the SDK, and
+ * Android keeps it), an SDK that fails to start counts as off and one that
+ * fails to stop as possibly on. None of it ever blocks the rest of the app.
  */
+export type StartResult = 'started' | 'nextLaunch' | 'withdrawn';
+
 export type MetaMeasurementSdk = {
   /** False when this build has no Meta SDK (web, Expo Go, an older binary). */
   available: () => boolean;
+  /**
+   * Android: a confirmed stop also keeps its consent as withdrawn on the
+   * device, and start() answers 'withdrawn' for it from then on, so a
+   * withdrawal holds even when the app could not save it.
+   */
+  keepsWithdrawals: boolean;
   /** iOS: the current 앱 추적 허용 state; null elsewhere. */
   getTracking: () => Promise<Tracking>;
   /** iOS: shows the system prompt (only while undecided). */
   requestTracking: () => Promise<Tracking>;
-  /** Turns the measurement on. Idempotent. */
-  start: () => Promise<void>;
-  /** Turns it off, here and for the next launches. Idempotent. */
-  stop: () => Promise<void>;
+  /**
+   * Starts measuring in this app session for the consent decided at `consent`
+   * and resolves once the SDK has: 'started'; 'nextLaunch' when this session
+   * stopped it earlier (Android starts it again only in a new process);
+   * 'withdrawn' when that consent was withdrawn on this device. Idempotent.
+   */
+  start: (consent: string) => Promise<StartResult>;
+  /**
+   * Stops it and resolves once the SDK has: true when the stop also holds for
+   * the next launches without being repeated, false when only for this
+   * session. Rejects when the SDK may still run. Idempotent.
+   */
+  stop: (consent: string) => Promise<boolean>;
 };
 
 export type AdMeasurementDeps = {
@@ -54,19 +77,22 @@ export type AdMeasurementState = {
   supported: boolean;
   choice: ConsentChoice | null;
   tracking: Tracking;
-  /** The Meta SDK runs in this app session. */
+  /** The Meta SDK runs in this app session (as it last confirmed). */
   active: boolean;
+  /** Allowed, but this session stopped the SDK earlier: it starts on the next launch (Android). */
+  deferred: boolean;
   prompt: ConsentPrompt;
   /** A decision is being applied (the iOS system prompt may be up). */
   busy: boolean;
 };
 
-export type DecisionResult = 'saved' | 'failed';
+/** `stopFailed`: a withdrawal was saved, but the SDK did not confirm it stopped in this session. */
+export type DecisionResult = 'saved' | 'failed' | 'stopFailed';
 
 export function createAdMeasurement(deps: AdMeasurementDeps) {
   const supported = deps.platform !== 'unsupported' && isAvailable(deps.sdk);
   let state: AdMeasurementState = {
-    ready: !supported, supported, choice: null, tracking: null, active: false, prompt: 'none', busy: false,
+    ready: !supported, supported, choice: null, tracking: null, active: false, deferred: false, prompt: 'none', busy: false,
   };
   let record: ConsentRecord | null = null;
   let initialized = false;
@@ -104,15 +130,20 @@ export function createAdMeasurement(deps: AdMeasurementDeps) {
     }
   }
 
-  async function stop(): Promise<void> {
+  /** The SDK's own stop: whether it holds for the next launches, or null when the SDK may still run. */
+  async function stopSdk(): Promise<boolean | null> {
     try {
-      await deps.sdk.stop();
+      const kept = await deps.sdk.stop(record?.decidedAt ?? '');
+      set({ active: false, deferred: false });
+      return kept;
     } catch {
-      // Still marked as on: the next launch stops it again.
-      return;
+      return null;
     }
-    set({ active: false });
-    if (record?.sdkOn) await save({ ...record, sdkOn: false });
+  }
+
+  async function stop(): Promise<void> {
+    // Cleared only once the stop holds without being repeated; until then every launch stops it again.
+    if ((await stopSdk()) && record?.sdkOn) await save({ ...record, sdkOn: false });
   }
 
   /** Brings the SDK in line with the saved choice and the system permission. */
@@ -125,12 +156,22 @@ export function createAdMeasurement(deps: AdMeasurementDeps) {
     if (state.active) return;
     // Marked before the start: one cut short is redone or undone next launch.
     if (!record.sdkOn && !(await save({ ...record, sdkOn: true }))) return;
+    let result: StartResult;
     try {
-      await deps.sdk.start();
-      set({ active: true });
+      result = await deps.sdk.start(record.decidedAt);
     } catch {
       set({ active: false });
+      return;
     }
+    if (result === 'started') set({ active: true, deferred: false });
+    else if (result === 'nextLaunch') set({ active: false, deferred: true });
+    else await withdrawn(record);
+  }
+
+  /** The SDK kept this consent as withdrawn (a withdrawal the app could not save): 동의하지 않음. */
+  async function withdrawn(granted: ConsentRecord): Promise<void> {
+    set({ choice: 'declined', active: false, deferred: false });
+    await save({ choice: 'declined', version: AD_MEASUREMENT_CONSENT_VERSION, decidedAt: deps.now().toISOString(), sdkOn: granted.sdkOn });
   }
 
   /** Once per app session. */
@@ -142,8 +183,9 @@ export function createAdMeasurement(deps: AdMeasurementDeps) {
       try {
         raw = await deps.readRecord();
       } catch {
-        // Unknown choice: no measurement and no question this session.
-        try { await deps.sdk.stop(); } catch { /* nothing more to do */ }
+        // Unknown choice: no measurement and no question this session. The
+        // SDK has not started; the stop also drops what it kept from before.
+        await stopSdk();
         set({ ready: true });
         return;
       }
@@ -159,10 +201,11 @@ export function createAdMeasurement(deps: AdMeasurementDeps) {
    * Agreeing on iOS asks the system once, while it has not decided yet.
    */
   function answer(choice: ConsentChoice): Promise<DecisionResult> {
-    return serial(async () => {
-      if (!supported || !state.ready) return 'failed' as const;
+    return serial(async (): Promise<DecisionResult> => {
+      if (!supported || !state.ready) return 'failed';
       set({ busy: true });
       try {
+        if (choice === 'declined' && record && currentChoice(record) === 'granted') return await withdraw(record);
         if (choice === 'granted' && shouldRequestTracking(deps.platform, state.tracking)) {
           let tracking: Tracking;
           try {
@@ -181,11 +224,32 @@ export function createAdMeasurement(deps: AdMeasurementDeps) {
         set({ prompt: 'none', ...(saved ? { choice } : {}) });
         if (saved) await apply();
         else if (choice === 'declined' && (state.active || record?.sdkOn)) await stop();
-        return saved ? ('saved' as const) : ('failed' as const);
+        return saved ? 'saved' : 'failed';
       } finally {
         set({ busy: false });
       }
     });
+  }
+
+  /**
+   * Withdrawing the consent in effect. The SDK stops first, so an app closed
+   * while the choice is saved does not measure again either: Android keeps the
+   * withdrawal itself, and that alone holds when the save fails.
+   */
+  async function withdraw(granted: ConsentRecord): Promise<DecisionResult> {
+    const kept = await stopSdk();
+    const saved = await save({
+      choice: 'declined',
+      version: AD_MEASUREMENT_CONSENT_VERSION,
+      decidedAt: deps.now().toISOString(),
+      // Still marked when the stop must be repeated on the next launch.
+      sdkOn: kept ? false : granted.sdkOn,
+    });
+    const keptNatively = kept === true && deps.sdk.keepsWithdrawals;
+    set({ prompt: 'none', ...(saved || keptNatively ? { choice: 'declined' as const } : {}) });
+    if (!saved) return keptNatively ? 'saved' : 'failed';
+    // A failed stop leaves `active` as it was: only a running SDK is reported.
+    return kept === null && state.active ? 'stopFailed' : 'saved';
   }
 
   /** 설정 › 광고 성과 측정 turned on: the notice comes first, then the answer. */

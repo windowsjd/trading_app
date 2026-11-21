@@ -16,10 +16,10 @@ const { load } = require('../../../test/ledgerTestHarness.cjs');
  * turning it off withdraws at once, and on iOS a consent without 앱 추적 허용
  * says that nothing is measured. Small values only in assertions.
  */
-const base: AdMeasurementState = { ready: true, supported: true, choice: null, tracking: null, active: false, prompt: 'none', busy: false };
+const base: AdMeasurementState = { ready: true, supported: true, choice: null, tracking: null, active: false, deferred: false, prompt: 'none', busy: false };
 
 function section(state: Partial<AdMeasurementState> = {}, platform = 'android') {
-  const h = { calls: [] as string[], openedSettings: 0, alerts: 0, result: 'saved' };
+  const h = { calls: [] as string[], openedSettings: 0, alerts: 0, results: [] as string[], result: 'saved' };
   const module = load(resolve('src/features/adMeasurement/AdMeasurementSettingsSection.tsx'), {
     'react-native': {
       View: 'View', Text: 'Text', Switch: 'Switch', Platform: { OS: platform },
@@ -32,7 +32,7 @@ function section(state: Partial<AdMeasurementState> = {}, platform = 'android') 
         answer: async (choice: string) => { h.calls.push(`answer:${choice}`); return h.result; },
       },
       useAdMeasurement: () => ({ ...base, ...state }),
-      alertIfNotSaved: (result: string) => { if (result === 'failed') h.alerts += 1; },
+      alertIfNotSaved: (result: string) => { h.results.push(result); if (result === 'failed') h.alerts += 1; },
     },
   });
   let renderer: any;
@@ -125,5 +125,25 @@ describe('설정 › 광고 성과 측정', () => {
     assert.equal(s.status({ ...base, choice: 'granted', active: false }, 'android'), '동의함 · 측정을 시작하지 못했습니다. 앱을 다시 실행하면 다시 시도합니다.');
     assert.equal(s.status({ ...base, ready: false }, 'android'), '확인 중입니다.');
     s.unmount();
+  });
+
+  it('says when a consent given again in this session measures from the next launch', () => {
+    const s = section({ choice: 'granted', deferred: true });
+    assert.equal(s.toggle().props.value, true);
+    assert.equal(s.statusLine(), '동의함 · 앱을 다시 실행하면 측정을 시작합니다.');
+    s.unmount();
+  });
+
+  it('never says nothing is sent while a withdrawn measurement has not confirmed its stop', async () => {
+    const s = section({ choice: 'declined', active: true });
+    assert.equal(s.toggle().props.value, false);
+    assert.equal(s.statusLine(), '동의하지 않음 · 측정을 바로 중단하지 못했습니다. 앱을 다시 실행하면 측정하지 않습니다.');
+    s.unmount();
+
+    const withdrawing = section({ choice: 'granted', active: true });
+    withdrawing.h.result = 'stopFailed';
+    await act(async () => { withdrawing.toggle().props.onValueChange(false); });
+    assert.deepEqual(withdrawing.h.results, ['stopFailed']);
+    withdrawing.unmount();
   });
 });

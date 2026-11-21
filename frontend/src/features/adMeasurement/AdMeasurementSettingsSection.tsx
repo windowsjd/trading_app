@@ -10,13 +10,18 @@ import type { AdMeasurementState } from './controller';
 /** The line under the switch: what is (and is not) sent right now. */
 export function adMeasurementStatus(state: AdMeasurementState, platform: 'ios' | 'android'): string {
   if (!state.ready) return '확인 중입니다.';
-  if (state.choice !== 'granted') return '동의하지 않음 · Meta에 아무 정보도 보내지 않습니다.';
+  if (state.choice !== 'granted')
+    return state.active
+      ? '동의하지 않음 · 측정을 바로 중단하지 못했습니다. 앱을 다시 실행하면 측정하지 않습니다.'
+      : '동의하지 않음 · Meta에 아무 정보도 보내지 않습니다.';
   if (platform === 'ios' && state.tracking?.status !== 'granted')
     return state.tracking?.status === 'undetermined'
       ? '동의함 · iOS 앱 추적 허용을 아직 선택하지 않아 측정하지 않습니다.'
       : '동의함 · iOS에서 앱 추적을 허용하지 않아 측정하지 않습니다. 허용하려면 iOS 설정을 여세요.';
   if (!state.active && measurementAllowed(platform, state.choice, state.tracking))
-    return '동의함 · 측정을 시작하지 못했습니다. 앱을 다시 실행하면 다시 시도합니다.';
+    return state.deferred
+      ? '동의함 · 앱을 다시 실행하면 측정을 시작합니다.'
+      : '동의함 · 측정을 시작하지 못했습니다. 앱을 다시 실행하면 다시 시도합니다.';
   return '동의함 · 앱 설치·실행 정보를 Meta에 보냅니다.';
 }
 
